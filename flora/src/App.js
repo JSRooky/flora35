@@ -1,20 +1,31 @@
-import { useState } from "react";
-import MapView from "./components/MapView";
-import { checkServer } from "./api/status";
+import React, { useEffect, useRef, useState } from "react";
+import { initMap } from "./components/initMap";
+import { addLocationsLayer } from "./components/addLocationsLayer";
+import { FeaturePopup } from "./components/FeaturePopup";
+import "./MapView.css";
 
-export default function App() {
-  const [status, setStatus] = useState(null);
+export default function MapView() {
+  const ref = useRef(null);
+  const map = useRef(null);
 
-  async function testConnection() {
-    const data = await checkServer();
-    setStatus(JSON.stringify(data));
-  }
+  const [popupData, setPopupData] = useState(null);
+
+  useEffect(() => {
+    if (!map.current && ref.current) {
+      map.current = initMap(ref.current);
+
+      map.current.on("load", () => {
+        addLocationsLayer(map.current);
+        FeaturePopup(map.current, setPopupData);
+      });
+    }
+  }, []);
 
   return (
     <>
-      <button onClick={testConnection}>Проверить сервер</button>
-      <div>{status}</div>
-      <MapView />
+      <div ref={ref} className="map-container" />
+
+
     </>
   );
 }

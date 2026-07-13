@@ -1,0 +1,385 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Rosaceae",
+        "name_ru": "Шиповник майский",
+        "name_latin": "Rosa majalis",
+        "found_by": "Кузнецов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [40.9123, 59.2211] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Asteraceae",
+        "name_ru": "Одуванчик лекарственный",
+        "name_latin": "Taraxacum officinale",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [41.1029, 59.5124] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Mustelidae",
+        "name_ru": "Обыкновенная ласка",
+        "name_latin": "Mustela nivalis",
+        "found_by": "Сидоров",
+        "identified_by": "Орлов"
+      },
+      "geometry": { "type": "Point", "coordinates": [39.8842, 59.7321] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Betulaceae",
+        "name_ru": "Берёза повислая",
+        "name_latin": "Betula pendula",
+        "found_by": "Кузнецов",
+        "identified_by": "Орлова"
+      },
+      "geometry": { "type": "Point", "coordinates": [40.2214, 59.8455] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Cervidae",
+        "name_ru": "Европейская косуля",
+        "name_latin": "Capreolus capreolus",
+        "found_by": "Павлов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [41.5521, 59.1123] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Ericaceae",
+        "name_ru": "Черника",
+        "name_latin": "Vaccinium myrtillus",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [42.1123, 59.3321] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Canidae",
+        "name_ru": "Лисица обыкновенная",
+        "name_latin": "Vulpes vulpes",
+        "found_by": "Сидоров",
+        "identified_by": "Орлов"
+      },
+      "geometry": { "type": "Point", "coordinates": [42.5522, 59.7422] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Pinaceae",
+        "name_ru": "Сосна обыкновенная",
+        "name_latin": "Pinus sylvestris",
+        "found_by": "Павлов",
+        "identified_by": "Орлова"
+      },
+      "geometry": { "type": "Point", "coordinates": [43.1121, 59.9123] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Sciuridae",
+        "name_ru": "Белка обыкновенная",
+        "name_latin": "Sciurus vulgaris",
+        "found_by": "Кузнецов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [43.5523, 59.2212] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Salicaceae",
+        "name_ru": "Ива белая",
+        "name_latin": "Salix alba",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [44.1124, 59.5121] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Poaceae",
+        "name_ru": "Мятлик луговой",
+        "name_latin": "Poa pratensis",
+        "found_by": "Сидоров",
+        "identified_by": "Орлов"
+      },
+      "geometry": { "type": "Point", "coordinates": [44.5521, 59.7424] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Accipitridae",
+        "name_ru": "Орел-мохноногий",
+        "name_latin": "Aquila chrysaetos",
+        "found_by": "Павлов",
+        "identified_by": "Орлова"
+      },
+      "geometry": { "type": "Point", "coordinates": [45.0123, 59.9121] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Ranunculaceae",
+        "name_ru": "Лютик едкий",
+        "name_latin": "Ranunculus acris",
+        "found_by": "Кузнецов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [40.3321, 58.9123] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Corvidae",
+        "name_ru": "Ворона серая",
+        "name_latin": "Corvus cornix",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [41.1123, 58.7422] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Fabaceae",
+        "name_ru": "Клевер луговой",
+        "name_latin": "Trifolium pratense",
+        "found_by": "Сидоров",
+        "identified_by": "Орлов"
+      },
+      "geometry": { "type": "Point", "coordinates": [41.5524, 58.5123] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Leporidae",
+        "name_ru": "Заяц-беляк",
+        "name_latin": "Lepus timidus",
+        "found_by": "Павлов",
+        "identified_by": "Орлова"
+      },
+      "geometry": { "type": "Point", "coordinates": [42.1122, 58.3321] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Polygonaceae",
+        "name_ru": "Гречиха посевная",
+        "name_latin": "Fagopyrum esculentum",
+        "found_by": "Кузнецов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [42.5523, 58.1124] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Strigidae",
+        "name_ru": "Филин",
+        "name_latin": "Bubo bubo",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [43.1124, 58.9122] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Brassicaceae",
+        "name_ru": "Сурепка обыкновенная",
+        "name_latin": "Barbarea vulgaris",
+        "found_by": "Сидоров",
+        "identified_by": "Орлов"
+      },
+      "geometry": { "type": "Point", "coordinates": [43.5521, 58.7423] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Muridae",
+        "name_ru": "Полевка обыкновенная",
+        "name_latin": "Microtus arvalis",
+        "found_by": "Павлов",
+        "identified_by": "Орлова"
+      },
+      "geometry": { "type": "Point", "coordinates": [44.1122, 58.5124] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Apiaceae",
+        "name_ru": "Борщевик сибирский",
+        "name_latin": "Heracleum sibiricum",
+        "found_by": "Кузнецов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [44.5523, 58.3322] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Anatidae",
+        "name_ru": "Кряква",
+        "name_latin": "Anas platyrhynchos",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [45.0122, 58.1123] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Violaceae",
+        "name_ru": "Фиалка трёхцветная",
+        "name_latin": "Viola tricolor",
+        "found_by": "Сидоров",
+        "identified_by": "Орлов"
+      },
+      "geometry": { "type": "Point", "coordinates": [40.5523, 60.1124] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Picidae",
+        "name_ru": "Большой пёстрый дятел",
+        "name_latin": "Dendrocopos major",
+        "found_by": "Павлов",
+        "identified_by": "Орлова"
+      },
+      "geometry": { "type": "Point", "coordinates": [41.1124, 60.3321] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Caryophyllaceae",
+        "name_ru": "Гвоздика полевая",
+        "name_latin": "Dianthus deltoides",
+        "found_by": "Кузнецов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [41.5522, 60.5523] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Felidae",
+        "name_ru": "Рысь",
+        "name_latin": "Lynx lynx",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [42.1123, 60.7421] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Lamiaceae",
+        "name_ru": "Мята луговая",
+        "name_latin": "Mentha arvensis",
+        "found_by": "Сидоров",
+        "identified_by": "Орлов"
+      },
+      "geometry": { "type": "Point", "coordinates": [42.5521, 60.9122] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Hirundinidae",
+        "name_ru": "Деревенская ласточка",
+        "name_latin": "Hirundo rustica",
+        "found_by": "Павлов",
+        "identified_by": "Орлова"
+      },
+      "geometry": { "type": "Point", "coordinates": [43.1122, 60.3324] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "plantae",
+        "family": "Ulmaceae",
+        "name_ru": "Вяз шершавый",
+        "name_latin": "Ulmus glabra",
+        "found_by": "Кузнецов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [43.5524, 60.5521] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "animalia",
+        "family": "Fringillidae",
+        "name_ru": "Зяблик",
+        "name_latin": "Fringilla coelebs",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [44.1123, 60.7423] }
+    }
+  ]
+}
