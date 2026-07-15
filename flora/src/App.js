@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { initMap } from "./components/initMap";
 import { addLocationsLayer } from "./components/addLocationsLayer";
-import { FeaturePopup } from "./components/FeaturePopup";
+import FeaturePopup from "./components/FeaturePopup";
 import "./MapView.css";
 
 export default function MapView() {
@@ -16,7 +16,21 @@ export default function MapView() {
 
       map.current.on("load", () => {
         addLocationsLayer(map.current);
-        FeaturePopup(map.current, setPopupData);
+
+        map.current.on("click", "unclustered-point", (e) => {
+          const feature = e.features?.[0];
+          if (feature) {
+            setPopupData(feature);
+          }
+        });
+
+        map.current.on("mouseenter", "unclustered-point", () => {
+          map.current.getCanvas().style.cursor = "pointer";
+        });
+
+        map.current.on("mouseleave", "unclustered-point", () => {
+          map.current.getCanvas().style.cursor = "";
+        });
       });
     }
   }, []);
@@ -24,8 +38,12 @@ export default function MapView() {
   return (
     <>
       <div ref={ref} className="map-container" />
-
-
+      {popupData && (
+        <FeaturePopup
+          feature={popupData}
+          onClose={() => setPopupData(null)}
+        />
+      )}
     </>
   );
 }
