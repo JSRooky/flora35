@@ -40,3 +40,18 @@
   font-size: 12px;
   background: transparent;
 }
+
+.popup-images-btn {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.popup-images-btn:hover {
+  background: #3a78c2;
+}

@@ -3,6 +3,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN;
 
+
 export function initMap(container) {
   return new mapboxgl.Map({
     container,
