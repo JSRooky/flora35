@@ -33,6 +33,13 @@ export default function MapView() {
         });
       });
     }
+
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+    };
   }, []);
 
   return (

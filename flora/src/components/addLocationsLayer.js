@@ -1,10 +1,37 @@
-import points from "../locations/points.geojson";
+import points from "../locations/points.json";
+
+const PLANT_IMAGE = "/images/plant.svg";
+const ANIMAL_IMAGE = "/images/animal.svg";
+
+function enrichWithImages(data) {
+  if (!data?.features) {
+    return data;
+  }
+
+  return {
+    ...data,
+    features: data.features.map((feature) => {
+      const image =
+        feature.properties.regnum === "animalia" ? ANIMAL_IMAGE : PLANT_IMAGE;
+
+      return {
+        ...feature,
+        properties: {
+          ...feature.properties,
+          image
+        }
+      };
+    })
+  };
+}
 
 export function addLocationsLayer(map) {
+  const data = enrichWithImages(points);
+
   // Источник с кластеризацией
   map.addSource("locations", {
     type: "geojson",
-    data: points,
+    data,
     cluster: true,
     clusterMaxZoom: 14,
     clusterRadius: 50
