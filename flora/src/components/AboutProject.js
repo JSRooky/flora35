@@ -4,14 +4,10 @@ import { renderMarkdown } from "../docs/renderMarkdown";
 import "../styles/AboutProject.css";
 
 function resolveMarkdownUrl(source) {
-  if (source.startsWith("http://") || source.startsWith("https://")) {
-    return source;
-  }
-
-  const publicUrl = process.env.PUBLIC_URL || "";
-  const normalizedPath = source.startsWith("/") ? source : `/${source}`;
-
-  return `${publicUrl}${normalizedPath}`;
+  // Webpack's asset import already resolves `source` to a fully-qualified
+  // public URL (including PUBLIC_URL/homepage, e.g. "/flora35/static/media/...").
+  // Prepending PUBLIC_URL again would double it up and 404, so just use it as-is.
+  return source;
 }
 
 export default function AboutProject() {
@@ -88,7 +84,7 @@ export default function AboutProject() {
             </div>
 
             <div className="about-project-dialog-content">
-              {loading ? <p>Загрузка...</p> : renderMarkdown(content)}
+              {loading || !content ? <p>Загрузка...</p> : renderMarkdown(content)}
             </div>
           </div>
         </div>
