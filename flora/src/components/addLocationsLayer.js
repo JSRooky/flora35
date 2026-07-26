@@ -337,7 +337,17 @@ export function filterFeatures(features, filters = {}) {
   }
 
   return features.filter((feature) =>
-    filterEntries.every(([key, value]) => feature.properties[key] === value)
+    filterEntries.every(([key, value]) => {
+      if (Array.isArray(value)) {
+        if (value.length === 0) {
+          return true;
+        }
+
+        return value.includes(feature.properties[key]);
+      }
+
+      return feature.properties[key] === value;
+    })
   );
 }
 

@@ -19,6 +19,7 @@ export default function FeaturePopup({
   onClusterByRegnumChange
 }) {
   const [showImages, setShowImages] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   if (!feature) return null;
 
@@ -26,8 +27,11 @@ export default function FeaturePopup({
   const [lng, lat] = geometry.coordinates;
   const images = properties ? getImages(properties) : [];
   const displayProperties = properties
-    ? Object.entries(properties).filter(([key]) => !INTERNAL_PROPERTIES.has(key))
+    ? Object.entries(properties).filter(
+        ([key]) => !INTERNAL_PROPERTIES.has(key) && key !== "status"
+      )
     : [];
+  const collapsedSummary = properties?.name_ru || properties?.name_latin || "Точка данных";
 
   const handleClose = () => {
     setShowImages(false);
@@ -36,14 +40,29 @@ export default function FeaturePopup({
 
   return (
     <>
-      <div className="feature-popup">
-        <button className="popup-close" onClick={handleClose}>
-          ×
-        </button>
+      <div className={`feature-popup ${collapsed ? "feature-popup--collapsed" : ""}`}>
+        <div className="feature-popup-header">
+          <h3 className="feature-popup-title">Сведения о точке данных</h3>
+          <div className="feature-popup-actions">
+            <button
+              type="button"
+              className="popup-panel-toggle"
+              onClick={() => setCollapsed((value) => !value)}
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? "Развернуть сведения о точке" : "Свернуть сведения о точке"}
+            >
+              {collapsed ? "▾" : "▴"}
+            </button>
+            <button className="popup-close" onClick={handleClose} aria-label="Закрыть">
+              ×
+            </button>
+          </div>
+        </div>
 
-        <div className="popup-content">
-          <h3>Сведения о точке данных</h3>
-
+        {collapsed ? (
+          <p className="popup-collapsed-summary">{collapsedSummary}</p>
+        ) : (
+          <div className="popup-content">
           <div className="popup-item">
             <strong>Широта:</strong>
             <span>{lat.toFixed(4)}</span>
@@ -76,6 +95,15 @@ export default function FeaturePopup({
                 </div>
               ))}
 
+              {properties?.status && (
+                <div className="popup-item">
+                  <div className="popup-item-text">
+                    <strong>status:</strong>
+                    <span>{properties.status}</span>
+                  </div>
+                </div>
+              )}
+
               <hr />
               <h4>Кластеризация</h4>
 
@@ -99,7 +127,8 @@ export default function FeaturePopup({
               )}
             </>
           )}
-        </div>
+          </div>
+        )}
       </div>
 
       {showImages && (

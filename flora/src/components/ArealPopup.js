@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import "../styles/ArealPopup.css";
 
 const RADIUS_MIN = 0.5;
@@ -8,22 +8,52 @@ function getRangeProgress(value) {
   return ((value - RADIUS_MIN) / (RADIUS_MAX - RADIUS_MIN)) * 100;
 }
 
-export default function ArealPopup({  enabled,
+function getCollapsedSummary(enabled, allMarkers, radius) {
+  if (allMarkers) {
+    return `Ко всем маркерам, ${radius} км`;
+  }
+
+  if (enabled) {
+    return `Ареал: ${radius} км`;
+  }
+
+  return "Ареал выключен";
+}
+
+export default function ArealPopup({
+  enabled,
   allMarkers,
   radius,
   onEnabledChange,
   onAllMarkersChange,
   onRadiusChange
 }) {
+  const [collapsed, setCollapsed] = useState(false);
   const isActive = enabled || allMarkers;
 
   return (
-    <div className="areal-popup">
-      <div className="areal-popup-content">
-        <h3>Ареал</h3>
+    <div className={`areal-popup ${collapsed ? "areal-popup--collapsed" : ""}`}>
+      <div className="areal-popup-header">
+        <h3 className="areal-popup-title">Ареал</h3>
+        <button
+          type="button"
+          className="popup-panel-toggle"
+          onClick={() => setCollapsed((value) => !value)}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Развернуть настройки ареала" : "Свернуть настройки ареала"}
+        >
+          {collapsed ? "▾" : "▴"}
+        </button>
+      </div>
 
-        <label className={`areal-switch ${allMarkers ? "areal-switch--disabled" : ""}`}>
-          <input
+      {collapsed ? (
+        <p className="popup-collapsed-summary">
+          {getCollapsedSummary(enabled, allMarkers, radius)}
+        </p>
+      ) : (
+        <div className="areal-popup-content">
+          <label className={`areal-switch ${allMarkers ? "areal-switch--disabled" : ""}`}>
+            <input
             type="checkbox"
             checked={enabled}
             disabled={allMarkers}
@@ -57,8 +87,10 @@ export default function ArealPopup({  enabled,
             disabled={!isActive}
             style={{ "--range-progress": `${getRangeProgress(radius)}%` }}
             onChange={(e) => onRadiusChange(Number(e.target.value))}
-          />        </div>
-      </div>
+          />
+        </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
 } from "./components/addArealLayer";
 import FeaturePopup from "./components/FeaturePopup";
 import ArealPopup from "./components/ArealPopup";
+import StatusFilterPanel from "./components/StatusFilterPanel";
 import "./MapView.css";
 
 export default function MapView() {
@@ -21,6 +22,7 @@ export default function MapView() {
 
   const [popupData, setPopupData] = useState(null);
   const [propertyFilters, setPropertyFilters] = useState({});
+  const [statusFilters, setStatusFilters] = useState([]);
   const [clusterByRegnum, setClusterByRegnumState] = useState(true);
   const [arealEnabled, setArealEnabled] = useState(false);
   const [arealAllMarkers, setArealAllMarkers] = useState(false);
@@ -32,7 +34,8 @@ export default function MapView() {
     arealEnabled,
     arealAllMarkers,
     arealRadius,
-    propertyFilters
+    propertyFilters,
+    statusFilters
   };
 
   const expandedLeavesRef = useRef(null);
@@ -44,11 +47,17 @@ export default function MapView() {
       arealEnabled: enabled,
       arealAllMarkers: allMarkers,
       arealRadius: radiusKm,
-      propertyFilters: filters
+      propertyFilters: filters,
+      statusFilters: selectedStatuses
     } = arealStateRef.current;
 
     if (!mapInstance || !feature) {
       return;
+    }
+
+    const combinedFilters = { ...filters };
+    if (selectedStatuses.length > 0) {
+      combinedFilters.status = selectedStatuses;
     }
 
     refreshArealDisplay(mapInstance, {
@@ -56,7 +65,7 @@ export default function MapView() {
       enabled,
       feature,
       radiusKm,
-      filters,
+      filters: combinedFilters,
       expandedLeaves: expandedLeavesRef.current
     });
 
@@ -83,13 +92,23 @@ export default function MapView() {
     });
   }, []);
 
+  const buildLocationFilters = useCallback(() => {
+    const filters = { ...propertyFilters };
+
+    if (statusFilters.length > 0) {
+      filters.status = statusFilters;
+    }
+
+    return filters;
+  }, [propertyFilters, statusFilters]);
+
   useEffect(() => {
     if (!map.current) {
       return;
     }
 
-    applyLocationsFilter(map.current, propertyFilters);
-  }, [propertyFilters]);
+    applyLocationsFilter(map.current, buildLocationFilters());
+  }, [buildLocationFilters]);
 
   useEffect(() => {
     if (!map.current) {
@@ -101,7 +120,7 @@ export default function MapView() {
 
   useEffect(() => {
     refreshAreal();
-  }, [popupData, arealEnabled, arealAllMarkers, arealRadius, propertyFilters, refreshAreal]);
+  }, [popupData, arealEnabled, arealAllMarkers, arealRadius, propertyFilters, statusFilters, refreshAreal]);
 
   useEffect(() => {
     const mapInstance = map.current;
@@ -157,6 +176,16 @@ export default function MapView() {
     });
   };
 
+  const handleStatusFilterChange = (status, enabled) => {
+    setStatusFilters((prev) => {
+      if (enabled) {
+        return prev.includes(status) ? prev : [...prev, status];
+      }
+
+      return prev.filter((value) => value !== status);
+    });
+  };
+
   useEffect(() => {
     if (!map.current && ref.current) {
       map.current = initMap(ref.current);
@@ -191,6 +220,10 @@ export default function MapView() {
   return (
     <>
       <div ref={ref} className="map-container" />
+      <StatusFilterPanel
+        activeStatusFilters={statusFilters}
+        onStatusFilterChange={handleStatusFilterChange}
+      />
       {popupData && (
         <div className="popup-stack">
           <FeaturePopup
