@@ -19,7 +19,8 @@ export default function FeaturePopup({
   activeFilters = {},
   onFilterChange,
   activeStatusFilters = [],
-  onStatusFilterChange
+  onStatusFilterChange,
+  onFiltersReset
 }) {
   const [showImages, setShowImages] = useState(false);
 
@@ -41,6 +42,10 @@ export default function FeaturePopup({
     : [];
 
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
+  const hasPropertyFilters = Object.keys(activeFilters).length > 0;
+  const hasStatusFilter =
+    Boolean(properties?.status) && activeStatusFilters.includes(properties.status);
+  const canResetFilters = hasPropertyFilters || hasStatusFilter;
 
   return (
     <>
@@ -82,7 +87,19 @@ export default function FeaturePopup({
                 {displayProperties.length > 0 && (
                   <>
                     <hr />
-                    <h4>Основное</h4>
+                    <div className="popup-section-header">
+                      <h4>Основное</h4>
+                      <button
+                        type="button"
+                        className="popup-filters-reset"
+                        onClick={() => onFiltersReset?.()}
+                        disabled={!canResetFilters}
+                        aria-label="Сбросить все фильтры свойств"
+                        title="Сбросить все фильтры свойств"
+                      >
+                        Сброс
+                      </button>
+                    </div>
 
                     {displayProperties.map(([key, value]) => (
                       <div key={key} className="popup-item popup-item--filter">

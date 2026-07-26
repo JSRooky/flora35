@@ -1,3 +1,4 @@
+import mapboxgl from "mapbox-gl";
 import points from "../locations/points.json";
 
 const PUBLIC_URL = process.env.PUBLIC_URL || "";
@@ -28,6 +29,105 @@ let interactionHandlers = null;
 let onClusterExpandedCallback = null;
 let onPointClickCallback = null;
 let onMapBackgroundClickCallback = null;
+let pointHoverPopup = null;
+let pointHoverPopupHideTimer = null;
+
+const POINT_TOOLTIP_FADE_MS = 180;
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** HTML-подсказка с русским и латинским названием вида. */
+function buildPointTooltipHtml(nameRu, nameLatin) {
+  const lines = [];
+
+  if (nameRu) {
+    lines.push(`<div class="point-tooltip-name-ru">${escapeHtml(nameRu)}</div>`);
+  }
+
+  if (nameLatin) {
+    lines.push(`<div class="point-tooltip-name-latin">${escapeHtml(nameLatin)}</div>`);
+  }
+
+  if (lines.length === 0) {
+    return '<div class="point-tooltip-name-ru">Точка данных</div>';
+  }
+
+  return lines.join("");
+}
+
+function clearPointHoverHideTimer() {
+  if (pointHoverPopupHideTimer) {
+    clearTimeout(pointHoverPopupHideTimer);
+    pointHoverPopupHideTimer = null;
+  }
+}
+
+function setPointHoverPopupVisible(visible, popup = pointHoverPopup) {
+  const popupElement = popup?.getElement();
+  if (!popupElement) {
+    return;
+  }
+
+  popupElement.classList.toggle("point-hover-tooltip--visible", visible);
+}
+
+function showPointHoverPopup(map, coordinates, html) {
+  clearPointHoverHideTimer();
+
+  if (!pointHoverPopup) {
+    pointHoverPopup = new mapboxgl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      className: "point-hover-tooltip",
+      offset: 10
+    });
+  }
+
+  const isNewPopup = !pointHoverPopup.isOpen();
+
+  pointHoverPopup.setLngLat(coordinates).setHTML(html).addTo(map);
+
+  if (isNewPopup) {
+    setPointHoverPopupVisible(false);
+    requestAnimationFrame(() => {
+      setPointHoverPopupVisible(true);
+    });
+    return;
+  }
+
+  setPointHoverPopupVisible(true);
+}
+
+function removePointHoverPopup({ immediate = false } = {}) {
+  clearPointHoverHideTimer();
+
+  if (!pointHoverPopup) {
+    return;
+  }
+
+  const popup = pointHoverPopup;
+
+  if (immediate) {
+    pointHoverPopup = null;
+    popup.remove();
+    return;
+  }
+
+  setPointHoverPopupVisible(false, popup);
+  pointHoverPopupHideTimer = setTimeout(() => {
+    pointHoverPopupHideTimer = null;
+    if (pointHoverPopup === popup) {
+      pointHoverPopup = null;
+    }
+    popup.remove();
+  }, POINT_TOOLTIP_FADE_MS);
+}
 
 /** Добавляет каждой точке URL иконки по полю regnum (растение / животное). */
 function enrichWithImages(data) {
@@ -192,6 +292,7 @@ function detachLocationsInteractions(map) {
     map.off("click", interactionHandlers.mapClick);
   }
 
+  removePointHoverPopup({ immediate: true });
   interactionHandlers = null;
 }
 
@@ -256,12 +357,29 @@ function attachLocationsInteractions(map) {
     }
   };
 
-  const pointEnter = () => {
+  const pointEnter = (event) => {
     map.getCanvas().style.cursor = "pointer";
+
+    const feature = event.features?.[0];
+    if (!feature?.geometry?.coordinates) {
+      return;
+    }
+
+    const { name_ru: nameRu, name_latin: nameLatin } = feature.properties ?? {};
+    if (!nameRu && !nameLatin) {
+      return;
+    }
+
+    showPointHoverPopup(
+      map,
+      feature.geometry.coordinates,
+      buildPointTooltipHtml(nameRu, nameLatin)
+    );
   };
 
   const pointLeave = () => {
     map.getCanvas().style.cursor = "";
+    removePointHoverPopup();
   };
 
   clusterLayerIds.forEach((layerId) => {

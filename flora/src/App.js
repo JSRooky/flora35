@@ -49,6 +49,25 @@ export default function MapView() {
   const [arealRadius, setArealRadius] = useState(5);
   const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
   const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
+  const hadFoundYearPropertyFilterRef = useRef(false);
+
+  const hasFoundYearPropertyFilter = Object.prototype.hasOwnProperty.call(
+    propertyFilters,
+    "found_year"
+  );
+
+  useEffect(() => {
+    if (hasFoundYearPropertyFilter) {
+      hadFoundYearPropertyFilterRef.current = true;
+      setYearFilterEnabled(false);
+      return;
+    }
+
+    if (hadFoundYearPropertyFilterRef.current) {
+      hadFoundYearPropertyFilterRef.current = false;
+      setYearFilterEnabled(true);
+    }
+  }, [hasFoundYearPropertyFilter]);
 
   const arealStateRef = useRef({});
   arealStateRef.current = {
@@ -85,7 +104,7 @@ export default function MapView() {
     if (selectedStatuses.length > 0) {
       combinedFilters.status = selectedStatuses;
     }
-    if (yearEnabled) {
+    if (yearEnabled && !Object.prototype.hasOwnProperty.call(filters, "found_year")) {
       combinedFilters.found_year = selectedYearRange;
     }
 
@@ -128,7 +147,7 @@ export default function MapView() {
       filters.status = statusFilters;
     }
 
-    if (yearFilterEnabled) {
+    if (yearFilterEnabled && !Object.prototype.hasOwnProperty.call(propertyFilters, "found_year")) {
       filters.found_year = yearRange;
     }
 
@@ -232,6 +251,15 @@ export default function MapView() {
     });
   };
 
+  const handleFeatureFiltersReset = useCallback(() => {
+    setPropertyFilters({});
+
+    const status = popupData?.properties?.status;
+    if (status) {
+      setStatusFilters((prev) => prev.filter((value) => value !== status));
+    }
+  }, [popupData]);
+
   const clearPointSelection = useCallback(() => {
     if (map.current) {
       clearArealLayer(map.current);
@@ -308,6 +336,7 @@ export default function MapView() {
           onEnabledChange={setYearFilterEnabled}
           range={yearRange}
           onRangeChange={setYearRange}
+          lockedByPropertyFilter={hasFoundYearPropertyFilter}
         />
       </div>
       <div className="popup-stack">
@@ -319,6 +348,7 @@ export default function MapView() {
           onFilterChange={handlePropertyFilterChange}
           activeStatusFilters={statusFilters}
           onStatusFilterChange={handleStatusFilterChange}
+          onFiltersReset={handleFeatureFiltersReset}
         />
         <ArealPopup
           enabled={arealEnabled}

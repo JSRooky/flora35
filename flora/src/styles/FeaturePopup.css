@@ -5,7 +5,7 @@
   border: 1px solid #ddd;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  padding: 16px;
+  padding: 13px 14px;
   max-width: 360px;
   width: 320px;
   height: auto;
@@ -37,7 +37,7 @@
   font-size: 16px;
   color: #333;
   border-bottom: 2px solid #007bff;
-  padding-bottom: 8px;
+  padding-bottom: 7px;
   flex: 1;
 }
 
@@ -78,10 +78,10 @@
 }
 
 .popup-content {
-  margin-top: 12px;
+  margin-top: 9px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 3px;
 }
 
 .popup-content h3 {
@@ -93,16 +93,52 @@
 }
 
 .popup-content h4 {
-  margin: 12px 0 8px 0;
+  margin: 0;
   font-size: 14px;
   color: #555;
+}
+
+.popup-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 7px 0 3px;
+}
+
+.popup-filters-reset {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border: 1px solid #007bff;
+  border-radius: 6px;
+  background: rgba(0, 123, 255, 0.12);
+  color: #007bff;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.popup-filters-reset:hover:not(:disabled) {
+  background: rgba(0, 123, 255, 0.22);
+  border-color: #0069d9;
+  color: #0069d9;
+}
+
+.popup-filters-reset:disabled {
+  border-color: #ccc;
+  background: rgba(255, 255, 255, 0.7);
+  color: #999;
+  cursor: not-allowed;
 }
 
 .popup-item {
   display: flex;
   justify-content: space-between;
-  margin: 8px 0;
+  margin: 3px 0;
   font-size: 13px;
+  line-height: 1.3;
 }
 
 .popup-item--filter {
@@ -176,7 +212,7 @@
 .feature-popup hr {
   border: none;
   border-top: 1px solid #eee;
-  margin: 12px 0;
+  margin: 7px 0;
 }
 
 .feature-switch {

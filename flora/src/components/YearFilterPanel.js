@@ -8,7 +8,11 @@ function getRangeProgress(value, min, max) {
   return ((value - min) / (max - min)) * 100;
 }
 
-function getCollapsedSummary(enabled, range) {
+function getCollapsedSummary(enabled, range, lockedByPropertyFilter) {
+  if (lockedByPropertyFilter) {
+    return "Отключён: фильтр по точке";
+  }
+
   if (!enabled) {
     return "Фильтр выключен";
   }
@@ -20,7 +24,8 @@ export default function YearFilterPanel({
   enabled = false,
   onEnabledChange,
   range = YEAR_BOUNDS,
-  onRangeChange
+  onRangeChange,
+  lockedByPropertyFilter = false
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [draftRange, setDraftRange] = useState(range);
@@ -66,6 +71,15 @@ export default function YearFilterPanel({
     onBlur: commitRange
   };
 
+  const isFullRange = draftRange.min === minYear && draftRange.max === maxYear;
+
+  const handleResetRange = () => {
+    const fullRange = { min: minYear, max: maxYear };
+    setDraftRange(fullRange);
+    draftRangeRef.current = fullRange;
+    onRangeChange?.(fullRange);
+  };
+
   return (
     <aside className={`year-filter-panel ${collapsed ? "year-filter-panel--collapsed" : ""}`}>
       <div className="year-filter-panel-header">
@@ -84,21 +98,48 @@ export default function YearFilterPanel({
 
       {collapsed ? (
         <p className="year-filter-panel-summary">
-          {getCollapsedSummary(enabled, range)}
+          {getCollapsedSummary(enabled, range, lockedByPropertyFilter)}
         </p>
       ) : (
         <div className="year-filter-panel-content">
-          <label className="year-filter-switch" title="Показывать только точки в выбранном диапазоне лет">
-            <input
-              type="checkbox"
-              checked={enabled}
-              onChange={(e) => onEnabledChange?.(e.target.checked)}
-            />
-            <span className="year-filter-switch-slider" />
-            <span className="year-filter-switch-label">Фильтровать по годам</span>
-          </label>
+          <div className="year-filter-controls-row">
+            <label
+              className={`year-filter-switch${
+                lockedByPropertyFilter ? " year-filter-switch--disabled" : ""
+              }`}
+              title={
+                lockedByPropertyFilter
+                  ? "Недоступно: включён фильтр по году в сведениях о точке"
+                  : "Показывать только точки в выбранном диапазоне лет"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={enabled}
+                disabled={lockedByPropertyFilter}
+                onChange={(e) => onEnabledChange?.(e.target.checked)}
+              />
+              <span className="year-filter-switch-slider" />
+              <span className="year-filter-switch-label">Фильтровать по годам</span>
+            </label>
 
-          <div className={`year-filter-range ${enabled ? "" : "year-filter-range--disabled"}`}>
+            <button
+              type="button"
+              className="year-filter-reset"
+              onClick={handleResetRange}
+              disabled={lockedByPropertyFilter || isFullRange}
+              aria-label="Сбросить диапазон годов"
+              title="Сбросить диапазон к полному интервалу"
+            >
+              Сброс
+            </button>
+          </div>
+
+          <div
+            className={`year-filter-range ${
+              enabled && !lockedByPropertyFilter ? "" : "year-filter-range--disabled"
+            }`}
+          >
             <p className="year-filter-range-label">
               Диапазон: <strong>{draftRange.min}</strong> — <strong>{draftRange.max}</strong>
             </p>
@@ -116,7 +157,7 @@ export default function YearFilterPanel({
                 max={maxYear}
                 step={1}
                 value={draftRange.min}
-                disabled={!enabled}
+                disabled={!enabled || lockedByPropertyFilter}
                 className={`year-filter-slider year-filter-slider--start${
                   activeThumb === "start" ? " year-filter-slider--active" : ""
                 }`}
@@ -131,7 +172,7 @@ export default function YearFilterPanel({
                 max={maxYear}
                 step={1}
                 value={draftRange.max}
-                disabled={!enabled}
+                disabled={!enabled || lockedByPropertyFilter}
                 className={`year-filter-slider year-filter-slider--end${
                   activeThumb === "end" ? " year-filter-slider--active" : ""
                 }`}

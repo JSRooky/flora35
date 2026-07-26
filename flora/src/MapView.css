@@ -41,9 +41,48 @@
   backdrop-filter: blur(4px); /* эффект смазывания заднего фона */
 }
 
+.point-hover-tooltip.mapboxgl-popup {
+  max-width: 240px;
+  z-index: 1001;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+
+.point-hover-tooltip.point-hover-tooltip--visible {
+  opacity: 1;
+}
+
+.point-hover-tooltip .mapboxgl-popup-content {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-family: Arial, sans-serif;
+  line-height: 1.35;
+}
+
+.point-hover-tooltip .mapboxgl-popup-tip {
+  border-top-color: rgba(255, 255, 255, 0.92);
+}
+
+.point-tooltip-name-ru {
+  color: #333;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.point-tooltip-name-latin {
+  margin-top: 2px;
+  color: #666;
+  font-size: 11px;
+  font-style: italic;
+}
+
 
 .popup-images-btn {
-  margin-top: 12px;
+  margin-top: 9px;
   padding: 8px 12px;
   background: #4a90e2;
   color: white;
