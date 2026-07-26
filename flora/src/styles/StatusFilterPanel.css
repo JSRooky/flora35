@@ -98,19 +98,7 @@
   color: #555;
 }
 
-.status-filter-summary,
-.status-filter-collapsed-summary {
-  margin: 10px 0 0;
-  font-size: 12px;
-  color: #666;
-  line-height: 1.4;
-}
-
 .status-filter-panel--collapsed .status-filter-panel-title {
   border-bottom: none;
   padding-bottom: 0;
-}
-
-.status-filter-collapsed-summary {
-  margin-top: 6px;
 }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import "../styles/ArealPopup.css";
 
 const RADIUS_MIN = 0.5;
@@ -26,10 +26,12 @@ export default function ArealPopup({
   radius,
   onEnabledChange,
   onAllMarkersChange,
-  onRadiusChange
+  onRadiusChange,
+  collapsed = false,
+  onCollapsedChange
 }) {
-  const [collapsed, setCollapsed] = useState(false);
   const isActive = enabled || allMarkers;
+  const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
 
   return (
     <div className={`areal-popup ${collapsed ? "areal-popup--collapsed" : ""}`}>
@@ -38,9 +40,10 @@ export default function ArealPopup({
         <button
           type="button"
           className="popup-panel-toggle"
-          onClick={() => setCollapsed((value) => !value)}
+          onClick={() => onCollapsedChange?.(!collapsed)}
           aria-expanded={!collapsed}
-          aria-label={collapsed ? "Развернуть настройки ареала" : "Свернуть настройки ареала"}
+          aria-label={toggleLabel}
+          title={toggleLabel}
         >
           {collapsed ? "▾" : "▴"}
         </button>

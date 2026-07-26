@@ -16,6 +16,7 @@ export default function StatusFilterPanel({
   onStatusFilterChange
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
 
   return (
     <aside
@@ -28,7 +29,8 @@ export default function StatusFilterPanel({
           className="status-filter-panel-toggle"
           onClick={() => setCollapsed((value) => !value)}
           aria-expanded={!collapsed}
-          aria-label={collapsed ? "Развернуть фильтр статуса" : "Свернуть фильтр статуса"}
+          aria-label={toggleLabel}
+          title={toggleLabel}
         >
           {collapsed ? "▾" : "▴"}
         </button>
@@ -49,18 +51,7 @@ export default function StatusFilterPanel({
               </label>
             ))}
           </div>
-          {activeStatusFilters.length > 0 && (
-            <p className="status-filter-summary">
-              Выбрано: {activeStatusFilters.join(", ")}
-            </p>
-          )}
         </div>
-      )}
-
-      {collapsed && activeStatusFilters.length > 0 && (
-        <p className="status-filter-collapsed-summary">
-          {activeStatusFilters.length} выбрано
-        </p>
       )}
     </aside>
   );

@@ -12,126 +12,129 @@ function getImages(properties) {
 
 export default function FeaturePopup({
   feature,
-  onClose,
+  collapsed = false,
+  onCollapsedChange,
   activeFilters = {},
   onFilterChange,
   clusterByRegnum = true,
   onClusterByRegnumChange
 }) {
   const [showImages, setShowImages] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
 
-  if (!feature) return null;
+  const collapsedSummary = feature
+    ? feature.properties?.name_ru ||
+      feature.properties?.name_latin ||
+      "Точка данных"
+    : "Точка не выбрана";
 
-  const { geometry, properties } = feature;
-  const [lng, lat] = geometry.coordinates;
+  const geometry = feature?.geometry;
+  const properties = feature?.properties;
+  const [lng, lat] = geometry?.coordinates ?? [0, 0];
   const images = properties ? getImages(properties) : [];
   const displayProperties = properties
     ? Object.entries(properties).filter(
         ([key]) => !INTERNAL_PROPERTIES.has(key) && key !== "status"
       )
     : [];
-  const collapsedSummary = properties?.name_ru || properties?.name_latin || "Точка данных";
 
-  const handleClose = () => {
-    setShowImages(false);
-    onClose();
-  };
+  const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
 
   return (
     <>
       <div className={`feature-popup ${collapsed ? "feature-popup--collapsed" : ""}`}>
         <div className="feature-popup-header">
           <h3 className="feature-popup-title">Сведения о точке данных</h3>
-          <div className="feature-popup-actions">
-            <button
-              type="button"
-              className="popup-panel-toggle"
-              onClick={() => setCollapsed((value) => !value)}
-              aria-expanded={!collapsed}
-              aria-label={collapsed ? "Развернуть сведения о точке" : "Свернуть сведения о точке"}
-            >
-              {collapsed ? "▾" : "▴"}
-            </button>
-            <button className="popup-close" onClick={handleClose} aria-label="Закрыть">
-              ×
-            </button>
-          </div>
+          <button
+            type="button"
+            className="popup-panel-toggle"
+            onClick={() => onCollapsedChange?.(!collapsed)}
+            aria-expanded={!collapsed}
+            aria-label={toggleLabel}
+            title={toggleLabel}
+          >
+            {collapsed ? "▾" : "▴"}
+          </button>
         </div>
 
         {collapsed ? (
           <p className="popup-collapsed-summary">{collapsedSummary}</p>
         ) : (
           <div className="popup-content">
-          <div className="popup-item">
-            <strong>Широта:</strong>
-            <span>{lat.toFixed(4)}</span>
-          </div>
-
-          <div className="popup-item">
-            <strong>Долгота:</strong>
-            <span>{lng.toFixed(4)}</span>
-          </div>
-
-          {displayProperties.length > 0 && (
-            <>
-              <hr />
-              <h4>Основное</h4>
-
-              {displayProperties.map(([key, value]) => (
-                <div key={key} className="popup-item popup-item--filter">
-                  <div className="popup-item-text">
-                    <strong>{key}:</strong>
-                    <span>{String(value)}</span>
-                  </div>
-                  <label className="property-switch" title="Показать маркеры с этим свойством">
-                    <input
-                      type="checkbox"
-                      checked={activeFilters[key] === value}
-                      onChange={(e) => onFilterChange?.(key, value, e.target.checked)}
-                    />
-                    <span className="property-switch-slider" />
-                  </label>
-                </div>
-              ))}
-
-              {properties?.status && (
+            {!feature ? (
+              <p className="popup-empty-state">Выберите точку на карте</p>
+            ) : (
+              <>
                 <div className="popup-item">
-                  <div className="popup-item-text">
-                    <strong>status:</strong>
-                    <span>{properties.status}</span>
-                  </div>
+                  <strong>Широта:</strong>
+                  <span>{lat.toFixed(4)}</span>
                 </div>
-              )}
 
-              <hr />
-              <h4>Кластеризация</h4>
+                <div className="popup-item">
+                  <strong>Долгота:</strong>
+                  <span>{lng.toFixed(4)}</span>
+                </div>
 
-              <label className="feature-switch" title="Группировать в кластеры только точки с одинаковым regnum">
-                <input
-                  type="checkbox"
-                  checked={clusterByRegnum}
-                  onChange={(e) => onClusterByRegnumChange?.(e.target.checked)}
-                />
-                <span className="feature-switch-slider" />
-                <span className="feature-switch-label">Группировать по царству</span>
-              </label>
+                {displayProperties.length > 0 && (
+                  <>
+                    <hr />
+                    <h4>Основное</h4>
 
-              {images.length > 0 && (
-                <button
-                  className="popup-images-btn"
-                  onClick={() => setShowImages(true)}
-                >
-                  Иллюстрации
-                </button>
-              )}
-            </>
-          )}
+                    {displayProperties.map(([key, value]) => (
+                      <div key={key} className="popup-item popup-item--filter">
+                        <div className="popup-item-text">
+                          <strong>{key}:</strong>
+                          <span>{String(value)}</span>
+                        </div>
+                        <label className="property-switch" title="Показать маркеры с этим свойством">
+                          <input
+                            type="checkbox"
+                            checked={activeFilters[key] === value}
+                            onChange={(e) => onFilterChange?.(key, value, e.target.checked)}
+                          />
+                          <span className="property-switch-slider" />
+                        </label>
+                      </div>
+                    ))}
+
+                    {properties?.status && (
+                      <div className="popup-item">
+                        <div className="popup-item-text">
+                          <strong>status:</strong>
+                          <span>{properties.status}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <hr />
+                    <h4>Кластеризация</h4>
+
+                    <label className="feature-switch" title="Группировать в кластеры только точки с одинаковым regnum">
+                      <input
+                        type="checkbox"
+                        checked={clusterByRegnum}
+                        onChange={(e) => onClusterByRegnumChange?.(e.target.checked)}
+                      />
+                      <span className="feature-switch-slider" />
+                      <span className="feature-switch-label">Группировать по царству</span>
+                    </label>
+
+                    {images.length > 0 && (
+                      <button
+                        className="popup-images-btn"
+                        onClick={() => setShowImages(true)}
+                      >
+                        Иллюстрации
+                      </button>
+                    )}
+                  </>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
 
-      {showImages && (
+      {showImages && images.length > 0 && (
         <FeatureImagesPopup
           images={images}
           onClose={() => setShowImages(false)}

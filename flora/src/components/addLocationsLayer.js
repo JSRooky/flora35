@@ -23,6 +23,7 @@ let currentFilters = {};
 let interactionHandlers = null;
 let onClusterExpandedCallback = null;
 let onPointClickCallback = null;
+let onMapBackgroundClickCallback = null;
 
 function enrichWithImages(data) {
   if (!data?.features) {
@@ -137,6 +138,10 @@ function detachLocationsInteractions(map) {
     map.off("mouseleave", layerId, interactionHandlers.pointLeave);
   });
 
+  if (interactionHandlers.mapClick) {
+    map.off("click", interactionHandlers.mapClick);
+  }
+
   interactionHandlers = null;
 }
 
@@ -218,6 +223,26 @@ function attachLocationsInteractions(map) {
     map.on("mouseleave", layerId, pointLeave);
   });
 
+  const mapClick = (event) => {
+    const locationLayerIds = [...clusterLayerIds, ...unclusteredLayerIds].filter((layerId) =>
+      map.getLayer(layerId)
+    );
+
+    if (locationLayerIds.length === 0) {
+      return;
+    }
+
+    const features = map.queryRenderedFeatures(event.point, {
+      layers: locationLayerIds
+    });
+
+    if (!features.length) {
+      onMapBackgroundClickCallback?.();
+    }
+  };
+
+  map.on("click", mapClick);
+
   interactionHandlers = {
     clusterLayerIds,
     unclusteredLayerIds,
@@ -226,7 +251,8 @@ function attachLocationsInteractions(map) {
     clusterLeave,
     pointClick,
     pointEnter,
-    pointLeave
+    pointLeave,
+    mapClick
   };
 }
 
@@ -460,11 +486,17 @@ export function isClusterByRegnumEnabled() {
 
 export function addLocationsLayer(
   map,
-  { onClusterExpanded, onPointClick, clusterByRegnum: initialClusterByRegnum = true } = {}
+  {
+    onClusterExpanded,
+    onPointClick,
+    onMapBackgroundClick,
+    clusterByRegnum: initialClusterByRegnum = true
+  } = {}
 ) {
   locationsData = enrichWithImages(points);
   clusterByRegnum = initialClusterByRegnum;
   onClusterExpandedCallback = onClusterExpanded;
   onPointClickCallback = onPointClick;
+  onMapBackgroundClickCallback = onMapBackgroundClick;
   rebuildLocationsLayers(map);
 }

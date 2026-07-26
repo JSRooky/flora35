@@ -3,7 +3,6 @@ import { initMap } from "./components/initMap";
 import {
   addLocationsLayer,
   applyLocationsFilter,
-  clearLocationsFilter,
   setClusterByRegnum
 } from "./components/addLocationsLayer";
 import {
@@ -24,6 +23,8 @@ export default function MapView() {
   const [propertyFilters, setPropertyFilters] = useState({});
   const [statusFilters, setStatusFilters] = useState([]);
   const [clusterByRegnum, setClusterByRegnumState] = useState(true);
+  const [featurePopupCollapsed, setFeaturePopupCollapsed] = useState(true);
+  const [arealPopupCollapsed, setArealPopupCollapsed] = useState(true);
   const [arealEnabled, setArealEnabled] = useState(false);
   const [arealAllMarkers, setArealAllMarkers] = useState(false);
   const [arealRadius, setArealRadius] = useState(5);
@@ -153,17 +154,6 @@ export default function MapView() {
     };
   }, [popupData, arealEnabled, arealAllMarkers, scheduleArealRefresh]);
 
-  const handleClosePopup = () => {
-    if (map.current) {
-      clearArealLayer(map.current);
-      clearLocationsFilter(map.current);
-    }
-    setPopupData(null);
-    setPropertyFilters({});
-    setArealEnabled(false);
-    setArealAllMarkers(false);
-  };
-
   const handlePropertyFilterChange = (key, value, enabled) => {
     setPropertyFilters((prev) => {
       const next = { ...prev };
@@ -186,6 +176,18 @@ export default function MapView() {
     });
   };
 
+  const clearPointSelection = useCallback(() => {
+    if (map.current) {
+      clearArealLayer(map.current);
+    }
+
+    setPopupData(null);
+    setPropertyFilters({});
+    setArealEnabled(false);
+    setArealAllMarkers(false);
+    setFeaturePopupCollapsed(true);
+  }, []);
+
   useEffect(() => {
     if (!map.current && ref.current) {
       map.current = initMap(ref.current);
@@ -203,6 +205,10 @@ export default function MapView() {
           },
           onPointClick: (feature) => {
             setPopupData(feature);
+            setFeaturePopupCollapsed(false);
+          },
+          onMapBackgroundClick: () => {
+            clearPointSelection();
           }
         });
         addArealLayer(map.current);
@@ -215,7 +221,7 @@ export default function MapView() {
         map.current = null;
       }
     };
-  }, []);
+  }, [clearPointSelection]);
 
   return (
     <>
@@ -224,26 +230,27 @@ export default function MapView() {
         activeStatusFilters={statusFilters}
         onStatusFilterChange={handleStatusFilterChange}
       />
-      {popupData && (
-        <div className="popup-stack">
-          <FeaturePopup
-            feature={popupData}
-            onClose={handleClosePopup}
-            activeFilters={propertyFilters}
-            onFilterChange={handlePropertyFilterChange}
-            clusterByRegnum={clusterByRegnum}
-            onClusterByRegnumChange={setClusterByRegnumState}
-          />
-          <ArealPopup
-            enabled={arealEnabled}
-            allMarkers={arealAllMarkers}
-            radius={arealRadius}
-            onEnabledChange={setArealEnabled}
-            onAllMarkersChange={setArealAllMarkers}
-            onRadiusChange={setArealRadius}
-          />
-        </div>
-      )}
+      <div className="popup-stack">
+        <FeaturePopup
+          feature={popupData}
+          collapsed={featurePopupCollapsed}
+          onCollapsedChange={setFeaturePopupCollapsed}
+          activeFilters={propertyFilters}
+          onFilterChange={handlePropertyFilterChange}
+          clusterByRegnum={clusterByRegnum}
+          onClusterByRegnumChange={setClusterByRegnumState}
+        />
+        <ArealPopup
+          enabled={arealEnabled}
+          allMarkers={arealAllMarkers}
+          radius={arealRadius}
+          onEnabledChange={setArealEnabled}
+          onAllMarkersChange={setArealAllMarkers}
+          onRadiusChange={setArealRadius}
+          collapsed={arealPopupCollapsed}
+          onCollapsedChange={setArealPopupCollapsed}
+        />
+      </div>
     </>
   );
 }
