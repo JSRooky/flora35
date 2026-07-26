@@ -3,7 +3,8 @@ import { initMap } from "./components/initMap";
 import {
   addLocationsLayer,
   applyLocationsFilter,
-  clearLocationsFilter
+  clearLocationsFilter,
+  setClusterByRegnum
 } from "./components/addLocationsLayer";
 import {
   addArealLayer,
@@ -20,6 +21,7 @@ export default function MapView() {
 
   const [popupData, setPopupData] = useState(null);
   const [propertyFilters, setPropertyFilters] = useState({});
+  const [clusterByRegnum, setClusterByRegnumState] = useState(true);
   const [arealEnabled, setArealEnabled] = useState(false);
   const [arealAllMarkers, setArealAllMarkers] = useState(false);
   const [arealRadius, setArealRadius] = useState(5);
@@ -90,6 +92,14 @@ export default function MapView() {
   }, [propertyFilters]);
 
   useEffect(() => {
+    if (!map.current) {
+      return;
+    }
+
+    setClusterByRegnum(map.current, clusterByRegnum);
+  }, [clusterByRegnum]);
+
+  useEffect(() => {
     refreshAreal();
   }, [popupData, arealEnabled, arealAllMarkers, arealRadius, propertyFilters, refreshAreal]);
 
@@ -105,7 +115,10 @@ export default function MapView() {
 
     const handleMapChange = () => scheduleArealRefresh();
     const handleSourceData = (event) => {
-      if (event.sourceId === "locations" && event.isSourceLoaded) {
+      if (
+        event.isSourceLoaded &&
+        (event.sourceId === "locations" || event.sourceId.startsWith("locations-"))
+      ) {
         scheduleArealRefresh();
       }
     };
@@ -158,24 +171,12 @@ export default function MapView() {
             }
             expandedLeavesRef.current = leaves;
             refreshArealRef.current();
-          }
-        });
-        addArealLayer(map.current);
-
-        map.current.on("click", "unclustered-point", (e) => {
-          const feature = e.features?.[0];
-          if (feature) {
+          },
+          onPointClick: (feature) => {
             setPopupData(feature);
           }
         });
-
-        map.current.on("mouseenter", "unclustered-point", () => {
-          map.current.getCanvas().style.cursor = "pointer";
-        });
-
-        map.current.on("mouseleave", "unclustered-point", () => {
-          map.current.getCanvas().style.cursor = "";
-        });
+        addArealLayer(map.current);
       });
     }
 
@@ -197,6 +198,8 @@ export default function MapView() {
             onClose={handleClosePopup}
             activeFilters={propertyFilters}
             onFilterChange={handlePropertyFilterChange}
+            clusterByRegnum={clusterByRegnum}
+            onClusterByRegnumChange={setClusterByRegnumState}
           />
           <ArealPopup
             enabled={arealEnabled}

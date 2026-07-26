@@ -14,7 +14,9 @@ export default function FeaturePopup({
   feature,
   onClose,
   activeFilters = {},
-  onFilterChange
+  onFilterChange,
+  clusterByRegnum = true,
+  onClusterByRegnumChange
 }) {
   const [showImages, setShowImages] = useState(false);
 
@@ -73,6 +75,19 @@ export default function FeaturePopup({
                   </label>
                 </div>
               ))}
+
+              <hr />
+              <h4>Кластеризация</h4>
+
+              <label className="feature-switch" title="Группировать в кластеры только точки с одинаковым regnum">
+                <input
+                  type="checkbox"
+                  checked={clusterByRegnum}
+                  onChange={(e) => onClusterByRegnumChange?.(e.target.checked)}
+                />
+                <span className="feature-switch-slider" />
+                <span className="feature-switch-label">Группировать по царству</span>
+              </label>
 
               {images.length > 0 && (
                 <button

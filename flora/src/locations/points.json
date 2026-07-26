@@ -1030,6 +1030,266 @@
         "identified_by": "Орлова"
       },
       "geometry": { "type": "Point", "coordinates": [42.2324, 60.8724] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Boletaceae",
+        "name_ru": "Белый гриб",
+        "name_latin": "Boletus edulis",
+        "found_by": "Кузнецов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [42.6525, 60.1125] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Boletaceae",
+        "name_ru": "Подберёзовик",
+        "name_latin": "Leccinum scabrum",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [43.0724, 60.3326] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Boletaceae",
+        "name_ru": "Подосиновик",
+        "name_latin": "Leccinum aurantiacum",
+        "found_by": "Сидоров",
+        "identified_by": "Орлов"
+      },
+      "geometry": { "type": "Point", "coordinates": [43.4923, 60.5525] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Cantharellaceae",
+        "name_ru": "Лисичка обыкновенная",
+        "name_latin": "Cantharellus cibarius",
+        "found_by": "Павлов",
+        "identified_by": "Орлова"
+      },
+      "geometry": { "type": "Point", "coordinates": [43.9125, 60.7724] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Physalacriaceae",
+        "name_ru": "Опёнок осенний",
+        "name_latin": "Armillaria mellea",
+        "found_by": "Кузнецов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [44.3324, 60.9925] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Russulaceae",
+        "name_ru": "Сыроежка",
+        "name_latin": "Russula emetica",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [44.7525, 59.2126] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Suillaceae",
+        "name_ru": "Моховик",
+        "name_latin": "Suillus bovinus",
+        "found_by": "Сидоров",
+        "identified_by": "Орлов"
+      },
+      "geometry": { "type": "Point", "coordinates": [45.1724, 59.4325] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Suillaceae",
+        "name_ru": "Маслёнок",
+        "name_latin": "Suillus luteus",
+        "found_by": "Павлов",
+        "identified_by": "Орлова"
+      },
+      "geometry": { "type": "Point", "coordinates": [39.8325, 59.6524] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Russulaceae",
+        "name_ru": "Груздь настоящий",
+        "name_latin": "Lactarius resimus",
+        "found_by": "Кузнецов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [40.2524, 59.8725] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Russulaceae",
+        "name_ru": "Рыжик",
+        "name_latin": "Lactarius deliciosus",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [40.6725, 60.0924] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Morchellaceae",
+        "name_ru": "Сморчок съедобный",
+        "name_latin": "Morchella esculenta",
+        "found_by": "Сидоров",
+        "identified_by": "Орлов"
+      },
+      "geometry": { "type": "Point", "coordinates": [41.0924, 60.3125] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Helvellaceae",
+        "name_ru": "Строчок",
+        "name_latin": "Helvella crispa",
+        "found_by": "Павлов",
+        "identified_by": "Орлова"
+      },
+      "geometry": { "type": "Point", "coordinates": [41.5125, 60.5324] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Polyporaceae",
+        "name_ru": "Трутовик настоящий",
+        "name_latin": "Fomes fomentarius",
+        "found_by": "Кузнецов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [41.9324, 60.7525] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Meripilaceae",
+        "name_ru": "Грифола куриная",
+        "name_latin": "Grifola frondosa",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [42.3525, 58.9924] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Agaricaceae",
+        "name_ru": "Шампиньон луговой",
+        "name_latin": "Agaricus campestris",
+        "found_by": "Сидоров",
+        "identified_by": "Орлов"
+      },
+      "geometry": { "type": "Point", "coordinates": [42.7724, 58.8125] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Agaricaceae",
+        "name_ru": "Шампиньон лесной",
+        "name_latin": "Agaricus silvaticus",
+        "found_by": "Павлов",
+        "identified_by": "Орлова"
+      },
+      "geometry": { "type": "Point", "coordinates": [43.1925, 58.6324] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Pleurotaceae",
+        "name_ru": "Вешенка обыкновенная",
+        "name_latin": "Pleurotus ostreatus",
+        "found_by": "Кузнецов",
+        "identified_by": "Смирнов"
+      },
+      "geometry": { "type": "Point", "coordinates": [43.6124, 58.4525] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Agaricaceae",
+        "name_ru": "Навозник",
+        "name_latin": "Coprinus comatus",
+        "found_by": "Иванов",
+        "identified_by": "Петров"
+      },
+      "geometry": { "type": "Point", "coordinates": [44.0325, 58.2724] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Amanitaceae",
+        "name_ru": "Мухомор красный",
+        "name_latin": "Amanita muscaria",
+        "found_by": "Сидоров",
+        "identified_by": "Орлов"
+      },
+      "geometry": { "type": "Point", "coordinates": [44.4524, 58.9925] }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "regnum": "fungi",
+        "family": "Amanitaceae",
+        "name_ru": "Бледная поганка",
+        "name_latin": "Amanita phalloides",
+        "found_by": "Павлов",
+        "identified_by": "Орлова"
+      },
+      "geometry": { "type": "Point", "coordinates": [44.8725, 58.8124] }
     }
   ]
 }

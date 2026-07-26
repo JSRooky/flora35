@@ -3,7 +3,26 @@ import points from "../locations/points.json";
 const PLANT_IMAGE = "/images/plant.svg";
 const ANIMAL_IMAGE = "/images/animal.svg";
 
+const CLUSTER_OPTIONS = {
+  clusterMaxZoom: 14,
+  clusterRadius: 50
+};
+
+const REGNUM_COLORS = {
+  plantae: "#27ae60",
+  animalia: "#ff6600",
+  fungi: "#9b59b6"
+};
+
+const DEFAULT_CLUSTER_COLOR = "#4a90e2";
+const DEFAULT_POINT_COLOR = "#4a90e2";
+
 let locationsData = null;
+let clusterByRegnum = true;
+let currentFilters = {};
+let interactionHandlers = null;
+let onClusterExpandedCallback = null;
+let onPointClickCallback = null;
 
 function enrichWithImages(data) {
   if (!data?.features) {
@@ -14,7 +33,9 @@ function enrichWithImages(data) {
     ...data,
     features: data.features.map((feature) => {
       const image =
-        feature.properties.regnum === "animalia" ? ANIMAL_IMAGE : PLANT_IMAGE;
+        feature.properties.regnum === "animalia"
+          ? ANIMAL_IMAGE
+          : PLANT_IMAGE;
 
       return {
         ...feature,
@@ -25,6 +46,288 @@ function enrichWithImages(data) {
       };
     })
   };
+}
+
+function getRegnumValues(features = locationsData?.features ?? []) {
+  return [...new Set(features.map((feature) => feature.properties.regnum).filter(Boolean))];
+}
+
+function getSourceId(regnum = null) {
+  return regnum ? `locations-${regnum}` : "locations";
+}
+
+function getLayerIds(regnum = null) {
+  const suffix = regnum ? `-${regnum}` : "";
+  return {
+    clusters: `clusters${suffix}`,
+    clusterCount: `cluster-count${suffix}`,
+    unclustered: regnum ? `unclustered-${regnum}` : "unclustered-point"
+  };
+}
+
+export function getUnclusteredLayerIds() {
+  if (clusterByRegnum) {
+    return getRegnumValues().map((regnum) => getLayerIds(regnum).unclustered);
+  }
+
+  return [getLayerIds().unclustered];
+}
+
+function getClusterLayerIds() {
+  if (clusterByRegnum) {
+    return getRegnumValues().map((regnum) => getLayerIds(regnum).clusters);
+  }
+
+  return [getLayerIds().clusters];
+}
+
+function getPointColorExpression() {
+  return [
+    "match",
+    ["get", "regnum"],
+    "plantae", REGNUM_COLORS.plantae,
+    "animalia", REGNUM_COLORS.animalia,
+    "fungi", REGNUM_COLORS.fungi,
+    DEFAULT_POINT_COLOR
+  ];
+}
+
+function removeLocationsFromMap(map) {
+  [getLayerIds().clusters, getLayerIds().clusterCount, getLayerIds().unclustered].forEach(
+    (layerId) => {
+      if (map.getLayer(layerId)) {
+        map.removeLayer(layerId);
+      }
+    }
+  );
+
+  if (map.getSource("locations")) {
+    map.removeSource("locations");
+  }
+
+  getRegnumValues().forEach((regnum) => {
+    const layerIds = getLayerIds(regnum);
+    [layerIds.clusters, layerIds.clusterCount, layerIds.unclustered].forEach((layerId) => {
+      if (map.getLayer(layerId)) {
+        map.removeLayer(layerId);
+      }
+    });
+
+    const sourceId = getSourceId(regnum);
+    if (map.getSource(sourceId)) {
+      map.removeSource(sourceId);
+    }
+  });
+}
+
+function detachLocationsInteractions(map) {
+  if (!interactionHandlers) {
+    return;
+  }
+
+  interactionHandlers.clusterLayerIds.forEach((layerId) => {
+    map.off("click", layerId, interactionHandlers.clusterClick);
+    map.off("mouseenter", layerId, interactionHandlers.clusterEnter);
+    map.off("mouseleave", layerId, interactionHandlers.clusterLeave);
+  });
+
+  interactionHandlers.unclusteredLayerIds.forEach((layerId) => {
+    map.off("click", layerId, interactionHandlers.pointClick);
+    map.off("mouseenter", layerId, interactionHandlers.pointEnter);
+    map.off("mouseleave", layerId, interactionHandlers.pointLeave);
+  });
+
+  interactionHandlers = null;
+}
+
+function attachLocationsInteractions(map) {
+  detachLocationsInteractions(map);
+
+  const clusterLayerIds = getClusterLayerIds();
+  const unclusteredLayerIds = getUnclusteredLayerIds();
+
+  const clusterClick = (event) => {
+    const features = map.queryRenderedFeatures(event.point, {
+      layers: clusterLayerIds
+    });
+    if (!features.length) {
+      return;
+    }
+
+    const clusterFeature = features[0];
+    const sourceId = clusterFeature.source;
+    const clusterId = clusterFeature.properties.cluster_id;
+    const source = map.getSource(sourceId);
+
+    source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
+      if (leavesErr) {
+        return;
+      }
+
+      source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+        if (err) {
+          return;
+        }
+
+        map.easeTo({
+          center: clusterFeature.geometry.coordinates,
+          zoom
+        });
+
+        map.once("moveend", () => {
+          map.once("idle", () => {
+            onClusterExpandedCallback?.(leaves);
+          });
+        });
+      });
+    });
+  };
+
+  const clusterEnter = () => {
+    map.getCanvas().style.cursor = "pointer";
+  };
+
+  const clusterLeave = () => {
+    map.getCanvas().style.cursor = "";
+  };
+
+  const pointClick = (event) => {
+    const feature = event.features?.[0];
+    if (feature) {
+      onPointClickCallback?.(feature);
+    }
+  };
+
+  const pointEnter = () => {
+    map.getCanvas().style.cursor = "pointer";
+  };
+
+  const pointLeave = () => {
+    map.getCanvas().style.cursor = "";
+  };
+
+  clusterLayerIds.forEach((layerId) => {
+    map.on("click", layerId, clusterClick);
+    map.on("mouseenter", layerId, clusterEnter);
+    map.on("mouseleave", layerId, clusterLeave);
+  });
+
+  unclusteredLayerIds.forEach((layerId) => {
+    map.on("click", layerId, pointClick);
+    map.on("mouseenter", layerId, pointEnter);
+    map.on("mouseleave", layerId, pointLeave);
+  });
+
+  interactionHandlers = {
+    clusterLayerIds,
+    unclusteredLayerIds,
+    clusterClick,
+    clusterEnter,
+    clusterLeave,
+    pointClick,
+    pointEnter,
+    pointLeave
+  };
+}
+
+function addClusterLayers(map, sourceId, regnum = null) {
+  const layerIds = getLayerIds(regnum);
+  const clusterColor = regnum ? REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR : DEFAULT_CLUSTER_COLOR;
+
+  map.addLayer({
+    id: layerIds.clusters,
+    type: "circle",
+    source: sourceId,
+    filter: ["has", "point_count"],
+    paint: {
+      "circle-color": clusterColor,
+      "circle-radius": [
+        "step",
+        ["get", "point_count"],
+        18, 10,
+        24, 30,
+        32
+      ],
+      "circle-stroke-width": 2,
+      "circle-stroke-color": "#ffffff"
+    }
+  });
+
+  map.addLayer({
+    id: layerIds.clusterCount,
+    type: "symbol",
+    source: sourceId,
+    filter: ["has", "point_count"],
+    layout: {
+      "text-field": "{point_count_abbreviated}",
+      "text-font": ["Open Sans Bold"],
+      "text-size": 12
+    },
+    paint: {
+      "text-color": "#ffffff"
+    }
+  });
+
+  map.addLayer({
+    id: layerIds.unclustered,
+    type: "circle",
+    source: sourceId,
+    filter: ["!", ["has", "point_count"]],
+    paint: {
+      "circle-color": regnum
+        ? REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR
+        : getPointColorExpression(),
+      "circle-radius": 6,
+      "circle-stroke-width": 1,
+      "circle-stroke-color": "#ffffff"
+    }
+  });
+}
+
+function rebuildLocationsLayers(map) {
+  if (!locationsData || !map.getStyle()) {
+    return;
+  }
+
+  detachLocationsInteractions(map);
+  removeLocationsFromMap(map);
+
+  const filteredFeatures = filterFeatures(locationsData.features, currentFilters);
+
+  if (clusterByRegnum) {
+    getRegnumValues().forEach((regnum) => {
+      const sourceId = getSourceId(regnum);
+      const features = filteredFeatures.filter(
+        (feature) => feature.properties.regnum === regnum
+      );
+
+      map.addSource(sourceId, {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features
+        },
+        cluster: true,
+        ...CLUSTER_OPTIONS
+      });
+
+      addClusterLayers(map, sourceId, regnum);
+    });
+  } else {
+    map.addSource("locations", {
+      type: "geojson",
+      data: {
+        type: "FeatureCollection",
+        features: filteredFeatures
+      },
+      cluster: true,
+      ...CLUSTER_OPTIONS
+    });
+
+    addClusterLayers(map, "locations");
+  }
+
+  attachLocationsInteractions(map);
 }
 
 export function filterFeatures(features, filters = {}) {
@@ -61,20 +364,36 @@ function dedupeCenters(centers) {
   });
 }
 
+function queryUnclusteredSourceFeatures(map) {
+  const sourceIds = clusterByRegnum
+    ? getRegnumValues().map((regnum) => getSourceId(regnum))
+    : ["locations"];
+
+  return sourceIds.flatMap((sourceId) => {
+    if (!map.getSource(sourceId)) {
+      return [];
+    }
+
+    return map.querySourceFeatures(sourceId, {
+      filter: ["!", ["has", "point_count"]]
+    });
+  });
+}
+
 export function getUnclusteredCenters(map, filters = {}, candidateFeatures = null) {
-  if (!map.getSource("locations")) {
+  const hasLocationsSource = clusterByRegnum
+    ? getRegnumValues().some((regnum) => map.getSource(getSourceId(regnum)))
+    : map.getSource("locations");
+
+  if (!hasLocationsSource) {
     return [];
   }
 
-  const sourceFeatures = map.querySourceFeatures("locations", {
-    filter: ["!", ["has", "point_count"]]
-  });
-  // queryRenderedFeatures does canvas hit-testing and is noticeably more
-  // expensive, so only fall back to it when source features aren't available.
+  const sourceFeatures = queryUnclusteredSourceFeatures(map);
   const visibleFeatures =
     sourceFeatures.length > 0
       ? sourceFeatures
-      : map.queryRenderedFeatures({ layers: ["unclustered-point"] });
+      : map.queryRenderedFeatures({ layers: getUnclusteredLayerIds() });
 
   if (candidateFeatures?.length) {
     const visibleKeys = new Set(
@@ -112,127 +431,30 @@ export function featureMatchesFilters(feature, filters = {}) {
 }
 
 export function applyLocationsFilter(map, filters = {}) {
-  const source = map.getSource("locations");
-  if (!source || !locationsData) {
-    return;
-  }
-
-  const filteredFeatures = filterFeatures(locationsData.features, filters);
-
-  source.setData({
-    ...locationsData,
-    features: filteredFeatures
-  });
+  currentFilters = filters;
+  rebuildLocationsLayers(map);
 }
 
 export function clearLocationsFilter(map) {
   applyLocationsFilter(map, {});
 }
 
-export function addLocationsLayer(map, { onClusterExpanded } = {}) {
+export function setClusterByRegnum(map, enabled) {
+  clusterByRegnum = enabled;
+  rebuildLocationsLayers(map);
+}
+
+export function isClusterByRegnumEnabled() {
+  return clusterByRegnum;
+}
+
+export function addLocationsLayer(
+  map,
+  { onClusterExpanded, onPointClick, clusterByRegnum: initialClusterByRegnum = true } = {}
+) {
   locationsData = enrichWithImages(points);
-
-  // Источник с кластеризацией
-  map.addSource("locations", {
-    type: "geojson",
-    data: locationsData,
-    cluster: true,
-    clusterMaxZoom: 14,
-    clusterRadius: 50
-  });
-
-  // Слой кластеров
-  map.addLayer({
-    id: "clusters",
-    type: "circle",
-    source: "locations",
-    filter: ["has", "point_count"],
-    paint: {
-      "circle-color": "#4a90e2",
-      "circle-radius": [
-        "step",
-        ["get", "point_count"],
-        18, 10,
-        24, 30,
-        32
-      ],
-      "circle-stroke-width": 2,
-      "circle-stroke-color": "#ffffff"
-    }
-  });
-
-  // Число точек внутри кластера
-  map.addLayer({
-    id: "cluster-count",
-    type: "symbol",
-    source: "locations",
-    filter: ["has", "point_count"],
-    layout: {
-      "text-field": "{point_count_abbreviated}",
-      "text-font": ["Open Sans Bold"],
-      "text-size": 12
-    },
-    paint: {
-      "text-color": "#ffffff"
-    }
-  });
-
-  // Одиночные точки
-  map.addLayer({
-    id: "unclustered-point",
-    type: "circle",
-    source: "locations",
-    filter: ["!", ["has", "point_count"]],
-    paint: {
-      "circle-color": "#ff6600",
-      "circle-radius": 6,
-      "circle-stroke-width": 1,
-      "circle-stroke-color": "#ffffff"
-    }
-  });
-
-  // Клик по кластеру → зум внутрь
-  map.on("click", "clusters", (e) => {
-    const features = map.queryRenderedFeatures(e.point, {
-      layers: ["clusters"]
-    });
-    if (!features.length) {
-      return;
-    }
-
-    const clusterId = features[0].properties.cluster_id;
-    const source = map.getSource("locations");
-
-    source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
-      if (leavesErr) {
-        return;
-      }
-
-      source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-        if (err) {
-          return;
-        }
-
-        map.easeTo({
-          center: features[0].geometry.coordinates,
-          zoom
-        });
-
-        map.once("moveend", () => {
-          map.once("idle", () => {
-            onClusterExpanded?.(leaves);
-          });
-        });
-      });
-    });
-  });
-
-  // Курсор при наведении на кластер — как у веб‑ссылки
-  map.on("mouseenter", "clusters", () => {
-    map.getCanvas().style.cursor = "pointer";
-  });
-
-  map.on("mouseleave", "clusters", () => {
-    map.getCanvas().style.cursor = "";
-  });
+  clusterByRegnum = initialClusterByRegnum;
+  onClusterExpandedCallback = onClusterExpanded;
+  onPointClickCallback = onPointClick;
+  rebuildLocationsLayers(map);
 }
