@@ -64,13 +64,19 @@ export default function MapView() {
   const refreshArealRef = useRef(refreshAreal);
   refreshArealRef.current = refreshAreal;
 
+  const arealRefreshScheduledRef = useRef(false);
+
   const scheduleArealRefresh = useCallback(() => {
     const mapInstance = map.current;
-    if (!mapInstance) {
+    // zoomend/moveend/sourcedata often fire together for a single gesture;
+    // avoid stacking multiple "idle" listeners that would refresh twice.
+    if (!mapInstance || arealRefreshScheduledRef.current) {
       return;
     }
 
+    arealRefreshScheduledRef.current = true;
     mapInstance.once("idle", () => {
+      arealRefreshScheduledRef.current = false;
       refreshArealRef.current();
     });
   }, []);

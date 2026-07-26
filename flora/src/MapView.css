@@ -32,25 +32,6 @@
 }
 
 
-.popup-panel {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  background: rgba(255, 255, 255, 0.85);
-  padding: 12px 16px;
-  border-radius: 8px;
-  max-width: 260px;
-  font-size: 14px;
-  z-index: 20;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-}
-
-.popup-panel pre {
-  margin: 8px 0 0;
-  font-size: 12px;
-  background: transparent;
-}
-
 .popup-images-btn {
   margin-top: 12px;
   padding: 8px 12px;

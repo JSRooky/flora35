@@ -69,10 +69,12 @@ export function getUnclusteredCenters(map, filters = {}, candidateFeatures = nul
   const sourceFeatures = map.querySourceFeatures("locations", {
     filter: ["!", ["has", "point_count"]]
   });
-  const renderedFeatures = map.queryRenderedFeatures({
-    layers: ["unclustered-point"]
-  });
-  const visibleFeatures = sourceFeatures.length > 0 ? sourceFeatures : renderedFeatures;
+  // queryRenderedFeatures does canvas hit-testing and is noticeably more
+  // expensive, so only fall back to it when source features aren't available.
+  const visibleFeatures =
+    sourceFeatures.length > 0
+      ? sourceFeatures
+      : map.queryRenderedFeatures({ layers: ["unclustered-point"] });
 
   if (candidateFeatures?.length) {
     const visibleKeys = new Set(
