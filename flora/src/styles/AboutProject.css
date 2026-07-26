@@ -1,52 +1,41 @@
-.about-project-trigger {
-  position: fixed;
-  left: 20px;
-  bottom: 20px;
-  z-index: 1000;
-  padding: 8px 14px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background-color: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(20px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  color: #333;
-  font-family: Arial, sans-serif;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.about-project-trigger:hover {
-  background-color: rgba(255, 255, 255, 0.95);
-}
-
 .about-project-overlay {
   position: fixed;
-  inset: 0;
-  z-index: 1100;
+  top: 49px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1090;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(12px, 3vw, 24px);
-  background: rgba(0, 0, 0, 0.45);
+  justify-content: flex-end;
+  background: rgba(0, 0, 0, 0.35);
 }
 
 .about-project-dialog {
   position: relative;
   box-sizing: border-box;
-  width: min(780px, 100%);
-  max-width: calc(100vw - 24px);
-  height: auto;
-  max-height: min(90vh, 900px);
+  width: min(420px, 100%);
+  height: 100%;
+  max-height: none;
   overflow: auto;
   padding: 20px 28px 24px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 6px;
-  background-color: rgba(255, 255, 255, 0.8);
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 0;
+  background-color: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
   font-family: Arial, sans-serif;
+  animation: aboutProjectSlideIn 0.3s ease-out;
+}
+
+@keyframes aboutProjectSlideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 .about-project-dialog-header {
@@ -121,11 +110,8 @@
 
 @media (max-width: 768px) {
   .about-project-dialog {
-    width: 100%;
-    max-width: none;
-    max-height: 90vh;
+    width: min(360px, 100%);
     padding: 18px 20px 20px;
-    border-radius: 6px;
   }
 
   .about-project-dialog-content {
@@ -134,20 +120,8 @@
 }
 
 @media (max-width: 480px) {
-  .about-project-overlay {
-    align-items: flex-end;
-    padding: 0;
-  }
-
   .about-project-dialog {
     width: 100%;
-    max-height: 92vh;
-    border-radius: 8px 8px 0 0;
     padding: 16px 16px 20px;
-  }
-
-  .about-project-trigger {
-    left: 12px;
-    bottom: 12px;
   }
 }
