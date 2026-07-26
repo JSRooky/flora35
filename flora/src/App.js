@@ -20,6 +20,7 @@ import FeaturePopup from "./components/FeaturePopup";
 import ArealPopup from "./components/ArealPopup";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
+import AboutProject from "./components/AboutProject";
 import "./MapView.css";
 
 const DEFAULT_CLUSTERING_ENABLED = true;
@@ -308,6 +309,7 @@ export default function MapView() {
           onCollapsedChange={setArealPopupCollapsed}
         />
       </div>
+      <AboutProject />
     </>
   );
 }
