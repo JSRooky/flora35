@@ -1,8 +1,14 @@
 import React from "react";
 import "../styles/ArealPopup.css";
 
-export default function ArealPopup({
-  enabled,
+const RADIUS_MIN = 0.5;
+const RADIUS_MAX = 15;
+
+function getRangeProgress(value) {
+  return ((value - RADIUS_MIN) / (RADIUS_MAX - RADIUS_MIN)) * 100;
+}
+
+export default function ArealPopup({  enabled,
   allMarkers,
   radius,
   onEnabledChange,
@@ -44,14 +50,14 @@ export default function ArealPopup({
           <input
             id="areal-radius-slider"
             type="range"
-            min={0.5}
-            max={15}
+            min={RADIUS_MIN}
+            max={RADIUS_MAX}
             step={0.1}
             value={radius}
             disabled={!isActive}
+            style={{ "--range-progress": `${getRangeProgress(radius)}%` }}
             onChange={(e) => onRadiusChange(Number(e.target.value))}
-          />
-        </div>
+          />        </div>
       </div>
     </div>
   );
