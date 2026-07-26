@@ -1,5 +1,8 @@
 .year-filter-panel {
+  box-sizing: border-box;
   width: 320px;
+  max-width: calc(100vw - 40px);
+  overflow-x: hidden;
   background-color: rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(20px);
   border: 1px solid #ddd;
@@ -13,11 +16,9 @@
 @keyframes yearFilterSlideIn {
   from {
     opacity: 0;
-    transform: translateX(20px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -35,6 +36,7 @@
   border-bottom: 2px solid #6f42c1;
   padding-bottom: 6px;
   flex: 1;
+  min-width: 0;
 }
 
 .year-filter-panel--collapsed .year-filter-panel-title {
@@ -79,6 +81,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
 }
 
 .year-filter-switch {
@@ -159,6 +162,7 @@
 .year-filter-switch-label {
   font-size: 13px;
   color: #333;
+  min-width: 0;
 }
 
 .year-filter-switch--disabled {
@@ -190,6 +194,7 @@
 .year-filter-dual-slider {
   position: relative;
   height: 24px;
+  overflow: hidden;
 }
 
 .year-filter-dual-slider::before {

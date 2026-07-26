@@ -1,4 +1,5 @@
 .feature-popup {
+  box-sizing: border-box;
   position: relative;
   background-color: rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(20px) ;
@@ -6,10 +7,11 @@
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   padding: 13px 14px;
-  max-width: 360px;
+  max-width: calc(100vw - 40px);
   width: 320px;
   height: auto;
-  overflow: visible; /* let popup expand with content; page will scroll if needed */
+  overflow-x: hidden;
+  overflow-y: auto;
   font-family: Arial, sans-serif;
   animation: slideIn 0.3s ease-out;
 }
@@ -17,11 +19,9 @@
 @keyframes slideIn {
   from {
     opacity: 0;
-    transform: translateX(-20px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -39,6 +39,7 @@
   border-bottom: 2px solid #007bff;
   padding-bottom: 7px;
   flex: 1;
+  min-width: 0;
 }
 
 .feature-popup--collapsed .feature-popup-title {

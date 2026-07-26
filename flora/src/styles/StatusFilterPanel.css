@@ -1,5 +1,8 @@
 .status-filter-panel {
-  width: 320px;
+  box-sizing: border-box;
+  width: 400px;
+  max-width: calc(100vw - 40px);
+  overflow-x: hidden;
   background-color: rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(20px);
   border: 1px solid #ddd;
@@ -13,11 +16,9 @@
 @keyframes statusFilterSlideIn {
   from {
     opacity: 0;
-    transform: translateX(20px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -91,6 +92,7 @@
 
 .status-filter-label {
   flex: 1;
+  min-width: 0;
   color: #555;
 }
 
