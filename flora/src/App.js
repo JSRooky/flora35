@@ -20,12 +20,15 @@ import FeaturePopup from "./components/FeaturePopup";
 import ArealPopup from "./components/ArealPopup";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
+import YearFilterPanel from "./components/YearFilterPanel";
 import AboutProject from "./components/AboutProject";
+import { getYearBounds } from "./components/yearBounds";
 import "./MapView.css";
 
 const DEFAULT_CLUSTERING_ENABLED = true;
 const DEFAULT_CLUSTER_BY_REGNUM = true;
 const DEFAULT_MARKERS_VISIBLE = true;
+const YEAR_BOUNDS = getYearBounds();
 
 export default function MapView() {
   const ref = useRef(null);
@@ -44,6 +47,8 @@ export default function MapView() {
   const [arealEnabled, setArealEnabled] = useState(false);
   const [arealAllMarkers, setArealAllMarkers] = useState(false);
   const [arealRadius, setArealRadius] = useState(5);
+  const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
+  const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
 
   const arealStateRef = useRef({});
   arealStateRef.current = {
@@ -52,7 +57,9 @@ export default function MapView() {
     arealAllMarkers,
     arealRadius,
     propertyFilters,
-    statusFilters
+    statusFilters,
+    yearFilterEnabled,
+    yearRange
   };
 
   const expandedLeavesRef = useRef(null);
@@ -65,7 +72,9 @@ export default function MapView() {
       arealAllMarkers: allMarkers,
       arealRadius: radiusKm,
       propertyFilters: filters,
-      statusFilters: selectedStatuses
+      statusFilters: selectedStatuses,
+      yearFilterEnabled: yearEnabled,
+      yearRange: selectedYearRange
     } = arealStateRef.current;
 
     if (!mapInstance || !feature) {
@@ -75,6 +84,9 @@ export default function MapView() {
     const combinedFilters = { ...filters };
     if (selectedStatuses.length > 0) {
       combinedFilters.status = selectedStatuses;
+    }
+    if (yearEnabled) {
+      combinedFilters.found_year = selectedYearRange;
     }
 
     refreshArealDisplay(mapInstance, {
@@ -116,8 +128,12 @@ export default function MapView() {
       filters.status = statusFilters;
     }
 
+    if (yearFilterEnabled) {
+      filters.found_year = yearRange;
+    }
+
     return filters;
-  }, [propertyFilters, statusFilters]);
+  }, [propertyFilters, statusFilters, yearFilterEnabled, yearRange]);
 
   useEffect(() => {
     if (!map.current) {
@@ -161,7 +177,7 @@ export default function MapView() {
 
   useEffect(() => {
     refreshAreal();
-  }, [popupData, arealEnabled, arealAllMarkers, arealRadius, propertyFilters, statusFilters, refreshAreal]);
+  }, [popupData, arealEnabled, arealAllMarkers, arealRadius, propertyFilters, statusFilters, yearFilterEnabled, yearRange, refreshAreal]);
 
   useEffect(() => {
     const mapInstance = map.current;
@@ -286,6 +302,12 @@ export default function MapView() {
           onClusteringEnabledChange={setClusteringEnabledState}
           clusterByRegnum={clusterByRegnum}
           onClusterByRegnumChange={setClusterByRegnumState}
+        />
+        <YearFilterPanel
+          enabled={yearFilterEnabled}
+          onEnabledChange={setYearFilterEnabled}
+          range={yearRange}
+          onRangeChange={setYearRange}
         />
       </div>
       <div className="popup-stack">

@@ -1,0 +1,238 @@
+.year-filter-panel {
+  width: 320px;
+  background-color: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 12px 16px;
+  font-family: Arial, sans-serif;
+  animation: yearFilterSlideIn 0.3s ease-out;
+}
+
+@keyframes yearFilterSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.year-filter-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.year-filter-panel-title {
+  margin: 0;
+  font-size: 15px;
+  color: #333;
+  border-bottom: 2px solid #6f42c1;
+  padding-bottom: 6px;
+  flex: 1;
+}
+
+.year-filter-panel--collapsed .year-filter-panel-title {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.year-filter-panel-toggle {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.6);
+  color: #333;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.year-filter-panel-toggle:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.year-filter-panel-summary {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.year-filter-panel-content {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.year-filter-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.year-filter-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.year-filter-switch-slider {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: #ccc;
+  border-radius: 20px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.year-filter-switch-slider::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.year-filter-switch input:checked + .year-filter-switch-slider {
+  background: #6f42c1;
+}
+
+.year-filter-switch input:checked + .year-filter-switch-slider::after {
+  transform: translateX(16px);
+}
+
+.year-filter-switch-label {
+  font-size: 13px;
+  color: #333;
+}
+
+.year-filter-range {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.year-filter-range--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.year-filter-range-label {
+  margin: 0;
+  font-size: 13px;
+  color: #555;
+}
+
+.year-filter-range-label strong {
+  color: #6f42c1;
+}
+
+.year-filter-dual-slider {
+  position: relative;
+  height: 24px;
+}
+
+.year-filter-dual-slider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: #ddd;
+}
+
+.year-filter-dual-slider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: var(--range-start);
+  right: calc(100% - var(--range-end));
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: #6f42c1;
+}
+
+.year-filter-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.year-filter-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  background: transparent;
+}
+
+.year-filter-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #6f42c1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.year-filter-slider::-moz-range-track {
+  height: 4px;
+  background: transparent;
+}
+
+.year-filter-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #6f42c1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.year-filter-slider--end {
+  z-index: 2;
+}
+
+.year-filter-slider--active {
+  z-index: 3;
+}
+
+.year-filter-bounds {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888;
+}

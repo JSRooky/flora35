@@ -10,7 +10,8 @@
         "name_ru": "Шиповник майский",
         "name_latin": "Rosa majalis",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1955
       },
       "geometry": {
         "type": "Point",
@@ -29,7 +30,8 @@
         "name_ru": "Одуванчик лекарственный",
         "name_latin": "Taraxacum officinale",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2013
       },
       "geometry": {
         "type": "Point",
@@ -48,7 +50,8 @@
         "name_ru": "Обыкновенная ласка",
         "name_latin": "Mustela nivalis",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2020
       },
       "geometry": {
         "type": "Point",
@@ -67,7 +70,8 @@
         "name_ru": "Берёза повислая",
         "name_latin": "Betula pendula",
         "found_by": "Кузнецов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1968
       },
       "geometry": {
         "type": "Point",
@@ -86,7 +90,8 @@
         "name_ru": "Европейская косуля",
         "name_latin": "Capreolus capreolus",
         "found_by": "Павлов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1964
       },
       "geometry": {
         "type": "Point",
@@ -105,7 +110,8 @@
         "name_ru": "Черника",
         "name_latin": "Vaccinium myrtillus",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1959
       },
       "geometry": {
         "type": "Point",
@@ -124,7 +130,8 @@
         "name_ru": "Лисица обыкновенная",
         "name_latin": "Vulpes vulpes",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1951
       },
       "geometry": {
         "type": "Point",
@@ -143,7 +150,8 @@
         "name_ru": "Сосна обыкновенная",
         "name_latin": "Pinus sylvestris",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2007
       },
       "geometry": {
         "type": "Point",
@@ -162,7 +170,8 @@
         "name_ru": "Белка обыкновенная",
         "name_latin": "Sciurus vulgaris",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1963
       },
       "geometry": {
         "type": "Point",
@@ -181,7 +190,8 @@
         "name_ru": "Ива белая",
         "name_latin": "Salix alba",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2005
       },
       "geometry": {
         "type": "Point",
@@ -200,7 +210,8 @@
         "name_ru": "Мятлик луговой",
         "name_latin": "Poa pratensis",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2017
       },
       "geometry": {
         "type": "Point",
@@ -219,7 +230,8 @@
         "name_ru": "Орел-мохноногий",
         "name_latin": "Aquila chrysaetos",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1992
       },
       "geometry": {
         "type": "Point",
@@ -238,7 +250,8 @@
         "name_ru": "Лютик едкий",
         "name_latin": "Ranunculus acris",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2016
       },
       "geometry": {
         "type": "Point",
@@ -257,7 +270,8 @@
         "name_ru": "Ворона серая",
         "name_latin": "Corvus cornix",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1967
       },
       "geometry": {
         "type": "Point",
@@ -276,7 +290,8 @@
         "name_ru": "Клевер луговой",
         "name_latin": "Trifolium pratense",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1959
       },
       "geometry": {
         "type": "Point",
@@ -295,7 +310,8 @@
         "name_ru": "Заяц-беляк",
         "name_latin": "Lepus timidus",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2021
       },
       "geometry": {
         "type": "Point",
@@ -314,7 +330,8 @@
         "name_ru": "Гречиха посевная",
         "name_latin": "Fagopyrum esculentum",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1974
       },
       "geometry": {
         "type": "Point",
@@ -333,7 +350,8 @@
         "name_ru": "Филин",
         "name_latin": "Bubo bubo",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1984
       },
       "geometry": {
         "type": "Point",
@@ -352,7 +370,8 @@
         "name_ru": "Сурепка обыкновенная",
         "name_latin": "Barbarea vulgaris",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1963
       },
       "geometry": {
         "type": "Point",
@@ -371,7 +390,8 @@
         "name_ru": "Полевка обыкновенная",
         "name_latin": "Microtus arvalis",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1964
       },
       "geometry": {
         "type": "Point",
@@ -390,7 +410,8 @@
         "name_ru": "Борщевик сибирский",
         "name_latin": "Heracleum sibiricum",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1995
       },
       "geometry": {
         "type": "Point",
@@ -409,7 +430,8 @@
         "name_ru": "Кряква",
         "name_latin": "Anas platyrhynchos",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1963
       },
       "geometry": {
         "type": "Point",
@@ -428,7 +450,8 @@
         "name_ru": "Фиалка трёхцветная",
         "name_latin": "Viola tricolor",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1953
       },
       "geometry": {
         "type": "Point",
@@ -447,7 +470,8 @@
         "name_ru": "Большой пёстрый дятел",
         "name_latin": "Dendrocopos major",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1951
       },
       "geometry": {
         "type": "Point",
@@ -466,7 +490,8 @@
         "name_ru": "Гвоздика полевая",
         "name_latin": "Dianthus deltoides",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2002
       },
       "geometry": {
         "type": "Point",
@@ -485,7 +510,8 @@
         "name_ru": "Рысь",
         "name_latin": "Lynx lynx",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1975
       },
       "geometry": {
         "type": "Point",
@@ -504,7 +530,8 @@
         "name_ru": "Мята луговая",
         "name_latin": "Mentha arvensis",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1968
       },
       "geometry": {
         "type": "Point",
@@ -523,7 +550,8 @@
         "name_ru": "Деревенская ласточка",
         "name_latin": "Hirundo rustica",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1975
       },
       "geometry": {
         "type": "Point",
@@ -542,7 +570,8 @@
         "name_ru": "Вяз шершавый",
         "name_latin": "Ulmus glabra",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1990
       },
       "geometry": {
         "type": "Point",
@@ -561,7 +590,8 @@
         "name_ru": "Зяблик",
         "name_latin": "Fringilla coelebs",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1972
       },
       "geometry": {
         "type": "Point",
@@ -580,7 +610,8 @@
         "name_ru": "Ель обыкновенная",
         "name_latin": "Picea abies",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1986
       },
       "geometry": {
         "type": "Point",
@@ -599,7 +630,8 @@
         "name_ru": "Кабан",
         "name_latin": "Sus scrofa",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1969
       },
       "geometry": {
         "type": "Point",
@@ -618,7 +650,8 @@
         "name_ru": "Осина",
         "name_latin": "Populus tremula",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2001
       },
       "geometry": {
         "type": "Point",
@@ -637,7 +670,8 @@
         "name_ru": "Бобр",
         "name_latin": "Castor fiber",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1976
       },
       "geometry": {
         "type": "Point",
@@ -656,7 +690,8 @@
         "name_ru": "Лещина обыкновенная",
         "name_latin": "Corylus avellana",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1966
       },
       "geometry": {
         "type": "Point",
@@ -675,7 +710,8 @@
         "name_ru": "Заяц-русак",
         "name_latin": "Lepus europaeus",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2019
       },
       "geometry": {
         "type": "Point",
@@ -694,7 +730,8 @@
         "name_ru": "Калина обыкновенная",
         "name_latin": "Viburnum opulus",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1976
       },
       "geometry": {
         "type": "Point",
@@ -713,7 +750,8 @@
         "name_ru": "Бурый медведь",
         "name_latin": "Ursus arctos",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2011
       },
       "geometry": {
         "type": "Point",
@@ -732,7 +770,8 @@
         "name_ru": "Черёмуха обыкновенная",
         "name_latin": "Prunus padus",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2008
       },
       "geometry": {
         "type": "Point",
@@ -751,7 +790,8 @@
         "name_ru": "Волк",
         "name_latin": "Canis lupus",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2024
       },
       "geometry": {
         "type": "Point",
@@ -770,7 +810,8 @@
         "name_ru": "Рябина обыкновенная",
         "name_latin": "Sorbus aucuparia",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2014
       },
       "geometry": {
         "type": "Point",
@@ -789,7 +830,8 @@
         "name_ru": "Серая неясыть",
         "name_latin": "Strix aluco",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1972
       },
       "geometry": {
         "type": "Point",
@@ -808,7 +850,8 @@
         "name_ru": "Подорожник большой",
         "name_latin": "Plantago major",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2018
       },
       "geometry": {
         "type": "Point",
@@ -827,7 +870,8 @@
         "name_ru": "Сойка",
         "name_latin": "Garrulus glandarius",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1980
       },
       "geometry": {
         "type": "Point",
@@ -846,7 +890,8 @@
         "name_ru": "Крапива двудомная",
         "name_latin": "Urtica dioica",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1958
       },
       "geometry": {
         "type": "Point",
@@ -865,7 +910,8 @@
         "name_ru": "Снегирь",
         "name_latin": "Pyrrhula pyrrhula",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1974
       },
       "geometry": {
         "type": "Point",
@@ -884,7 +930,8 @@
         "name_ru": "Ландыш майский",
         "name_latin": "Convallaria majalis",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1988
       },
       "geometry": {
         "type": "Point",
@@ -903,7 +950,8 @@
         "name_ru": "Большая синица",
         "name_latin": "Parus major",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2016
       },
       "geometry": {
         "type": "Point",
@@ -922,7 +970,8 @@
         "name_ru": "Можжевельник обыкновенный",
         "name_latin": "Juniperus communis",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2024
       },
       "geometry": {
         "type": "Point",
@@ -941,7 +990,8 @@
         "name_ru": "Скворец",
         "name_latin": "Sturnus vulgaris",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1979
       },
       "geometry": {
         "type": "Point",
@@ -960,7 +1010,8 @@
         "name_ru": "Иван-чай узколистный",
         "name_latin": "Chamaenerion angustifolium",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1999
       },
       "geometry": {
         "type": "Point",
@@ -979,7 +1030,8 @@
         "name_ru": "Полевой жаворонок",
         "name_latin": "Alauda arvensis",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1959
       },
       "geometry": {
         "type": "Point",
@@ -998,7 +1050,8 @@
         "name_ru": "Брусника",
         "name_latin": "Vaccinium vitis-idaea",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1991
       },
       "geometry": {
         "type": "Point",
@@ -1017,7 +1070,8 @@
         "name_ru": "Перепел",
         "name_latin": "Coturnix coturnix",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2002
       },
       "geometry": {
         "type": "Point",
@@ -1036,7 +1090,8 @@
         "name_ru": "Клюква болотная",
         "name_latin": "Vaccinium oxycoccos",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1970
       },
       "geometry": {
         "type": "Point",
@@ -1055,7 +1110,8 @@
         "name_ru": "Тетерев",
         "name_latin": "Lyrurus tetrix",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1969
       },
       "geometry": {
         "type": "Point",
@@ -1074,7 +1130,8 @@
         "name_ru": "Ромашка аптечная",
         "name_latin": "Matricaria chamomilla",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2006
       },
       "geometry": {
         "type": "Point",
@@ -1093,7 +1150,8 @@
         "name_ru": "Глухарь",
         "name_latin": "Tetrao urogallus",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1970
       },
       "geometry": {
         "type": "Point",
@@ -1112,7 +1170,8 @@
         "name_ru": "Лопух большой",
         "name_latin": "Arctium lappa",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1953
       },
       "geometry": {
         "type": "Point",
@@ -1131,7 +1190,8 @@
         "name_ru": "Ёж европейский",
         "name_latin": "Erinaceus europaeus",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1984
       },
       "geometry": {
         "type": "Point",
@@ -1150,7 +1210,8 @@
         "name_ru": "Хвощ лесной",
         "name_latin": "Equisetum sylvaticum",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1962
       },
       "geometry": {
         "type": "Point",
@@ -1169,7 +1230,8 @@
         "name_ru": "Обыкновенный крот",
         "name_latin": "Talpa europaea",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1969
       },
       "geometry": {
         "type": "Point",
@@ -1188,7 +1250,8 @@
         "name_ru": "Папоротник орляк",
         "name_latin": "Pteridium aquilinum",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1950
       },
       "geometry": {
         "type": "Point",
@@ -1207,7 +1270,8 @@
         "name_ru": "Водяная летучая мышь",
         "name_latin": "Myotis daubentonii",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2009
       },
       "geometry": {
         "type": "Point",
@@ -1226,7 +1290,8 @@
         "name_ru": "Багульник болотный",
         "name_latin": "Rhododendron tomentosum",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2023
       },
       "geometry": {
         "type": "Point",
@@ -1245,7 +1310,8 @@
         "name_ru": "Выдра",
         "name_latin": "Lutra lutra",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2019
       },
       "geometry": {
         "type": "Point",
@@ -1264,7 +1330,8 @@
         "name_ru": "Ольха чёрная",
         "name_latin": "Alnus glutinosa",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1982
       },
       "geometry": {
         "type": "Point",
@@ -1283,7 +1350,8 @@
         "name_ru": "Барсук",
         "name_latin": "Meles meles",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1997
       },
       "geometry": {
         "type": "Point",
@@ -1302,7 +1370,8 @@
         "name_ru": "Камыш обыкновенный",
         "name_latin": "Phragmites australis",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1951
       },
       "geometry": {
         "type": "Point",
@@ -1321,7 +1390,8 @@
         "name_ru": "Лось",
         "name_latin": "Alces alces",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2002
       },
       "geometry": {
         "type": "Point",
@@ -1340,7 +1410,8 @@
         "name_ru": "Рогоз широколистный",
         "name_latin": "Typha latifolia",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1985
       },
       "geometry": {
         "type": "Point",
@@ -1359,7 +1430,8 @@
         "name_ru": "Серый гусь",
         "name_latin": "Anser anser",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1955
       },
       "geometry": {
         "type": "Point",
@@ -1378,7 +1450,8 @@
         "name_ru": "Кувшинка белая",
         "name_latin": "Nymphaea alba",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1975
       },
       "geometry": {
         "type": "Point",
@@ -1397,7 +1470,8 @@
         "name_ru": "Лебедь-шипун",
         "name_latin": "Cygnus olor",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1971
       },
       "geometry": {
         "type": "Point",
@@ -1416,7 +1490,8 @@
         "name_ru": "Любка двулистная",
         "name_latin": "Platanthera bifolia",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2007
       },
       "geometry": {
         "type": "Point",
@@ -1435,7 +1510,8 @@
         "name_ru": "Озёрная чайка",
         "name_latin": "Larus ridibundus",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1963
       },
       "geometry": {
         "type": "Point",
@@ -1454,7 +1530,8 @@
         "name_ru": "Вороний глаз",
         "name_latin": "Paris quadrifolia",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1961
       },
       "geometry": {
         "type": "Point",
@@ -1473,7 +1550,8 @@
         "name_ru": "Соловей",
         "name_latin": "Luscinia luscinia",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1983
       },
       "geometry": {
         "type": "Point",
@@ -1492,7 +1570,8 @@
         "name_ru": "Звездчатка лесная",
         "name_latin": "Stellaria holostea",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1957
       },
       "geometry": {
         "type": "Point",
@@ -1511,7 +1590,8 @@
         "name_ru": "Дубонос",
         "name_latin": "Coccothraustes coccothraustes",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2010
       },
       "geometry": {
         "type": "Point",
@@ -1530,7 +1610,8 @@
         "name_ru": "Белый гриб",
         "name_latin": "Boletus edulis",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2023
       },
       "geometry": {
         "type": "Point",
@@ -1549,7 +1630,8 @@
         "name_ru": "Подберёзовик",
         "name_latin": "Leccinum scabrum",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1970
       },
       "geometry": {
         "type": "Point",
@@ -1568,7 +1650,8 @@
         "name_ru": "Подосиновик",
         "name_latin": "Leccinum aurantiacum",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1984
       },
       "geometry": {
         "type": "Point",
@@ -1587,7 +1670,8 @@
         "name_ru": "Лисичка обыкновенная",
         "name_latin": "Cantharellus cibarius",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1974
       },
       "geometry": {
         "type": "Point",
@@ -1606,7 +1690,8 @@
         "name_ru": "Опёнок осенний",
         "name_latin": "Armillaria mellea",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1958
       },
       "geometry": {
         "type": "Point",
@@ -1625,7 +1710,8 @@
         "name_ru": "Сыроежка",
         "name_latin": "Russula emetica",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2013
       },
       "geometry": {
         "type": "Point",
@@ -1644,7 +1730,8 @@
         "name_ru": "Моховик",
         "name_latin": "Suillus bovinus",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1955
       },
       "geometry": {
         "type": "Point",
@@ -1663,7 +1750,8 @@
         "name_ru": "Маслёнок",
         "name_latin": "Suillus luteus",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2004
       },
       "geometry": {
         "type": "Point",
@@ -1682,7 +1770,8 @@
         "name_ru": "Груздь настоящий",
         "name_latin": "Lactarius resimus",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2023
       },
       "geometry": {
         "type": "Point",
@@ -1701,7 +1790,8 @@
         "name_ru": "Рыжик",
         "name_latin": "Lactarius deliciosus",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2004
       },
       "geometry": {
         "type": "Point",
@@ -1720,7 +1810,8 @@
         "name_ru": "Сморчок съедобный",
         "name_latin": "Morchella esculenta",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1994
       },
       "geometry": {
         "type": "Point",
@@ -1739,7 +1830,8 @@
         "name_ru": "Строчок",
         "name_latin": "Helvella crispa",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1991
       },
       "geometry": {
         "type": "Point",
@@ -1758,7 +1850,8 @@
         "name_ru": "Трутовик настоящий",
         "name_latin": "Fomes fomentarius",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1988
       },
       "geometry": {
         "type": "Point",
@@ -1777,7 +1870,8 @@
         "name_ru": "Грифола куриная",
         "name_latin": "Grifola frondosa",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2014
       },
       "geometry": {
         "type": "Point",
@@ -1796,7 +1890,8 @@
         "name_ru": "Шампиньон луговой",
         "name_latin": "Agaricus campestris",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2025
       },
       "geometry": {
         "type": "Point",
@@ -1815,7 +1910,8 @@
         "name_ru": "Шампиньон лесной",
         "name_latin": "Agaricus silvaticus",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2001
       },
       "geometry": {
         "type": "Point",
@@ -1834,7 +1930,8 @@
         "name_ru": "Вешенка обыкновенная",
         "name_latin": "Pleurotus ostreatus",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1977
       },
       "geometry": {
         "type": "Point",
@@ -1853,7 +1950,8 @@
         "name_ru": "Навозник",
         "name_latin": "Coprinus comatus",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1982
       },
       "geometry": {
         "type": "Point",
@@ -1872,7 +1970,8 @@
         "name_ru": "Мухомор красный",
         "name_latin": "Amanita muscaria",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2004
       },
       "geometry": {
         "type": "Point",
@@ -1891,7 +1990,8 @@
         "name_ru": "Бледная поганка",
         "name_latin": "Amanita phalloides",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2001
       },
       "geometry": {
         "type": "Point",
@@ -1910,7 +2010,8 @@
         "name_ru": "Тур",
         "name_latin": "Bos primigenius",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1977
       },
       "geometry": {
         "type": "Point",
@@ -1929,7 +2030,8 @@
         "name_ru": "Тарпан",
         "name_latin": "Equus ferus ferus",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2022
       },
       "geometry": {
         "type": "Point",
@@ -1948,7 +2050,8 @@
         "name_ru": "Гагарка",
         "name_latin": "Pinguinus impennis",
         "found_by": "Сидоров",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1980
       },
       "geometry": {
         "type": "Point",
@@ -1967,7 +2070,8 @@
         "name_ru": "Морская корова Стеллера",
         "name_latin": "Hydrodamalis gigas",
         "found_by": "Павлов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1967
       },
       "geometry": {
         "type": "Point",
@@ -1986,7 +2090,8 @@
         "name_ru": "Зубр европейский",
         "name_latin": "Bison bonasus",
         "found_by": "Кузнецов",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2018
       },
       "geometry": {
         "type": "Point",
@@ -2005,7 +2110,8 @@
         "name_ru": "Лошадь Пржевальского",
         "name_latin": "Equus przewalskii",
         "found_by": "Иванов",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1996
       },
       "geometry": {
         "type": "Point",
@@ -2024,7 +2130,8 @@
         "name_ru": "Одуванчик лекарственный",
         "name_latin": "Taraxacum officinale",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1980
       },
       "geometry": {
         "type": "Point",
@@ -2043,7 +2150,8 @@
         "name_ru": "Одуванчик лекарственный",
         "name_latin": "Taraxacum officinale",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1964
       },
       "geometry": {
         "type": "Point",
@@ -2062,7 +2170,8 @@
         "name_ru": "Берёза повислая",
         "name_latin": "Betula pendula",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1964
       },
       "geometry": {
         "type": "Point",
@@ -2081,7 +2190,8 @@
         "name_ru": "Берёза повислая",
         "name_latin": "Betula pendula",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1973
       },
       "geometry": {
         "type": "Point",
@@ -2100,7 +2210,8 @@
         "name_ru": "Лисица обыкновенная",
         "name_latin": "Vulpes vulpes",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2005
       },
       "geometry": {
         "type": "Point",
@@ -2119,7 +2230,8 @@
         "name_ru": "Лисица обыкновенная",
         "name_latin": "Vulpes vulpes",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1954
       },
       "geometry": {
         "type": "Point",
@@ -2138,7 +2250,8 @@
         "name_ru": "Белка обыкновенная",
         "name_latin": "Sciurus vulgaris",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1976
       },
       "geometry": {
         "type": "Point",
@@ -2157,7 +2270,8 @@
         "name_ru": "Мятлик луговой",
         "name_latin": "Poa pratensis",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2009
       },
       "geometry": {
         "type": "Point",
@@ -2176,7 +2290,8 @@
         "name_ru": "Орел-мохноногий",
         "name_latin": "Aquila chrysaetos",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1990
       },
       "geometry": {
         "type": "Point",
@@ -2195,7 +2310,8 @@
         "name_ru": "Лютик едкий",
         "name_latin": "Ranunculus acris",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2012
       },
       "geometry": {
         "type": "Point",
@@ -2214,7 +2330,8 @@
         "name_ru": "Лютик едкий",
         "name_latin": "Ranunculus acris",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1972
       },
       "geometry": {
         "type": "Point",
@@ -2233,7 +2350,8 @@
         "name_ru": "Гречиха посевная",
         "name_latin": "Fagopyrum esculentum",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1957
       },
       "geometry": {
         "type": "Point",
@@ -2252,7 +2370,8 @@
         "name_ru": "Гречиха посевная",
         "name_latin": "Fagopyrum esculentum",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1969
       },
       "geometry": {
         "type": "Point",
@@ -2271,7 +2390,8 @@
         "name_ru": "Кряква",
         "name_latin": "Anas platyrhynchos",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1960
       },
       "geometry": {
         "type": "Point",
@@ -2290,7 +2410,8 @@
         "name_ru": "Кряква",
         "name_latin": "Anas platyrhynchos",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2001
       },
       "geometry": {
         "type": "Point",
@@ -2309,7 +2430,8 @@
         "name_ru": "Фиалка трёхцветная",
         "name_latin": "Viola tricolor",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2024
       },
       "geometry": {
         "type": "Point",
@@ -2328,7 +2450,8 @@
         "name_ru": "Большой пёстрый дятел",
         "name_latin": "Dendrocopos major",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1997
       },
       "geometry": {
         "type": "Point",
@@ -2347,7 +2470,8 @@
         "name_ru": "Большой пёстрый дятел",
         "name_latin": "Dendrocopos major",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1975
       },
       "geometry": {
         "type": "Point",
@@ -2366,7 +2490,8 @@
         "name_ru": "Рысь",
         "name_latin": "Lynx lynx",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1974
       },
       "geometry": {
         "type": "Point",
@@ -2385,7 +2510,8 @@
         "name_ru": "Рысь",
         "name_latin": "Lynx lynx",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1956
       },
       "geometry": {
         "type": "Point",
@@ -2404,7 +2530,8 @@
         "name_ru": "Мята луговая",
         "name_latin": "Mentha arvensis",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1983
       },
       "geometry": {
         "type": "Point",
@@ -2423,7 +2550,8 @@
         "name_ru": "Вяз шершавый",
         "name_latin": "Ulmus glabra",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2020
       },
       "geometry": {
         "type": "Point",
@@ -2442,7 +2570,8 @@
         "name_ru": "Вяз шершавый",
         "name_latin": "Ulmus glabra",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1997
       },
       "geometry": {
         "type": "Point",
@@ -2461,7 +2590,8 @@
         "name_ru": "Зяблик",
         "name_latin": "Fringilla coelebs",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1977
       },
       "geometry": {
         "type": "Point",
@@ -2480,7 +2610,8 @@
         "name_ru": "Зяблик",
         "name_latin": "Fringilla coelebs",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2001
       },
       "geometry": {
         "type": "Point",
@@ -2499,7 +2630,8 @@
         "name_ru": "Ель обыкновенная",
         "name_latin": "Picea abies",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1980
       },
       "geometry": {
         "type": "Point",
@@ -2518,7 +2650,8 @@
         "name_ru": "Бобр",
         "name_latin": "Castor fiber",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1971
       },
       "geometry": {
         "type": "Point",
@@ -2537,7 +2670,8 @@
         "name_ru": "Лещина обыкновенная",
         "name_latin": "Corylus avellana",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2010
       },
       "geometry": {
         "type": "Point",
@@ -2556,7 +2690,8 @@
         "name_ru": "Лещина обыкновенная",
         "name_latin": "Corylus avellana",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2015
       },
       "geometry": {
         "type": "Point",
@@ -2575,7 +2710,8 @@
         "name_ru": "Заяц-русак",
         "name_latin": "Lepus europaeus",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1950
       },
       "geometry": {
         "type": "Point",
@@ -2594,7 +2730,8 @@
         "name_ru": "Калина обыкновенная",
         "name_latin": "Viburnum opulus",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1988
       },
       "geometry": {
         "type": "Point",
@@ -2613,7 +2750,8 @@
         "name_ru": "Бурый медведь",
         "name_latin": "Ursus arctos",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 2004
       },
       "geometry": {
         "type": "Point",
@@ -2632,7 +2770,8 @@
         "name_ru": "Волк",
         "name_latin": "Canis lupus",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1957
       },
       "geometry": {
         "type": "Point",
@@ -2651,7 +2790,8 @@
         "name_ru": "Волк",
         "name_latin": "Canis lupus",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2010
       },
       "geometry": {
         "type": "Point",
@@ -2670,7 +2810,8 @@
         "name_ru": "Рябина обыкновенная",
         "name_latin": "Sorbus aucuparia",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1996
       },
       "geometry": {
         "type": "Point",
@@ -2689,7 +2830,8 @@
         "name_ru": "Рябина обыкновенная",
         "name_latin": "Sorbus aucuparia",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1985
       },
       "geometry": {
         "type": "Point",
@@ -2708,7 +2850,8 @@
         "name_ru": "Серая неясыть",
         "name_latin": "Strix aluco",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2006
       },
       "geometry": {
         "type": "Point",
@@ -2727,7 +2870,8 @@
         "name_ru": "Серая неясыть",
         "name_latin": "Strix aluco",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1952
       },
       "geometry": {
         "type": "Point",
@@ -2746,7 +2890,8 @@
         "name_ru": "Сойка",
         "name_latin": "Garrulus glandarius",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 2025
       },
       "geometry": {
         "type": "Point",
@@ -2765,7 +2910,8 @@
         "name_ru": "Крапива двудомная",
         "name_latin": "Urtica dioica",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 2008
       },
       "geometry": {
         "type": "Point",
@@ -2784,7 +2930,8 @@
         "name_ru": "Крапива двудомная",
         "name_latin": "Urtica dioica",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2016
       },
       "geometry": {
         "type": "Point",
@@ -2803,7 +2950,8 @@
         "name_ru": "Ландыш майский",
         "name_latin": "Convallaria majalis",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1974
       },
       "geometry": {
         "type": "Point",
@@ -2822,7 +2970,8 @@
         "name_ru": "Ландыш майский",
         "name_latin": "Convallaria majalis",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1979
       },
       "geometry": {
         "type": "Point",
@@ -2841,7 +2990,8 @@
         "name_ru": "Большая синица",
         "name_latin": "Parus major",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1998
       },
       "geometry": {
         "type": "Point",
@@ -2860,7 +3010,8 @@
         "name_ru": "Можжевельник обыкновенный",
         "name_latin": "Juniperus communis",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1952
       },
       "geometry": {
         "type": "Point",
@@ -2879,7 +3030,8 @@
         "name_ru": "Скворец",
         "name_latin": "Sturnus vulgaris",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 2015
       },
       "geometry": {
         "type": "Point",
@@ -2898,7 +3050,8 @@
         "name_ru": "Полевой жаворонок",
         "name_latin": "Alauda arvensis",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2007
       },
       "geometry": {
         "type": "Point",
@@ -2917,7 +3070,8 @@
         "name_ru": "Полевой жаворонок",
         "name_latin": "Alauda arvensis",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1970
       },
       "geometry": {
         "type": "Point",
@@ -2936,7 +3090,8 @@
         "name_ru": "Брусника",
         "name_latin": "Vaccinium vitis-idaea",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2014
       },
       "geometry": {
         "type": "Point",
@@ -2955,7 +3110,8 @@
         "name_ru": "Клюква болотная",
         "name_latin": "Vaccinium oxycoccos",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1957
       },
       "geometry": {
         "type": "Point",
@@ -2974,7 +3130,8 @@
         "name_ru": "Клюква болотная",
         "name_latin": "Vaccinium oxycoccos",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 2018
       },
       "geometry": {
         "type": "Point",
@@ -2993,7 +3150,8 @@
         "name_ru": "Тетерев",
         "name_latin": "Lyrurus tetrix",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 2024
       },
       "geometry": {
         "type": "Point",
@@ -3012,7 +3170,8 @@
         "name_ru": "Тетерев",
         "name_latin": "Lyrurus tetrix",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1959
       },
       "geometry": {
         "type": "Point",
@@ -3031,7 +3190,8 @@
         "name_ru": "Ромашка аптечная",
         "name_latin": "Matricaria chamomilla",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1999
       },
       "geometry": {
         "type": "Point",
@@ -3050,7 +3210,8 @@
         "name_ru": "Глухарь",
         "name_latin": "Tetrao urogallus",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1955
       },
       "geometry": {
         "type": "Point",
@@ -3069,7 +3230,8 @@
         "name_ru": "Ёж европейский",
         "name_latin": "Erinaceus europaeus",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2023
       },
       "geometry": {
         "type": "Point",
@@ -3088,7 +3250,8 @@
         "name_ru": "Хвощ лесной",
         "name_latin": "Equisetum sylvaticum",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1992
       },
       "geometry": {
         "type": "Point",
@@ -3107,7 +3270,8 @@
         "name_ru": "Хвощ лесной",
         "name_latin": "Equisetum sylvaticum",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1960
       },
       "geometry": {
         "type": "Point",
@@ -3126,7 +3290,8 @@
         "name_ru": "Обыкновенный крот",
         "name_latin": "Talpa europaea",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 2014
       },
       "geometry": {
         "type": "Point",
@@ -3145,7 +3310,8 @@
         "name_ru": "Папоротник орляк",
         "name_latin": "Pteridium aquilinum",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1951
       },
       "geometry": {
         "type": "Point",
@@ -3164,7 +3330,8 @@
         "name_ru": "Папоротник орляк",
         "name_latin": "Pteridium aquilinum",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2020
       },
       "geometry": {
         "type": "Point",
@@ -3183,7 +3350,8 @@
         "name_ru": "Водяная летучая мышь",
         "name_latin": "Myotis daubentonii",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1968
       },
       "geometry": {
         "type": "Point",
@@ -3202,7 +3370,8 @@
         "name_ru": "Водяная летучая мышь",
         "name_latin": "Myotis daubentonii",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1959
       },
       "geometry": {
         "type": "Point",
@@ -3221,7 +3390,8 @@
         "name_ru": "Выдра",
         "name_latin": "Lutra lutra",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1989
       },
       "geometry": {
         "type": "Point",
@@ -3240,7 +3410,8 @@
         "name_ru": "Барсук",
         "name_latin": "Meles meles",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1960
       },
       "geometry": {
         "type": "Point",
@@ -3259,7 +3430,8 @@
         "name_ru": "Барсук",
         "name_latin": "Meles meles",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 2020
       },
       "geometry": {
         "type": "Point",
@@ -3278,7 +3450,8 @@
         "name_ru": "Камыш обыкновенный",
         "name_latin": "Phragmites australis",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1973
       },
       "geometry": {
         "type": "Point",
@@ -3297,7 +3470,8 @@
         "name_ru": "Кувшинка белая",
         "name_latin": "Nymphaea alba",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1955
       },
       "geometry": {
         "type": "Point",
@@ -3316,7 +3490,8 @@
         "name_ru": "Кувшинка белая",
         "name_latin": "Nymphaea alba",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 2011
       },
       "geometry": {
         "type": "Point",
@@ -3335,7 +3510,8 @@
         "name_ru": "Лебедь-шипун",
         "name_latin": "Cygnus olor",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1956
       },
       "geometry": {
         "type": "Point",
@@ -3354,7 +3530,8 @@
         "name_ru": "Лебедь-шипун",
         "name_latin": "Cygnus olor",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1988
       },
       "geometry": {
         "type": "Point",
@@ -3373,7 +3550,8 @@
         "name_ru": "Любка двулистная",
         "name_latin": "Platanthera bifolia",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 2004
       },
       "geometry": {
         "type": "Point",
@@ -3392,7 +3570,8 @@
         "name_ru": "Соловей",
         "name_latin": "Luscinia luscinia",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2025
       },
       "geometry": {
         "type": "Point",
@@ -3411,7 +3590,8 @@
         "name_ru": "Соловей",
         "name_latin": "Luscinia luscinia",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2006
       },
       "geometry": {
         "type": "Point",
@@ -3430,7 +3610,8 @@
         "name_ru": "Звездчатка лесная",
         "name_latin": "Stellaria holostea",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2017
       },
       "geometry": {
         "type": "Point",
@@ -3449,7 +3630,8 @@
         "name_ru": "Дубонос",
         "name_latin": "Coccothraustes coccothraustes",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1963
       },
       "geometry": {
         "type": "Point",
@@ -3468,7 +3650,8 @@
         "name_ru": "Дубонос",
         "name_latin": "Coccothraustes coccothraustes",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1951
       },
       "geometry": {
         "type": "Point",
@@ -3487,7 +3670,8 @@
         "name_ru": "Подосиновик",
         "name_latin": "Leccinum aurantiacum",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2020
       },
       "geometry": {
         "type": "Point",
@@ -3506,7 +3690,8 @@
         "name_ru": "Подосиновик",
         "name_latin": "Leccinum aurantiacum",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2007
       },
       "geometry": {
         "type": "Point",
@@ -3525,7 +3710,8 @@
         "name_ru": "Опёнок осенний",
         "name_latin": "Armillaria mellea",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1956
       },
       "geometry": {
         "type": "Point",
@@ -3544,7 +3730,8 @@
         "name_ru": "Сыроежка",
         "name_latin": "Russula emetica",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 2009
       },
       "geometry": {
         "type": "Point",
@@ -3563,7 +3750,8 @@
         "name_ru": "Моховик",
         "name_latin": "Suillus bovinus",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1998
       },
       "geometry": {
         "type": "Point",
@@ -3582,7 +3770,8 @@
         "name_ru": "Моховик",
         "name_latin": "Suillus bovinus",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1959
       },
       "geometry": {
         "type": "Point",
@@ -3601,7 +3790,8 @@
         "name_ru": "Рыжик",
         "name_latin": "Lactarius deliciosus",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2025
       },
       "geometry": {
         "type": "Point",
@@ -3620,7 +3810,8 @@
         "name_ru": "Строчок",
         "name_latin": "Helvella crispa",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1992
       },
       "geometry": {
         "type": "Point",
@@ -3639,7 +3830,8 @@
         "name_ru": "Строчок",
         "name_latin": "Helvella crispa",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 2014
       },
       "geometry": {
         "type": "Point",
@@ -3658,7 +3850,8 @@
         "name_ru": "Грифола куриная",
         "name_latin": "Grifola frondosa",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1969
       },
       "geometry": {
         "type": "Point",
@@ -3677,7 +3870,8 @@
         "name_ru": "Грифола куриная",
         "name_latin": "Grifola frondosa",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2004
       },
       "geometry": {
         "type": "Point",
@@ -3696,7 +3890,8 @@
         "name_ru": "Шампиньон луговой",
         "name_latin": "Agaricus campestris",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2005
       },
       "geometry": {
         "type": "Point",
@@ -3715,7 +3910,8 @@
         "name_ru": "Шампиньон луговой",
         "name_latin": "Agaricus campestris",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1996
       },
       "geometry": {
         "type": "Point",
@@ -3734,7 +3930,8 @@
         "name_ru": "Шампиньон лесной",
         "name_latin": "Agaricus silvaticus",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1980
       },
       "geometry": {
         "type": "Point",
@@ -3753,7 +3950,8 @@
         "name_ru": "Вешенка обыкновенная",
         "name_latin": "Pleurotus ostreatus",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1998
       },
       "geometry": {
         "type": "Point",
@@ -3772,7 +3970,8 @@
         "name_ru": "Навозник",
         "name_latin": "Coprinus comatus",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1951
       },
       "geometry": {
         "type": "Point",
@@ -3791,7 +3990,8 @@
         "name_ru": "Мухомор красный",
         "name_latin": "Amanita muscaria",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 2009
       },
       "geometry": {
         "type": "Point",
@@ -3810,7 +4010,8 @@
         "name_ru": "Бледная поганка",
         "name_latin": "Amanita phalloides",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1967
       },
       "geometry": {
         "type": "Point",
@@ -3829,7 +4030,8 @@
         "name_ru": "Бледная поганка",
         "name_latin": "Amanita phalloides",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1983
       },
       "geometry": {
         "type": "Point",
@@ -3848,7 +4050,8 @@
         "name_ru": "Тур",
         "name_latin": "Bos primigenius",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2011
       },
       "geometry": {
         "type": "Point",
@@ -3867,7 +4070,8 @@
         "name_ru": "Тарпан",
         "name_latin": "Equus ferus ferus",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1992
       },
       "geometry": {
         "type": "Point",
@@ -3886,7 +4090,8 @@
         "name_ru": "Лошадь Пржевальского",
         "name_latin": "Equus przewalskii",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2000
       },
       "geometry": {
         "type": "Point",
@@ -3905,7 +4110,8 @@
         "name_ru": "Лошадь Пржевальского",
         "name_latin": "Equus przewalskii",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1977
       },
       "geometry": {
         "type": "Point",
@@ -3924,7 +4130,8 @@
         "name_ru": "Борщевик сибирский",
         "name_latin": "Heracleum sibiricum",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1964
       },
       "geometry": {
         "type": "Point",
@@ -3943,7 +4150,8 @@
         "name_ru": "Трутовик настоящий",
         "name_latin": "Fomes fomentarius",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2001
       },
       "geometry": {
         "type": "Point",
@@ -3962,7 +4170,8 @@
         "name_ru": "Осина",
         "name_latin": "Populus tremula",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1953
       },
       "geometry": {
         "type": "Point",
@@ -3981,7 +4190,8 @@
         "name_ru": "Озёрная чайка",
         "name_latin": "Larus ridibundus",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 2026
       },
       "geometry": {
         "type": "Point",
@@ -4000,7 +4210,8 @@
         "name_ru": "Дубонос",
         "name_latin": "Coccothraustes coccothraustes",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2011
       },
       "geometry": {
         "type": "Point",
@@ -4019,7 +4230,8 @@
         "name_ru": "Моховик",
         "name_latin": "Suillus bovinus",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1974
       },
       "geometry": {
         "type": "Point",
@@ -4038,7 +4250,8 @@
         "name_ru": "Вороний глаз",
         "name_latin": "Paris quadrifolia",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1989
       },
       "geometry": {
         "type": "Point",
@@ -4057,7 +4270,8 @@
         "name_ru": "Серый гусь",
         "name_latin": "Anser anser",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2017
       },
       "geometry": {
         "type": "Point",
@@ -4076,7 +4290,8 @@
         "name_ru": "Гвоздика полевая",
         "name_latin": "Dianthus deltoides",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 2005
       },
       "geometry": {
         "type": "Point",
@@ -4095,7 +4310,8 @@
         "name_ru": "Большая синица",
         "name_latin": "Parus major",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 2021
       },
       "geometry": {
         "type": "Point",
@@ -4114,7 +4330,8 @@
         "name_ru": "Ольха чёрная",
         "name_latin": "Alnus glutinosa",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2007
       },
       "geometry": {
         "type": "Point",
@@ -4133,7 +4350,8 @@
         "name_ru": "Полевой жаворонок",
         "name_latin": "Alauda arvensis",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2014
       },
       "geometry": {
         "type": "Point",
@@ -4152,7 +4370,8 @@
         "name_ru": "Кряква",
         "name_latin": "Anas platyrhynchos",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 2012
       },
       "geometry": {
         "type": "Point",
@@ -4171,7 +4390,8 @@
         "name_ru": "Перепел",
         "name_latin": "Coturnix coturnix",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1964
       },
       "geometry": {
         "type": "Point",
@@ -4190,7 +4410,8 @@
         "name_ru": "Подорожник большой",
         "name_latin": "Plantago major",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1964
       },
       "geometry": {
         "type": "Point",
@@ -4209,7 +4430,8 @@
         "name_ru": "Грифола куриная",
         "name_latin": "Grifola frondosa",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1979
       },
       "geometry": {
         "type": "Point",
@@ -4228,7 +4450,8 @@
         "name_ru": "Лютик едкий",
         "name_latin": "Ranunculus acris",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1988
       },
       "geometry": {
         "type": "Point",
@@ -4247,7 +4470,8 @@
         "name_ru": "Лисичка обыкновенная",
         "name_latin": "Cantharellus cibarius",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2017
       },
       "geometry": {
         "type": "Point",
@@ -4266,7 +4490,8 @@
         "name_ru": "Шампиньон луговой",
         "name_latin": "Agaricus campestris",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1962
       },
       "geometry": {
         "type": "Point",
@@ -4285,7 +4510,8 @@
         "name_ru": "Морская корова Стеллера",
         "name_latin": "Hydrodamalis gigas",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1989
       },
       "geometry": {
         "type": "Point",
@@ -4304,7 +4530,8 @@
         "name_ru": "Кувшинка белая",
         "name_latin": "Nymphaea alba",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1968
       },
       "geometry": {
         "type": "Point",
@@ -4323,7 +4550,8 @@
         "name_ru": "Шампиньон лесной",
         "name_latin": "Agaricus silvaticus",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1993
       },
       "geometry": {
         "type": "Point",
@@ -4342,7 +4570,8 @@
         "name_ru": "Деревенская ласточка",
         "name_latin": "Hirundo rustica",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2001
       },
       "geometry": {
         "type": "Point",
@@ -4361,7 +4590,8 @@
         "name_ru": "Лошадь Пржевальского",
         "name_latin": "Equus przewalskii",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1994
       },
       "geometry": {
         "type": "Point",
@@ -4380,7 +4610,8 @@
         "name_ru": "Европейская косуля",
         "name_latin": "Capreolus capreolus",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1952
       },
       "geometry": {
         "type": "Point",
@@ -4399,7 +4630,8 @@
         "name_ru": "Можжевельник обыкновенный",
         "name_latin": "Juniperus communis",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1972
       },
       "geometry": {
         "type": "Point",
@@ -4418,7 +4650,8 @@
         "name_ru": "Бобр",
         "name_latin": "Castor fiber",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1980
       },
       "geometry": {
         "type": "Point",
@@ -4437,7 +4670,8 @@
         "name_ru": "Глухарь",
         "name_latin": "Tetrao urogallus",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1992
       },
       "geometry": {
         "type": "Point",
@@ -4456,7 +4690,8 @@
         "name_ru": "Гагарка",
         "name_latin": "Pinguinus impennis",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1969
       },
       "geometry": {
         "type": "Point",
@@ -4475,7 +4710,8 @@
         "name_ru": "Зубр европейский",
         "name_latin": "Bison bonasus",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1970
       },
       "geometry": {
         "type": "Point",
@@ -4494,7 +4730,8 @@
         "name_ru": "Лебедь-шипун",
         "name_latin": "Cygnus olor",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1975
       },
       "geometry": {
         "type": "Point",
@@ -4513,7 +4750,8 @@
         "name_ru": "Водяная летучая мышь",
         "name_latin": "Myotis daubentonii",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1973
       },
       "geometry": {
         "type": "Point",
@@ -4532,7 +4770,8 @@
         "name_ru": "Папоротник орляк",
         "name_latin": "Pteridium aquilinum",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1984
       },
       "geometry": {
         "type": "Point",
@@ -4551,7 +4790,8 @@
         "name_ru": "Сурепка обыкновенная",
         "name_latin": "Barbarea vulgaris",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1986
       },
       "geometry": {
         "type": "Point",
@@ -4570,7 +4810,8 @@
         "name_ru": "Тетерев",
         "name_latin": "Lyrurus tetrix",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 2023
       },
       "geometry": {
         "type": "Point",
@@ -4589,7 +4830,8 @@
         "name_ru": "Обыкновенный крот",
         "name_latin": "Talpa europaea",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 2011
       },
       "geometry": {
         "type": "Point",
@@ -4608,7 +4850,8 @@
         "name_ru": "Кабан",
         "name_latin": "Sus scrofa",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1967
       },
       "geometry": {
         "type": "Point",
@@ -4627,7 +4870,8 @@
         "name_ru": "Ель обыкновенная",
         "name_latin": "Picea abies",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 2005
       },
       "geometry": {
         "type": "Point",
@@ -4646,7 +4890,8 @@
         "name_ru": "Белка обыкновенная",
         "name_latin": "Sciurus vulgaris",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1972
       },
       "geometry": {
         "type": "Point",
@@ -4665,7 +4910,8 @@
         "name_ru": "Мятлик луговой",
         "name_latin": "Poa pratensis",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 2005
       },
       "geometry": {
         "type": "Point",
@@ -4684,7 +4930,8 @@
         "name_ru": "Рябина обыкновенная",
         "name_latin": "Sorbus aucuparia",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1986
       },
       "geometry": {
         "type": "Point",
@@ -4703,7 +4950,8 @@
         "name_ru": "Багульник болотный",
         "name_latin": "Rhododendron tomentosum",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1997
       },
       "geometry": {
         "type": "Point",
@@ -4722,7 +4970,8 @@
         "name_ru": "Мухомор красный",
         "name_latin": "Amanita muscaria",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1954
       },
       "geometry": {
         "type": "Point",
@@ -4741,7 +4990,8 @@
         "name_ru": "Черёмуха обыкновенная",
         "name_latin": "Prunus padus",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1985
       },
       "geometry": {
         "type": "Point",
@@ -4760,7 +5010,8 @@
         "name_ru": "Филин",
         "name_latin": "Bubo bubo",
         "found_by": "Сидоров",
-        "identified_by": "Волков"
+        "identified_by": "Волков",
+        "found_year": 1968
       },
       "geometry": {
         "type": "Point",
@@ -4779,7 +5030,8 @@
         "name_ru": "Барсук",
         "name_latin": "Meles meles",
         "found_by": "Павлов",
-        "identified_by": "Морозов"
+        "identified_by": "Морозов",
+        "found_year": 1973
       },
       "geometry": {
         "type": "Point",
@@ -4798,7 +5050,8 @@
         "name_ru": "Сморчок съедобный",
         "name_latin": "Morchella esculenta",
         "found_by": "Новиков",
-        "identified_by": "Смирнов"
+        "identified_by": "Смирнов",
+        "found_year": 1977
       },
       "geometry": {
         "type": "Point",
@@ -4817,7 +5070,8 @@
         "name_ru": "Клевер луговой",
         "name_latin": "Trifolium pratense",
         "found_by": "Федоров",
-        "identified_by": "Петров"
+        "identified_by": "Петров",
+        "found_year": 1977
       },
       "geometry": {
         "type": "Point",
@@ -4836,7 +5090,8 @@
         "name_ru": "Клюква болотная",
         "name_latin": "Vaccinium oxycoccos",
         "found_by": "Кузнецов",
-        "identified_by": "Орлов"
+        "identified_by": "Орлов",
+        "found_year": 1988
       },
       "geometry": {
         "type": "Point",
@@ -4855,7 +5110,8 @@
         "name_ru": "Фиалка трёхцветная",
         "name_latin": "Viola tricolor",
         "found_by": "Иванов",
-        "identified_by": "Орлова"
+        "identified_by": "Орлова",
+        "found_year": 1985
       },
       "geometry": {
         "type": "Point",

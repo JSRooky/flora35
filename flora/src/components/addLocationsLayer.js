@@ -447,6 +447,15 @@ export function filterFeatures(features, filters = {}) {
 
   return features.filter((feature) =>
     filterEntries.every(([key, value]) => {
+      if (value && typeof value === "object" && !Array.isArray(value) && "min" in value && "max" in value) {
+        const prop = feature.properties[key];
+        if (prop == null) {
+          return false;
+        }
+
+        return prop >= value.min && prop <= value.max;
+      }
+
       if (Array.isArray(value)) {
         if (value.length === 0) {
           return true;
