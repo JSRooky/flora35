@@ -15,7 +15,9 @@ export default function FeaturePopup({
   collapsed = false,
   onCollapsedChange,
   activeFilters = {},
-  onFilterChange
+  onFilterChange,
+  activeStatusFilters = [],
+  onStatusFilterChange
 }) {
   const [showImages, setShowImages] = useState(false);
 
@@ -97,11 +99,21 @@ export default function FeaturePopup({
                     ))}
 
                     {properties?.status && (
-                      <div className="popup-item">
+                      <div className="popup-item popup-item--filter">
                         <div className="popup-item-text">
                           <strong>status:</strong>
                           <span>{properties.status}</span>
                         </div>
+                        <label className="property-switch" title="Показать маркеры с этим свойством">
+                          <input
+                            type="checkbox"
+                            checked={activeStatusFilters.includes(properties.status)}
+                            onChange={(e) =>
+                              onStatusFilterChange?.(properties.status, e.target.checked)
+                            }
+                          />
+                          <span className="property-switch-slider" />
+                        </label>
                       </div>
                     )}
 

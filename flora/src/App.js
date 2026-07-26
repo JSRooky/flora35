@@ -294,6 +294,8 @@ export default function MapView() {
           onCollapsedChange={setFeaturePopupCollapsed}
           activeFilters={propertyFilters}
           onFilterChange={handlePropertyFilterChange}
+          activeStatusFilters={statusFilters}
+          onStatusFilterChange={handleStatusFilterChange}
         />
         <ArealPopup
           enabled={arealEnabled}

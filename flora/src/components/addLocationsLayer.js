@@ -314,7 +314,7 @@ function addUnclusteredLayer(map, sourceId, regnum = null) {
         ? REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR
         : getPointColorExpression(),
       "circle-radius": 5,
-      "circle-stroke-width": 0,
+      "circle-stroke-width": 1,
       "circle-stroke-color": "#ffffff"
     }
   };
