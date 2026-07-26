@@ -3,6 +3,8 @@ import points from "../locations/points.json";
 const PLANT_IMAGE = "/images/plant.svg";
 const ANIMAL_IMAGE = "/images/animal.svg";
 
+let locationsData = null;
+
 function enrichWithImages(data) {
   if (!data?.features) {
     return data;
@@ -25,13 +27,113 @@ function enrichWithImages(data) {
   };
 }
 
-export function addLocationsLayer(map) {
-  const data = enrichWithImages(points);
+export function filterFeatures(features, filters = {}) {
+  const filterEntries = Object.entries(filters);
+  if (filterEntries.length === 0) {
+    return features;
+  }
+
+  return features.filter((feature) =>
+    filterEntries.every(([key, value]) => feature.properties[key] === value)
+  );
+}
+
+export function getFilteredFeatureCenters(filters = {}) {
+  if (!locationsData) {
+    return [];
+  }
+
+  return filterFeatures(locationsData.features, filters).map(
+    (feature) => feature.geometry.coordinates
+  );
+}
+
+function dedupeCenters(centers) {
+  const seen = new Set();
+
+  return centers.filter(([lng, lat]) => {
+    const key = `${lng},${lat}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+export function getUnclusteredCenters(map, filters = {}, candidateFeatures = null) {
+  if (!map.getSource("locations")) {
+    return [];
+  }
+
+  const sourceFeatures = map.querySourceFeatures("locations", {
+    filter: ["!", ["has", "point_count"]]
+  });
+  const renderedFeatures = map.queryRenderedFeatures({
+    layers: ["unclustered-point"]
+  });
+  const visibleFeatures = sourceFeatures.length > 0 ? sourceFeatures : renderedFeatures;
+
+  if (candidateFeatures?.length) {
+    const visibleKeys = new Set(
+      visibleFeatures.map(
+        (feature) => `${feature.geometry.coordinates[0]},${feature.geometry.coordinates[1]}`
+      )
+    );
+
+    return dedupeCenters(
+      filterFeatures(candidateFeatures, filters)
+        .map((feature) => feature.geometry.coordinates)
+        .filter(([lng, lat]) => visibleKeys.has(`${lng},${lat}`))
+    );
+  }
+
+  return dedupeCenters(
+    filterFeatures(visibleFeatures, filters).map((feature) => feature.geometry.coordinates)
+  );
+}
+
+export function isFeatureUnclusteredOnMap(map, feature) {
+  if (!feature?.geometry?.coordinates) {
+    return false;
+  }
+
+  const [lng, lat] = feature.geometry.coordinates;
+
+  return getUnclusteredCenters(map).some(
+    ([clusterLng, clusterLat]) => clusterLng === lng && clusterLat === lat
+  );
+}
+
+export function featureMatchesFilters(feature, filters = {}) {
+  return filterFeatures([feature], filters).length > 0;
+}
+
+export function applyLocationsFilter(map, filters = {}) {
+  const source = map.getSource("locations");
+  if (!source || !locationsData) {
+    return;
+  }
+
+  const filteredFeatures = filterFeatures(locationsData.features, filters);
+
+  source.setData({
+    ...locationsData,
+    features: filteredFeatures
+  });
+}
+
+export function clearLocationsFilter(map) {
+  applyLocationsFilter(map, {});
+}
+
+export function addLocationsLayer(map, { onClusterExpanded } = {}) {
+  locationsData = enrichWithImages(points);
 
   // Источник с кластеризацией
   map.addSource("locations", {
     type: "geojson",
-    data,
+    data: locationsData,
     cluster: true,
     clusterMaxZoom: 14,
     clusterRadius: 50
@@ -92,15 +194,33 @@ export function addLocationsLayer(map) {
     const features = map.queryRenderedFeatures(e.point, {
       layers: ["clusters"]
     });
+    if (!features.length) {
+      return;
+    }
 
     const clusterId = features[0].properties.cluster_id;
+    const source = map.getSource("locations");
 
-    map.getSource("locations").getClusterExpansionZoom(clusterId, (err, zoom) => {
-      if (err) return;
+    source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
+      if (leavesErr) {
+        return;
+      }
 
-      map.easeTo({
-        center: features[0].geometry.coordinates,
-        zoom
+      source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+        if (err) {
+          return;
+        }
+
+        map.easeTo({
+          center: features[0].geometry.coordinates,
+          zoom
+        });
+
+        map.once("moveend", () => {
+          map.once("idle", () => {
+            onClusterExpanded?.(leaves);
+          });
+        });
       });
     });
   });

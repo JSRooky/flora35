@@ -77,6 +77,62 @@
   font-size: 13px;
 }
 
+.popup-item--filter {
+  align-items: center;
+  gap: 8px;
+}
+
+.popup-item-text {
+  display: flex;
+  justify-content: space-between;
+  flex: 1;
+  min-width: 0;
+}
+
+.property-switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.property-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.property-switch-slider {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: #ccc;
+  border-radius: 20px;
+  transition: background 0.2s;
+}
+
+.property-switch-slider::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.property-switch input:checked + .property-switch-slider {
+  background: #007bff;
+}
+
+.property-switch input:checked + .property-switch-slider::after {
+  transform: translateX(16px);
+}
+
 .popup-item strong {
   color: #333;
   margin-right: 8px;

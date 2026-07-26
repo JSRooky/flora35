@@ -2,13 +2,20 @@ import React, { useState } from "react";
 import FeatureImagesPopup from "./FeatureImagesPopup";
 import "../styles/FeaturePopup.css";
 
+const INTERNAL_PROPERTIES = new Set(["image", "images"]);
+
 function getImages(properties) {
   if (properties.images?.length > 0) return properties.images;
   if (properties.image) return [properties.image];
   return [];
 }
 
-export default function FeaturePopup({ feature, onClose }) {
+export default function FeaturePopup({
+  feature,
+  onClose,
+  activeFilters = {},
+  onFilterChange
+}) {
   const [showImages, setShowImages] = useState(false);
 
   if (!feature) return null;
@@ -16,6 +23,9 @@ export default function FeaturePopup({ feature, onClose }) {
   const { geometry, properties } = feature;
   const [lng, lat] = geometry.coordinates;
   const images = properties ? getImages(properties) : [];
+  const displayProperties = properties
+    ? Object.entries(properties).filter(([key]) => !INTERNAL_PROPERTIES.has(key))
+    : [];
 
   const handleClose = () => {
     setShowImages(false);
@@ -42,15 +52,25 @@ export default function FeaturePopup({ feature, onClose }) {
             <span>{lng.toFixed(4)}</span>
           </div>
 
-          {properties && Object.entries(properties).length > 0 && (
+          {displayProperties.length > 0 && (
             <>
               <hr />
               <h4>Основное</h4>
 
-              {Object.entries(properties).map(([key, value]) => (
-                <div key={key} className="popup-item">
-                  <strong>{key}:</strong>
-                  <span>{String(value)}</span>
+              {displayProperties.map(([key, value]) => (
+                <div key={key} className="popup-item popup-item--filter">
+                  <div className="popup-item-text">
+                    <strong>{key}:</strong>
+                    <span>{String(value)}</span>
+                  </div>
+                  <label className="property-switch" title="Показать маркеры с этим свойством">
+                    <input
+                      type="checkbox"
+                      checked={activeFilters[key] === value}
+                      onChange={(e) => onFilterChange?.(key, value, e.target.checked)}
+                    />
+                    <span className="property-switch-slider" />
+                  </label>
                 </div>
               ))}
 

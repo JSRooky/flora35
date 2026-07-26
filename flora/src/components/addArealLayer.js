@@ -1,4 +1,8 @@
-import points from "../locations/points.json";
+import {
+  getUnclusteredCenters,
+  featureMatchesFilters,
+  isFeatureUnclusteredOnMap
+} from "./addLocationsLayer";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -81,9 +85,35 @@ export function updateArealLayer(map, centers, radiusKm) {
   });
 }
 
-export function updateArealLayerForAll(map, radiusKm) {
-  const centers = points.features.map((feature) => feature.geometry.coordinates);
+export function updateArealLayerForAll(map, radiusKm, filters = {}, expandedLeaves = null) {
+  const centers = getUnclusteredCenters(map, filters, expandedLeaves);
   updateArealLayer(map, centers, radiusKm);
+}
+
+export function refreshArealDisplay(
+  map,
+  { allMarkers, enabled, feature, radiusKm, filters = {}, expandedLeaves = null }
+) {
+  if (!map) {
+    return;
+  }
+
+  if (allMarkers) {
+    updateArealLayerForAll(map, radiusKm, filters, expandedLeaves);
+    return;
+  }
+
+  if (
+    enabled &&
+    feature &&
+    featureMatchesFilters(feature, filters) &&
+    isFeatureUnclusteredOnMap(map, feature)
+  ) {
+    updateArealLayer(map, feature.geometry.coordinates, radiusKm);
+    return;
+  }
+
+  clearArealLayer(map);
 }
 
 export function clearArealLayer(map) {

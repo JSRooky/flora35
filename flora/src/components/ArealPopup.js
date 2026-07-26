@@ -34,7 +34,7 @@ export default function ArealPopup({
             onChange={(e) => onAllMarkersChange(e.target.checked)}
           />
           <span className="areal-switch-slider" />
-          <span className="areal-switch-label">Ко всем маркерам</span>
+          <span className="areal-switch-label">Ко всем видимым маркерам</span>
         </label>
 
         <div className={`areal-radius ${isActive ? "" : "areal-radius--disabled"}`}>
