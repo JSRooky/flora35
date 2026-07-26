@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import "../styles/MapDisplayPanel.css";
 
+/** Краткое описание текущих настроек карты для свёрнутой панели. */
 function getCollapsedSummary(
   markersVisible,
   heatmapEnabled,
@@ -38,6 +39,7 @@ export default function MapDisplayPanel({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
+  // Кластеризация имеет смысл только когда маркеры видны.
   const clusteringDisabled = !markersVisible;
 
   return (

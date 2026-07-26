@@ -18,6 +18,7 @@ const REGNUM_COLORS = {
 const DEFAULT_CLUSTER_COLOR = "#4a90e2";
 const DEFAULT_POINT_COLOR = "#4a90e2";
 
+// Модульное состояние слоя: карта одна, пересборка слоёв идёт через rebuildLocationsLayers.
 let locationsData = null;
 let clusterByRegnum = true;
 let clusteringEnabled = true;
@@ -28,6 +29,7 @@ let onClusterExpandedCallback = null;
 let onPointClickCallback = null;
 let onMapBackgroundClickCallback = null;
 
+/** Добавляет каждой точке URL иконки по полю regnum (растение / животное). */
 function enrichWithImages(data) {
   if (!data?.features) {
     return data;
@@ -56,6 +58,7 @@ function getRegnumValues(features = locationsData?.features ?? []) {
   return [...new Set(features.map((feature) => feature.properties.regnum).filter(Boolean))];
 }
 
+/** ID GeoJSON-источника: общий или отдельный для каждого regnum. */
 function getSourceId(regnum = null) {
   return regnum ? `locations-${regnum}` : "locations";
 }
@@ -167,6 +170,7 @@ function removeLocationsFromMap(map) {
   });
 }
 
+/** Снимает обработчики кликов и hover перед пересборкой слоёв. */
 function detachLocationsInteractions(map) {
   if (!interactionHandlers) {
     return;
@@ -191,6 +195,7 @@ function detachLocationsInteractions(map) {
   interactionHandlers = null;
 }
 
+/** Навешивает обработчики на кластеры, отдельные точки и клик по фону карты. */
 function attachLocationsInteractions(map) {
   detachLocationsInteractions(map);
 
@@ -210,6 +215,7 @@ function attachLocationsInteractions(map) {
     const clusterId = clusterFeature.properties.cluster_id;
     const source = map.getSource(sourceId);
 
+    // Сначала получаем точки кластера, затем зумим до уровня их «раскрытия».
     source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
       if (leavesErr) {
         return;
@@ -225,6 +231,7 @@ function attachLocationsInteractions(map) {
           zoom
         });
 
+        // Колбэк вызываем после завершения анимации и отрисовки новых точек.
         map.once("moveend", () => {
           map.once("idle", () => {
             onClusterExpandedCallback?.(leaves);
@@ -269,6 +276,7 @@ function attachLocationsInteractions(map) {
     map.on("mouseleave", layerId, pointLeave);
   });
 
+  // Клик по карте вне маркеров — сброс выбранной точки.
   const mapClick = (event) => {
     const locationLayerIds = [...clusterLayerIds, ...unclusteredLayerIds].filter((layerId) =>
       map.getLayer(layerId)
@@ -320,6 +328,7 @@ function addUnclusteredLayer(map, sourceId, regnum = null) {
   };
 
   if (clusteringEnabled) {
+    // Исключаем агрегированные точки кластера — показываем только «листья».
     layer.filter = ["!", ["has", "point_count"]];
   }
 
@@ -367,6 +376,10 @@ function addClusterLayers(map, sourceId, regnum = null) {
   addUnclusteredLayer(map, sourceId, regnum);
 }
 
+/**
+ * Полностью пересоздаёт источники и слои точек.
+ * Вызывается при смене фильтров, режима кластеризации или группировки по regnum.
+ */
 function rebuildLocationsLayers(map) {
   if (!locationsData || !map.getStyle()) {
     return;
@@ -388,6 +401,7 @@ function rebuildLocationsLayers(map) {
 
     addUnclusteredLayer(map, "locations");
   } else if (clusterByRegnum) {
+    // Отдельный кластеризуемый источник на каждое царство — кластеры не смешивают regnum.
     getRegnumValues().forEach((regnum) => {
       const sourceId = getSourceId(regnum);
       const features = filteredFeatures.filter(
@@ -424,6 +438,7 @@ function rebuildLocationsLayers(map) {
   applyMarkersVisibility(map);
 }
 
+/** Фильтрует GeoJSON-объекты по properties; массив значений — логика «любой из». */
 export function filterFeatures(features, filters = {}) {
   const filterEntries = Object.entries(filters);
   if (filterEntries.length === 0) {
@@ -455,6 +470,7 @@ export function getFilteredFeatureCenters(filters = {}) {
   );
 }
 
+/** Убирает дубли координат (несколько объектов могут совпасть по lng/lat). */
 function dedupeCenters(centers) {
   const seen = new Set();
 
@@ -493,6 +509,10 @@ function queryUnclusteredSourceFeatures(map) {
   });
 }
 
+/**
+ * Возвращает координаты некластеризованных точек, видимых на карте.
+ * candidateFeatures — точки из только что раскрытого кластера (для режима «все маркеры»).
+ */
 export function getUnclusteredCenters(map, filters = {}, candidateFeatures = null) {
   const hasLocationsSource = clusteringEnabled
     ? clusterByRegnum
@@ -508,6 +528,7 @@ export function getUnclusteredCenters(map, filters = {}, candidateFeatures = nul
   const visibleFeatures =
     sourceFeatures.length > 0
       ? sourceFeatures
+      // Запасной путь: если querySourceFeatures ещё пуст, берём отрисованные слои.
       : map.queryRenderedFeatures({ layers: getUnclusteredLayerIds() });
 
   if (candidateFeatures?.length) {
@@ -529,6 +550,7 @@ export function getUnclusteredCenters(map, filters = {}, candidateFeatures = nul
   );
 }
 
+/** Проверяет, отображается ли точка как отдельный маркер, а не внутри кластера. */
 export function isFeatureUnclusteredOnMap(map, feature) {
   if (!feature?.geometry?.coordinates) {
     return false;
@@ -585,6 +607,7 @@ export function isMarkersVisible() {
   return markersVisible;
 }
 
+/** Точка входа: инициализация слоя маркеров и регистрация колбэков из App. */
 export function addLocationsLayer(
   map,
   {

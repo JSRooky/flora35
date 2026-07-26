@@ -1,9 +1,10 @@
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
+// Токен берётся из .env (REACT_APP_MAPBOX_TOKEN).
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN;
 
-
+/** Создаёт экземпляр карты Mapbox с начальным видом на Вологодскую область. */
 export function initMap(container) {
   return new mapboxgl.Map({
     container,

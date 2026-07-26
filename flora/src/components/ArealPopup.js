@@ -4,6 +4,7 @@ import "../styles/ArealPopup.css";
 const RADIUS_MIN = 0.5;
 const RADIUS_MAX = 15;
 
+/** Процент заполнения слайдера радиуса для CSS-переменной --range-progress. */
 function getRangeProgress(value) {
   return ((value - RADIUS_MIN) / (RADIUS_MAX - RADIUS_MIN)) * 100;
 }
@@ -20,6 +21,7 @@ function getCollapsedSummary(enabled, allMarkers, radius) {
   return "Ареал выключен";
 }
 
+/** Панель управления «зоной поиска» вокруг точки или всех видимых маркеров. */
 export default function ArealPopup({
   enabled,
   allMarkers,
@@ -30,6 +32,7 @@ export default function ArealPopup({
   collapsed = false,
   onCollapsedChange
 }) {
+  // Радиус доступен, если включён ареал для одной точки или для всех маркеров.
   const isActive = enabled || allMarkers;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
 
@@ -55,6 +58,7 @@ export default function ArealPopup({
         </p>
       ) : (
         <div className="areal-popup-content">
+          {/* Режим «одна точка» недоступен, когда включён ареал ко всем маркерам. */}
           <label className={`areal-switch ${allMarkers ? "areal-switch--disabled" : ""}`}>
             <input
             type="checkbox"

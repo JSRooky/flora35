@@ -9,10 +9,15 @@ const EMPTY_COLLECTION = {
   features: []
 };
 
+/** Принимает одну координату [lng, lat] или массив таких координат. */
 function normalizeCenters(centers) {
   return Array.isArray(centers[0]) ? centers : [centers];
 }
 
+/**
+ * Строит GeoJSON-полигон — аппроксимацию круга на сфере.
+ * radiusKm — радиус в километрах от центра.
+ */
 function createCirclePolygon(center, radiusKm, steps = 64) {
   const [lng, lat] = center;
   const coords = [];
@@ -38,6 +43,7 @@ function createCirclePolygon(center, radiusKm, steps = 64) {
   };
 }
 
+/** Добавляет на карту слой заливки и контура ареала (изначально пустой). */
 export function addArealLayer(map) {
   if (map.getSource("areal")) {
     return;
@@ -69,6 +75,7 @@ export function addArealLayer(map) {
   });
 }
 
+/** Рисует круги заданного радиуса вокруг одного или нескольких центров. */
 export function updateArealLayer(map, centers, radiusKm) {
   const source = map.getSource("areal");
   if (!source) {
@@ -85,11 +92,16 @@ export function updateArealLayer(map, centers, radiusKm) {
   });
 }
 
+/** Строит ареалы вокруг всех некластеризованных точек, видимых на карте. */
 export function updateArealLayerForAll(map, radiusKm, filters = {}, expandedLeaves = null) {
   const centers = getUnclusteredCenters(map, filters, expandedLeaves);
   updateArealLayer(map, centers, radiusKm);
 }
 
+/**
+ * Пересчитывает отображение ареала по текущему режиму:
+ * ко всем маркерам, вокруг выбранной точки или очистка слоя.
+ */
 export function refreshArealDisplay(
   map,
   { allMarkers, enabled, feature, radiusKm, filters = {}, expandedLeaves = null }
@@ -107,6 +119,7 @@ export function refreshArealDisplay(
     enabled &&
     feature &&
     featureMatchesFilters(feature, filters) &&
+    // Ареал для одной точки показываем только если она не внутри кластера.
     isFeatureUnclusteredOnMap(map, feature)
   ) {
     updateArealLayer(map, feature.geometry.coordinates, radiusKm);

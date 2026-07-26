@@ -2,8 +2,10 @@ import React, { useState } from "react";
 import FeatureImagesPopup from "./FeatureImagesPopup";
 import "../styles/FeaturePopup.css";
 
+// Служебные поля, добавленные слоем карты; не показываем в списке свойств.
 const INTERNAL_PROPERTIES = new Set(["image", "images"]);
 
+/** Собирает URL иллюстраций из properties (массив или одиночное поле). */
 function getImages(properties) {
   if (properties.images?.length > 0) return properties.images;
   if (properties.image) return [properties.image];
@@ -31,6 +33,7 @@ export default function FeaturePopup({
   const properties = feature?.properties;
   const [lng, lat] = geometry?.coordinates ?? [0, 0];
   const images = properties ? getImages(properties) : [];
+  // status выводится отдельно — у него свой фильтр через StatusFilterPanel.
   const displayProperties = properties
     ? Object.entries(properties).filter(
         ([key]) => !INTERNAL_PROPERTIES.has(key) && key !== "status"
@@ -90,6 +93,7 @@ export default function FeaturePopup({
                         <label className="property-switch" title="Показать маркеры с этим свойством">
                           <input
                             type="checkbox"
+                            // Фильтр по точному совпадению пары ключ–значение.
                             checked={activeFilters[key] === value}
                             onChange={(e) => onFilterChange?.(key, value, e.target.checked)}
                           />

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import "../styles/StatusFilterPanel.css";
 
+/** Коды и подписи категорий МСОП (IUCN Red List). */
 export const STATUS_OPTIONS = [
   { code: "EX", label: "Исчезнувший" },
   { code: "EW", label: "Исчезнувший в дикой природе" },

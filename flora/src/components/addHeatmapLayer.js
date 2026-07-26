@@ -9,6 +9,7 @@ const EMPTY_COLLECTION = {
   features: []
 };
 
+/** Формирует GeoJSON для тепловой карты с учётом активных фильтров. */
 function buildHeatmapData(filters = {}) {
   return {
     type: "FeatureCollection",
@@ -16,6 +17,7 @@ function buildHeatmapData(filters = {}) {
   };
 }
 
+/** Добавляет слой тепловой карты под маркерами (по умолчанию скрыт). */
 export function addHeatmapLayer(map) {
   if (map.getSource(SOURCE_ID)) {
     return;
@@ -26,6 +28,7 @@ export function addHeatmapLayer(map) {
     data: EMPTY_COLLECTION
   });
 
+  // Вставляем heatmap ниже маркеров, чтобы точки оставались кликабельными.
   const beforeId = getFirstLocationsLayerId(map);
 
   map.addLayer(
@@ -80,6 +83,7 @@ export function addHeatmapLayer(map) {
   );
 }
 
+/** Включает/выключает тепловую карту и обновляет её данные при включении. */
 export function setHeatmapEnabled(map, enabled, filters = {}) {
   if (!map.getLayer(LAYER_ID)) {
     addHeatmapLayer(map);

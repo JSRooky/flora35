@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import "../styles/FeatureImagesPopup.css";
 
+/** Модальная галерея иллюстраций выбранной точки. */
 export default function FeatureImagesPopup({ images, onClose }) {
   const [index, setIndex] = useState(0);
 
+  // При смене набора изображений возвращаемся к первому слайду.
   useEffect(() => {
     setIndex(0);
   }, [images]);
@@ -14,6 +16,7 @@ export default function FeatureImagesPopup({ images, onClose }) {
   const prev = () => setIndex((i) => (i - 1 + images.length) % images.length);
 
   return (
+    // Клик по затемнению закрывает галерею.
     <div className="img-popup-overlay" onClick={onClose}>
       <div className="img-popup" onClick={(e) => e.stopPropagation()}>
         <button className="img-popup-close" onClick={onClose} aria-label="Закрыть">
