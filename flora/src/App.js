@@ -3,8 +3,14 @@ import { initMap } from "./components/initMap";
 import {
   addLocationsLayer,
   applyLocationsFilter,
-  setClusterByRegnum
+  setClusterByRegnum,
+  setClusteringEnabled,
+  setMarkersVisible
 } from "./components/addLocationsLayer";
+import {
+  addHeatmapLayer,
+  setHeatmapEnabled
+} from "./components/addHeatmapLayer";
 import {
   addArealLayer,
   clearArealLayer,
@@ -13,7 +19,12 @@ import {
 import FeaturePopup from "./components/FeaturePopup";
 import ArealPopup from "./components/ArealPopup";
 import StatusFilterPanel from "./components/StatusFilterPanel";
+import MapDisplayPanel from "./components/MapDisplayPanel";
 import "./MapView.css";
+
+const DEFAULT_CLUSTERING_ENABLED = true;
+const DEFAULT_CLUSTER_BY_REGNUM = true;
+const DEFAULT_MARKERS_VISIBLE = true;
 
 export default function MapView() {
   const ref = useRef(null);
@@ -22,7 +33,11 @@ export default function MapView() {
   const [popupData, setPopupData] = useState(null);
   const [propertyFilters, setPropertyFilters] = useState({});
   const [statusFilters, setStatusFilters] = useState([]);
-  const [clusterByRegnum, setClusterByRegnumState] = useState(true);
+  const [clusterByRegnum, setClusterByRegnumState] = useState(DEFAULT_CLUSTER_BY_REGNUM);
+  const [clusteringEnabled, setClusteringEnabledState] = useState(DEFAULT_CLUSTERING_ENABLED);
+  const [markersVisible, setMarkersVisibleState] = useState(DEFAULT_MARKERS_VISIBLE);
+  const [mapReady, setMapReady] = useState(false);
+  const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
   const [featurePopupCollapsed, setFeaturePopupCollapsed] = useState(true);
   const [arealPopupCollapsed, setArealPopupCollapsed] = useState(true);
   const [arealEnabled, setArealEnabled] = useState(false);
@@ -112,12 +127,36 @@ export default function MapView() {
   }, [buildLocationFilters]);
 
   useEffect(() => {
-    if (!map.current) {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    setMarkersVisible(map.current, markersVisible);
+  }, [markersVisible, mapReady]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    setClusteringEnabled(map.current, clusteringEnabled);
+  }, [clusteringEnabled, mapReady]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady || !clusteringEnabled) {
       return;
     }
 
     setClusterByRegnum(map.current, clusterByRegnum);
-  }, [clusterByRegnum]);
+  }, [clusterByRegnum, clusteringEnabled, mapReady]);
+
+  useEffect(() => {
+    if (!map.current) {
+      return;
+    }
+
+    setHeatmapEnabled(map.current, heatmapEnabled, buildLocationFilters());
+  }, [heatmapEnabled, buildLocationFilters]);
 
   useEffect(() => {
     refreshAreal();
@@ -209,13 +248,19 @@ export default function MapView() {
           },
           onMapBackgroundClick: () => {
             clearPointSelection();
-          }
+          },
+          clusteringEnabled: DEFAULT_CLUSTERING_ENABLED,
+          clusterByRegnum: DEFAULT_CLUSTER_BY_REGNUM,
+          markersVisible: DEFAULT_MARKERS_VISIBLE
         });
         addArealLayer(map.current);
+        addHeatmapLayer(map.current);
+        setMapReady(true);
       });
     }
 
     return () => {
+      setMapReady(false);
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -226,10 +271,22 @@ export default function MapView() {
   return (
     <>
       <div ref={ref} className="map-container" />
-      <StatusFilterPanel
-        activeStatusFilters={statusFilters}
-        onStatusFilterChange={handleStatusFilterChange}
-      />
+      <div className="right-panel-stack">
+        <StatusFilterPanel
+          activeStatusFilters={statusFilters}
+          onStatusFilterChange={handleStatusFilterChange}
+        />
+        <MapDisplayPanel
+          markersVisible={markersVisible}
+          onMarkersVisibleChange={setMarkersVisibleState}
+          heatmapEnabled={heatmapEnabled}
+          onHeatmapEnabledChange={setHeatmapEnabledState}
+          clusteringEnabled={clusteringEnabled}
+          onClusteringEnabledChange={setClusteringEnabledState}
+          clusterByRegnum={clusterByRegnum}
+          onClusterByRegnumChange={setClusterByRegnumState}
+        />
+      </div>
       <div className="popup-stack">
         <FeaturePopup
           feature={popupData}
@@ -237,8 +294,6 @@ export default function MapView() {
           onCollapsedChange={setFeaturePopupCollapsed}
           activeFilters={propertyFilters}
           onFilterChange={handlePropertyFilterChange}
-          clusterByRegnum={clusterByRegnum}
-          onClusterByRegnumChange={setClusterByRegnumState}
         />
         <ArealPopup
           enabled={arealEnabled}

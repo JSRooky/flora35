@@ -15,9 +15,7 @@ export default function FeaturePopup({
   collapsed = false,
   onCollapsedChange,
   activeFilters = {},
-  onFilterChange,
-  clusterByRegnum = true,
-  onClusterByRegnumChange
+  onFilterChange
 }) {
   const [showImages, setShowImages] = useState(false);
 
@@ -62,7 +60,9 @@ export default function FeaturePopup({
           <div className="popup-content">
             {!feature ? (
               <p className="popup-empty-state">Выберите точку на карте</p>
-            ) : (
+            ) : null}
+
+            {feature ? (
               <>
                 <div className="popup-item">
                   <strong>Широта:</strong>
@@ -105,19 +105,6 @@ export default function FeaturePopup({
                       </div>
                     )}
 
-                    <hr />
-                    <h4>Кластеризация</h4>
-
-                    <label className="feature-switch" title="Группировать в кластеры только точки с одинаковым regnum">
-                      <input
-                        type="checkbox"
-                        checked={clusterByRegnum}
-                        onChange={(e) => onClusterByRegnumChange?.(e.target.checked)}
-                      />
-                      <span className="feature-switch-slider" />
-                      <span className="feature-switch-label">Группировать по царству</span>
-                    </label>
-
                     {images.length > 0 && (
                       <button
                         className="popup-images-btn"
@@ -129,7 +116,7 @@ export default function FeaturePopup({
                   </>
                 )}
               </>
-            )}
+            ) : null}
           </div>
         )}
       </div>

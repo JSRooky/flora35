@@ -229,6 +229,15 @@
   color: #333;
 }
 
+.feature-switch--disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.feature-switch--disabled .feature-switch-slider {
+  background: #ddd;
+}
+
 /* Scrollbar styling */
 .feature-popup::-webkit-scrollbar {
   width: 6px;

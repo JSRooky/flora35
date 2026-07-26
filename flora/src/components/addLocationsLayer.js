@@ -19,6 +19,8 @@ const DEFAULT_POINT_COLOR = "#4a90e2";
 
 let locationsData = null;
 let clusterByRegnum = true;
+let clusteringEnabled = true;
+let markersVisible = true;
 let currentFilters = {};
 let interactionHandlers = null;
 let onClusterExpandedCallback = null;
@@ -67,6 +69,10 @@ function getLayerIds(regnum = null) {
 }
 
 export function getUnclusteredLayerIds() {
+  if (!clusteringEnabled) {
+    return [getLayerIds().unclustered];
+  }
+
   if (clusterByRegnum) {
     return getRegnumValues().map((regnum) => getLayerIds(regnum).unclustered);
   }
@@ -74,12 +80,51 @@ export function getUnclusteredLayerIds() {
   return [getLayerIds().unclustered];
 }
 
+export function getFirstLocationsLayerId(map) {
+  const layerIds = [...getClusterLayerIds(), ...getUnclusteredLayerIds()];
+  return layerIds.find((layerId) => map.getLayer(layerId));
+}
+
 function getClusterLayerIds() {
+  if (!clusteringEnabled) {
+    return [];
+  }
+
   if (clusterByRegnum) {
     return getRegnumValues().map((regnum) => getLayerIds(regnum).clusters);
   }
 
   return [getLayerIds().clusters];
+}
+
+function getClusterCountLayerIds() {
+  if (!clusteringEnabled) {
+    return [];
+  }
+
+  if (clusterByRegnum) {
+    return getRegnumValues().map((regnum) => getLayerIds(regnum).clusterCount);
+  }
+
+  return [getLayerIds().clusterCount];
+}
+
+function getAllLocationsLayerIds() {
+  return [
+    ...getClusterLayerIds(),
+    ...getClusterCountLayerIds(),
+    ...getUnclusteredLayerIds()
+  ];
+}
+
+function applyMarkersVisibility(map) {
+  const visibility = markersVisible ? "visible" : "none";
+
+  getAllLocationsLayerIds().forEach((layerId) => {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", visibility);
+    }
+  });
 }
 
 function getPointColorExpression() {
@@ -256,6 +301,30 @@ function attachLocationsInteractions(map) {
   };
 }
 
+function addUnclusteredLayer(map, sourceId, regnum = null) {
+  const layerIds = getLayerIds(regnum);
+
+  const layer = {
+    id: layerIds.unclustered,
+    type: "circle",
+    source: sourceId,
+    paint: {
+      "circle-color": regnum
+        ? REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR
+        : getPointColorExpression(),
+      "circle-radius": 5,
+      "circle-stroke-width": 0,
+      "circle-stroke-color": "#ffffff"
+    }
+  };
+
+  if (clusteringEnabled) {
+    layer.filter = ["!", ["has", "point_count"]];
+  }
+
+  map.addLayer(layer);
+}
+
 function addClusterLayers(map, sourceId, regnum = null) {
   const layerIds = getLayerIds(regnum);
   const clusterColor = regnum ? REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR : DEFAULT_CLUSTER_COLOR;
@@ -294,20 +363,7 @@ function addClusterLayers(map, sourceId, regnum = null) {
     }
   });
 
-  map.addLayer({
-    id: layerIds.unclustered,
-    type: "circle",
-    source: sourceId,
-    filter: ["!", ["has", "point_count"]],
-    paint: {
-      "circle-color": regnum
-        ? REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR
-        : getPointColorExpression(),
-      "circle-radius": 6,
-      "circle-stroke-width": 1,
-      "circle-stroke-color": "#ffffff"
-    }
-  });
+  addUnclusteredLayer(map, sourceId, regnum);
 }
 
 function rebuildLocationsLayers(map) {
@@ -320,7 +376,17 @@ function rebuildLocationsLayers(map) {
 
   const filteredFeatures = filterFeatures(locationsData.features, currentFilters);
 
-  if (clusterByRegnum) {
+  if (!clusteringEnabled) {
+    map.addSource("locations", {
+      type: "geojson",
+      data: {
+        type: "FeatureCollection",
+        features: filteredFeatures
+      }
+    });
+
+    addUnclusteredLayer(map, "locations");
+  } else if (clusterByRegnum) {
     getRegnumValues().forEach((regnum) => {
       const sourceId = getSourceId(regnum);
       const features = filteredFeatures.filter(
@@ -354,6 +420,7 @@ function rebuildLocationsLayers(map) {
   }
 
   attachLocationsInteractions(map);
+  applyMarkersVisibility(map);
 }
 
 export function filterFeatures(features, filters = {}) {
@@ -401,6 +468,15 @@ function dedupeCenters(centers) {
 }
 
 function queryUnclusteredSourceFeatures(map) {
+  if (!clusteringEnabled) {
+    const sourceId = "locations";
+    if (!map.getSource(sourceId)) {
+      return [];
+    }
+
+    return map.querySourceFeatures(sourceId);
+  }
+
   const sourceIds = clusterByRegnum
     ? getRegnumValues().map((regnum) => getSourceId(regnum))
     : ["locations"];
@@ -417,8 +493,10 @@ function queryUnclusteredSourceFeatures(map) {
 }
 
 export function getUnclusteredCenters(map, filters = {}, candidateFeatures = null) {
-  const hasLocationsSource = clusterByRegnum
-    ? getRegnumValues().some((regnum) => map.getSource(getSourceId(regnum)))
+  const hasLocationsSource = clusteringEnabled
+    ? clusterByRegnum
+      ? getRegnumValues().some((regnum) => map.getSource(getSourceId(regnum)))
+      : map.getSource("locations")
     : map.getSource("locations");
 
   if (!hasLocationsSource) {
@@ -455,6 +533,10 @@ export function isFeatureUnclusteredOnMap(map, feature) {
     return false;
   }
 
+  if (!clusteringEnabled) {
+    return featureMatchesFilters(feature, currentFilters);
+  }
+
   const [lng, lat] = feature.geometry.coordinates;
 
   return getUnclusteredCenters(map).some(
@@ -480,8 +562,26 @@ export function setClusterByRegnum(map, enabled) {
   rebuildLocationsLayers(map);
 }
 
+export function setClusteringEnabled(map, enabled) {
+  clusteringEnabled = enabled;
+  rebuildLocationsLayers(map);
+}
+
+export function setMarkersVisible(map, visible) {
+  markersVisible = visible;
+  applyMarkersVisibility(map);
+}
+
 export function isClusterByRegnumEnabled() {
   return clusterByRegnum;
+}
+
+export function isClusteringEnabled() {
+  return clusteringEnabled;
+}
+
+export function isMarkersVisible() {
+  return markersVisible;
 }
 
 export function addLocationsLayer(
@@ -490,11 +590,15 @@ export function addLocationsLayer(
     onClusterExpanded,
     onPointClick,
     onMapBackgroundClick,
-    clusterByRegnum: initialClusterByRegnum = true
+    clusterByRegnum: initialClusterByRegnum = true,
+    clusteringEnabled: initialClusteringEnabled = true,
+    markersVisible: initialMarkersVisible = true
   } = {}
 ) {
   locationsData = enrichWithImages(points);
   clusterByRegnum = initialClusterByRegnum;
+  clusteringEnabled = initialClusteringEnabled;
+  markersVisible = initialMarkersVisible;
   onClusterExpandedCallback = onClusterExpanded;
   onPointClickCallback = onPointClick;
   onMapBackgroundClickCallback = onMapBackgroundClick;

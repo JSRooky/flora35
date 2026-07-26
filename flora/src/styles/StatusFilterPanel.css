@@ -1,8 +1,4 @@
 .status-filter-panel {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 1000;
   width: 320px;
   background-color: rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(20px);
