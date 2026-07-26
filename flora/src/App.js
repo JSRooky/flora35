@@ -22,6 +22,7 @@ import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
 import YearFilterPanel from "./components/YearFilterPanel";
 import AboutProject from "./components/AboutProject";
+import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import "./MapView.css";
 
@@ -42,14 +43,27 @@ export default function MapView() {
   const [markersVisible, setMarkersVisibleState] = useState(DEFAULT_MARKERS_VISIBLE);
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
-  const [featurePopupCollapsed, setFeaturePopupCollapsed] = useState(true);
-  const [arealPopupCollapsed, setArealPopupCollapsed] = useState(true);
+  const [activeModule, setActiveModule] = useState(null);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [arealEnabled, setArealEnabled] = useState(false);
   const [arealAllMarkers, setArealAllMarkers] = useState(false);
   const [arealRadius, setArealRadius] = useState(5);
   const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
   const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
   const hadFoundYearPropertyFilterRef = useRef(false);
+
+  const handlePanelClose = useCallback(() => {
+    setActiveModule(null);
+  }, []);
+
+  const handleModuleSelect = useCallback((moduleId) => {
+    if (moduleId === MODULE_IDS.ABOUT) {
+      setAboutOpen(true);
+      return;
+    }
+
+    setActiveModule((current) => (current === moduleId ? null : moduleId));
+  }, []);
 
   const hasFoundYearPropertyFilter = Object.prototype.hasOwnProperty.call(
     propertyFilters,
@@ -269,7 +283,7 @@ export default function MapView() {
     setPropertyFilters({});
     setArealEnabled(false);
     setArealAllMarkers(false);
-    setFeaturePopupCollapsed(true);
+    setActiveModule(null);
   }, []);
 
   useEffect(() => {
@@ -289,7 +303,7 @@ export default function MapView() {
           },
           onPointClick: (feature) => {
             setPopupData(feature);
-            setFeaturePopupCollapsed(false);
+            setActiveModule(MODULE_IDS.FEATURE);
           },
           onMapBackgroundClick: () => {
             clearPointSelection();
@@ -315,53 +329,70 @@ export default function MapView() {
 
   return (
     <>
+      <ModuleMenu activeModule={activeModule} onModuleSelect={handleModuleSelect} />
       <div ref={ref} className="map-container" />
-      <div className="right-panel-stack">
-        <StatusFilterPanel
-          activeStatusFilters={statusFilters}
-          onStatusFilterChange={handleStatusFilterChange}
-        />
-        <MapDisplayPanel
-          markersVisible={markersVisible}
-          onMarkersVisibleChange={setMarkersVisibleState}
-          heatmapEnabled={heatmapEnabled}
-          onHeatmapEnabledChange={setHeatmapEnabledState}
-          clusteringEnabled={clusteringEnabled}
-          onClusteringEnabledChange={setClusteringEnabledState}
-          clusterByRegnum={clusterByRegnum}
-          onClusterByRegnumChange={setClusterByRegnumState}
-        />
-        <YearFilterPanel
-          enabled={yearFilterEnabled}
-          onEnabledChange={setYearFilterEnabled}
-          range={yearRange}
-          onRangeChange={setYearRange}
-          lockedByPropertyFilter={hasFoundYearPropertyFilter}
-        />
-      </div>
-      <div className="popup-stack">
-        <FeaturePopup
-          feature={popupData}
-          collapsed={featurePopupCollapsed}
-          onCollapsedChange={setFeaturePopupCollapsed}
-          activeFilters={propertyFilters}
-          onFilterChange={handlePropertyFilterChange}
-          activeStatusFilters={statusFilters}
-          onStatusFilterChange={handleStatusFilterChange}
-          onFiltersReset={handleFeatureFiltersReset}
-        />
-        <ArealPopup
-          enabled={arealEnabled}
-          allMarkers={arealAllMarkers}
-          radius={arealRadius}
-          onEnabledChange={setArealEnabled}
-          onAllMarkersChange={setArealAllMarkers}
-          onRadiusChange={setArealRadius}
-          collapsed={arealPopupCollapsed}
-          onCollapsedChange={setArealPopupCollapsed}
-        />
-      </div>
-      <AboutProject />
+      {activeModule !== null && (
+        <div className="module-panel-stack">
+          {activeModule === MODULE_IDS.STATUS && (
+            <StatusFilterPanel
+              activeStatusFilters={statusFilters}
+              onStatusFilterChange={handleStatusFilterChange}
+              collapsed={false}
+              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+            />
+          )}
+          {activeModule === MODULE_IDS.MAP && (
+            <MapDisplayPanel
+              markersVisible={markersVisible}
+              onMarkersVisibleChange={setMarkersVisibleState}
+              heatmapEnabled={heatmapEnabled}
+              onHeatmapEnabledChange={setHeatmapEnabledState}
+              clusteringEnabled={clusteringEnabled}
+              onClusteringEnabledChange={setClusteringEnabledState}
+              clusterByRegnum={clusterByRegnum}
+              onClusterByRegnumChange={setClusterByRegnumState}
+              collapsed={false}
+              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+            />
+          )}
+          {activeModule === MODULE_IDS.YEAR && (
+            <YearFilterPanel
+              enabled={yearFilterEnabled}
+              onEnabledChange={setYearFilterEnabled}
+              range={yearRange}
+              onRangeChange={setYearRange}
+              lockedByPropertyFilter={hasFoundYearPropertyFilter}
+              collapsed={false}
+              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+            />
+          )}
+          {activeModule === MODULE_IDS.FEATURE && (
+            <FeaturePopup
+              feature={popupData}
+              collapsed={false}
+              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+              activeFilters={propertyFilters}
+              onFilterChange={handlePropertyFilterChange}
+              activeStatusFilters={statusFilters}
+              onStatusFilterChange={handleStatusFilterChange}
+              onFiltersReset={handleFeatureFiltersReset}
+            />
+          )}
+          {activeModule === MODULE_IDS.AREAL && (
+            <ArealPopup
+              enabled={arealEnabled}
+              allMarkers={arealAllMarkers}
+              radius={arealRadius}
+              onEnabledChange={setArealEnabled}
+              onAllMarkersChange={setArealAllMarkers}
+              onRadiusChange={setArealRadius}
+              collapsed={false}
+              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+            />
+          )}
+        </div>
+      )}
+      <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
     </>
   );
 }

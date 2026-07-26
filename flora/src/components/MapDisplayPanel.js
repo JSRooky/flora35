@@ -35,9 +35,14 @@ export default function MapDisplayPanel({
   clusteringEnabled = true,
   onClusteringEnabledChange,
   clusterByRegnum = true,
-  onClusterByRegnumChange
+  onClusterByRegnumChange,
+  collapsed: collapsedProp,
+  onCollapsedChange
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsedInternal, setCollapsedInternal] = useState(true);
+  const isControlled = collapsedProp !== undefined;
+  const collapsed = isControlled ? collapsedProp : collapsedInternal;
+  const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   // Кластеризация имеет смысл только когда маркеры видны.
   const clusteringDisabled = !markersVisible;
@@ -49,7 +54,7 @@ export default function MapDisplayPanel({
         <button
           type="button"
           className="map-display-panel-toggle"
-          onClick={() => setCollapsed((value) => !value)}
+          onClick={() => setCollapsed(!collapsed)}
           aria-expanded={!collapsed}
           aria-label={toggleLabel}
           title={toggleLabel}

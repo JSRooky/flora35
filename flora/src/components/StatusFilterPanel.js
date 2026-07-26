@@ -14,9 +14,14 @@ export const STATUS_OPTIONS = [
 
 export default function StatusFilterPanel({
   activeStatusFilters = [],
-  onStatusFilterChange
+  onStatusFilterChange,
+  collapsed: collapsedProp,
+  onCollapsedChange
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsedInternal, setCollapsedInternal] = useState(true);
+  const isControlled = collapsedProp !== undefined;
+  const collapsed = isControlled ? collapsedProp : collapsedInternal;
+  const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
 
   return (
@@ -28,7 +33,7 @@ export default function StatusFilterPanel({
         <button
           type="button"
           className="status-filter-panel-toggle"
-          onClick={() => setCollapsed((value) => !value)}
+          onClick={() => setCollapsed(!collapsed)}
           aria-expanded={!collapsed}
           aria-label={toggleLabel}
           title={toggleLabel}

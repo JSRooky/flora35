@@ -5,24 +5,16 @@
   overflow: hidden;
 }
 
-.right-panel-stack {
+.module-panel-stack {
   position: fixed;
-  top: 20px;
-  right: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  z-index: 1000;
-}
-
-.popup-stack {
-  position: fixed;
-  top: 20px;
+  top: 49px;
   left: 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   z-index: 1000;
+  max-height: calc(100vh - 69px);
+  overflow-y: auto;
 }
 
 

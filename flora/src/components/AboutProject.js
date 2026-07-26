@@ -12,8 +12,11 @@ function resolveMarkdownUrl(source) {
   return source;
 }
 
-export default function AboutProject() {
-  const [open, setOpen] = useState(false);
+export default function AboutProject({ open: openProp, onOpenChange }) {
+  const [openInternal, setOpenInternal] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : openInternal;
+  const setOpen = onOpenChange ?? setOpenInternal;
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -59,15 +62,6 @@ export default function AboutProject() {
 
   return (
     <>
-      <button
-        type="button"
-        className="about-project-trigger"
-        onClick={() => setOpen(true)}
-        aria-haspopup="dialog"
-      >
-        О проекте
-      </button>
-
       {open && (
         // Клик по затемнению закрывает диалог.
         <div className="about-project-overlay" onClick={() => setOpen(false)}>

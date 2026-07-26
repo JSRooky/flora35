@@ -25,9 +25,14 @@ export default function YearFilterPanel({
   onEnabledChange,
   range = YEAR_BOUNDS,
   onRangeChange,
-  lockedByPropertyFilter = false
+  lockedByPropertyFilter = false,
+  collapsed: collapsedProp,
+  onCollapsedChange
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsedInternal, setCollapsedInternal] = useState(true);
+  const isControlled = collapsedProp !== undefined;
+  const collapsed = isControlled ? collapsedProp : collapsedInternal;
+  const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
   const [draftRange, setDraftRange] = useState(range);
   const [activeThumb, setActiveThumb] = useState(null);
   const draftRangeRef = useRef(draftRange);
@@ -87,7 +92,7 @@ export default function YearFilterPanel({
         <button
           type="button"
           className="year-filter-panel-toggle"
-          onClick={() => setCollapsed((value) => !value)}
+          onClick={() => setCollapsed(!collapsed)}
           aria-expanded={!collapsed}
           aria-label={toggleLabel}
           title={toggleLabel}
