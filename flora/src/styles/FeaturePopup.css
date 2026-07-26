@@ -1,7 +1,5 @@
 .feature-popup {
-  position: fixed;
-  top: 20px;
-  left: 20px;
+  position: relative;
   background-color: rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(20px) ;
   border: 1px solid #ddd;
@@ -12,7 +10,6 @@
   width: 320px;
   height: auto;
   overflow: visible; /* let popup expand with content; page will scroll if needed */
-  z-index: 1000;
   font-family: Arial, sans-serif;
   animation: slideIn 0.3s ease-out;
 }

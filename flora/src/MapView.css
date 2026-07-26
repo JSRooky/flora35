@@ -5,6 +5,16 @@
   overflow: hidden;
 }
 
+.popup-stack {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 1000;
+}
+
 
 /* Перемещаем атрибуцию внутрь карты */
 .mapboxgl-ctrl-attrib {
