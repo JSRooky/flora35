@@ -1,7 +1,8 @@
 import points from "../locations/points.json";
 
-const PLANT_IMAGE = "/images/plant.svg";
-const ANIMAL_IMAGE = "/images/animal.svg";
+const PUBLIC_URL = process.env.PUBLIC_URL || "";
+const PLANT_IMAGE = `${PUBLIC_URL}/images/plant.svg`;
+const ANIMAL_IMAGE = `${PUBLIC_URL}/images/animal.svg`;
 
 const CLUSTER_OPTIONS = {
   clusterMaxZoom: 14,
