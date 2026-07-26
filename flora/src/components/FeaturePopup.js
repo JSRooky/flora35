@@ -30,22 +30,22 @@ export default function FeaturePopup({ feature, onClose }) {
         </button>
 
         <div className="popup-content">
-          <h3>Marker Info</h3>
+          <h3>Сведения о точке данных</h3>
 
           <div className="popup-item">
-            <strong>Latitude:</strong>
+            <strong>Широта:</strong>
             <span>{lat.toFixed(4)}</span>
           </div>
 
           <div className="popup-item">
-            <strong>Longitude:</strong>
+            <strong>Долгота:</strong>
             <span>{lng.toFixed(4)}</span>
           </div>
 
           {properties && Object.entries(properties).length > 0 && (
             <>
               <hr />
-              <h4>Properties</h4>
+              <h4>Основное</h4>
 
               {Object.entries(properties).map(([key, value]) => (
                 <div key={key} className="popup-item">

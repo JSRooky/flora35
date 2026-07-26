@@ -14,7 +14,7 @@ export default function ArealPopup({
   return (
     <div className="areal-popup">
       <div className="areal-popup-content">
-        <h3>Areal</h3>
+        <h3>Ареал</h3>
 
         <label className={`areal-switch ${allMarkers ? "areal-switch--disabled" : ""}`}>
           <input
@@ -24,7 +24,7 @@ export default function ArealPopup({
             onChange={(e) => onEnabledChange(e.target.checked)}
           />
           <span className="areal-switch-slider" />
-          <span className="areal-switch-label">Add Areal</span>
+          <span className="areal-switch-label">Установить ареал</span>
         </label>
 
         <label className="areal-switch">
@@ -34,19 +34,19 @@ export default function ArealPopup({
             onChange={(e) => onAllMarkersChange(e.target.checked)}
           />
           <span className="areal-switch-slider" />
-          <span className="areal-switch-label">All markers</span>
+          <span className="areal-switch-label">Ко всем маркерам</span>
         </label>
 
         <div className={`areal-radius ${isActive ? "" : "areal-radius--disabled"}`}>
           <label htmlFor="areal-radius-slider">
-            Radius: <strong>{radius} km</strong>
+            Радиус ареала: <strong>{radius} км</strong>
           </label>
           <input
             id="areal-radius-slider"
             type="range"
-            min={1}
-            max={50}
-            step={1}
+            min={0.5}
+            max={15}
+            step={0.1}
             value={radius}
             disabled={!isActive}
             onChange={(e) => onRadiusChange(Number(e.target.value))}

@@ -15,7 +15,7 @@
 @keyframes arealSlideIn {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateX(-20px);
   }
   to {
     opacity: 1;
