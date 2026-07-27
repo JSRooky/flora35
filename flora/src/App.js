@@ -98,9 +98,9 @@ export default function MapView() {
   const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
   // Сводка о полигоне, уже отображённом на карте (не путать с выбранной точкой).
   const [speciesPolygonInfo, setSpeciesPolygonInfo] = useState(null);
-  // Буфер: диаметры зон (красная/жёлтая/зелёная), км; bufferVisible — показан ли он сейчас.
+  // Буфер: диаметры зон (красная/жёлтая/зелёная), км; bufferEnabled — включён ли переключатель.
   const [bufferDiameters, setBufferDiameters] = useState(DEFAULT_BUFFER_DIAMETERS_KM);
-  const [bufferVisible, setBufferVisible] = useState(true);
+  const [bufferEnabled, setBufferEnabled] = useState(false);
   const [bufferSelectionMode, setBufferSelectionMode] = useState(false);
   const [bufferSelectedPoints, setBufferSelectedPoints] = useState([]);
   const [areaDrawingMode, setAreaDrawingMode] = useState(false);
@@ -516,7 +516,6 @@ export default function MapView() {
    * предыдущей» — иначе кольца буфера накладывались бы некорректно.
    */
   const handleBufferDiameterChange = useCallback((index, value) => {
-    setBufferVisible(true);
     setBufferDiameters((prev) => {
       const next = [...prev];
       next[index] = value;
@@ -538,10 +537,14 @@ export default function MapView() {
   }, []);
 
   const handleBufferReset = useCallback(() => {
-    setBufferVisible(false);
+    setBufferEnabled(false);
     setBufferDiameters(DEFAULT_BUFFER_DIAMETERS_KM);
     setBufferSelectedPoints([]);
     setBufferSelectionMode(false);
+  }, []);
+
+  const handleBufferEnabledChange = useCallback((enabled) => {
+    setBufferEnabled(enabled);
   }, []);
 
   const handleBufferSelectionModeChange = useCallback(() => {
@@ -565,7 +568,6 @@ export default function MapView() {
 
       return next;
     });
-    setBufferVisible(true);
   }, [popupData]);
 
   const handleArealPointSelect = useCallback((feature) => {
@@ -592,7 +594,7 @@ export default function MapView() {
     setArealAllMarkers(false);
     setSpeciesPolygonInfo(null);
     setBufferDiameters(DEFAULT_BUFFER_DIAMETERS_KM);
-    setBufferVisible(true);
+    setBufferEnabled(false);
     setBufferSelectedPoints([]);
     setBufferSelectionMode(false);
     setActiveModule(null);
@@ -600,8 +602,7 @@ export default function MapView() {
     setBufferDockedWithFeature(false);
   }, []);
 
-  // Буфер строится для выбранной точки или для всех точек в выделении и обновляется
-  // при изменении диаметров зон; «Сброс» скрывает его до следующего изменения.
+  // Буфер строится только при включённом переключателе «Построить буфер».
   useEffect(() => {
     const mapInstance = map.current;
     if (!mapInstance || !mapReady) {
@@ -615,12 +616,12 @@ export default function MapView() {
           ? [popupData]
           : [];
 
-    if (bufferVisible && bufferFeatures.length > 0) {
+    if (bufferEnabled && bufferFeatures.length > 0) {
       updateBufferLayer(mapInstance, bufferFeatures, bufferDiameters);
     } else {
       clearBufferLayer(mapInstance);
     }
-  }, [bufferVisible, popupData, bufferSelectedPoints, bufferDiameters, mapReady]);
+  }, [bufferEnabled, popupData, bufferSelectedPoints, bufferDiameters, mapReady]);
 
   useEffect(() => {
     if (!map.current && ref.current) {
@@ -644,7 +645,6 @@ export default function MapView() {
 
             dismissArealPointHintOnPointClick(feature);
             setPopupData(feature);
-            setBufferVisible(true);
             // Если какая-то панель уже открыта, оставляем её открытой — просто обновляем
             // данные точки. «Сведения о точке» открываются только если панелей ещё нет.
             setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
@@ -794,10 +794,11 @@ export default function MapView() {
           (activeModule === MODULE_IDS.FEATURE && bufferDockedWithFeature) ? (
             <BufferPopup
               feature={popupData}
-              active={bufferVisible}
+              enabled={bufferEnabled}
               diametersKm={bufferDiameters}
               selectionMode={bufferSelectionMode}
               selectedCount={bufferSelectedPoints.length}
+              onEnabledChange={handleBufferEnabledChange}
               onSelectionModeChange={handleBufferSelectionModeChange}
               onDiameterChange={handleBufferDiameterChange}
               onReset={handleBufferReset}

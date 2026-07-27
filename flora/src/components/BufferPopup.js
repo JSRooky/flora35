@@ -36,13 +36,13 @@ function formatSelectedPointsCount(count) {
   return `${count} точек`;
 }
 
-function getCollapsedSummary(active, feature, selectedCount, diametersKm) {
+function getCollapsedSummary(enabled, feature, selectedCount, diametersKm) {
   if (!feature && selectedCount === 0) {
     return "Точка не выбрана";
   }
 
-  if (!active) {
-    return "Буфер сброшен";
+  if (!enabled) {
+    return "Буфер выключен";
   }
 
   const pointsLabel =
@@ -55,14 +55,16 @@ function getCollapsedSummary(active, feature, selectedCount, diametersKm) {
  * Панель модуля «Буфер»: набор окружностей (красная/жёлтая/зелёная) вокруг выбранной
  * или нескольких точек. Кнопка «Добавить» включает режим, в котором клик по точке
  * добавляет или убирает её из выделения.
- * Диаметр каждой окружности задаётся отдельным слайдером; «Сброс» убирает буфер с карты.
+ * Диаметр каждой окружности задаётся отдельным слайдером; переключатель включает
+ * построение буфера; «Сброс» убирает его с карты и сбрасывает настройки.
  */
 export default function BufferPopup({
   feature,
-  active,
+  enabled,
   diametersKm,
   selectionMode = false,
   selectedCount = 0,
+  onEnabledChange,
   onSelectionModeChange,
   onDiameterChange,
   onReset,
@@ -95,13 +97,24 @@ export default function BufferPopup({
 
       {collapsed ? (
         <p className="popup-collapsed-summary">
-          {getCollapsedSummary(active, feature, selectedCount, diametersKm)}
+          {getCollapsedSummary(enabled, feature, selectedCount, diametersKm)}
         </p>
       ) : (
         <div className="buffer-popup-content">
           {!hasPoints && (
             <p className="buffer-popup-status">Выберите точку на карте или добавьте точки в выделение.</p>
           )}
+
+          <label className={`buffer-switch ${!hasPoints ? "buffer-switch--disabled" : ""}`}>
+            <input
+              type="checkbox"
+              checked={enabled}
+              disabled={!hasPoints}
+              onChange={(e) => onEnabledChange?.(e.target.checked)}
+            />
+            <span className="buffer-switch-slider" />
+            <span className="buffer-switch-label">Построить буфер</span>
+          </label>
 
           {selectionMode && (
             <p className="buffer-popup-status buffer-popup-status--selection">
@@ -118,9 +131,10 @@ export default function BufferPopup({
           {BUFFER_ZONES.map((zone, index) => {
             const minDiameter = index === 0 ? BUFFER_MIN_DIAMETER_KM : diametersKm[index - 1];
             const value = diametersKm[index];
+            const zoneDisabled = !hasPoints || !enabled;
 
             return (
-              <div className="buffer-zone" key={zone.id}>
+              <div className={`buffer-zone${zoneDisabled ? " buffer-zone--disabled" : ""}`} key={zone.id}>
                 <label htmlFor={`buffer-zone-${zone.id}`}>
                   {zone.label}: <strong>{formatDiameter(value)}</strong>
                 </label>
@@ -131,7 +145,7 @@ export default function BufferPopup({
                   max={zone.maxDiameterKm}
                   step={BUFFER_DIAMETER_STEP_KM}
                   value={value}
-                  disabled={!hasPoints}
+                  disabled={zoneDisabled}
                   style={{
                     "--range-progress": `${getRangeProgress(value, minDiameter, zone.maxDiameterKm)}%`,
                     "--range-color": zone.color
@@ -157,7 +171,7 @@ export default function BufferPopup({
               type="button"
               className="buffer-reset-btn"
               onClick={onReset}
-              disabled={!hasPoints || !active}
+              disabled={!enabled && selectedCount === 0 && !selectionMode}
             >
               Сброс
             </button>

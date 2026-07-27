@@ -86,71 +86,73 @@ export default function AreaSelectionPopup({
         </div>
       </div>
 
-      {collapsed ? (
-        <p className="popup-collapsed-summary">
-          {getCollapsedSummary(drawingMode, hasArea, containedPoints)}
-        </p>
-      ) : (
-        <div className="area-selection-popup-content">
-          {drawingMode ? (
-            <p className="area-selection-popup-status area-selection-popup-status--drawing">
-              Зажмите левую кнопку мыши и обведите область на карте.
-            </p>
-          ) : (
-            <p className="area-selection-popup-status">
-              Нажмите «Рисовать» и обведите на карте область, чтобы увидеть попавшие в неё точки.
-            </p>
-          )}
-
-          <div className="area-selection-actions">
-            <button
-              type="button"
-              className={`area-selection-draw-btn${drawingMode ? " area-selection-draw-btn--active" : ""}`}
-              onClick={onDrawingModeChange}
-              aria-pressed={drawingMode}
-              title={drawToggleLabel}
-            >
-              Рисовать
-            </button>
-            <button
-              type="button"
-              className="area-selection-reset-btn"
-              onClick={onReset}
-              disabled={!hasArea && !drawingMode}
-            >
-              Сброс
-            </button>
-          </div>
-
-          {hasArea && (
-            <div className="area-selection-contained-points">
-              <p className="area-selection-contained-points-title">
-                В области:{" "}
-                <strong>{formatContainedPointsCount(containedPoints?.count ?? 0)}</strong>
+      <div className="area-selection-popup-body">
+        {collapsed ? (
+          <p className="popup-collapsed-summary">
+            {getCollapsedSummary(drawingMode, hasArea, containedPoints)}
+          </p>
+        ) : (
+          <div className="area-selection-popup-content">
+            {drawingMode ? (
+              <p className="area-selection-popup-status area-selection-popup-status--drawing">
+                Зажмите левую кнопку мыши и обведите область на карте.
               </p>
+            ) : (
+              <p className="area-selection-popup-status">
+                Нажмите «Рисовать» и обведите на карте область, чтобы увидеть попавшие в неё точки.
+              </p>
+            )}
 
-              {hasContainedPoints ? (
-                <ul className="area-selection-contained-points-list">
-                  {containedPoints.points.map((feature) => (
-                    <li key={getArealPointKey(feature)}>
-                      <button
-                        type="button"
-                        className="area-selection-contained-points-item"
-                        onClick={() => onPointSelect?.(feature)}
-                      >
-                        {getPointLabel(feature, containedPoints.points)}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="area-selection-popup-status">Ни одна точка не попала в выделение.</p>
-              )}
+            <div className="area-selection-actions">
+              <button
+                type="button"
+                className={`area-selection-draw-btn${drawingMode ? " area-selection-draw-btn--active" : ""}`}
+                onClick={onDrawingModeChange}
+                aria-pressed={drawingMode}
+                title={drawToggleLabel}
+              >
+                Рисовать
+              </button>
+              <button
+                type="button"
+                className="area-selection-reset-btn"
+                onClick={onReset}
+                disabled={!hasArea && !drawingMode}
+              >
+                Сброс
+              </button>
             </div>
-          )}
-        </div>
-      )}
-      <ModuleHelpPanel sectionId={MODULE_IDS.AREA} open={helpOpen} />
+
+            {hasArea && (
+              <div className="area-selection-contained-points">
+                <p className="area-selection-contained-points-title">
+                  В области:{" "}
+                  <strong>{formatContainedPointsCount(containedPoints?.count ?? 0)}</strong>
+                </p>
+
+                {hasContainedPoints ? (
+                  <ul className="area-selection-contained-points-list">
+                    {containedPoints.points.map((feature) => (
+                      <li key={getArealPointKey(feature)}>
+                        <button
+                          type="button"
+                          className="area-selection-contained-points-item"
+                          onClick={() => onPointSelect?.(feature)}
+                        >
+                          {getPointLabel(feature, containedPoints.points)}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="area-selection-popup-status">Ни одна точка не попала в выделение.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        <ModuleHelpPanel sectionId={MODULE_IDS.AREA} open={helpOpen} />
+      </div>
     </div>
   );
 }

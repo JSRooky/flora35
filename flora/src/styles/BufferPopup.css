@@ -66,6 +66,66 @@
   color: #333;
 }
 
+.buffer-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.buffer-switch--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.buffer-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.buffer-switch-slider {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: #ccc;
+  border-radius: 20px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.buffer-switch-slider::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.buffer-switch input:checked + .buffer-switch-slider {
+  background: #e74c3c;
+}
+
+.buffer-switch input:checked + .buffer-switch-slider::after {
+  transform: translateX(16px);
+}
+
+.buffer-switch-label {
+  font-size: 13px;
+  color: #333;
+}
+
+.buffer-zone--disabled {
+  opacity: 0.5;
+}
+
 .buffer-zone {
   display: flex;
   flex-direction: column;
