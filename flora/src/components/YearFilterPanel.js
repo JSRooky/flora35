@@ -40,8 +40,7 @@ export default function YearFilterPanel({
   const draftRangeRef = useRef(draftRange);
   const isDraggingRef = useRef(false);
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
-  const [helpOpen, setHelpOpen] = useState(false);
-  const { min: minYear, max: maxYear } = YEAR_BOUNDS;
+  const [helpOpen, setHelpOpen] = useState(false); // раздел ## year в docs/moduleHelp.md
 
   useEffect(() => {
     if (isDraggingRef.current) {

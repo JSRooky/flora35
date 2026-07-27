@@ -4,6 +4,7 @@ import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/SpeciesPolygonPopup.css";
 
+/** Склонение «N точка/точки/точек» для русского интерфейса. */
 function formatPointCount(count) {
   const mod10 = count % 10;
   const mod100 = count % 100;
@@ -19,6 +20,7 @@ function formatPointCount(count) {
   return `${count} точек`;
 }
 
+/** Краткая подпись для свёрнутой панели — по построенному полигону, а не по выбранной точке. */
 function getCollapsedSummary(polygonInfo) {
   if (!polygonInfo?.built) {
     return "Полигон не построен";
@@ -27,6 +29,10 @@ function getCollapsedSummary(polygonInfo) {
   return polygonInfo.nameRu || polygonInfo.nameLatin || "Полигон вида";
 }
 
+/**
+ * Текст статуса в панели: различает «ещё не построен», «построен для выбранного вида»
+ * и «на карте другой вид, чем выбран сейчас».
+ */
 function getStatusMessage(feature, polygonInfo) {
   if (!feature) {
     return "Выберите точку на карте.";
@@ -51,6 +57,11 @@ function getStatusMessage(feature, polygonInfo) {
   return "Не удалось построить полигон для выбранного вида.";
 }
 
+/**
+ * Панель экспериментального модуля «Полигон».
+ * feature — текущая выбранная точка; polygonInfo — что уже отображено на карте.
+ * Полигон не перестраивается автоматически при смене точки — только по кнопкам.
+ */
 export default function SpeciesPolygonPopup({
   feature,
   polygonInfo,
@@ -60,7 +71,7 @@ export default function SpeciesPolygonPopup({
   onCollapsedChange
 }) {
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
-  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false); // раздел ## polygon в docs/moduleHelp.md
   const speciesLabel =
     feature?.properties?.name_ru ||
     feature?.properties?.name_latin ||

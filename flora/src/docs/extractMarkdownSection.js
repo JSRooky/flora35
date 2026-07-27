@@ -17,6 +17,7 @@ export function extractMarkdownSection(markdown, sectionId) {
 
   const sectionStart = match.index + match[0].length;
   const rest = normalized.slice(sectionStart);
+  // Обрезаем текст до следующего заголовка ## или до конца файла.
   const nextSectionMatch = rest.match(/^##\s+/m);
   const sectionBody = nextSectionMatch
     ? rest.slice(0, nextSectionMatch.index)

@@ -7,6 +7,7 @@ export const MODULE_IDS = {
   YEAR: "year",
   FEATURE: "feature",
   AREAL: "areal",
+  // Совпадает с заголовком ## polygon в docs/moduleHelp.md.
   POLYGON: "polygon",
   ABOUT: "about"
 };
@@ -28,6 +29,7 @@ function ModuleMenuButton({
   activeModule,
   onModuleSelect,
   className = "",
+  // Некоторые модули (например, «Полигон») требуют предварительного выбора точки.
   disabled = false
 }) {
   return (
@@ -55,6 +57,7 @@ export default function ModuleMenu({ activeModule, onModuleSelect, pointSelected
                 label={label}
                 activeModule={activeModule}
                 onModuleSelect={onModuleSelect}
+                // «Полигон» доступен только при выбранной точке на карте.
                 disabled={id === MODULE_IDS.POLYGON && !pointSelected}
               />
             </li>

@@ -25,7 +25,7 @@ export default function StatusFilterPanel({
   const collapsed = isControlled ? collapsedProp : collapsedInternal;
   const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
-  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false); // раздел ## status в docs/moduleHelp.md
 
   return (
     <aside

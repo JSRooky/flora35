@@ -25,6 +25,10 @@ export function getPointsForSpecies(feature) {
   );
 }
 
+/**
+ * Строит GeoJSON-полигон по набору координат.
+ * Turf convex требует минимум три точки; для одной и двух — буфер вокруг точки/отрезка.
+ */
 function buildPolygonFromCoordinates(coordinates) {
   if (coordinates.length === 0) {
     return null;
@@ -76,6 +80,7 @@ export function addSpeciesPolygonLayer(map) {
 /**
  * Строит полигон (выпуклая оболочка Turf.js) по всем точкам выбранного вида
  * и отображает его на карте.
+ * Возвращает сводку для панели модуля: built, pointCount, nameRu, nameLatin.
  */
 export function updateSpeciesPolygonLayer(map, feature) {
   const source = map.getSource(SOURCE_ID);
@@ -123,6 +128,7 @@ export function updateSpeciesPolygonLayer(map, feature) {
   };
 }
 
+/** Очищает слой полигона вида на карте. */
 export function clearSpeciesPolygonLayer(map) {
   const source = map.getSource(SOURCE_ID);
   if (!source) {

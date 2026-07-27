@@ -62,6 +62,7 @@ export default function MapView() {
   const [arealRadius, setArealRadius] = useState(5);
   const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
   const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
+  // Сводка о полигоне, уже отображённом на карте (не путать с выбранной точкой).
   const [speciesPolygonInfo, setSpeciesPolygonInfo] = useState(null);
   const hadFoundYearPropertyFilterRef = useRef(false);
 
@@ -336,6 +337,10 @@ export default function MapView() {
     setSpeciesPolygonInfo(null);
   }, []);
 
+  /**
+   * Строит полигон по виду текущей выбранной точки.
+   * Смена точки сама по себе полигон не меняет — только явный вызов этой функции.
+   */
   const handleSpeciesPolygonBuild = useCallback(() => {
     if (!map.current || !popupData) {
       return;
@@ -398,7 +403,7 @@ export default function MapView() {
           markersVisible: DEFAULT_MARKERS_VISIBLE
         });
         addArealLayer(map.current);
-        addSpeciesPolygonLayer(map.current);
+        addSpeciesPolygonLayer(map.current); // слой экспериментального модуля «Полигон»
         addHeatmapLayer(map.current);
         setMapReady(true);
       });

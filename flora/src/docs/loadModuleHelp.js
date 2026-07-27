@@ -1,6 +1,7 @@
 import moduleHelpUrl from "./moduleHelp.md";
 import { extractMarkdownSection } from "./extractMarkdownSection";
 
+// Файл справки загружается один раз и переиспользуется всеми панелями модулей.
 let cachedMarkdown = null;
 let loadPromise = null;
 
@@ -31,6 +32,7 @@ function fetchModuleHelpMarkdown() {
   return loadPromise;
 }
 
+/** Возвращает markdown-раздел справки для модуля с идентификатором sectionId. */
 export function loadModuleHelpSection(sectionId) {
   return fetchModuleHelpMarkdown().then((markdown) => {
     const section = extractMarkdownSection(markdown, sectionId);

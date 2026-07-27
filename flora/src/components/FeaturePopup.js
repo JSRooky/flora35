@@ -28,7 +28,7 @@ export default function FeaturePopup({
   onFiltersReset
 }) {
   const [showImages, setShowImages] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false); // блок справки из docs/moduleHelp.md, раздел ## feature
 
   const collapsedSummary = feature
     ? feature.properties?.name_ru ||

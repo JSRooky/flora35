@@ -67,7 +67,7 @@ export default function ArealPopup({
   const isActive = enabled || allMarkers;
   const hasContainedPoints = containedPoints?.count > 0;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
-  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false); // раздел ## areal в docs/moduleHelp.md
 
   return (
     <div className={`areal-popup ${collapsed ? "areal-popup--collapsed" : ""}`}>

@@ -3,6 +3,7 @@ import { loadModuleHelpSection } from "../docs/loadModuleHelp";
 import { renderMarkdown } from "../docs/renderMarkdown";
 import "../styles/ModuleHelp.css";
 
+/** Кнопка «?» в заголовке панели модуля; переключает блок справки ниже. */
 export function ModuleHelpButton({ open, onClick, className = "" }) {
   return (
     <button
@@ -18,6 +19,10 @@ export function ModuleHelpButton({ open, onClick, className = "" }) {
   );
 }
 
+/**
+ * Блок справки под панелью модуля.
+ * sectionId должен совпадать с заголовком ## sectionId в docs/moduleHelp.md.
+ */
 export function ModuleHelpPanel({ sectionId, open }) {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);

@@ -46,7 +46,7 @@ export default function MapDisplayPanel({
   const collapsed = isControlled ? collapsedProp : collapsedInternal;
   const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
-  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false); // раздел ## map в docs/moduleHelp.md
   // Кластеризация имеет смысл только когда маркеры видны.
   const clusteringDisabled = !markersVisible;
 
