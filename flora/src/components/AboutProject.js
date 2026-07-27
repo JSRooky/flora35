@@ -63,7 +63,7 @@ export default function AboutProject({ open: openProp, onOpenChange }) {
   return (
     <>
       {open && (
-        // Клик по затемнению закрывает диалог.
+        // Клик вне окна закрывает диалог.
         <div className="about-project-overlay" onClick={() => setOpen(false)}>
           <div
             className="about-project-dialog"
