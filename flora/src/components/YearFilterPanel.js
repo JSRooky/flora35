@@ -5,6 +5,8 @@ import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/YearFilterPanel.css";
 
 const YEAR_BOUNDS = getYearBounds();
+const minYear = YEAR_BOUNDS.min;
+const maxYear = YEAR_BOUNDS.max;
 
 function getRangeProgress(value, min, max) {
   return ((value - min) / (max - min)) * 100;
