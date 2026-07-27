@@ -53,7 +53,7 @@ export default function MapDisplayPanel({
   return (
     <aside className={`map-display-panel ${collapsed ? "map-display-panel--collapsed" : ""}`}>
       <div className="map-display-panel-header">
-        <h3 className="map-display-panel-title">Операции с картой</h3>
+        <h3 className="map-display-panel-title">Группы точек</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
           <button

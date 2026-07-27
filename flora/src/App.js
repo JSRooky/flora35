@@ -17,7 +17,8 @@ import {
   isFeatureUnclusteredOnMap,
   setClusterByRegnum,
   setClusteringEnabled,
-  setMarkersVisible
+  setMarkersVisible,
+  setHoverTooltipsEnabled
 } from "./components/addLocationsLayer";
 import {
   addHeatmapLayer,
@@ -105,6 +106,7 @@ export default function MapView() {
   const [bufferSelectedPoints, setBufferSelectedPoints] = useState([]);
   const [areaDrawingMode, setAreaDrawingMode] = useState(false);
   const [areaPolygon, setAreaPolygon] = useState(null);
+  const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
   const [panelCollapsed, setPanelCollapsed] = useState({});
   const hadFoundYearPropertyFilterRef = useRef(false);
 
@@ -388,6 +390,10 @@ export default function MapView() {
 
     applyLocationsFilter(map.current, buildLocationFilters());
   }, [buildLocationFilters]);
+
+  useEffect(() => {
+    setHoverTooltipsEnabled(!hoverTooltipsDisabled);
+  }, [hoverTooltipsDisabled]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -712,6 +718,8 @@ export default function MapView() {
         activeModule={activeModule}
         onModuleSelect={handleModuleSelect}
         pointSelected={Boolean(popupData)}
+        hoverTooltipsDisabled={hoverTooltipsDisabled}
+        onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
       />
       <div ref={ref} className="map-container" />
       {activeModule !== null && (

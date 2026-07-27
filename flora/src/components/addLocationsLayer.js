@@ -31,6 +31,8 @@ let onPointClickCallback = null;
 let onMapBackgroundClickCallback = null;
 let pointHoverPopup = null;
 let pointHoverPopupHideTimer = null;
+let clusterHoverRequestId = 0;
+let hoverTooltipsEnabled = true;
 
 const POINT_TOOLTIP_FADE_MS = 180;
 
@@ -61,6 +63,105 @@ function buildPointTooltipHtml(nameRu, nameLatin) {
   return lines.join("");
 }
 
+function formatClusterPointsCount(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${count} точка`;
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${count} точки`;
+  }
+
+  return `${count} точек`;
+}
+
+function formatClusterSpeciesCount(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${count} вид`;
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${count} вида`;
+  }
+
+  return `${count} видов`;
+}
+
+/** Уникальные виды в кластере с количеством точек каждого вида. */
+function getSpeciesSummaryFromLeaves(leaves) {
+  const speciesMap = new Map();
+
+  leaves.forEach((leaf) => {
+    const { name_ru: nameRu = "", name_latin: nameLatin = "" } = leaf.properties ?? {};
+    const key = nameLatin || nameRu || leaf.id || `${leaf.geometry?.coordinates?.join(",")}`;
+
+    if (!speciesMap.has(key)) {
+      speciesMap.set(key, {
+        nameRu,
+        nameLatin,
+        count: 1
+      });
+      return;
+    }
+
+    speciesMap.get(key).count += 1;
+  });
+
+  return [...speciesMap.values()].sort((a, b) => {
+    const nameA = a.nameRu || a.nameLatin || "";
+    const nameB = b.nameRu || b.nameLatin || "";
+    return nameA.localeCompare(nameB, "ru");
+  });
+}
+
+function getSpeciesLabel(species, speciesList) {
+  const label = species.nameRu || species.nameLatin || "Без названия";
+  const hasDuplicateName = speciesList.filter((item) => item.nameRu === species.nameRu).length > 1;
+
+  if (hasDuplicateName && species.nameLatin) {
+    return `${species.nameRu || species.nameLatin} (${species.nameLatin})`;
+  }
+
+  return label;
+}
+
+/** HTML-подсказка со списком видов в кластере. */
+function buildClusterTooltipHtml(leaves) {
+  const speciesList = getSpeciesSummaryFromLeaves(leaves);
+
+  if (speciesList.length === 0) {
+    return `<div class="cluster-tooltip-title">${formatClusterPointsCount(leaves.length)}</div>`;
+  }
+
+  const items = speciesList
+    .map((species) => {
+      const label = escapeHtml(getSpeciesLabel(species, speciesList));
+      const countSuffix = species.count > 1 ? ` <span class="cluster-tooltip-count">— ${species.count}</span>` : "";
+      return `<li class="cluster-tooltip-item">${label}${countSuffix}</li>`;
+    })
+    .join("");
+
+  return `
+    <div class="cluster-tooltip-title">${formatClusterSpeciesCount(speciesList.length)}</div>
+    <div class="cluster-tooltip-subtitle">${formatClusterPointsCount(leaves.length)}</div>
+    <ul class="cluster-tooltip-list">${items}</ul>
+  `;
+}
+
+function getClusterHoverLayerIds() {
+  return [...getClusterLayerIds(), ...getClusterCountLayerIds()];
+}
+
+function cancelClusterHoverRequest() {
+  clusterHoverRequestId += 1;
+}
+
 function clearPointHoverHideTimer() {
   if (pointHoverPopupHideTimer) {
     clearTimeout(pointHoverPopupHideTimer);
@@ -78,6 +179,10 @@ function setPointHoverPopupVisible(visible, popup = pointHoverPopup) {
 }
 
 function showPointHoverPopup(map, coordinates, html) {
+  if (!hoverTooltipsEnabled) {
+    return;
+  }
+
   clearPointHoverHideTimer();
 
   if (!pointHoverPopup) {
@@ -286,6 +391,15 @@ function detachLocationsInteractions(map) {
     map.off("mouseleave", layerId, interactionHandlers.clusterLeave);
   });
 
+  interactionHandlers.clusterHoverLayerIds?.forEach((layerId) => {
+    if (interactionHandlers.clusterLayerIds.includes(layerId)) {
+      return;
+    }
+
+    map.off("mouseenter", layerId, interactionHandlers.clusterEnter);
+    map.off("mouseleave", layerId, interactionHandlers.clusterLeave);
+  });
+
   interactionHandlers.unclusteredLayerIds.forEach((layerId) => {
     map.off("click", layerId, interactionHandlers.pointClick);
     map.off("mouseenter", layerId, interactionHandlers.pointEnter);
@@ -297,6 +411,7 @@ function detachLocationsInteractions(map) {
   }
 
   removePointHoverPopup({ immediate: true });
+  cancelClusterHoverRequest();
   interactionHandlers = null;
 }
 
@@ -305,6 +420,7 @@ function attachLocationsInteractions(map) {
   detachLocationsInteractions(map);
 
   const clusterLayerIds = getClusterLayerIds();
+  const clusterHoverLayerIds = getClusterHoverLayerIds();
   const unclusteredLayerIds = getUnclusteredLayerIds();
 
   const clusterClick = (event) => {
@@ -346,12 +462,39 @@ function attachLocationsInteractions(map) {
     });
   };
 
-  const clusterEnter = () => {
+  const clusterEnter = (event) => {
     map.getCanvas().style.cursor = "pointer";
+
+    if (!hoverTooltipsEnabled) {
+      return;
+    }
+
+    const clusterFeature = event.features?.[0];
+    const clusterId = clusterFeature?.properties?.cluster_id;
+    const sourceId = clusterFeature?.source;
+    const coordinates = clusterFeature?.geometry?.coordinates;
+    const source = sourceId ? map.getSource(sourceId) : null;
+
+    if (!source || clusterId === undefined || !coordinates) {
+      return;
+    }
+
+    const requestId = clusterHoverRequestId + 1;
+    clusterHoverRequestId = requestId;
+
+    source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
+      if (leavesErr || requestId !== clusterHoverRequestId || !leaves?.length) {
+        return;
+      }
+
+      showPointHoverPopup(map, coordinates, buildClusterTooltipHtml(leaves));
+    });
   };
 
   const clusterLeave = () => {
     map.getCanvas().style.cursor = "";
+    cancelClusterHoverRequest();
+    removePointHoverPopup();
   };
 
   const pointClick = (event) => {
@@ -363,6 +506,10 @@ function attachLocationsInteractions(map) {
 
   const pointEnter = (event) => {
     map.getCanvas().style.cursor = "pointer";
+
+    if (!hoverTooltipsEnabled) {
+      return;
+    }
 
     const feature = event.features?.[0];
     if (!feature?.geometry?.coordinates) {
@@ -388,6 +535,15 @@ function attachLocationsInteractions(map) {
 
   clusterLayerIds.forEach((layerId) => {
     map.on("click", layerId, clusterClick);
+    map.on("mouseenter", layerId, clusterEnter);
+    map.on("mouseleave", layerId, clusterLeave);
+  });
+
+  clusterHoverLayerIds.forEach((layerId) => {
+    if (clusterLayerIds.includes(layerId)) {
+      return;
+    }
+
     map.on("mouseenter", layerId, clusterEnter);
     map.on("mouseleave", layerId, clusterLeave);
   });
@@ -421,6 +577,7 @@ function attachLocationsInteractions(map) {
 
   interactionHandlers = {
     clusterLayerIds,
+    clusterHoverLayerIds,
     unclusteredLayerIds,
     clusterClick,
     clusterEnter,
@@ -751,6 +908,20 @@ export function isClusteringEnabled() {
 
 export function isMarkersVisible() {
   return markersVisible;
+}
+
+/** Включает или отключает всплывающие подсказки при наведении на точки и кластеры. */
+export function setHoverTooltipsEnabled(enabled) {
+  hoverTooltipsEnabled = enabled;
+
+  if (!enabled) {
+    cancelClusterHoverRequest();
+    removePointHoverPopup({ immediate: true });
+  }
+}
+
+export function isHoverTooltipsEnabled() {
+  return hoverTooltipsEnabled;
 }
 
 /** Точка входа: инициализация слоя маркеров и регистрация колбэков из App. */

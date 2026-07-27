@@ -41,10 +41,14 @@
   flex-shrink: 0;
   width: 1px;
   height: 22px;
-  margin: 0 4px 0 auto;
+  margin: 0 4px;
   background: rgba(0, 0, 0, 0.12);
   border-radius: 1px;
   align-self: center;
+}
+
+.module-menu-separator--push-end {
+  margin: 0 4px 0 auto;
 }
 
 .module-menu-btn {
@@ -99,6 +103,74 @@
 .module-menu-btn--disabled:hover,
 .module-menu-btn:disabled:hover {
   background: transparent;
+}
+
+.module-menu-toggle-item {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.module-menu-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.module-menu-switch:hover {
+  background: rgba(0, 122, 255, 0.08);
+}
+
+.module-menu-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.module-menu-switch-slider {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  background: #ccc;
+  border-radius: 18px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.module-menu-switch-slider::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.module-menu-switch input:checked + .module-menu-switch-slider {
+  background: #007aff;
+}
+
+.module-menu-switch input:checked + .module-menu-switch-slider::after {
+  transform: translateX(14px);
+}
+
+.module-menu-switch-label {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1d1d1f;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 @media (max-width: 768px) {

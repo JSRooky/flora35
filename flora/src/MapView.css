@@ -66,11 +66,50 @@
   font-weight: 600;
 }
 
+.point-hover-tooltip.mapboxgl-popup:has(.cluster-tooltip-title) {
+  max-width: 280px;
+}
+
 .point-tooltip-name-latin {
   margin-top: 2px;
   color: #666;
   font-size: 11px;
   font-style: italic;
+}
+
+.cluster-tooltip-title {
+  color: #333;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cluster-tooltip-subtitle {
+  margin-top: 2px;
+  color: #666;
+  font-size: 11px;
+}
+
+.cluster-tooltip-list {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.cluster-tooltip-item {
+  color: #333;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.cluster-tooltip-item + .cluster-tooltip-item {
+  margin-top: 2px;
+}
+
+.cluster-tooltip-count {
+  color: #666;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .areal-point-hint.mapboxgl-popup {
