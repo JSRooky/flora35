@@ -65,6 +65,12 @@ export default function MapView() {
     setActiveModule((current) => (current === moduleId ? null : moduleId));
   }, []);
 
+  const handleYearRangeChange = useCallback((nextRange) => {
+    setYearRange((prev) =>
+      prev.min === nextRange.min && prev.max === nextRange.max ? prev : nextRange
+    );
+  }, []);
+
   const hasFoundYearPropertyFilter = Object.prototype.hasOwnProperty.call(
     propertyFilters,
     "found_year"
@@ -360,7 +366,7 @@ export default function MapView() {
               enabled={yearFilterEnabled}
               onEnabledChange={setYearFilterEnabled}
               range={yearRange}
-              onRangeChange={setYearRange}
+              onRangeChange={handleYearRangeChange}
               lockedByPropertyFilter={hasFoundYearPropertyFilter}
               collapsed={false}
               onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}

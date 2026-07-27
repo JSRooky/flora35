@@ -36,20 +36,71 @@ export default function YearFilterPanel({
   const [draftRange, setDraftRange] = useState(range);
   const [activeThumb, setActiveThumb] = useState(null);
   const draftRangeRef = useRef(draftRange);
+  const isDraggingRef = useRef(false);
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const { min: minYear, max: maxYear } = YEAR_BOUNDS;
 
   useEffect(() => {
-    setDraftRange(range);
-  }, [range]);
+    if (isDraggingRef.current) {
+      return;
+    }
+
+    setDraftRange((prev) =>
+      prev.min === range.min && prev.max === range.max ? prev : range
+    );
+  }, [range.min, range.max]);
 
   useEffect(() => {
     draftRangeRef.current = draftRange;
   }, [draftRange]);
 
   const commitRange = () => {
-    onRangeChange?.({ ...draftRangeRef.current });
+    const next = draftRangeRef.current;
+    onRangeChange?.({ min: next.min, max: next.max });
     setActiveThumb(null);
+  };
+
+  const handlePointerDown = (thumb) => (event) => {
+    isDraggingRef.current = true;
+    setActiveThumb(thumb);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerUp = (event) => {
+    if (!isDraggingRef.current) {
+      return;
+    }
+
+    isDraggingRef.current = false;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    commitRange();
+  };
+
+  const handlePointerCancel = () => {
+    if (!isDraggingRef.current) {
+      return;
+    }
+
+    isDraggingRef.current = false;
+    setDraftRange(range);
+    draftRangeRef.current = range;
+    setActiveThumb(null);
+  };
+
+  const handleKeyUp = (event) => {
+    if (
+      !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(
+        event.key
+      )
+    ) {
+      return;
+    }
+
+    commitRange();
   };
 
   const handleStartChange = (event) => {
@@ -68,12 +119,10 @@ export default function YearFilterPanel({
     }));
   };
 
-  const sliderCommitHandlers = {
-    onMouseUp: commitRange,
-    onTouchEnd: commitRange,
-    onPointerUp: commitRange,
-    onKeyUp: commitRange,
-    onBlur: commitRange
+  const sliderInteractionHandlers = {
+    onPointerUp: handlePointerUp,
+    onPointerCancel: handlePointerCancel,
+    onKeyUp: handleKeyUp
   };
 
   const isFullRange = draftRange.min === minYear && draftRange.max === maxYear;
@@ -168,8 +217,8 @@ export default function YearFilterPanel({
                 }`}
                 aria-label="Начальный год"
                 onChange={handleStartChange}
-                onPointerDown={() => setActiveThumb("start")}
-                {...sliderCommitHandlers}
+                onPointerDown={handlePointerDown("start")}
+                {...sliderInteractionHandlers}
               />
               <input
                 type="range"
@@ -183,8 +232,8 @@ export default function YearFilterPanel({
                 }`}
                 aria-label="Конечный год"
                 onChange={handleEndChange}
-                onPointerDown={() => setActiveThumb("end")}
-                {...sliderCommitHandlers}
+                onPointerDown={handlePointerDown("end")}
+                {...sliderInteractionHandlers}
               />
             </div>
 
