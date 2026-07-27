@@ -27,9 +27,16 @@ import {
   clearSpeciesPolygonLayer,
   updateSpeciesPolygonLayer
 } from "./components/addSpeciesPolygonLayer";
+import {
+  addBufferLayer,
+  clearBufferLayer,
+  updateBufferLayer,
+  DEFAULT_BUFFER_DIAMETERS_KM
+} from "./components/addBufferLayer";
 import FeaturePopup from "./components/FeaturePopup";
 import ArealPopup from "./components/ArealPopup";
 import SpeciesPolygonPopup from "./components/SpeciesPolygonPopup";
+import BufferPopup from "./components/BufferPopup";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
 import YearFilterPanel from "./components/YearFilterPanel";
@@ -66,6 +73,9 @@ export default function MapView() {
   const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
   // Сводка о полигоне, уже отображённом на карте (не путать с выбранной точкой).
   const [speciesPolygonInfo, setSpeciesPolygonInfo] = useState(null);
+  // Буфер: диаметры зон (красная/жёлтая/зелёная), км; bufferVisible — показан ли он сейчас.
+  const [bufferDiameters, setBufferDiameters] = useState(DEFAULT_BUFFER_DIAMETERS_KM);
+  const [bufferVisible, setBufferVisible] = useState(true);
   const hadFoundYearPropertyFilterRef = useRef(false);
 
   const handlePanelClose = useCallback(() => {
@@ -370,6 +380,37 @@ export default function MapView() {
     setSpeciesPolygonInfo(info);
   }, [popupData]);
 
+  /**
+   * Меняет диаметр одной зоны буфера, поддерживая порядок «каждая следующая зона не меньше
+   * предыдущей» — иначе кольца буфера накладывались бы некорректно.
+   */
+  const handleBufferDiameterChange = useCallback((index, value) => {
+    setBufferVisible(true);
+    setBufferDiameters((prev) => {
+      const next = [...prev];
+      next[index] = value;
+
+      for (let i = index + 1; i < next.length; i++) {
+        if (next[i] < next[i - 1]) {
+          next[i] = next[i - 1];
+        }
+      }
+
+      for (let i = index - 1; i >= 0; i--) {
+        if (next[i] > next[i + 1]) {
+          next[i] = next[i + 1];
+        }
+      }
+
+      return next;
+    });
+  }, []);
+
+  const handleBufferReset = useCallback(() => {
+    setBufferVisible(false);
+    setBufferDiameters(DEFAULT_BUFFER_DIAMETERS_KM);
+  }, []);
+
   const handleArealPointSelect = useCallback((feature) => {
     const mapInstance = map.current;
 
@@ -385,6 +426,7 @@ export default function MapView() {
       hideArealPointHint();
       clearArealLayer(map.current);
       clearSpeciesPolygonLayer(map.current);
+      clearBufferLayer(map.current);
     }
 
     setPopupData(null);
@@ -392,9 +434,26 @@ export default function MapView() {
     setArealEnabled(false);
     setArealAllMarkers(false);
     setSpeciesPolygonInfo(null);
+    setBufferDiameters(DEFAULT_BUFFER_DIAMETERS_KM);
+    setBufferVisible(true);
     setActiveModule(null);
     setArealDockedWithFeature(false);
   }, []);
+
+  // Буфер строится сразу для выбранной точки и обновляется при изменении диаметров зон;
+  // «Сброс» скрывает его до следующего изменения слайдера или выбора новой точки.
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance || !mapReady) {
+      return;
+    }
+
+    if (bufferVisible && popupData) {
+      updateBufferLayer(mapInstance, popupData, bufferDiameters);
+    } else {
+      clearBufferLayer(mapInstance);
+    }
+  }, [bufferVisible, popupData, bufferDiameters, mapReady]);
 
   useEffect(() => {
     if (!map.current && ref.current) {
@@ -414,8 +473,10 @@ export default function MapView() {
           onPointClick: (feature) => {
             dismissArealPointHintOnPointClick(feature);
             setPopupData(feature);
-            setArealDockedWithFeature(false);
-            setActiveModule(MODULE_IDS.FEATURE);
+            setBufferVisible(true);
+            // Если какая-то панель уже открыта, оставляем её открытой — просто обновляем
+            // данные точки. «Сведения о точке» открываются только если панелей ещё нет.
+            setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
           },
           onMapBackgroundClick: () => {
             clearPointSelection();
@@ -426,6 +487,7 @@ export default function MapView() {
         });
         addArealLayer(map.current);
         addSpeciesPolygonLayer(map.current); // слой экспериментального модуля «Полигон»
+        addBufferLayer(map.current);
         addHeatmapLayer(map.current);
         setMapReady(true);
       });
@@ -529,6 +591,17 @@ export default function MapView() {
               polygonInfo={speciesPolygonInfo}
               onBuild={handleSpeciesPolygonBuild}
               onReset={handleSpeciesPolygonReset}
+              collapsed={false}
+              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+            />
+          )}
+          {activeModule === MODULE_IDS.BUFFER && (
+            <BufferPopup
+              feature={popupData}
+              active={bufferVisible}
+              diametersKm={bufferDiameters}
+              onDiameterChange={handleBufferDiameterChange}
+              onReset={handleBufferReset}
               collapsed={false}
               onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
             />
