@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
+import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/MapDisplayPanel.css";
 
 /** Краткое описание текущих настроек карты для свёрнутой панели. */
@@ -44,6 +46,7 @@ export default function MapDisplayPanel({
   const collapsed = isControlled ? collapsedProp : collapsedInternal;
   const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
+  const [helpOpen, setHelpOpen] = useState(false);
   // Кластеризация имеет смысл только когда маркеры видны.
   const clusteringDisabled = !markersVisible;
 
@@ -51,16 +54,19 @@ export default function MapDisplayPanel({
     <aside className={`map-display-panel ${collapsed ? "map-display-panel--collapsed" : ""}`}>
       <div className="map-display-panel-header">
         <h3 className="map-display-panel-title">Операции с картой</h3>
-        <button
-          type="button"
-          className="map-display-panel-toggle"
-          onClick={() => setCollapsed(!collapsed)}
-          aria-expanded={!collapsed}
-          aria-label={toggleLabel}
-          title={toggleLabel}
-        >
-          {collapsed ? "▾" : "▴"}
-        </button>
+        <div className="popup-panel-header-actions">
+          <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          <button
+            type="button"
+            className="map-display-panel-toggle"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-expanded={!collapsed}
+            aria-label={toggleLabel}
+            title={toggleLabel}
+          >
+            {collapsed ? "▾" : "▴"}
+          </button>
+        </div>
       </div>
 
       {collapsed ? (
@@ -139,6 +145,7 @@ export default function MapDisplayPanel({
           </label>
         </div>
       )}
+      <ModuleHelpPanel sectionId={MODULE_IDS.MAP} open={helpOpen} />
     </aside>
   );
 }

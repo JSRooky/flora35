@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
+import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/StatusFilterPanel.css";
 
 /** Коды и подписи категорий МСОП (IUCN Red List). */
@@ -23,6 +25,7 @@ export default function StatusFilterPanel({
   const collapsed = isControlled ? collapsedProp : collapsedInternal;
   const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
+  const [helpOpen, setHelpOpen] = useState(false);
 
   return (
     <aside
@@ -30,16 +33,19 @@ export default function StatusFilterPanel({
     >
       <div className="status-filter-panel-header">
         <h3 className="status-filter-panel-title">Статус (МСОП)</h3>
-        <button
-          type="button"
-          className="status-filter-panel-toggle"
-          onClick={() => setCollapsed(!collapsed)}
-          aria-expanded={!collapsed}
-          aria-label={toggleLabel}
-          title={toggleLabel}
-        >
-          {collapsed ? "▾" : "▴"}
-        </button>
+        <div className="popup-panel-header-actions">
+          <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          <button
+            type="button"
+            className="status-filter-panel-toggle"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-expanded={!collapsed}
+            aria-label={toggleLabel}
+            title={toggleLabel}
+          >
+            {collapsed ? "▾" : "▴"}
+          </button>
+        </div>
       </div>
 
       {!collapsed && (
@@ -59,6 +65,7 @@ export default function StatusFilterPanel({
           </div>
         </div>
       )}
+      <ModuleHelpPanel sectionId={MODULE_IDS.STATUS} open={helpOpen} />
     </aside>
   );
 }

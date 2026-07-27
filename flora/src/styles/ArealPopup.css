@@ -30,14 +30,6 @@
   margin-top: 12px;
 }
 
-.areal-popup-content h3 {
-  margin: 0;
-  font-size: 16px;
-  color: #333;
-  border-bottom: 2px solid #27ae60;
-  padding-bottom: 8px;
-}
-
 .areal-popup-header {
   display: flex;
   align-items: center;
@@ -213,4 +205,55 @@
 
 .areal-radius--disabled {
   opacity: 0.5;
+}
+
+.areal-contained-points {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.areal-contained-points-title {
+  margin: 0;
+  font-size: 13px;
+  color: #555;
+}
+
+.areal-contained-points-title strong {
+  color: #27ae60;
+}
+
+.areal-contained-points-list {
+  margin: 0;
+  padding-left: 0;
+  max-height: 140px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.areal-contained-points-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: #1a6b3c;
+  text-align: left;
+  line-height: 1.5;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.areal-contained-points-item:hover {
+  color: #27ae60;
+}
+
+.areal-contained-points-list li + li {
+  margin-top: 2px;
 }

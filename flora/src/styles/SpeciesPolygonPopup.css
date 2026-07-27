@@ -1,0 +1,128 @@
+.species-polygon-popup {
+  box-sizing: border-box;
+  position: relative;
+  background-color: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  max-width: calc(100vw - 40px);
+  width: 320px;
+  overflow-x: hidden;
+  font-family: Arial, sans-serif;
+  animation: speciesPolygonSlideIn 0.3s ease-out;
+}
+
+@keyframes speciesPolygonSlideIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.species-polygon-popup-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.species-polygon-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.species-polygon-popup-title {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+  border-bottom: 2px solid #4a90e2;
+  padding-bottom: 8px;
+  flex: 1;
+}
+
+.species-polygon-popup--collapsed .species-polygon-popup-title {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.popup-panel-toggle {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.6);
+  color: #333;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.popup-panel-toggle:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.popup-collapsed-summary {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.species-polygon-popup-species {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
+  line-height: 1.4;
+}
+
+.species-polygon-popup-species-latin {
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+}
+
+.species-polygon-popup-points {
+  margin: 0;
+  font-size: 13px;
+  color: #444;
+}
+
+.species-polygon-popup-status {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+  line-height: 1.45;
+}
+
+.species-polygon-reset-btn {
+  align-self: flex-start;
+  padding: 8px 16px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  color: #333;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.species-polygon-reset-btn:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
+.species-polygon-reset-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

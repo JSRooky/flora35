@@ -1,0 +1,79 @@
+.module-help-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  color: #007bff;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.module-help-btn:hover {
+  background: rgba(255, 255, 255, 0.95);
+  color: #0056b3;
+}
+
+.module-help-btn--active {
+  background: rgba(0, 123, 255, 0.15);
+  color: #0056b3;
+}
+
+.popup-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.module-help-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 13px;
+  line-height: 1.45;
+  color: #333;
+}
+
+.module-help-panel-content h2,
+.module-help-panel-content h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #222;
+}
+
+.module-help-panel-content p {
+  margin: 0 0 8px;
+}
+
+.module-help-panel-content p:last-child,
+.module-help-panel-content ul:last-child {
+  margin-bottom: 0;
+}
+
+.module-help-panel-content ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+
+.module-help-panel-content li {
+  margin-bottom: 4px;
+}
+
+.module-help-panel-content li:last-child {
+  margin-bottom: 0;
+}
+
+.module-help-panel-loading,
+.module-help-panel-error {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+}

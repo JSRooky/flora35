@@ -73,6 +73,32 @@
   font-style: italic;
 }
 
+.areal-point-hint.mapboxgl-popup {
+  max-width: 220px;
+  z-index: 1001;
+  pointer-events: none;
+}
+
+.areal-point-hint .mapboxgl-popup-content {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-family: Arial, sans-serif;
+  line-height: 1.35;
+}
+
+.areal-point-hint .mapboxgl-popup-tip {
+  border-top-color: rgba(255, 255, 255, 0.92);
+}
+
+.areal-point-hint-name {
+  color: #333;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 
 .popup-images-btn {
   margin-top: 9px;

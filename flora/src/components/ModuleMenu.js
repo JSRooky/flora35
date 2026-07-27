@@ -7,12 +7,14 @@ export const MODULE_IDS = {
   YEAR: "year",
   FEATURE: "feature",
   AREAL: "areal",
+  POLYGON: "polygon",
   ABOUT: "about"
 };
 
 const MAIN_MODULE_ITEMS = [
   { id: MODULE_IDS.FEATURE, label: "Сведения о точке" },
   { id: MODULE_IDS.AREAL, label: "Ареал" },
+  { id: MODULE_IDS.POLYGON, label: "Полигон" },
   { id: MODULE_IDS.YEAR, label: "Год находки" },
   { id: MODULE_IDS.STATUS, label: "Статус МСОП" },
   { id: MODULE_IDS.MAP, label: "Операции с картой" }
@@ -20,20 +22,28 @@ const MAIN_MODULE_ITEMS = [
 
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
 
-function ModuleMenuButton({ id, label, activeModule, onModuleSelect, className = "" }) {
+function ModuleMenuButton({
+  id,
+  label,
+  activeModule,
+  onModuleSelect,
+  className = "",
+  disabled = false
+}) {
   return (
     <button
       type="button"
-      className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${className ? ` ${className}` : ""}`}
-      onClick={() => onModuleSelect(id)}
+      className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${disabled ? " module-menu-btn--disabled" : ""}${className ? ` ${className}` : ""}`}
+      onClick={() => !disabled && onModuleSelect(id)}
       aria-pressed={activeModule === id}
+      disabled={disabled}
     >
       {label}
     </button>
   );
 }
 
-export default function ModuleMenu({ activeModule, onModuleSelect }) {
+export default function ModuleMenu({ activeModule, onModuleSelect, pointSelected = false }) {
   return (
     <nav className="module-menu" aria-label="Модули приложения">
       <div className="module-menu-dock">
@@ -45,6 +55,7 @@ export default function ModuleMenu({ activeModule, onModuleSelect }) {
                 label={label}
                 activeModule={activeModule}
                 onModuleSelect={onModuleSelect}
+                disabled={id === MODULE_IDS.POLYGON && !pointSelected}
               />
             </li>
           ))}

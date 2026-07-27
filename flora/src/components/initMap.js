@@ -13,4 +13,3 @@ export function initMap(container) {
     zoom: 6.2
   });
 }
-

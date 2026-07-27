@@ -1,8 +1,19 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { initMap } from "./components/initMap";
+import {
+  addArealLayer,
+  clearArealLayer,
+  dismissArealPointHintOnPointClick,
+  getArealContainedPointsSummary,
+  hideArealPointHint,
+  panToArealPoint,
+  refreshArealDisplay
+} from "./components/addArealLayer";
 import {
   addLocationsLayer,
   applyLocationsFilter,
+  featureMatchesFilters,
+  isFeatureUnclusteredOnMap,
   setClusterByRegnum,
   setClusteringEnabled,
   setMarkersVisible
@@ -12,12 +23,13 @@ import {
   setHeatmapEnabled
 } from "./components/addHeatmapLayer";
 import {
-  addArealLayer,
-  clearArealLayer,
-  refreshArealDisplay
-} from "./components/addArealLayer";
+  addSpeciesPolygonLayer,
+  clearSpeciesPolygonLayer,
+  updateSpeciesPolygonLayer
+} from "./components/addSpeciesPolygonLayer";
 import FeaturePopup from "./components/FeaturePopup";
 import ArealPopup from "./components/ArealPopup";
+import SpeciesPolygonPopup from "./components/SpeciesPolygonPopup";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
 import YearFilterPanel from "./components/YearFilterPanel";
@@ -50,7 +62,9 @@ export default function MapView() {
   const [arealRadius, setArealRadius] = useState(5);
   const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
   const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
+  const [speciesPolygonInfo, setSpeciesPolygonInfo] = useState(null);
   const hadFoundYearPropertyFilterRef = useRef(false);
+  const prevPopupDataRef = useRef(null);
 
   const handlePanelClose = useCallback(() => {
     setActiveModule(null);
@@ -116,7 +130,7 @@ export default function MapView() {
       yearRange: selectedYearRange
     } = arealStateRef.current;
 
-    if (!mapInstance || !feature) {
+    if (!mapInstance) {
       return;
     }
 
@@ -174,6 +188,38 @@ export default function MapView() {
     return filters;
   }, [propertyFilters, statusFilters, yearFilterEnabled, yearRange]);
 
+  const arealContainedPoints = useMemo(() => {
+    const mapInstance = map.current;
+
+    if (!arealEnabled || arealAllMarkers || !popupData || !mapReady || !mapInstance) {
+      return null;
+    }
+
+    const filters = buildLocationFilters();
+
+    if (
+      !featureMatchesFilters(popupData, filters) ||
+      !isFeatureUnclusteredOnMap(mapInstance, popupData)
+    ) {
+      return null;
+    }
+
+    return getArealContainedPointsSummary(popupData, arealRadius, filters);
+  }, [
+    arealEnabled,
+    arealAllMarkers,
+    popupData,
+    arealRadius,
+    buildLocationFilters,
+    mapReady
+  ]);
+
+  useEffect(() => {
+    if (!arealEnabled && !arealAllMarkers) {
+      hideArealPointHint();
+    }
+  }, [arealEnabled, arealAllMarkers]);
+
   useEffect(() => {
     if (!map.current) {
       return;
@@ -220,11 +266,13 @@ export default function MapView() {
 
   useEffect(() => {
     const mapInstance = map.current;
-    if (!mapInstance || !popupData) {
+    if (!mapInstance) {
       return;
     }
 
-    if (!arealEnabled && !arealAllMarkers) {
+    // Ареал для одной точки требует выбранную точку; режим "ко всем маркерам"
+    // работает и без неё.
+    if (!arealAllMarkers && (!arealEnabled || !popupData)) {
       return;
     }
 
@@ -232,6 +280,7 @@ export default function MapView() {
     const handleSourceData = (event) => {
       if (
         event.isSourceLoaded &&
+        typeof event.sourceId === "string" &&
         (event.sourceId === "locations" || event.sourceId.startsWith("locations-"))
       ) {
         scheduleArealRefresh();
@@ -280,15 +329,52 @@ export default function MapView() {
     }
   }, [popupData]);
 
+  const handleSpeciesPolygonReset = useCallback(() => {
+    if (map.current) {
+      clearSpeciesPolygonLayer(map.current);
+    }
+
+    setSpeciesPolygonInfo(null);
+  }, []);
+
+  useEffect(() => {
+    const mapInstance = map.current;
+    const popupChanged = prevPopupDataRef.current !== popupData;
+    prevPopupDataRef.current = popupData;
+
+    if (popupChanged && mapInstance) {
+      clearSpeciesPolygonLayer(mapInstance);
+      setSpeciesPolygonInfo(null);
+    }
+
+    if (activeModule === MODULE_IDS.POLYGON && popupData && mapInstance) {
+      const info = updateSpeciesPolygonLayer(mapInstance, popupData);
+      setSpeciesPolygonInfo(info);
+    }
+  }, [popupData, activeModule]);
+
+  const handleArealPointSelect = useCallback((feature) => {
+    const mapInstance = map.current;
+
+    if (!mapInstance) {
+      return;
+    }
+
+    panToArealPoint(mapInstance, feature);
+  }, []);
+
   const clearPointSelection = useCallback(() => {
     if (map.current) {
+      hideArealPointHint();
       clearArealLayer(map.current);
+      clearSpeciesPolygonLayer(map.current);
     }
 
     setPopupData(null);
     setPropertyFilters({});
     setArealEnabled(false);
     setArealAllMarkers(false);
+    setSpeciesPolygonInfo(null);
     setActiveModule(null);
   }, []);
 
@@ -308,6 +394,7 @@ export default function MapView() {
             refreshArealRef.current();
           },
           onPointClick: (feature) => {
+            dismissArealPointHintOnPointClick(feature);
             setPopupData(feature);
             setActiveModule(MODULE_IDS.FEATURE);
           },
@@ -319,6 +406,7 @@ export default function MapView() {
           markersVisible: DEFAULT_MARKERS_VISIBLE
         });
         addArealLayer(map.current);
+        addSpeciesPolygonLayer(map.current);
         addHeatmapLayer(map.current);
         setMapReady(true);
       });
@@ -335,7 +423,11 @@ export default function MapView() {
 
   return (
     <>
-      <ModuleMenu activeModule={activeModule} onModuleSelect={handleModuleSelect} />
+      <ModuleMenu
+        activeModule={activeModule}
+        onModuleSelect={handleModuleSelect}
+        pointSelected={Boolean(popupData)}
+      />
       <div ref={ref} className="map-container" />
       {activeModule !== null && (
         <div className="module-panel-stack">
@@ -389,9 +481,19 @@ export default function MapView() {
               enabled={arealEnabled}
               allMarkers={arealAllMarkers}
               radius={arealRadius}
+              containedPoints={arealContainedPoints}
+              onPointSelect={handleArealPointSelect}
               onEnabledChange={setArealEnabled}
               onAllMarkersChange={setArealAllMarkers}
               onRadiusChange={setArealRadius}
+              collapsed={false}
+              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+            />
+          )}
+          {activeModule === MODULE_IDS.POLYGON && (
+            <SpeciesPolygonPopup
+              polygonInfo={speciesPolygonInfo}
+              onReset={handleSpeciesPolygonReset}
               collapsed={false}
               onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
             />

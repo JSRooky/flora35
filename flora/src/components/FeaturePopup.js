@@ -1,14 +1,19 @@
 import React, { useState } from "react";
 import FeatureImagesPopup from "./FeatureImagesPopup";
+import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
+import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/FeaturePopup.css";
 
 // Служебные поля, добавленные слоем карты; не показываем в списке свойств.
 const INTERNAL_PROPERTIES = new Set(["image", "images"]);
 
-/** Собирает URL иллюстраций из properties (массив или одиночное поле). */
+/**
+ * Собирает URL иллюстраций из properties.
+ * Поле `image` — служебная иконка маркера (plant.svg/animal.svg),
+ * добавляемая слоем карты, и не является иллюстрацией вида — не используем её здесь.
+ */
 function getImages(properties) {
   if (properties.images?.length > 0) return properties.images;
-  if (properties.image) return [properties.image];
   return [];
 }
 
@@ -23,6 +28,7 @@ export default function FeaturePopup({
   onFiltersReset
 }) {
   const [showImages, setShowImages] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const collapsedSummary = feature
     ? feature.properties?.name_ru ||
@@ -52,16 +58,19 @@ export default function FeaturePopup({
       <div className={`feature-popup ${collapsed ? "feature-popup--collapsed" : ""}`}>
         <div className="feature-popup-header">
           <h3 className="feature-popup-title">Сведения о точке данных</h3>
-          <button
-            type="button"
-            className="popup-panel-toggle"
-            onClick={() => onCollapsedChange?.(!collapsed)}
-            aria-expanded={!collapsed}
-            aria-label={toggleLabel}
-            title={toggleLabel}
-          >
-            {collapsed ? "▾" : "▴"}
-          </button>
+          <div className="popup-panel-header-actions">
+            <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+            <button
+              type="button"
+              className="popup-panel-toggle"
+              onClick={() => onCollapsedChange?.(!collapsed)}
+              aria-expanded={!collapsed}
+              aria-label={toggleLabel}
+              title={toggleLabel}
+            >
+              {collapsed ? "▾" : "▴"}
+            </button>
+          </div>
         </div>
 
         {collapsed ? (
@@ -152,6 +161,7 @@ export default function FeaturePopup({
             ) : null}
           </div>
         )}
+        <ModuleHelpPanel sectionId={MODULE_IDS.FEATURE} open={helpOpen} />
       </div>
 
       {showImages && images.length > 0 && (

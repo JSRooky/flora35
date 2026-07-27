@@ -242,6 +242,10 @@ function getPointColorExpression() {
   ];
 }
 
+export function getPointColorForRegnum(regnum) {
+  return REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR;
+}
+
 function removeLocationsFromMap(map) {
   [getLayerIds().clusters, getLayerIds().clusterCount, getLayerIds().unclustered].forEach(
     (layerId) => {
@@ -597,11 +601,20 @@ export function getFilteredFeatureCenters(filters = {}) {
   );
 }
 
+export function getFilteredFeatures(filters = {}) {
+  if (!locationsData) {
+    return [];
+  }
+
+  return filterFeatures(locationsData.features, filters);
+}
+
 /** Убирает дубли координат (несколько объектов могут совпасть по lng/lat). */
-function dedupeCenters(centers) {
+function dedupeFeaturesByCoordinates(features) {
   const seen = new Set();
 
-  return centers.filter(([lng, lat]) => {
+  return features.filter((feature) => {
+    const [lng, lat] = feature.geometry.coordinates;
     const key = `${lng},${lat}`;
     if (seen.has(key)) {
       return false;
@@ -637,10 +650,10 @@ function queryUnclusteredSourceFeatures(map) {
 }
 
 /**
- * Возвращает координаты некластеризованных точек, видимых на карте.
+ * Возвращает некластеризованные точки, видимые на карте.
  * candidateFeatures — точки из только что раскрытого кластера (для режима «все маркеры»).
  */
-export function getUnclusteredCenters(map, filters = {}, candidateFeatures = null) {
+export function getUnclusteredFeatures(map, filters = {}, candidateFeatures = null) {
   const hasLocationsSource = clusteringEnabled
     ? clusterByRegnum
       ? getRegnumValues().some((regnum) => map.getSource(getSourceId(regnum)))
@@ -665,15 +678,21 @@ export function getUnclusteredCenters(map, filters = {}, candidateFeatures = nul
       )
     );
 
-    return dedupeCenters(
-      filterFeatures(candidateFeatures, filters)
-        .map((feature) => feature.geometry.coordinates)
-        .filter(([lng, lat]) => visibleKeys.has(`${lng},${lat}`))
+    return dedupeFeaturesByCoordinates(
+      filterFeatures(candidateFeatures, filters).filter((feature) => {
+        const [lng, lat] = feature.geometry.coordinates;
+        return visibleKeys.has(`${lng},${lat}`);
+      })
     );
   }
 
-  return dedupeCenters(
-    filterFeatures(visibleFeatures, filters).map((feature) => feature.geometry.coordinates)
+  return dedupeFeaturesByCoordinates(filterFeatures(visibleFeatures, filters));
+}
+
+/** Возвращает координаты некластеризованных точек, видимых на карте. */
+export function getUnclusteredCenters(map, filters = {}, candidateFeatures = null) {
+  return getUnclusteredFeatures(map, filters, candidateFeatures).map(
+    (feature) => feature.geometry.coordinates
   );
 }
 

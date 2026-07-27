@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { getYearBounds } from "./yearBounds";
+import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
+import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/YearFilterPanel.css";
 
 const YEAR_BOUNDS = getYearBounds();
@@ -38,6 +40,7 @@ export default function YearFilterPanel({
   const draftRangeRef = useRef(draftRange);
   const isDraggingRef = useRef(false);
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
+  const [helpOpen, setHelpOpen] = useState(false);
   const { min: minYear, max: maxYear } = YEAR_BOUNDS;
 
   useEffect(() => {
@@ -48,7 +51,7 @@ export default function YearFilterPanel({
     setDraftRange((prev) =>
       prev.min === range.min && prev.max === range.max ? prev : range
     );
-  }, [range.min, range.max]);
+  }, [range]);
 
   useEffect(() => {
     draftRangeRef.current = draftRange;
@@ -138,16 +141,19 @@ export default function YearFilterPanel({
     <aside className={`year-filter-panel ${collapsed ? "year-filter-panel--collapsed" : ""}`}>
       <div className="year-filter-panel-header">
         <h3 className="year-filter-panel-title">Год находки</h3>
-        <button
-          type="button"
-          className="year-filter-panel-toggle"
-          onClick={() => setCollapsed(!collapsed)}
-          aria-expanded={!collapsed}
-          aria-label={toggleLabel}
-          title={toggleLabel}
-        >
-          {collapsed ? "▾" : "▴"}
-        </button>
+        <div className="popup-panel-header-actions">
+          <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          <button
+            type="button"
+            className="year-filter-panel-toggle"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-expanded={!collapsed}
+            aria-label={toggleLabel}
+            title={toggleLabel}
+          >
+            {collapsed ? "▾" : "▴"}
+          </button>
+        </div>
       </div>
 
       {collapsed ? (
@@ -244,6 +250,7 @@ export default function YearFilterPanel({
           </div>
         </div>
       )}
+      <ModuleHelpPanel sectionId={MODULE_IDS.YEAR} open={helpOpen} />
     </aside>
   );
 }
