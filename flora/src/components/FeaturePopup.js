@@ -25,7 +25,9 @@ export default function FeaturePopup({
   onFilterChange,
   activeStatusFilters = [],
   onStatusFilterChange,
-  onFiltersReset
+  onFiltersReset,
+  onOpenAreal,
+  arealDockedOpen = false
 }) {
   const [showImages, setShowImages] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false); // блок справки из docs/moduleHelp.md, раздел ## feature
@@ -156,6 +158,17 @@ export default function FeaturePopup({
                       </button>
                     )}
                   </>
+                )}
+
+                {onOpenAreal && (
+                  <button
+                    type="button"
+                    className={`feature-open-areal-btn${arealDockedOpen ? " feature-open-areal-btn--active" : ""}`}
+                    onClick={onOpenAreal}
+                    disabled={arealDockedOpen}
+                  >
+                    {arealDockedOpen ? "Ареал открыт" : "Ареал"}
+                  </button>
                 )}
               </>
             ) : null}

@@ -56,6 +56,8 @@ export default function MapView() {
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
   const [activeModule, setActiveModule] = useState(null);
+  // Ареал, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
+  const [arealDockedWithFeature, setArealDockedWithFeature] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [arealEnabled, setArealEnabled] = useState(false);
   const [arealAllMarkers, setArealAllMarkers] = useState(false);
@@ -68,6 +70,7 @@ export default function MapView() {
 
   const handlePanelClose = useCallback(() => {
     setActiveModule(null);
+    setArealDockedWithFeature(false);
   }, []);
 
   const handleModuleSelect = useCallback((moduleId) => {
@@ -76,7 +79,24 @@ export default function MapView() {
       return;
     }
 
+    if (moduleId === MODULE_IDS.AREAL) {
+      // Из меню «Ареал» открывается отдельно — панель точки не остаётся в стеке.
+      setArealDockedWithFeature(false);
+      setActiveModule((current) => (current === moduleId ? null : moduleId));
+      return;
+    }
+
+    setArealDockedWithFeature(false);
     setActiveModule((current) => (current === moduleId ? null : moduleId));
+  }, []);
+
+  const handleOpenArealFromFeature = useCallback(() => {
+    setActiveModule(MODULE_IDS.FEATURE);
+    setArealDockedWithFeature(true);
+  }, []);
+
+  const handleArealDockedClose = useCallback(() => {
+    setArealDockedWithFeature(false);
   }, []);
 
   const handleYearRangeChange = useCallback((nextRange) => {
@@ -373,6 +393,7 @@ export default function MapView() {
     setArealAllMarkers(false);
     setSpeciesPolygonInfo(null);
     setActiveModule(null);
+    setArealDockedWithFeature(false);
   }, []);
 
   useEffect(() => {
@@ -393,6 +414,7 @@ export default function MapView() {
           onPointClick: (feature) => {
             dismissArealPointHintOnPointClick(feature);
             setPopupData(feature);
+            setArealDockedWithFeature(false);
             setActiveModule(MODULE_IDS.FEATURE);
           },
           onMapBackgroundClick: () => {
@@ -428,6 +450,46 @@ export default function MapView() {
       <div ref={ref} className="map-container" />
       {activeModule !== null && (
         <div className="module-panel-stack">
+          {activeModule === MODULE_IDS.FEATURE && (
+            <FeaturePopup
+              feature={popupData}
+              collapsed={false}
+              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+              activeFilters={propertyFilters}
+              onFilterChange={handlePropertyFilterChange}
+              activeStatusFilters={statusFilters}
+              onStatusFilterChange={handleStatusFilterChange}
+              onFiltersReset={handleFeatureFiltersReset}
+              onOpenAreal={handleOpenArealFromFeature}
+              arealDockedOpen={arealDockedWithFeature}
+            />
+          )}
+          {(activeModule === MODULE_IDS.AREAL ||
+            (activeModule === MODULE_IDS.FEATURE && arealDockedWithFeature)) && (
+            <ArealPopup
+              enabled={arealEnabled}
+              allMarkers={arealAllMarkers}
+              radius={arealRadius}
+              containedPoints={arealContainedPoints}
+              onPointSelect={handleArealPointSelect}
+              onEnabledChange={setArealEnabled}
+              onAllMarkersChange={setArealAllMarkers}
+              onRadiusChange={setArealRadius}
+              collapsed={false}
+              onCollapsedChange={(collapsed) => {
+                if (!collapsed) {
+                  return;
+                }
+
+                if (arealDockedWithFeature) {
+                  handleArealDockedClose();
+                  return;
+                }
+
+                handlePanelClose();
+              }}
+            />
+          )}
           {activeModule === MODULE_IDS.STATUS && (
             <StatusFilterPanel
               activeStatusFilters={statusFilters}
@@ -457,32 +519,6 @@ export default function MapView() {
               range={yearRange}
               onRangeChange={handleYearRangeChange}
               lockedByPropertyFilter={hasFoundYearPropertyFilter}
-              collapsed={false}
-              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
-            />
-          )}
-          {activeModule === MODULE_IDS.FEATURE && (
-            <FeaturePopup
-              feature={popupData}
-              collapsed={false}
-              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
-              activeFilters={propertyFilters}
-              onFilterChange={handlePropertyFilterChange}
-              activeStatusFilters={statusFilters}
-              onStatusFilterChange={handleStatusFilterChange}
-              onFiltersReset={handleFeatureFiltersReset}
-            />
-          )}
-          {activeModule === MODULE_IDS.AREAL && (
-            <ArealPopup
-              enabled={arealEnabled}
-              allMarkers={arealAllMarkers}
-              radius={arealRadius}
-              containedPoints={arealContainedPoints}
-              onPointSelect={handleArealPointSelect}
-              onEnabledChange={setArealEnabled}
-              onAllMarkersChange={setArealAllMarkers}
-              onRadiusChange={setArealRadius}
               collapsed={false}
               onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
             />
