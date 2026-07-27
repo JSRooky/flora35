@@ -7,13 +7,13 @@
 
 .module-panel-stack {
   position: fixed;
-  top: 49px;
+  top: 68px;
   left: 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   z-index: 1000;
-  max-height: calc(100vh - 69px);
+  max-height: calc(100vh - 88px);
   overflow-x: hidden;
   overflow-y: auto;
 }

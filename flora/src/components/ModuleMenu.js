@@ -36,26 +36,29 @@ function ModuleMenuButton({ id, label, activeModule, onModuleSelect, className =
 export default function ModuleMenu({ activeModule, onModuleSelect }) {
   return (
     <nav className="module-menu" aria-label="Модули приложения">
-      <ul className="module-menu-list">
-        {MAIN_MODULE_ITEMS.map(({ id, label }) => (
-          <li key={id}>
+      <div className="module-menu-dock">
+        <ul className="module-menu-list">
+          {MAIN_MODULE_ITEMS.map(({ id, label }) => (
+            <li key={id}>
+              <ModuleMenuButton
+                id={id}
+                label={label}
+                activeModule={activeModule}
+                onModuleSelect={onModuleSelect}
+              />
+            </li>
+          ))}
+          <li className="module-menu-separator" aria-hidden="true" />
+          <li>
             <ModuleMenuButton
-              id={id}
-              label={label}
+              id={ABOUT_MODULE_ITEM.id}
+              label={ABOUT_MODULE_ITEM.label}
               activeModule={activeModule}
               onModuleSelect={onModuleSelect}
             />
           </li>
-        ))}
-        <li className="module-menu-item--about">
-          <ModuleMenuButton
-            id={ABOUT_MODULE_ITEM.id}
-            label={ABOUT_MODULE_ITEM.label}
-            activeModule={activeModule}
-            onModuleSelect={onModuleSelect}
-          />
-        </li>
-      </ul>
+        </ul>
+      </div>
     </nav>
   );
 }
