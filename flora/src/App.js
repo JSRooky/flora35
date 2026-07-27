@@ -64,7 +64,6 @@ export default function MapView() {
   const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
   const [speciesPolygonInfo, setSpeciesPolygonInfo] = useState(null);
   const hadFoundYearPropertyFilterRef = useRef(false);
-  const prevPopupDataRef = useRef(null);
 
   const handlePanelClose = useCallback(() => {
     setActiveModule(null);
@@ -337,21 +336,14 @@ export default function MapView() {
     setSpeciesPolygonInfo(null);
   }, []);
 
-  useEffect(() => {
-    const mapInstance = map.current;
-    const popupChanged = prevPopupDataRef.current !== popupData;
-    prevPopupDataRef.current = popupData;
-
-    if (popupChanged && mapInstance) {
-      clearSpeciesPolygonLayer(mapInstance);
-      setSpeciesPolygonInfo(null);
+  const handleSpeciesPolygonBuild = useCallback(() => {
+    if (!map.current || !popupData) {
+      return;
     }
 
-    if (activeModule === MODULE_IDS.POLYGON && popupData && mapInstance) {
-      const info = updateSpeciesPolygonLayer(mapInstance, popupData);
-      setSpeciesPolygonInfo(info);
-    }
-  }, [popupData, activeModule]);
+    const info = updateSpeciesPolygonLayer(map.current, popupData);
+    setSpeciesPolygonInfo(info);
+  }, [popupData]);
 
   const handleArealPointSelect = useCallback((feature) => {
     const mapInstance = map.current;
@@ -492,7 +484,9 @@ export default function MapView() {
           )}
           {activeModule === MODULE_IDS.POLYGON && (
             <SpeciesPolygonPopup
+              feature={popupData}
               polygonInfo={speciesPolygonInfo}
+              onBuild={handleSpeciesPolygonBuild}
               onReset={handleSpeciesPolygonReset}
               collapsed={false}
               onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}

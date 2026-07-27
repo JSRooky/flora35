@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { getPointsForSpecies } from "./addSpeciesPolygonLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/SpeciesPolygonPopup.css";
@@ -26,8 +27,34 @@ function getCollapsedSummary(polygonInfo) {
   return polygonInfo.nameRu || polygonInfo.nameLatin || "Полигон вида";
 }
 
+function getStatusMessage(feature, polygonInfo) {
+  if (!feature) {
+    return "Выберите точку на карте.";
+  }
+
+  if (!polygonInfo?.built) {
+    return "Нажмите «Построить», чтобы построить полигон по точкам выбранного вида.";
+  }
+
+  const selectedSpecies = feature.properties?.name_latin;
+  const builtSpecies = polygonInfo.nameLatin;
+
+  if (selectedSpecies && builtSpecies && selectedSpecies !== builtSpecies) {
+    const builtLabel = polygonInfo.nameRu || polygonInfo.nameLatin;
+    return `На карте отображается полигон вида «${builtLabel}». «Построить» заменит его полигоном выбранного вида.`;
+  }
+
+  if (polygonInfo.built) {
+    return "Полигон построен по точкам вида (выпуклая оболочка).";
+  }
+
+  return "Не удалось построить полигон для выбранного вида.";
+}
+
 export default function SpeciesPolygonPopup({
+  feature,
   polygonInfo,
+  onBuild,
   onReset,
   collapsed = false,
   onCollapsedChange
@@ -35,9 +62,12 @@ export default function SpeciesPolygonPopup({
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false);
   const speciesLabel =
-    polygonInfo?.nameRu ||
-    polygonInfo?.nameLatin ||
+    feature?.properties?.name_ru ||
+    feature?.properties?.name_latin ||
     "Вид не определён";
+  const speciesLatin = feature?.properties?.name_latin;
+  const pointCount = feature ? getPointsForSpecies(feature).length : 0;
+  const canBuild = Boolean(feature) && pointCount > 0;
 
   return (
     <div className={`species-polygon-popup ${collapsed ? "species-polygon-popup--collapsed" : ""}`}>
@@ -63,33 +93,41 @@ export default function SpeciesPolygonPopup({
       ) : (
         <div className="species-polygon-popup-content">
           <p className="species-polygon-popup-species">
-            Вид: <strong>{speciesLabel}</strong>
+            Выбранный вид: <strong>{speciesLabel}</strong>
           </p>
 
-          {polygonInfo?.nameLatin && polygonInfo?.nameRu && (
-            <p className="species-polygon-popup-species-latin">{polygonInfo.nameLatin}</p>
+          {speciesLatin && feature?.properties?.name_ru && (
+            <p className="species-polygon-popup-species-latin">{speciesLatin}</p>
           )}
 
-          {polygonInfo?.pointCount > 0 && (
+          {pointCount > 0 && (
             <p className="species-polygon-popup-points">
-              Точек вида: <strong>{formatPointCount(polygonInfo.pointCount)}</strong>
+              Точек вида: <strong>{formatPointCount(pointCount)}</strong>
             </p>
           )}
 
           <p className="species-polygon-popup-status">
-            {polygonInfo?.built
-              ? "Полигон построен по точкам вида (выпуклая оболочка)."
-              : "Не удалось построить полигон для выбранного вида."}
+            {getStatusMessage(feature, polygonInfo)}
           </p>
 
-          <button
-            type="button"
-            className="species-polygon-reset-btn"
-            onClick={onReset}
-            disabled={!polygonInfo?.built}
-          >
-            Сброс
-          </button>
+          <div className="species-polygon-actions">
+            <button
+              type="button"
+              className="species-polygon-build-btn"
+              onClick={onBuild}
+              disabled={!canBuild}
+            >
+              Построить
+            </button>
+            <button
+              type="button"
+              className="species-polygon-reset-btn"
+              onClick={onReset}
+              disabled={!polygonInfo?.built}
+            >
+              Сбросить
+            </button>
+          </div>
         </div>
       )}
       <ModuleHelpPanel sectionId={MODULE_IDS.POLYGON} open={helpOpen} />
