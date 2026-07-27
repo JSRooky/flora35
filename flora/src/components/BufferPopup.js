@@ -84,11 +84,6 @@ export default function BufferPopup({
             return (
               <div className="buffer-zone" key={zone.id}>
                 <label htmlFor={`buffer-zone-${zone.id}`}>
-                  <span
-                    className="buffer-zone-swatch"
-                    style={{ backgroundColor: zone.color }}
-                    aria-hidden="true"
-                  />
                   {zone.label}: <strong>{formatDiameter(value)}</strong>
                 </label>
                 <input

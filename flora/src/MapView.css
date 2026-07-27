@@ -11,7 +11,7 @@
   left: 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   z-index: 1000;
   max-height: calc(100vh - 88px);
   overflow-x: hidden;

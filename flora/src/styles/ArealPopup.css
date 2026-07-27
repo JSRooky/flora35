@@ -6,7 +6,7 @@
   border: 1px solid #ddd;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  padding: 16px;
+  padding: 12px;
   max-width: calc(100vw - 40px);
   width: 320px;
   overflow-x: hidden;
@@ -26,8 +26,8 @@
 .areal-popup-content {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-top: 12px;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .areal-popup-header {

@@ -27,7 +27,9 @@ export default function FeaturePopup({
   onStatusFilterChange,
   onFiltersReset,
   onOpenAreal,
-  arealDockedOpen = false
+  arealDockedOpen = false,
+  onOpenBuffer,
+  bufferDockedOpen = false
 }) {
   const [showImages, setShowImages] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false); // блок справки из docs/moduleHelp.md, раздел ## feature
@@ -62,16 +64,18 @@ export default function FeaturePopup({
           <h3 className="feature-popup-title">Сведения о точке данных</h3>
           <div className="popup-panel-header-actions">
             <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
-            <button
-              type="button"
-              className="popup-panel-toggle"
-              onClick={() => onCollapsedChange?.(!collapsed)}
-              aria-expanded={!collapsed}
-              aria-label={toggleLabel}
-              title={toggleLabel}
-            >
-              {collapsed ? "▾" : "▴"}
-            </button>
+            {onCollapsedChange && (
+              <button
+                type="button"
+                className="popup-panel-toggle"
+                onClick={() => onCollapsedChange(!collapsed)}
+                aria-expanded={!collapsed}
+                aria-label={toggleLabel}
+                title={toggleLabel}
+              >
+                {collapsed ? "▾" : "▴"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -160,15 +164,29 @@ export default function FeaturePopup({
                   </>
                 )}
 
-                {onOpenAreal && (
-                  <button
-                    type="button"
-                    className={`feature-open-areal-btn${arealDockedOpen ? " feature-open-areal-btn--active" : ""}`}
-                    onClick={onOpenAreal}
-                    disabled={arealDockedOpen}
-                  >
-                    {arealDockedOpen ? "Ареал открыт" : "Ареал"}
-                  </button>
+                {(onOpenAreal || onOpenBuffer) && (
+                  <div className="feature-module-actions">
+                    {onOpenAreal && (
+                      <button
+                        type="button"
+                        className={`feature-open-areal-btn${arealDockedOpen ? " feature-open-areal-btn--active" : ""}`}
+                        onClick={onOpenAreal}
+                        disabled={arealDockedOpen}
+                      >
+                        {arealDockedOpen ? "Ареал открыт" : "Ареал"}
+                      </button>
+                    )}
+                    {onOpenBuffer && (
+                      <button
+                        type="button"
+                        className={`feature-open-buffer-btn${bufferDockedOpen ? " feature-open-buffer-btn--active" : ""}`}
+                        onClick={onOpenBuffer}
+                        disabled={bufferDockedOpen}
+                      >
+                        {bufferDockedOpen ? "Буфер открыт" : "Буфер"}
+                      </button>
+                    )}
+                  </div>
                 )}
               </>
             ) : null}

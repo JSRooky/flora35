@@ -45,6 +45,16 @@ import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import "./MapView.css";
 
+const PANEL_IDS = {
+  FEATURE: "feature",
+  AREAL: "areal",
+  STATUS: "status",
+  MAP: "map",
+  YEAR: "year",
+  POLYGON: "polygon",
+  BUFFER: "buffer"
+};
+
 const DEFAULT_CLUSTERING_ENABLED = true;
 const DEFAULT_CLUSTER_BY_REGNUM = true;
 const DEFAULT_MARKERS_VISIBLE = true;
@@ -65,6 +75,8 @@ export default function MapView() {
   const [activeModule, setActiveModule] = useState(null);
   // Ареал, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
   const [arealDockedWithFeature, setArealDockedWithFeature] = useState(false);
+  // Буфер, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
+  const [bufferDockedWithFeature, setBufferDockedWithFeature] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [arealEnabled, setArealEnabled] = useState(false);
   const [arealAllMarkers, setArealAllMarkers] = useState(false);
@@ -76,12 +88,20 @@ export default function MapView() {
   // Буфер: диаметры зон (красная/жёлтая/зелёная), км; bufferVisible — показан ли он сейчас.
   const [bufferDiameters, setBufferDiameters] = useState(DEFAULT_BUFFER_DIAMETERS_KM);
   const [bufferVisible, setBufferVisible] = useState(true);
+  const [panelCollapsed, setPanelCollapsed] = useState({});
   const hadFoundYearPropertyFilterRef = useRef(false);
 
-  const handlePanelClose = useCallback(() => {
-    setActiveModule(null);
-    setArealDockedWithFeature(false);
-  }, []);
+  const isPanelCollapsed = useCallback(
+    (panelId) => panelCollapsed[panelId] ?? false,
+    [panelCollapsed]
+  );
+
+  const handlePanelCollapsedChange = useCallback(
+    (panelId) => (collapsed) => {
+      setPanelCollapsed((prev) => ({ ...prev, [panelId]: collapsed }));
+    },
+    []
+  );
 
   const handleModuleSelect = useCallback((moduleId) => {
     if (moduleId === MODULE_IDS.ABOUT) {
@@ -96,7 +116,15 @@ export default function MapView() {
       return;
     }
 
+    if (moduleId === MODULE_IDS.BUFFER) {
+      // Из меню «Буфер» открывается отдельно — панель точки не остаётся в стеке.
+      setBufferDockedWithFeature(false);
+      setActiveModule((current) => (current === moduleId ? null : moduleId));
+      return;
+    }
+
     setArealDockedWithFeature(false);
+    setBufferDockedWithFeature(false);
     setActiveModule((current) => (current === moduleId ? null : moduleId));
   }, []);
 
@@ -105,8 +133,9 @@ export default function MapView() {
     setArealDockedWithFeature(true);
   }, []);
 
-  const handleArealDockedClose = useCallback(() => {
-    setArealDockedWithFeature(false);
+  const handleOpenBufferFromFeature = useCallback(() => {
+    setActiveModule(MODULE_IDS.FEATURE);
+    setBufferDockedWithFeature(true);
   }, []);
 
   const handleYearRangeChange = useCallback((nextRange) => {
@@ -438,6 +467,7 @@ export default function MapView() {
     setBufferVisible(true);
     setActiveModule(null);
     setArealDockedWithFeature(false);
+    setBufferDockedWithFeature(false);
   }, []);
 
   // Буфер строится сразу для выбранной точки и обновляется при изменении диаметров зон;
@@ -515,8 +545,8 @@ export default function MapView() {
           {activeModule === MODULE_IDS.FEATURE && (
             <FeaturePopup
               feature={popupData}
-              collapsed={false}
-              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+              collapsed={isPanelCollapsed(PANEL_IDS.FEATURE)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.FEATURE)}
               activeFilters={propertyFilters}
               onFilterChange={handlePropertyFilterChange}
               activeStatusFilters={statusFilters}
@@ -524,6 +554,8 @@ export default function MapView() {
               onFiltersReset={handleFeatureFiltersReset}
               onOpenAreal={handleOpenArealFromFeature}
               arealDockedOpen={arealDockedWithFeature}
+              onOpenBuffer={handleOpenBufferFromFeature}
+              bufferDockedOpen={bufferDockedWithFeature}
             />
           )}
           {(activeModule === MODULE_IDS.AREAL ||
@@ -537,27 +569,16 @@ export default function MapView() {
               onEnabledChange={setArealEnabled}
               onAllMarkersChange={setArealAllMarkers}
               onRadiusChange={setArealRadius}
-              collapsed={false}
-              onCollapsedChange={(collapsed) => {
-                if (!collapsed) {
-                  return;
-                }
-
-                if (arealDockedWithFeature) {
-                  handleArealDockedClose();
-                  return;
-                }
-
-                handlePanelClose();
-              }}
+              collapsed={isPanelCollapsed(PANEL_IDS.AREAL)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.AREAL)}
             />
           )}
           {activeModule === MODULE_IDS.STATUS && (
             <StatusFilterPanel
               activeStatusFilters={statusFilters}
               onStatusFilterChange={handleStatusFilterChange}
-              collapsed={false}
-              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+              collapsed={isPanelCollapsed(PANEL_IDS.STATUS)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.STATUS)}
             />
           )}
           {activeModule === MODULE_IDS.MAP && (
@@ -570,8 +591,8 @@ export default function MapView() {
               onClusteringEnabledChange={setClusteringEnabledState}
               clusterByRegnum={clusterByRegnum}
               onClusterByRegnumChange={setClusterByRegnumState}
-              collapsed={false}
-              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+              collapsed={isPanelCollapsed(PANEL_IDS.MAP)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.MAP)}
             />
           )}
           {activeModule === MODULE_IDS.YEAR && (
@@ -581,8 +602,8 @@ export default function MapView() {
               range={yearRange}
               onRangeChange={handleYearRangeChange}
               lockedByPropertyFilter={hasFoundYearPropertyFilter}
-              collapsed={false}
-              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+              collapsed={isPanelCollapsed(PANEL_IDS.YEAR)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.YEAR)}
             />
           )}
           {activeModule === MODULE_IDS.POLYGON && (
@@ -591,21 +612,22 @@ export default function MapView() {
               polygonInfo={speciesPolygonInfo}
               onBuild={handleSpeciesPolygonBuild}
               onReset={handleSpeciesPolygonReset}
-              collapsed={false}
-              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+              collapsed={isPanelCollapsed(PANEL_IDS.POLYGON)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.POLYGON)}
             />
           )}
-          {activeModule === MODULE_IDS.BUFFER && (
+          {activeModule === MODULE_IDS.BUFFER ||
+          (activeModule === MODULE_IDS.FEATURE && bufferDockedWithFeature) ? (
             <BufferPopup
               feature={popupData}
               active={bufferVisible}
               diametersKm={bufferDiameters}
               onDiameterChange={handleBufferDiameterChange}
               onReset={handleBufferReset}
-              collapsed={false}
-              onCollapsedChange={(collapsed) => collapsed && handlePanelClose()}
+              collapsed={isPanelCollapsed(PANEL_IDS.BUFFER)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.BUFFER)}
             />
-          )}
+          ) : null}
         </div>
       )}
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
