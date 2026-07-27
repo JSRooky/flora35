@@ -21,8 +21,23 @@ function formatDiameter(value) {
   return `${value.toFixed(1)} км`;
 }
 
-function getCollapsedSummary(active, feature, diametersKm) {
-  if (!feature) {
+function formatSelectedPointsCount(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${count} точка`;
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${count} точки`;
+  }
+
+  return `${count} точек`;
+}
+
+function getCollapsedSummary(active, feature, selectedCount, diametersKm) {
+  if (!feature && selectedCount === 0) {
     return "Точка не выбрана";
   }
 
@@ -30,18 +45,25 @@ function getCollapsedSummary(active, feature, diametersKm) {
     return "Буфер сброшен";
   }
 
-  return `Буфер: ${diametersKm.map(formatDiameter).join(" / ")}`;
+  const pointsLabel =
+    selectedCount > 1 ? `${formatSelectedPointsCount(selectedCount)}, ` : "";
+
+  return `${pointsLabel}Буфер: ${diametersKm.map(formatDiameter).join(" / ")}`;
 }
 
 /**
- * Панель модуля «Буфер»: набор окружностей (красная/жёлтая/зелёная) вокруг выбранной точки.
- * Диаметр каждой окружности задаётся отдельным слайдером; буфер строится сразу для
- * выбранной точки и обновляется при перемещении слайдеров, «Сброс» убирает его с карты.
+ * Панель модуля «Буфер»: набор окружностей (красная/жёлтая/зелёная) вокруг выбранной
+ * или нескольких точек. Кнопка «Добавить» включает режим, в котором клик по точке
+ * добавляет или убирает её из выделения.
+ * Диаметр каждой окружности задаётся отдельным слайдером; «Сброс» убирает буфер с карты.
  */
 export default function BufferPopup({
   feature,
   active,
   diametersKm,
+  selectionMode = false,
+  selectedCount = 0,
+  onSelectionModeChange,
   onDiameterChange,
   onReset,
   collapsed = false,
@@ -49,6 +71,8 @@ export default function BufferPopup({
 }) {
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## buffer в docs/moduleHelp.md
+  const hasPoints = Boolean(feature) || selectedCount > 0;
+  const selectionToggleLabel = selectionMode ? "Режим добавления и удаления" : "Добавить";
 
   return (
     <div className={`buffer-popup ${collapsed ? "buffer-popup--collapsed" : ""}`}>
@@ -71,11 +95,25 @@ export default function BufferPopup({
 
       {collapsed ? (
         <p className="popup-collapsed-summary">
-          {getCollapsedSummary(active, feature, diametersKm)}
+          {getCollapsedSummary(active, feature, selectedCount, diametersKm)}
         </p>
       ) : (
         <div className="buffer-popup-content">
-          {!feature && <p className="buffer-popup-status">Выберите точку на карте.</p>}
+          {!hasPoints && (
+            <p className="buffer-popup-status">Выберите точку на карте или добавьте точки в выделение.</p>
+          )}
+
+          {selectionMode && (
+            <p className="buffer-popup-status buffer-popup-status--selection">
+              Кликните точку на карте, чтобы добавить или убрать её из выделения.
+            </p>
+          )}
+
+          {selectedCount > 0 && (
+            <p className="buffer-popup-status">
+              В выделении: <strong>{formatSelectedPointsCount(selectedCount)}</strong>
+            </p>
+          )}
 
           {BUFFER_ZONES.map((zone, index) => {
             const minDiameter = index === 0 ? BUFFER_MIN_DIAMETER_KM : diametersKm[index - 1];
@@ -93,7 +131,7 @@ export default function BufferPopup({
                   max={zone.maxDiameterKm}
                   step={BUFFER_DIAMETER_STEP_KM}
                   value={value}
-                  disabled={!feature}
+                  disabled={!hasPoints}
                   style={{
                     "--range-progress": `${getRangeProgress(value, minDiameter, zone.maxDiameterKm)}%`,
                     "--range-color": zone.color
@@ -108,9 +146,18 @@ export default function BufferPopup({
           <div className="buffer-actions">
             <button
               type="button"
+              className={`buffer-selection-btn${selectionMode ? " buffer-selection-btn--active" : ""}`}
+              onClick={onSelectionModeChange}
+              aria-pressed={selectionMode}
+              title={selectionToggleLabel}
+            >
+              Добавить
+            </button>
+            <button
+              type="button"
               className="buffer-reset-btn"
               onClick={onReset}
-              disabled={!feature || !active}
+              disabled={!hasPoints || !active}
             >
               Сброс
             </button>

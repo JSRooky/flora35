@@ -11,6 +11,8 @@ export const MODULE_IDS = {
   POLYGON: "polygon",
   // Совпадает с заголовком ## buffer в docs/moduleHelp.md.
   BUFFER: "buffer",
+  // Совпадает с заголовком ## area в docs/moduleHelp.md.
+  AREA: "area",
   ABOUT: "about"
 };
 
@@ -19,6 +21,7 @@ const MAIN_MODULE_ITEMS = [
   { id: MODULE_IDS.AREAL, label: "Ареал" },
   { id: MODULE_IDS.POLYGON, label: "Полигон" },
   { id: MODULE_IDS.BUFFER, label: "Буфер" },
+  { id: MODULE_IDS.AREA, label: "Область" },
   { id: MODULE_IDS.YEAR, label: "Год находки" },
   { id: MODULE_IDS.STATUS, label: "Статус МСОП" },
   { id: MODULE_IDS.MAP, label: "Операции с картой" }

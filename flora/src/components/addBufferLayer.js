@@ -1,4 +1,4 @@
-import { circle, difference, featureCollection } from "@turf/turf";
+import { circle, difference, featureCollection, union } from "@turf/turf";
 
 const SOURCE_ID = "buffer";
 
@@ -55,15 +55,47 @@ export function addBufferLayer(map) {
   });
 }
 
+/** Объединяет окружности одного радиуса вокруг нескольких центров. */
+function unionCircles(centers, radiusKm) {
+  if (!centers.length) {
+    return null;
+  }
+
+  let result = circle(centers[0], radiusKm, { units: "kilometers", steps: 64 });
+
+  for (let index = 1; index < centers.length; index++) {
+    const nextCircle = circle(centers[index], radiusKm, {
+      units: "kilometers",
+      steps: 64
+    });
+    result = union(featureCollection([result, nextCircle]));
+  }
+
+  return result;
+}
+
+function normalizeCenters(centers) {
+  if (!centers) {
+    return [];
+  }
+
+  if (Array.isArray(centers[0])) {
+    return centers;
+  }
+
+  return [centers];
+}
+
 /**
- * Строит кольца буфера вокруг точки по диаметрам зон (км, в порядке BUFFER_ZONES).
+ * Строит кольца буфера вокруг одной или нескольких точек по диаметрам зон (км).
  * Каждая следующая зона — это кольцо между своим и предыдущим радиусом (Turf difference),
  * а не просто круг поверх предыдущего: так цвета зон не смешиваются при наложении.
  */
-export function buildBufferRings(center, diametersKm) {
-  const circles = diametersKm.map((diameterKm) =>
-    circle(center, Math.max(diameterKm, 0) / 2, { units: "kilometers", steps: 64 })
-  );
+export function buildBufferRings(centers, diametersKm) {
+  const normalizedCenters = normalizeCenters(centers);
+  const circles = diametersKm
+    .map((diameterKm) => unionCircles(normalizedCenters, Math.max(diameterKm, 0) / 2))
+    .filter(Boolean);
 
   const rings = [];
 
@@ -93,16 +125,19 @@ export function buildBufferRings(center, diametersKm) {
   return rings;
 }
 
-/** Рисует буфер вокруг точки и возвращает сводку для панели модуля. */
-export function updateBufferLayer(map, feature, diametersKm) {
+/** Рисует буфер вокруг одной или нескольких точек и возвращает сводку для панели. */
+export function updateBufferLayer(map, features, diametersKm) {
   const source = map.getSource(SOURCE_ID);
-  const center = feature?.geometry?.coordinates;
+  const featureList = Array.isArray(features) ? features : features ? [features] : [];
+  const centers = featureList
+    .map((feature) => feature?.geometry?.coordinates)
+    .filter(Boolean);
 
-  if (!source || !center) {
+  if (!source || !centers.length) {
     return { built: false };
   }
 
-  const rings = buildBufferRings(center, diametersKm);
+  const rings = buildBufferRings(centers, diametersKm);
 
   source.setData({
     type: "FeatureCollection",

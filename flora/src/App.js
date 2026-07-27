@@ -5,6 +5,7 @@ import {
   clearArealLayer,
   dismissArealPointHintOnPointClick,
   getArealContainedPointsSummary,
+  getArealPointKey,
   hideArealPointHint,
   panToArealPoint,
   refreshArealDisplay
@@ -33,10 +34,21 @@ import {
   updateBufferLayer,
   DEFAULT_BUFFER_DIAMETERS_KM
 } from "./components/addBufferLayer";
+import {
+  addAreaSelectionLayer,
+  clearAreaSelectionLayer,
+  getAreaContainedPointsSummary,
+  isAreaDrawingActive,
+  startAreaDrawing,
+  stopActiveAreaDrawing,
+  updateAreaSelectionLayer,
+  updateAreaSelectionPreview
+} from "./components/addAreaSelectionLayer";
 import FeaturePopup from "./components/FeaturePopup";
 import ArealPopup from "./components/ArealPopup";
 import SpeciesPolygonPopup from "./components/SpeciesPolygonPopup";
 import BufferPopup from "./components/BufferPopup";
+import AreaSelectionPopup from "./components/AreaSelectionPopup";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
 import YearFilterPanel from "./components/YearFilterPanel";
@@ -52,7 +64,8 @@ const PANEL_IDS = {
   MAP: "map",
   YEAR: "year",
   POLYGON: "polygon",
-  BUFFER: "buffer"
+  BUFFER: "buffer",
+  AREA: "area"
 };
 
 const DEFAULT_CLUSTERING_ENABLED = true;
@@ -88,6 +101,10 @@ export default function MapView() {
   // Буфер: диаметры зон (красная/жёлтая/зелёная), км; bufferVisible — показан ли он сейчас.
   const [bufferDiameters, setBufferDiameters] = useState(DEFAULT_BUFFER_DIAMETERS_KM);
   const [bufferVisible, setBufferVisible] = useState(true);
+  const [bufferSelectionMode, setBufferSelectionMode] = useState(false);
+  const [bufferSelectedPoints, setBufferSelectedPoints] = useState([]);
+  const [areaDrawingMode, setAreaDrawingMode] = useState(false);
+  const [areaPolygon, setAreaPolygon] = useState(null);
   const [panelCollapsed, setPanelCollapsed] = useState({});
   const hadFoundYearPropertyFilterRef = useRef(false);
 
@@ -118,6 +135,14 @@ export default function MapView() {
 
     if (moduleId === MODULE_IDS.BUFFER) {
       // Из меню «Буфер» открывается отдельно — панель точки не остаётся в стеке.
+      setBufferDockedWithFeature(false);
+      setActiveModule((current) => (current === moduleId ? null : moduleId));
+      return;
+    }
+
+    if (moduleId === MODULE_IDS.AREA) {
+      // Из меню «Область» открывается отдельно — панель точки не остаётся в стеке.
+      setArealDockedWithFeature(false);
       setBufferDockedWithFeature(false);
       setActiveModule((current) => (current === moduleId ? null : moduleId));
       return;
@@ -172,6 +197,13 @@ export default function MapView() {
     statusFilters,
     yearFilterEnabled,
     yearRange
+  };
+
+  const bufferStateRef = useRef({});
+  bufferStateRef.current = {
+    bufferSelectionMode,
+    activeModule,
+    bufferDockedWithFeature
   };
 
   const expandedLeavesRef = useRef(null);
@@ -246,6 +278,76 @@ export default function MapView() {
 
     return filters;
   }, [propertyFilters, statusFilters, yearFilterEnabled, yearRange]);
+
+  const areaContainedPoints = useMemo(() => {
+    if (!areaPolygon || !mapReady) {
+      return null;
+    }
+
+    return getAreaContainedPointsSummary(areaPolygon, buildLocationFilters());
+  }, [areaPolygon, buildLocationFilters, mapReady]);
+
+  useEffect(() => {
+    if (activeModule !== MODULE_IDS.AREA) {
+      setAreaDrawingMode(false);
+    }
+  }, [activeModule]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    if (areaPolygon) {
+      updateAreaSelectionLayer(map.current, areaPolygon);
+    } else {
+      clearAreaSelectionLayer(map.current);
+    }
+  }, [areaPolygon, mapReady]);
+
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance || !mapReady || activeModule !== MODULE_IDS.AREA || !areaDrawingMode) {
+      stopActiveAreaDrawing();
+      return;
+    }
+
+    startAreaDrawing(mapInstance, {
+      onPreview: (coordinates) => {
+        updateAreaSelectionPreview(mapInstance, coordinates);
+      },
+      onComplete: (ringCoordinates) => {
+        setAreaPolygon(ringCoordinates);
+        setAreaDrawingMode(false);
+      }
+    });
+
+    return () => {
+      stopActiveAreaDrawing();
+    };
+  }, [areaDrawingMode, activeModule, mapReady]);
+
+  const handleAreaDrawingModeChange = useCallback(() => {
+    setAreaDrawingMode((prev) => !prev);
+  }, []);
+
+  const handleAreaReset = useCallback(() => {
+    setAreaDrawingMode(false);
+    setAreaPolygon(null);
+    if (map.current) {
+      clearAreaSelectionLayer(map.current);
+    }
+  }, []);
+
+  const handleAreaPointSelect = useCallback((feature) => {
+    const mapInstance = map.current;
+
+    if (!mapInstance) {
+      return;
+    }
+
+    panToArealPoint(mapInstance, feature);
+  }, []);
 
   const arealContainedPoints = useMemo(() => {
     const mapInstance = map.current;
@@ -438,7 +540,33 @@ export default function MapView() {
   const handleBufferReset = useCallback(() => {
     setBufferVisible(false);
     setBufferDiameters(DEFAULT_BUFFER_DIAMETERS_KM);
+    setBufferSelectedPoints([]);
+    setBufferSelectionMode(false);
   }, []);
+
+  const handleBufferSelectionModeChange = useCallback(() => {
+    setBufferSelectionMode((prev) => {
+      const next = !prev;
+
+      if (next) {
+        setBufferSelectedPoints((points) => {
+          if (!popupData) {
+            return points;
+          }
+
+          const key = getArealPointKey(popupData);
+          if (points.some((point) => getArealPointKey(point) === key)) {
+            return points;
+          }
+
+          return [...points, popupData];
+        });
+      }
+
+      return next;
+    });
+    setBufferVisible(true);
+  }, [popupData]);
 
   const handleArealPointSelect = useCallback((feature) => {
     const mapInstance = map.current;
@@ -465,25 +593,34 @@ export default function MapView() {
     setSpeciesPolygonInfo(null);
     setBufferDiameters(DEFAULT_BUFFER_DIAMETERS_KM);
     setBufferVisible(true);
+    setBufferSelectedPoints([]);
+    setBufferSelectionMode(false);
     setActiveModule(null);
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature(false);
   }, []);
 
-  // Буфер строится сразу для выбранной точки и обновляется при изменении диаметров зон;
-  // «Сброс» скрывает его до следующего изменения слайдера или выбора новой точки.
+  // Буфер строится для выбранной точки или для всех точек в выделении и обновляется
+  // при изменении диаметров зон; «Сброс» скрывает его до следующего изменения.
   useEffect(() => {
     const mapInstance = map.current;
     if (!mapInstance || !mapReady) {
       return;
     }
 
-    if (bufferVisible && popupData) {
-      updateBufferLayer(mapInstance, popupData, bufferDiameters);
+    const bufferFeatures =
+      bufferSelectedPoints.length > 0
+        ? bufferSelectedPoints
+        : popupData
+          ? [popupData]
+          : [];
+
+    if (bufferVisible && bufferFeatures.length > 0) {
+      updateBufferLayer(mapInstance, bufferFeatures, bufferDiameters);
     } else {
       clearBufferLayer(mapInstance);
     }
-  }, [bufferVisible, popupData, bufferDiameters, mapReady]);
+  }, [bufferVisible, popupData, bufferSelectedPoints, bufferDiameters, mapReady]);
 
   useEffect(() => {
     if (!map.current && ref.current) {
@@ -501,14 +638,50 @@ export default function MapView() {
             refreshArealRef.current();
           },
           onPointClick: (feature) => {
+            if (isAreaDrawingActive()) {
+              return;
+            }
+
             dismissArealPointHintOnPointClick(feature);
             setPopupData(feature);
             setBufferVisible(true);
             // Если какая-то панель уже открыта, оставляем её открытой — просто обновляем
             // данные точки. «Сведения о точке» открываются только если панелей ещё нет.
             setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
+
+            const {
+              bufferSelectionMode: selectionMode,
+              activeModule: currentModule,
+              bufferDockedWithFeature: bufferDocked
+            } = bufferStateRef.current;
+            const bufferPanelOpen =
+              currentModule === MODULE_IDS.BUFFER ||
+              (currentModule === MODULE_IDS.FEATURE && bufferDocked);
+
+            if (bufferPanelOpen) {
+              if (selectionMode) {
+                setBufferSelectedPoints((points) => {
+                  const key = getArealPointKey(feature);
+                  const existingIndex = points.findIndex(
+                    (point) => getArealPointKey(point) === key
+                  );
+
+                  if (existingIndex >= 0) {
+                    return points.filter((_, index) => index !== existingIndex);
+                  }
+
+                  return [...points, feature];
+                });
+              } else {
+                setBufferSelectedPoints([]);
+              }
+            }
           },
           onMapBackgroundClick: () => {
+            if (isAreaDrawingActive()) {
+              return;
+            }
+
             clearPointSelection();
           },
           clusteringEnabled: DEFAULT_CLUSTERING_ENABLED,
@@ -518,6 +691,7 @@ export default function MapView() {
         addArealLayer(map.current);
         addSpeciesPolygonLayer(map.current); // слой экспериментального модуля «Полигон»
         addBufferLayer(map.current);
+        addAreaSelectionLayer(map.current);
         addHeatmapLayer(map.current);
         setMapReady(true);
       });
@@ -622,12 +796,27 @@ export default function MapView() {
               feature={popupData}
               active={bufferVisible}
               diametersKm={bufferDiameters}
+              selectionMode={bufferSelectionMode}
+              selectedCount={bufferSelectedPoints.length}
+              onSelectionModeChange={handleBufferSelectionModeChange}
               onDiameterChange={handleBufferDiameterChange}
               onReset={handleBufferReset}
               collapsed={isPanelCollapsed(PANEL_IDS.BUFFER)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.BUFFER)}
             />
           ) : null}
+          {activeModule === MODULE_IDS.AREA && (
+            <AreaSelectionPopup
+              drawingMode={areaDrawingMode}
+              hasArea={Boolean(areaPolygon)}
+              containedPoints={areaContainedPoints}
+              onDrawingModeChange={handleAreaDrawingModeChange}
+              onPointSelect={handleAreaPointSelect}
+              onReset={handleAreaReset}
+              collapsed={isPanelCollapsed(PANEL_IDS.AREA)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.AREA)}
+            />
+          )}
         </div>
       )}
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />

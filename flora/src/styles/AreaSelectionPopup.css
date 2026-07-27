@@ -1,0 +1,170 @@
+.area-selection-popup {
+  box-sizing: border-box;
+  position: relative;
+  background-color: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 11px 12px;
+  max-width: calc(100vw - 40px);
+  width: 320px;
+  overflow-x: hidden;
+  font-family: Arial, sans-serif;
+  animation: areaSelectionSlideIn 0.3s ease-out;
+}
+
+@keyframes areaSelectionSlideIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.area-selection-popup-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.area-selection-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.area-selection-popup-title {
+  margin: 0;
+  font-size: 15px;
+  color: #333;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 6px;
+  flex: 1;
+}
+
+.area-selection-popup--collapsed .area-selection-popup-title {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.area-selection-popup-status {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+  line-height: 1.35;
+}
+
+.area-selection-popup-status--drawing {
+  color: #2471a3;
+}
+
+.area-selection-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 2px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.area-selection-draw-btn {
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid #3498db;
+  background: rgba(52, 152, 219, 0.12);
+  color: #2471a3;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.area-selection-draw-btn:hover {
+  background: rgba(52, 152, 219, 0.22);
+  border-color: #2471a3;
+}
+
+.area-selection-draw-btn--active {
+  background: #3498db;
+  border-color: #2471a3;
+  color: #fff;
+}
+
+.area-selection-draw-btn--active:hover {
+  background: #2f89cc;
+}
+
+.area-selection-reset-btn {
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.area-selection-reset-btn:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
+.area-selection-reset-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.area-selection-contained-points {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.area-selection-contained-points-title {
+  margin: 0;
+  font-size: 13px;
+  color: #555;
+}
+
+.area-selection-contained-points-title strong {
+  color: #2471a3;
+}
+
+.area-selection-contained-points-list {
+  margin: 0;
+  padding-left: 0;
+  max-height: 160px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.area-selection-contained-points-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: #1f618d;
+  text-align: left;
+  line-height: 1.5;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(31, 97, 141, 0.35);
+}
+
+.area-selection-contained-points-item:hover {
+  color: #154360;
+  text-decoration-color: currentColor;
+}
