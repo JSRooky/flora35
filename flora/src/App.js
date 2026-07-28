@@ -26,6 +26,10 @@ import {
   setHeatmapEnabled
 } from "./components/addHeatmapLayer";
 import {
+  addOsmBasemapLayer,
+  setOsmBasemapEnabled
+} from "./components/addOsmBasemapLayer";
+import {
   addSpeciesPolygonLayer,
   clearSpeciesPolygonLayer,
   updateSpeciesPolygonLayer
@@ -110,6 +114,7 @@ export default function MapView() {
   const [areaDrawingMode, setAreaDrawingMode] = useState(false);
   const [areaPolygon, setAreaPolygon] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
+  const [osmBasemapEnabled, setOsmBasemapEnabledState] = useState(false);
   const [panelCollapsed, setPanelCollapsed] = useState({});
   const hadFoundYearPropertyFilterRef = useRef(false);
 
@@ -403,6 +408,14 @@ export default function MapView() {
       return;
     }
 
+    setOsmBasemapEnabled(map.current, osmBasemapEnabled);
+  }, [osmBasemapEnabled, mapReady]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
     setMarkersVisible(map.current, markersVisible);
   }, [markersVisible, mapReady]);
 
@@ -669,6 +682,7 @@ export default function MapView() {
       map.current = initMap(ref.current);
 
       map.current.on("load", () => {
+        addOsmBasemapLayer(map.current);
         addLocationsLayer(map.current, {
           onClusterExpanded: (leaves) => {
             const { arealEnabled: enabled, arealAllMarkers: allMarkers } =
@@ -756,6 +770,8 @@ export default function MapView() {
         pointSelected={Boolean(popupData)}
         hoverTooltipsDisabled={hoverTooltipsDisabled}
         onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
+        osmBasemapEnabled={osmBasemapEnabled}
+        onOsmBasemapEnabledChange={setOsmBasemapEnabledState}
       />
       <div ref={ref} className="map-container" />
       {activeModule !== null && (

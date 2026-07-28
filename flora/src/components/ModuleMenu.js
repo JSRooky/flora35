@@ -78,7 +78,9 @@ export default function ModuleMenu({
   onModuleSelect,
   pointSelected = false,
   hoverTooltipsDisabled = false,
-  onHoverTooltipsDisabledChange
+  onHoverTooltipsDisabledChange,
+  osmBasemapEnabled = false,
+  onOsmBasemapEnabledChange
 }) {
   const renderModuleItem = ({ id, label }) => (
     <li key={id}>
@@ -100,6 +102,17 @@ export default function ModuleMenu({
           <li className="module-menu-separator" aria-hidden="true" />
           {MAP_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />
+          <li className="module-menu-toggle-item">
+            <label className="module-menu-switch" title="Использовать подложку OpenStreetMap вместо стандартной карты">
+              <input
+                type="checkbox"
+                checked={osmBasemapEnabled}
+                onChange={(event) => onOsmBasemapEnabledChange?.(event.target.checked)}
+              />
+              <span className="module-menu-switch-slider" aria-hidden="true" />
+              <span className="module-menu-switch-label">OpenStreetMap</span>
+            </label>
+          </li>
           <li className="module-menu-toggle-item">
             <label className="module-menu-switch" title="Отключить подсказки при наведении на точки и кластеры">
               <input
