@@ -1,5 +1,6 @@
 import mapboxgl from "mapbox-gl";
 import points from "../locations/points.json";
+import { expandFindingsToFeatures } from "../locations/expandFindings";
 
 const PUBLIC_URL = process.env.PUBLIC_URL || "";
 const PLANT_IMAGE = `${PUBLIC_URL}/images/plant.svg`;
@@ -1204,7 +1205,7 @@ export function addLocationsLayer(
     markersVisible: initialMarkersVisible = true
   } = {}
 ) {
-  locationsData = enrichWithImages(points);
+  locationsData = enrichWithImages(expandFindingsToFeatures(points));
   clusterByRegnum = initialClusterByRegnum;
   clusteringEnabled = initialClusteringEnabled;
   clusterPieChartsEnabled = initialClusterPieChartsEnabled;

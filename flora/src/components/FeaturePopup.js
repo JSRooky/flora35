@@ -5,7 +5,7 @@ import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/FeaturePopup.css";
 
 // Служебные поля, добавленные слоем карты; не показываем в списке свойств.
-const INTERNAL_PROPERTIES = new Set(["image", "images"]);
+const INTERNAL_PROPERTIES = new Set(["image", "images", "species_id", "finding_id"]);
 
 /**
  * Собирает URL иллюстраций из properties.
