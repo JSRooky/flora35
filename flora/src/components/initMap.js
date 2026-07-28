@@ -1,7 +1,9 @@
-import mapboxgl from "mapbox-gl";
+import mapboxgl from "mapbox-gl/dist/mapbox-gl-csp";
 import "mapbox-gl/dist/mapbox-gl.css";
 
-// Токен берётся из .env (REACT_APP_MAPBOX_TOKEN).
+// CRA must load the Mapbox worker via worker-loader; direct imports break in production.
+mapboxgl.workerClass = require("worker-loader!mapbox-gl/dist/mapbox-gl-csp-worker").default; // eslint-disable-line import/no-webpack-loader-syntax
+
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN;
 
 /** Создаёт экземпляр карты Mapbox с начальным видом на Вологодскую область. */
