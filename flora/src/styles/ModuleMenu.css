@@ -51,6 +51,11 @@
   margin: 0 4px 0 auto;
 }
 
+.module-menu-btn-wrap {
+  display: inline-block;
+  cursor: not-allowed;
+}
+
 .module-menu-btn {
   position: relative;
   display: block;

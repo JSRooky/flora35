@@ -38,6 +38,8 @@ function isPointRequiredModule(id) {
   );
 }
 
+const DISABLED_POINT_REQUIRED_TITLE = "Выберите точку";
+
 function ModuleMenuButton({
   id,
   label,
@@ -47,7 +49,7 @@ function ModuleMenuButton({
   // Некоторые модули (например, «Полигон») требуют предварительного выбора точки.
   disabled = false
 }) {
-  return (
+  const button = (
     <button
       type="button"
       className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${disabled ? " module-menu-btn--disabled" : ""}${className ? ` ${className}` : ""}`}
@@ -58,6 +60,17 @@ function ModuleMenuButton({
       {label}
     </button>
   );
+
+  // У disabled-кнопок не срабатывает title, поэтому оборачиваем в span.
+  if (disabled) {
+    return (
+      <span className="module-menu-btn-wrap" title={DISABLED_POINT_REQUIRED_TITLE}>
+        {button}
+      </span>
+    );
+  }
+
+  return button;
 }
 
 export default function ModuleMenu({
