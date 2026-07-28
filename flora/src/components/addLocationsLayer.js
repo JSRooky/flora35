@@ -106,18 +106,21 @@ function formatClusterSpeciesCount(count) {
   return `${count} видов`;
 }
 
+const MAX_CLUSTER_TOOLTIP_SPECIES = 5;
+
 /** Уникальные виды в кластере с количеством точек каждого вида. */
 function getSpeciesSummaryFromLeaves(leaves) {
   const speciesMap = new Map();
 
   leaves.forEach((leaf) => {
-    const { name_ru: nameRu = "", name_latin: nameLatin = "" } = leaf.properties ?? {};
+    const { name_ru: nameRu = "", name_latin: nameLatin = "", regnum = "" } = leaf.properties ?? {};
     const key = nameLatin || nameRu || leaf.id || `${leaf.geometry?.coordinates?.join(",")}`;
 
     if (!speciesMap.has(key)) {
       speciesMap.set(key, {
         nameRu,
         nameLatin,
+        regnum,
         count: 1
       });
       return;
@@ -152,18 +155,27 @@ function buildClusterTooltipHtml(leaves) {
     return `<div class="cluster-tooltip-title">${formatClusterPointsCount(leaves.length)}</div>`;
   }
 
-  const items = speciesList
+  const visibleSpecies = speciesList.slice(0, MAX_CLUSTER_TOOLTIP_SPECIES);
+  const hiddenSpecies = speciesList.slice(MAX_CLUSTER_TOOLTIP_SPECIES);
+
+  const items = visibleSpecies
     .map((species) => {
       const label = escapeHtml(getSpeciesLabel(species, speciesList));
+      const color = getPointColorForRegnum(species.regnum);
       const countSuffix = species.count > 1 ? ` <span class="cluster-tooltip-count">— ${species.count}</span>` : "";
-      return `<li class="cluster-tooltip-item">${label}${countSuffix}</li>`;
+      return `<li class="cluster-tooltip-item"><span class="cluster-tooltip-species" style="color: ${color}">${label}</span>${countSuffix}</li>`;
     })
     .join("");
+
+  const moreItem =
+    hiddenSpecies.length > 0
+      ? `<li class="cluster-tooltip-item cluster-tooltip-more">и еще ${formatClusterSpeciesCount(hiddenSpecies.length)}</li>`
+      : "";
 
   return `
     <div class="cluster-tooltip-title">${formatClusterSpeciesCount(speciesList.length)}</div>
     <div class="cluster-tooltip-subtitle">${formatClusterPointsCount(leaves.length)}</div>
-    <ul class="cluster-tooltip-list">${items}</ul>
+    <ul class="cluster-tooltip-list">${items}${moreItem}</ul>
   `;
 }
 

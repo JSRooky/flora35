@@ -101,14 +101,15 @@
 .cluster-tooltip-list {
   margin: 6px 0 0;
   padding-left: 16px;
-  max-height: 180px;
-  overflow-y: auto;
 }
 
 .cluster-tooltip-item {
-  color: #333;
   font-size: 12px;
   line-height: 1.4;
+}
+
+.cluster-tooltip-species {
+  font-weight: 600;
 }
 
 .cluster-tooltip-item + .cluster-tooltip-item {
@@ -119,6 +120,11 @@
   color: #666;
   font-size: 11px;
   font-weight: 600;
+}
+
+.cluster-tooltip-more {
+  color: #666;
+  font-style: italic;
 }
 
 .areal-point-hint.mapboxgl-popup {
