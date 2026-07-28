@@ -19,11 +19,24 @@ const REGNUM_COLORS = {
 const DEFAULT_CLUSTER_COLOR = "#4a90e2";
 const DEFAULT_POINT_COLOR = "#4a90e2";
 
+const CLUSTER_REGNUM_KEYS = ["plantae", "animalia", "fungi"];
+
+const CLUSTER_REGNUM_PROPERTIES = Object.fromEntries(
+  CLUSTER_REGNUM_KEYS.map((regnum) => [
+    regnum,
+    ["+", ["case", ["==", ["get", "regnum"], regnum], 1, 0]]
+  ])
+);
+
 // Модульное состояние слоя: карта одна, пересборка слоёв идёт через rebuildLocationsLayers.
 let locationsData = null;
 let clusterByRegnum = true;
 let clusteringEnabled = true;
+let clusterPieChartsEnabled = false;
 let markersVisible = true;
+let clusterPieChartMarkersOnScreen = {};
+let clusterPieChartRenderHandler = null;
+let clusterPieChartMap = null;
 let currentFilters = {};
 let interactionHandlers = null;
 let onClusterExpandedCallback = null;
@@ -156,6 +169,224 @@ function buildClusterTooltipHtml(leaves) {
 
 function getClusterHoverLayerIds() {
   return [...getClusterLayerIds(), ...getClusterCountLayerIds()];
+}
+
+function getClusterPieChartDimensions(total) {
+  if (total >= 100) {
+    return { radius: 32, fontSize: 14 };
+  }
+
+  if (total >= 10) {
+    return { radius: 24, fontSize: 12 };
+  }
+
+  return { radius: 18, fontSize: 11 };
+}
+
+function donutSegment(start, end, radius, innerRadius, color) {
+  let segmentEnd = end;
+
+  if (segmentEnd - start === 1) {
+    segmentEnd -= 0.0001;
+  }
+
+  const startAngle = 2 * Math.PI * (start - 0.25);
+  const endAngle = 2 * Math.PI * (segmentEnd - 0.25);
+  const x0 = Math.cos(startAngle);
+  const y0 = Math.sin(startAngle);
+  const x1 = Math.cos(endAngle);
+  const y1 = Math.sin(endAngle);
+  const largeArc = segmentEnd - start > 0.5 ? 1 : 0;
+
+  return `<path d="M ${radius + innerRadius * x0} ${radius + innerRadius * y0} L ${
+    radius + radius * x0
+  } ${radius + radius * y0} A ${radius} ${radius} 0 ${largeArc} 1 ${radius + radius * x1} ${
+    radius + radius * y1
+  } L ${radius + innerRadius * x1} ${radius + innerRadius * y1} A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${
+    radius + innerRadius * x0
+  } ${radius + innerRadius * y0}" fill="${color}" />`;
+}
+
+function getClusterPieChartSignature(props) {
+  return CLUSTER_REGNUM_KEYS.map((key) => Number(props[key]) || 0).join(":");
+}
+
+/** SVG-пончик: доли plantae / animalia / fungi и общее число точек в центре. */
+function createClusterPieChartElement(props) {
+  const counts = CLUSTER_REGNUM_KEYS.map((key) => Number(props[key]) || 0);
+  const total = Number(props.point_count) || counts.reduce((sum, count) => sum + count, 0);
+
+  if (total <= 0) {
+    return null;
+  }
+
+  const { radius, fontSize } = getClusterPieChartDimensions(total);
+  const innerRadius = Math.round(radius * 0.6);
+  const size = radius * 2;
+  const offsets = [];
+  let runningTotal = 0;
+
+  counts.forEach((count) => {
+    offsets.push(runningTotal);
+    runningTotal += count;
+  });
+
+  let segmentsHtml = "";
+
+  counts.forEach((count, index) => {
+    if (count <= 0) {
+      return;
+    }
+
+    segmentsHtml += donutSegment(
+      offsets[index] / total,
+      (offsets[index] + count) / total,
+      radius,
+      innerRadius,
+      REGNUM_COLORS[CLUSTER_REGNUM_KEYS[index]]
+    );
+  });
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "cluster-pie-chart-marker";
+  wrapper.innerHTML = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+    ${segmentsHtml}
+    <circle cx="${radius}" cy="${radius}" r="${innerRadius}" fill="#ffffff" />
+    <text dominant-baseline="central" transform="translate(${radius}, ${radius})" text-anchor="middle" fill="#333333" font-size="${fontSize}" font-weight="700" font-family="Arial, sans-serif">${total.toLocaleString("ru-RU")}</text>
+  </svg>`;
+
+  return wrapper;
+}
+
+function removeAllClusterPieChartMarkers() {
+  Object.values(clusterPieChartMarkersOnScreen).forEach((marker) => marker.remove());
+  clusterPieChartMarkersOnScreen = {};
+}
+
+/** Удаляет SVG-диаграммы, не попавшие в реестр (дубликаты cluster_id из querySourceFeatures). */
+function removeOrphanedClusterPieChartMarkers(map) {
+  if (!map?.getContainer) {
+    return;
+  }
+
+  map.getContainer().querySelectorAll(".cluster-pie-chart-marker").forEach((element) => {
+    element.closest(".mapboxgl-marker")?.remove();
+  });
+}
+
+function setClusterPieChartMarkersVisibility(visible) {
+  Object.values(clusterPieChartMarkersOnScreen).forEach((marker) => {
+    const element = marker.getElement();
+    if (element) {
+      element.style.display = visible ? "" : "none";
+    }
+  });
+}
+
+function detachClusterPieChartMarkers(map = clusterPieChartMap) {
+  if (clusterPieChartRenderHandler && clusterPieChartMap) {
+    clusterPieChartMap.off("render", clusterPieChartRenderHandler);
+  }
+
+  removeAllClusterPieChartMarkers();
+  removeOrphanedClusterPieChartMarkers(map);
+  clusterPieChartRenderHandler = null;
+  clusterPieChartMap = null;
+}
+
+function getVisibleClusterFeatures(map) {
+  const features = map.querySourceFeatures("locations");
+  const clustersById = new Map();
+
+  features.forEach((feature) => {
+    const props = feature.properties;
+
+    if (!props?.cluster) {
+      return;
+    }
+
+    const clusterId = props.cluster_id;
+
+    if (clusterId === undefined || !feature.geometry?.coordinates) {
+      return;
+    }
+
+    clustersById.set(clusterId, feature);
+  });
+
+  return clustersById;
+}
+
+function updateClusterPieChartMarkers(map) {
+  if (!clusterPieChartsEnabled || !clusteringEnabled || clusterByRegnum || !markersVisible) {
+    removeAllClusterPieChartMarkers();
+    removeOrphanedClusterPieChartMarkers(map);
+    return;
+  }
+
+  if (!map.getSource("locations") || !map.isSourceLoaded("locations")) {
+    return;
+  }
+
+  const clusterFeatures = getVisibleClusterFeatures(map);
+  const nextMarkers = {};
+
+  clusterFeatures.forEach((feature, clusterId) => {
+    const props = feature.properties;
+    const coordinates = feature.geometry.coordinates;
+    const signature = getClusterPieChartSignature(props);
+    let marker = nextMarkers[clusterId] ?? clusterPieChartMarkersOnScreen[clusterId];
+
+    if (!marker) {
+      const element = createClusterPieChartElement(props);
+
+      if (!element) {
+        return;
+      }
+
+      marker = new mapboxgl.Marker({ element, anchor: "center" })
+        .setLngLat(coordinates)
+        .addTo(map);
+      marker.__pieChartSignature = signature;
+    } else if (marker.__pieChartSignature !== signature) {
+      marker.remove();
+      const element = createClusterPieChartElement(props);
+
+      if (!element) {
+        return;
+      }
+
+      marker = new mapboxgl.Marker({ element, anchor: "center" })
+        .setLngLat(coordinates)
+        .addTo(map);
+      marker.__pieChartSignature = signature;
+    } else {
+      marker.setLngLat(coordinates);
+    }
+
+    nextMarkers[clusterId] = marker;
+  });
+
+  Object.entries(clusterPieChartMarkersOnScreen).forEach(([clusterId, marker]) => {
+    if (!nextMarkers[clusterId]) {
+      marker.remove();
+    }
+  });
+
+  clusterPieChartMarkersOnScreen = nextMarkers;
+}
+
+function attachClusterPieChartMarkers(map) {
+  detachClusterPieChartMarkers(map);
+
+  if (!clusterPieChartsEnabled || !clusteringEnabled || clusterByRegnum) {
+    return;
+  }
+
+  clusterPieChartMap = map;
+  clusterPieChartRenderHandler = () => updateClusterPieChartMarkers(map);
+  map.on("render", clusterPieChartRenderHandler);
+  updateClusterPieChartMarkers(map);
 }
 
 function cancelClusterHoverRequest() {
@@ -334,6 +565,8 @@ function applyMarkersVisibility(map) {
       map.setLayoutProperty(layerId, "visibility", visibility);
     }
   });
+
+  setClusterPieChartMarkersVisibility(markersVisible);
 }
 
 function getPointColorExpression() {
@@ -352,6 +585,8 @@ export function getPointColorForRegnum(regnum) {
 }
 
 function removeLocationsFromMap(map) {
+  detachClusterPieChartMarkers(map);
+
   [getLayerIds().clusters, getLayerIds().clusterCount, getLayerIds().unclustered].forEach(
     (layerId) => {
       if (map.getLayer(layerId)) {
@@ -617,6 +852,7 @@ function addUnclusteredLayer(map, sourceId, regnum = null) {
 function addClusterLayers(map, sourceId, regnum = null) {
   const layerIds = getLayerIds(regnum);
   const clusterColor = regnum ? REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR : DEFAULT_CLUSTER_COLOR;
+  const usePieCharts = clusterPieChartsEnabled && !regnum;
 
   map.addLayer({
     id: layerIds.clusters,
@@ -632,25 +868,29 @@ function addClusterLayers(map, sourceId, regnum = null) {
         24, 30,
         32
       ],
-      "circle-stroke-width": 2,
-      "circle-stroke-color": "#ffffff"
+      "circle-stroke-width": usePieCharts ? 0 : 2,
+      "circle-stroke-color": "#ffffff",
+      "circle-opacity": usePieCharts ? 0 : 1,
+      "circle-stroke-opacity": usePieCharts ? 0 : 1
     }
   });
 
-  map.addLayer({
-    id: layerIds.clusterCount,
-    type: "symbol",
-    source: sourceId,
-    filter: ["has", "point_count"],
-    layout: {
-      "text-field": "{point_count_abbreviated}",
-      "text-font": ["Open Sans Bold"],
-      "text-size": 12
-    },
-    paint: {
-      "text-color": "#ffffff"
-    }
-  });
+  if (!usePieCharts) {
+    map.addLayer({
+      id: layerIds.clusterCount,
+      type: "symbol",
+      source: sourceId,
+      filter: ["has", "point_count"],
+      layout: {
+        "text-field": "{point_count_abbreviated}",
+        "text-font": ["Open Sans Bold"],
+        "text-size": 12
+      },
+      paint: {
+        "text-color": "#ffffff"
+      }
+    });
+  }
 
   addUnclusteredLayer(map, sourceId, regnum);
 }
@@ -707,7 +947,8 @@ function rebuildLocationsLayers(map) {
         features: filteredFeatures
       },
       cluster: true,
-      ...CLUSTER_OPTIONS
+      ...CLUSTER_OPTIONS,
+      ...(clusterPieChartsEnabled ? { clusterProperties: CLUSTER_REGNUM_PROPERTIES } : {})
     });
 
     addClusterLayers(map, "locations");
@@ -715,6 +956,7 @@ function rebuildLocationsLayers(map) {
 
   attachLocationsInteractions(map);
   applyMarkersVisibility(map);
+  attachClusterPieChartMarkers(map);
 }
 
 /** Фильтрует GeoJSON-объекты по properties; массив значений — логика «любой из». */
@@ -910,6 +1152,19 @@ export function isMarkersVisible() {
   return markersVisible;
 }
 
+export function setClusterPieChartsEnabled(map, enabled) {
+  if (!enabled) {
+    detachClusterPieChartMarkers(map);
+  }
+
+  clusterPieChartsEnabled = enabled;
+  rebuildLocationsLayers(map);
+}
+
+export function isClusterPieChartsEnabled() {
+  return clusterPieChartsEnabled;
+}
+
 /** Включает или отключает всплывающие подсказки при наведении на точки и кластеры. */
 export function setHoverTooltipsEnabled(enabled) {
   hoverTooltipsEnabled = enabled;
@@ -933,12 +1188,14 @@ export function addLocationsLayer(
     onMapBackgroundClick,
     clusterByRegnum: initialClusterByRegnum = true,
     clusteringEnabled: initialClusteringEnabled = true,
+    clusterPieChartsEnabled: initialClusterPieChartsEnabled = false,
     markersVisible: initialMarkersVisible = true
   } = {}
 ) {
   locationsData = enrichWithImages(points);
   clusterByRegnum = initialClusterByRegnum;
   clusteringEnabled = initialClusteringEnabled;
+  clusterPieChartsEnabled = initialClusterPieChartsEnabled;
   markersVisible = initialMarkersVisible;
   onClusterExpandedCallback = onClusterExpanded;
   onPointClickCallback = onPointClick;

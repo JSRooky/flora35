@@ -17,6 +17,7 @@ import {
   isFeatureUnclusteredOnMap,
   setClusterByRegnum,
   setClusteringEnabled,
+  setClusterPieChartsEnabled,
   setMarkersVisible,
   setHoverTooltipsEnabled
 } from "./components/addLocationsLayer";
@@ -71,6 +72,7 @@ const PANEL_IDS = {
 
 const DEFAULT_CLUSTERING_ENABLED = true;
 const DEFAULT_CLUSTER_BY_REGNUM = true;
+const DEFAULT_CLUSTER_PIE_CHARTS = false;
 const DEFAULT_MARKERS_VISIBLE = true;
 const YEAR_BOUNDS = getYearBounds();
 
@@ -83,6 +85,7 @@ export default function MapView() {
   const [statusFilters, setStatusFilters] = useState([]);
   const [clusterByRegnum, setClusterByRegnumState] = useState(DEFAULT_CLUSTER_BY_REGNUM);
   const [clusteringEnabled, setClusteringEnabledState] = useState(DEFAULT_CLUSTERING_ENABLED);
+  const [clusterPieCharts, setClusterPieChartsState] = useState(DEFAULT_CLUSTER_PIE_CHARTS);
   const [markersVisible, setMarkersVisibleState] = useState(DEFAULT_MARKERS_VISIBLE);
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
@@ -420,6 +423,14 @@ export default function MapView() {
   }, [clusterByRegnum, clusteringEnabled, mapReady]);
 
   useEffect(() => {
+    if (!map.current || !mapReady || !clusteringEnabled) {
+      return;
+    }
+
+    setClusterPieChartsEnabled(map.current, clusterPieCharts);
+  }, [clusterPieCharts, clusteringEnabled, mapReady]);
+
+  useEffect(() => {
     if (!map.current) {
       return;
     }
@@ -485,6 +496,30 @@ export default function MapView() {
 
       return prev.filter((value) => value !== status);
     });
+  };
+
+  const handleClusteringEnabledChange = (enabled) => {
+    if (!enabled) {
+      setClusterPieChartsState(false);
+    }
+
+    setClusteringEnabledState(enabled);
+  };
+
+  const handleClusterByRegnumChange = (enabled) => {
+    if (enabled) {
+      setClusterPieChartsState(false);
+    }
+
+    setClusterByRegnumState(enabled);
+  };
+
+  const handleClusterPieChartsChange = (enabled) => {
+    if (enabled) {
+      setClusterByRegnumState(false);
+    }
+
+    setClusterPieChartsState(enabled);
   };
 
   const handleFeatureFiltersReset = useCallback(() => {
@@ -692,6 +727,7 @@ export default function MapView() {
           },
           clusteringEnabled: DEFAULT_CLUSTERING_ENABLED,
           clusterByRegnum: DEFAULT_CLUSTER_BY_REGNUM,
+          clusterPieChartsEnabled: DEFAULT_CLUSTER_PIE_CHARTS,
           markersVisible: DEFAULT_MARKERS_VISIBLE
         });
         addArealLayer(map.current);
@@ -770,9 +806,11 @@ export default function MapView() {
               heatmapEnabled={heatmapEnabled}
               onHeatmapEnabledChange={setHeatmapEnabledState}
               clusteringEnabled={clusteringEnabled}
-              onClusteringEnabledChange={setClusteringEnabledState}
+              onClusteringEnabledChange={handleClusteringEnabledChange}
               clusterByRegnum={clusterByRegnum}
-              onClusterByRegnumChange={setClusterByRegnumState}
+              onClusterByRegnumChange={handleClusterByRegnumChange}
+              clusterPieCharts={clusterPieCharts}
+              onClusterPieChartsChange={handleClusterPieChartsChange}
               collapsed={isPanelCollapsed(PANEL_IDS.MAP)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.MAP)}
             />

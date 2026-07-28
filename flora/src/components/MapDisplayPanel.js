@@ -8,7 +8,8 @@ function getCollapsedSummary(
   markersVisible,
   heatmapEnabled,
   clusteringEnabled,
-  clusterByRegnum
+  clusterByRegnum,
+  clusterPieCharts
 ) {
   const parts = [];
 
@@ -17,7 +18,11 @@ function getCollapsedSummary(
   }
 
   if (clusteringEnabled && markersVisible) {
-    parts.push(clusterByRegnum ? "кластеризация по царству" : "кластеризация");
+    if (clusterPieCharts) {
+      parts.push("кластеры-диаграммы");
+    } else {
+      parts.push(clusterByRegnum ? "кластеризация по царству" : "кластеризация");
+    }
   } else if (markersVisible) {
     parts.push("без кластеризации");
   }
@@ -38,6 +43,8 @@ export default function MapDisplayPanel({
   onClusteringEnabledChange,
   clusterByRegnum = true,
   onClusterByRegnumChange,
+  clusterPieCharts = false,
+  onClusterPieChartsChange,
   collapsed: collapsedProp,
   onCollapsedChange
 }) {
@@ -49,6 +56,9 @@ export default function MapDisplayPanel({
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## map в docs/moduleHelp.md
   // Кластеризация имеет смысл только когда маркеры видны.
   const clusteringDisabled = !markersVisible;
+  const clusterPieChartsDisabled = clusteringDisabled || !clusteringEnabled;
+  const clusterByRegnumDisabled =
+    clusteringDisabled || !clusteringEnabled || clusterPieCharts;
 
   return (
     <aside className={`map-display-panel ${collapsed ? "map-display-panel--collapsed" : ""}`}>
@@ -75,7 +85,8 @@ export default function MapDisplayPanel({
             markersVisible,
             heatmapEnabled,
             clusteringEnabled,
-            clusterByRegnum
+            clusterByRegnum,
+            clusterPieCharts
           )}
         </p>
       ) : (
@@ -102,24 +113,48 @@ export default function MapDisplayPanel({
 
           <label
             className={`map-display-switch${
-              clusteringDisabled || !clusteringEnabled ? " map-display-switch--disabled" : ""
+              clusterByRegnumDisabled ? " map-display-switch--disabled" : ""
             }`}
             title={
               clusteringDisabled
                 ? "Доступно только при включённых маркерах"
-                : clusteringEnabled
-                  ? "Группировать в кластеры только точки с одинаковым regnum"
-                  : "Доступно только при включённой кластеризации"
+                : !clusteringEnabled
+                  ? "Доступно только при включённой кластеризации"
+                  : clusterPieCharts
+                    ? "Недоступно при включённых кластерах-диаграммах"
+                    : "Группировать в кластеры только точки с одинаковым regnum"
             }
           >
             <input
               type="checkbox"
               checked={clusterByRegnum}
-              disabled={clusteringDisabled || !clusteringEnabled}
+              disabled={clusterByRegnumDisabled}
               onChange={(e) => onClusterByRegnumChange?.(e.target.checked)}
             />
             <span className="map-display-switch-slider" />
             <span className="map-display-switch-label">Группировать по царству</span>
+          </label>
+
+          <label
+            className={`map-display-switch${
+              clusterPieChartsDisabled ? " map-display-switch--disabled" : ""
+            }`}
+            title={
+              clusteringDisabled
+                ? "Доступно только при включённых маркерах"
+                : !clusteringEnabled
+                  ? "Доступно только при включённой кластеризации"
+                  : "Показывать состав кластера секторной диаграммой; отключает группировку по царству"
+            }
+          >
+            <input
+              type="checkbox"
+              checked={clusterPieCharts}
+              disabled={clusterPieChartsDisabled}
+              onChange={(e) => onClusterPieChartsChange?.(e.target.checked)}
+            />
+            <span className="map-display-switch-slider" />
+            <span className="map-display-switch-label">Кластеры-диаграммы</span>
           </label>
 
           <hr />

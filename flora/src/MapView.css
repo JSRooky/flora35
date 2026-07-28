@@ -66,6 +66,15 @@
   font-weight: 600;
 }
 
+.cluster-pie-chart-marker {
+  pointer-events: none;
+}
+
+.cluster-pie-chart-marker svg {
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+}
+
 .point-hover-tooltip.mapboxgl-popup:has(.cluster-tooltip-title) {
   max-width: 280px;
 }
