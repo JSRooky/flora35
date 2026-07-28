@@ -27,6 +27,7 @@ export function expandFindingsToFeatures(data) {
           family: species.family,
           name_ru: species.name_ru,
           name_latin: species.name_latin,
+          description_md: species.description_md,
           found_by: finding.found_by,
           identified_by: finding.identified_by,
           found_year: finding.found_year

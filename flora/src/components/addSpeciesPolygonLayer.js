@@ -1,4 +1,4 @@
-import { buffer, convex, featureCollection, lineString, point } from "@turf/turf";
+import { booleanPointInPolygon, buffer, convex, featureCollection, lineString, point } from "@turf/turf";
 import { getFilteredFeatures, getPointColorForRegnum } from "./addLocationsLayer";
 
 const EMPTY_COLLECTION = {
@@ -124,7 +124,61 @@ export function updateSpeciesPolygonLayer(map, feature) {
     built: true,
     pointCount: coordinates.length,
     nameRu: feature.properties?.name_ru,
-    nameLatin: feature.properties?.name_latin
+    nameLatin: feature.properties?.name_latin,
+    polygon
+  };
+}
+
+/**
+ * Точки из отфильтрованного набора внутри полигона вида,
+ * без точек вида, по которому полигон построен.
+ */
+export function getPointsWithinSpeciesPolygon(polygonFeature, excludeSpeciesLatin, filters = {}) {
+  if (!polygonFeature?.geometry) {
+    return [];
+  }
+
+  return getFilteredFeatures(filters).filter((feature) => {
+    const coordinates = feature.geometry?.coordinates;
+    if (!coordinates) {
+      return false;
+    }
+
+    if (excludeSpeciesLatin && feature.properties?.name_latin === excludeSpeciesLatin) {
+      return false;
+    }
+
+    return booleanPointInPolygon(point(coordinates), polygonFeature);
+  });
+}
+
+/** Сводка по видам внутри полигона: количество и список уникальных названий. */
+export function getSpeciesPolygonContainedSummary(polygonFeature, excludeSpeciesLatin, filters = {}) {
+  const points = getPointsWithinSpeciesPolygon(polygonFeature, excludeSpeciesLatin, filters);
+  const speciesByLatin = new Map();
+
+  points.forEach((feature) => {
+    const nameLatin = feature.properties?.name_latin;
+    const speciesKey = nameLatin || feature.properties?.name_ru;
+
+    if (!speciesKey || speciesByLatin.has(speciesKey)) {
+      return;
+    }
+
+    speciesByLatin.set(speciesKey, {
+      nameRu: feature.properties?.name_ru || "Без названия",
+      nameLatin: nameLatin || "",
+      point: feature
+    });
+  });
+
+  const species = [...speciesByLatin.values()].sort((a, b) =>
+    a.nameRu.localeCompare(b.nameRu, "ru")
+  );
+
+  return {
+    count: species.length,
+    species
   };
 }
 

@@ -14,6 +14,13 @@
   animation: speciesPolygonSlideIn 0.3s ease-out;
 }
 
+.species-polygon-popup:not(.species-polygon-popup--collapsed) {
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+  overflow: hidden;
+}
+
 @keyframes speciesPolygonSlideIn {
   from {
     opacity: 0;
@@ -23,18 +30,12 @@
   }
 }
 
-.species-polygon-popup-content {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 8px;
-}
-
 .species-polygon-popup-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .species-polygon-popup-title {
@@ -76,6 +77,16 @@
   line-height: 1.4;
 }
 
+.species-polygon-popup-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .species-polygon-popup-species {
   margin: 0;
   font-size: 14px;
@@ -107,6 +118,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .species-polygon-build-btn,
@@ -150,4 +162,37 @@
 .species-polygon-reset-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.species-polygon-popup .areal-contained-points {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.species-polygon-popup .areal-contained-points-list {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.species-polygon-popup .areal-contained-points-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.species-polygon-popup .areal-contained-points-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.species-polygon-popup .areal-contained-points-list::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.species-polygon-popup .areal-contained-points-list::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }

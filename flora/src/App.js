@@ -32,6 +32,7 @@ import {
 import {
   addSpeciesPolygonLayer,
   clearSpeciesPolygonLayer,
+  getSpeciesPolygonContainedSummary,
   updateSpeciesPolygonLayer
 } from "./components/addSpeciesPolygonLayer";
 import {
@@ -296,6 +297,18 @@ export default function MapView() {
 
     return getAreaContainedPointsSummary(areaPolygon, buildLocationFilters());
   }, [areaPolygon, buildLocationFilters, mapReady]);
+
+  const speciesPolygonContainedSpecies = useMemo(() => {
+    if (!speciesPolygonInfo?.built || !speciesPolygonInfo.polygon || !mapReady) {
+      return null;
+    }
+
+    return getSpeciesPolygonContainedSummary(
+      speciesPolygonInfo.polygon,
+      speciesPolygonInfo.nameLatin,
+      buildLocationFilters()
+    );
+  }, [speciesPolygonInfo, buildLocationFilters, mapReady]);
 
   useEffect(() => {
     if (activeModule !== MODULE_IDS.AREA) {
@@ -634,6 +647,16 @@ export default function MapView() {
     panToArealPoint(mapInstance, feature);
   }, []);
 
+  const handleSpeciesPolygonSpeciesSelect = useCallback((feature) => {
+    const mapInstance = map.current;
+
+    if (!mapInstance) {
+      return;
+    }
+
+    panToArealPoint(mapInstance, feature);
+  }, []);
+
   const clearPointSelection = useCallback(() => {
     if (map.current) {
       hideArealPointHint();
@@ -846,8 +869,10 @@ export default function MapView() {
             <SpeciesPolygonPopup
               feature={popupData}
               polygonInfo={speciesPolygonInfo}
+              containedSpecies={speciesPolygonContainedSpecies}
               onBuild={handleSpeciesPolygonBuild}
               onReset={handleSpeciesPolygonReset}
+              onSpeciesSelect={handleSpeciesPolygonSpeciesSelect}
               collapsed={isPanelCollapsed(PANEL_IDS.POLYGON)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.POLYGON)}
             />

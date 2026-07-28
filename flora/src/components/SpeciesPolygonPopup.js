@@ -3,6 +3,23 @@ import { getPointsForSpecies } from "./addSpeciesPolygonLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/SpeciesPolygonPopup.css";
+import "../styles/ArealPopup.css";
+
+/** Склонение «N вид/вида/видов» для русского интерфейса. */
+function formatSpeciesCount(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${count} вид`;
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${count} вида`;
+  }
+
+  return `${count} видов`;
+}
 
 /** Склонение «N точка/точки/точек» для русского интерфейса. */
 function formatPointCount(count) {
@@ -20,10 +37,26 @@ function formatPointCount(count) {
   return `${count} точек`;
 }
 
+function getSpeciesLabel(species, speciesList) {
+  const hasDuplicateName = speciesList.filter(
+    (item) => item.nameRu === species.nameRu
+  ).length > 1;
+
+  if (hasDuplicateName && species.nameLatin) {
+    return `${species.nameRu} (${species.nameLatin})`;
+  }
+
+  return species.nameRu;
+}
+
 /** Краткая подпись для свёрнутой панели — по построенному полигону, а не по выбранной точке. */
-function getCollapsedSummary(polygonInfo) {
+function getCollapsedSummary(polygonInfo, containedSpecies) {
   if (!polygonInfo?.built) {
     return "Полигон не построен";
+  }
+
+  if (containedSpecies?.count > 0) {
+    return `В полигоне: ${formatSpeciesCount(containedSpecies.count)}`;
   }
 
   return polygonInfo.nameRu || polygonInfo.nameLatin || "Полигон вида";
@@ -65,8 +98,10 @@ function getStatusMessage(feature, polygonInfo) {
 export default function SpeciesPolygonPopup({
   feature,
   polygonInfo,
+  containedSpecies = null,
   onBuild,
   onReset,
+  onSpeciesSelect,
   collapsed = false,
   onCollapsedChange
 }) {
@@ -79,6 +114,8 @@ export default function SpeciesPolygonPopup({
   const speciesLatin = feature?.properties?.name_latin;
   const pointCount = feature ? getPointsForSpecies(feature).length : 0;
   const canBuild = Boolean(feature) && pointCount > 0;
+  const hasContainedSpecies = polygonInfo?.built;
+  const hasSpeciesInPolygon = containedSpecies?.count > 0;
 
   return (
     <div className={`species-polygon-popup ${collapsed ? "species-polygon-popup--collapsed" : ""}`}>
@@ -100,7 +137,9 @@ export default function SpeciesPolygonPopup({
       </div>
 
       {collapsed ? (
-        <p className="popup-collapsed-summary">{getCollapsedSummary(polygonInfo)}</p>
+        <p className="popup-collapsed-summary">
+          {getCollapsedSummary(polygonInfo, containedSpecies)}
+        </p>
       ) : (
         <div className="species-polygon-popup-content">
           <p className="species-polygon-popup-species">
@@ -139,6 +178,35 @@ export default function SpeciesPolygonPopup({
               Сбросить
             </button>
           </div>
+
+          {hasContainedSpecies && (
+            <div className="areal-contained-points">
+              <p className="areal-contained-points-title">
+                В полигоне:{" "}
+                <strong>{formatSpeciesCount(containedSpecies?.count ?? 0)}</strong>
+              </p>
+
+              {hasSpeciesInPolygon ? (
+                <ul className="areal-contained-points-list">
+                  {containedSpecies.species.map((species) => (
+                    <li key={species.nameLatin || species.nameRu}>
+                      <button
+                        type="button"
+                        className="areal-contained-points-item"
+                        onClick={() => onSpeciesSelect?.(species.point)}
+                      >
+                        {getSpeciesLabel(species, containedSpecies.species)}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="species-polygon-popup-status">
+                  Ни один другой вид не попал в полигон.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
       <ModuleHelpPanel sectionId={MODULE_IDS.POLYGON} open={helpOpen} />

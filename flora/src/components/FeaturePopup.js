@@ -1,11 +1,23 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import FeatureImagesPopup from "./FeatureImagesPopup";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import SpeciesDescriptionPopup from "./SpeciesDescriptionPopup";
+import {
+  formatPropertyValue,
+  getPropertyLabel,
+  sortPropertyEntries
+} from "./featurePropertyLabels";
 import "../styles/FeaturePopup.css";
 
 // Служебные поля, добавленные слоем карты; не показываем в списке свойств.
-const INTERNAL_PROPERTIES = new Set(["image", "images", "species_id", "finding_id"]);
+const INTERNAL_PROPERTIES = new Set([
+  "image",
+  "images",
+  "species_id",
+  "finding_id",
+  "description_md"
+]);
 
 /**
  * Собирает URL иллюстраций из properties.
@@ -32,7 +44,12 @@ export default function FeaturePopup({
   bufferDockedOpen = false
 }) {
   const [showImages, setShowImages] = useState(false);
+  const [showSpeciesDescription, setShowSpeciesDescription] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false); // блок справки из docs/moduleHelp.md, раздел ## feature
+
+  useEffect(() => {
+    setShowSpeciesDescription(false);
+  }, [feature?.id, feature?.properties?.finding_id]);
 
   const collapsedSummary = feature
     ? feature.properties?.name_ru ||
@@ -44,10 +61,13 @@ export default function FeaturePopup({
   const properties = feature?.properties;
   const [lng, lat] = geometry?.coordinates ?? [0, 0];
   const images = properties ? getImages(properties) : [];
+  const descriptionPath = properties?.description_md;
   // status выводится отдельно — у него свой фильтр через StatusFilterPanel.
   const displayProperties = properties
-    ? Object.entries(properties).filter(
-        ([key]) => !INTERNAL_PROPERTIES.has(key) && key !== "status"
+    ? sortPropertyEntries(
+        Object.entries(properties).filter(
+          ([key]) => !INTERNAL_PROPERTIES.has(key) && key !== "status"
+        )
       )
     : [];
 
@@ -119,8 +139,8 @@ export default function FeaturePopup({
                     {displayProperties.map(([key, value]) => (
                       <div key={key} className="popup-item popup-item--filter">
                         <div className="popup-item-text">
-                          <strong>{key}:</strong>
-                          <span>{String(value)}</span>
+                          <strong>{getPropertyLabel(key)}:</strong>
+                          <span>{formatPropertyValue(key, value)}</span>
                         </div>
                         <label className="property-switch" title="Показать маркеры с этим свойством">
                           <input
@@ -137,8 +157,8 @@ export default function FeaturePopup({
                     {properties?.status && (
                       <div className="popup-item popup-item--filter">
                         <div className="popup-item-text">
-                          <strong>status:</strong>
-                          <span>{properties.status}</span>
+                          <strong>{getPropertyLabel("status")}:</strong>
+                          <span>{formatPropertyValue("status", properties.status)}</span>
                         </div>
                         <label className="property-switch" title="Показать маркеры с этим свойством">
                           <input
@@ -152,24 +172,33 @@ export default function FeaturePopup({
                         </label>
                       </div>
                     )}
+                  </>
+                )}
 
+                {(descriptionPath || images.length > 0 || onOpenAreal || onOpenBuffer) && (
+                  <div className="feature-popup-actions">
+                    {descriptionPath && (
+                      <button
+                        type="button"
+                        className="feature-popup-action-btn"
+                        onClick={() => setShowSpeciesDescription(true)}
+                      >
+                        О виде
+                      </button>
+                    )}
                     {images.length > 0 && (
                       <button
-                        className="popup-images-btn"
+                        type="button"
+                        className="feature-popup-action-btn"
                         onClick={() => setShowImages(true)}
                       >
                         Иллюстрации
                       </button>
                     )}
-                  </>
-                )}
-
-                {(onOpenAreal || onOpenBuffer) && (
-                  <div className="feature-module-actions">
                     {onOpenAreal && (
                       <button
                         type="button"
-                        className={`feature-open-areal-btn${arealDockedOpen ? " feature-open-areal-btn--active" : ""}`}
+                        className={`feature-popup-action-btn${arealDockedOpen ? " feature-popup-action-btn--active" : ""}`}
                         onClick={onOpenAreal}
                         disabled={arealDockedOpen}
                       >
@@ -179,7 +208,7 @@ export default function FeaturePopup({
                     {onOpenBuffer && (
                       <button
                         type="button"
-                        className={`feature-open-buffer-btn${bufferDockedOpen ? " feature-open-buffer-btn--active" : ""}`}
+                        className={`feature-popup-action-btn${bufferDockedOpen ? " feature-popup-action-btn--active" : ""}`}
                         onClick={onOpenBuffer}
                         disabled={bufferDockedOpen}
                       >
@@ -199,6 +228,13 @@ export default function FeaturePopup({
         <FeatureImagesPopup
           images={images}
           onClose={() => setShowImages(false)}
+        />
+      )}
+
+      {showSpeciesDescription && descriptionPath && (
+        <SpeciesDescriptionPopup
+          descriptionPath={descriptionPath}
+          onClose={() => setShowSpeciesDescription(false)}
         />
       )}
     </>
