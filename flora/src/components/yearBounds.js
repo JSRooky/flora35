@@ -1,7 +1,6 @@
-import points from "../locations/points.json";
-import { expandFindingsToFeatures } from "../locations/expandFindings";
+import { getFeatureCollection } from "../locations/loadPoints";
 
-const pointsFeatureCollection = expandFindingsToFeatures(points);
+const pointsFeatureCollection = getFeatureCollection();
 
 /** Минимальный и максимальный год находки среди всех точек данных. */
 export function getYearBounds() {

@@ -1,0 +1,245 @@
+.user-submission-panel {
+  box-sizing: border-box;
+  width: 400px;
+  max-width: calc(100vw - 40px);
+  overflow-x: hidden;
+  background-color: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 12px 16px;
+  font-family: Arial, sans-serif;
+  animation: userSubmissionSlideIn 0.3s ease-out;
+}
+
+@keyframes userSubmissionSlideIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.user-submission-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.user-submission-panel-title {
+  margin: 0;
+  font-size: 15px;
+  color: #333;
+  border-bottom: 2px solid #6c757d;
+  padding-bottom: 6px;
+  flex: 1;
+}
+
+.user-submission-panel-toggle {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.6);
+  color: #333;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.user-submission-panel-toggle:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.user-submission-panel-content {
+  margin-top: 12px;
+}
+
+.user-submission-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.user-submission-legend {
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.user-submission-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.user-submission-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #333;
+}
+
+.user-submission-field input,
+.user-submission-field select,
+.user-submission-field textarea,
+.user-submission-autocomplete input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font: inherit;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.user-submission-autocomplete-wrap {
+  position: relative;
+}
+
+.user-submission-suggestions {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 180px;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.user-submission-suggestion {
+  padding: 6px 10px;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.user-submission-suggestion:hover,
+.user-submission-suggestion--active {
+  background: rgba(108, 117, 125, 0.12);
+}
+
+.user-submission-coordinates {
+  padding: 6px 10px;
+  border: 1px dashed #aaa;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  color: #444;
+}
+
+.user-submission-status-field {
+  gap: 6px;
+}
+
+.user-submission-status-label {
+  font-size: 13px;
+  color: #333;
+}
+
+.user-submission-status-options {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.user-submission-status-option {
+  position: relative;
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 6px 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-weight: 600;
+  color: #444;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+
+.user-submission-status-option:hover {
+  border-color: #999;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.user-submission-status-option input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+}
+
+.user-submission-status-option:has(input:checked) {
+  border-color: #6c757d;
+  background: #6c757d;
+  color: #fff;
+}
+
+.user-submission-status-option:has(input:checked):hover {
+  border-color: #5a6268;
+  background: #5a6268;
+}
+
+.user-submission-status-code {
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.user-submission-message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.user-submission-message--success {
+  color: #1e7e34;
+}
+
+.user-submission-message--error {
+  color: #b02a37;
+}
+
+.user-submission-submit {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #6c757d;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.user-submission-submit:hover:not(:disabled) {
+  background: #5a6268;
+}
+
+.user-submission-submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}

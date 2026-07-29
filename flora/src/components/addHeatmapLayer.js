@@ -1,8 +1,5 @@
-import points from "../locations/points.json";
-import { expandFindingsToFeatures } from "../locations/expandFindings";
+import { getFeatureCollection } from "../locations/loadPoints";
 import { filterFeatures, getFirstLocationsLayerId } from "./addLocationsLayer";
-
-const pointsFeatureCollection = expandFindingsToFeatures(points);
 
 const SOURCE_ID = "heatmap";
 const LAYER_ID = "heatmap";
@@ -16,7 +13,7 @@ const EMPTY_COLLECTION = {
 function buildHeatmapData(filters = {}) {
   return {
     type: "FeatureCollection",
-    features: filterFeatures(pointsFeatureCollection.features, filters)
+    features: filterFeatures(getFeatureCollection().features, filters)
   };
 }
 

@@ -1,0 +1,35 @@
+{
+  "type": "SpeciesCollection",
+  "species": [
+    {
+      "id": "orchis-militaris",
+      "regnum": "plantae",
+      "status": "NE",
+      "family": "",
+      "name_ru": "Ятрышник шлемоносный",
+      "name_latin": "Orchis militaris",
+      "findings": [
+        {
+          "id": "orchis-militaris-001",
+          "coordinates": [
+            39.327608647141005,
+            59.62455769554887
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Суслова",
+          "found_year": 2005
+        },
+        {
+          "id": "orchis-militaris-002",
+          "coordinates": [
+            38.449520514149356,
+            59.94875203149408
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Суслова",
+          "found_year": 2003
+        }
+      ]
+    }
+  ]
+}

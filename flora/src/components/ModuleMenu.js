@@ -1,4 +1,5 @@
 import React from "react";
+import { DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
 import "../styles/ModuleMenu.css";
 
 export const MODULE_IDS = {
@@ -13,6 +14,8 @@ export const MODULE_IDS = {
   BUFFER: "buffer",
   // Совпадает с заголовком ## area в docs/moduleHelp.md.
   AREA: "area",
+  // Экспериментальный модуль ввода пользовательских данных через Firebase.
+  SUBMIT: "submit",
   ABOUT: "about"
 };
 
@@ -28,6 +31,10 @@ const MAP_MODULE_ITEMS = [
   { id: MODULE_IDS.POLYGON, label: "Полигон" },
   { id: MODULE_IDS.BUFFER, label: "Буфер" },
   { id: MODULE_IDS.AREA, label: "Область" }
+];
+
+const TEST_MODULE_ITEMS = [
+  { id: MODULE_IDS.SUBMIT, label: "Ввод данных о находке" }
 ];
 
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
@@ -80,7 +87,9 @@ export default function ModuleMenu({
   hoverTooltipsDisabled = false,
   onHoverTooltipsDisabledChange,
   osmBasemapEnabled = false,
-  onOsmBasemapEnabledChange
+  onOsmBasemapEnabledChange,
+  dataSourceMode,
+  onDataSourceModeChange
 }) {
   const renderModuleItem = ({ id, label }) => (
     <li key={id}>
@@ -102,6 +111,29 @@ export default function ModuleMenu({
           <li className="module-menu-separator" aria-hidden="true" />
           {MAP_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />
+          {TEST_MODULE_ITEMS.map(renderModuleItem)}
+          <li className="module-menu-separator" aria-hidden="true" />
+          <li className="module-menu-toggle-item module-menu-data-source">
+            <span className="module-menu-data-source-label">Данные на карте</span>
+            <div className="module-menu-data-source-options" role="radiogroup" aria-label="Данные на карте">
+              {DATA_SOURCE_OPTIONS.map(({ value, label, title }) => (
+                <label
+                  key={value}
+                  className="module-menu-data-source-option"
+                  title={title}
+                >
+                  <input
+                    type="radio"
+                    name="data-source"
+                    value={value}
+                    checked={dataSourceMode === value}
+                    onChange={(event) => onDataSourceModeChange?.(event.target.value)}
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+          </li>
           <li className="module-menu-toggle-item">
             <label className="module-menu-switch" title="Использовать подложку OpenStreetMap вместо стандартной карты">
               <input

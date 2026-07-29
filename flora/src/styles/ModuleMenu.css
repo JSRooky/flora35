@@ -178,6 +178,68 @@
   white-space: nowrap;
 }
 
+.module-menu-data-source {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 220px;
+  padding: 2px 4px;
+}
+
+.module-menu-data-source-label {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.module-menu-data-source-options {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+.module-menu-data-source-option {
+  position: relative;
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 5px 4px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.55);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  color: #333;
+  line-height: 1.1;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+
+.module-menu-data-source-option:hover {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.module-menu-data-source-option input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+}
+
+.module-menu-data-source-option:has(input:checked) {
+  border-color: #007aff;
+  background: rgba(0, 122, 255, 0.12);
+  color: #0056b3;
+}
+
 @media (max-width: 768px) {
   .module-menu {
     padding: 8px 10px 0;

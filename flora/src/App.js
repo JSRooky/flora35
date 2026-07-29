@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { initMap } from "./components/initMap";
 import {
   addArealLayer,
@@ -15,6 +15,7 @@ import {
   applyLocationsFilter,
   featureMatchesFilters,
   isFeatureUnclusteredOnMap,
+  reloadLocationsData,
   setClusterByRegnum,
   setClusteringEnabled,
   setClusterPieChartsEnabled,
@@ -23,8 +24,10 @@ import {
 } from "./components/addLocationsLayer";
 import {
   addHeatmapLayer,
-  setHeatmapEnabled
+  setHeatmapEnabled,
+  updateHeatmapData
 } from "./components/addHeatmapLayer";
+import { setUserPointsCollection, setDataSourceFilter, DATA_SOURCE_MODES } from "./locations/loadPoints";
 import {
   addOsmBasemapLayer,
   setOsmBasemapEnabled
@@ -64,6 +67,8 @@ import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import "./MapView.css";
 
+const UserSubmissionPanel = lazy(() => import("./components/UserSubmissionPanel"));
+
 const PANEL_IDS = {
   FEATURE: "feature",
   AREAL: "areal",
@@ -72,7 +77,8 @@ const PANEL_IDS = {
   YEAR: "year",
   POLYGON: "polygon",
   BUFFER: "buffer",
-  AREA: "area"
+  AREA: "area",
+  SUBMIT: "submit"
 };
 
 const DEFAULT_CLUSTERING_ENABLED = true;
@@ -116,7 +122,9 @@ export default function MapView() {
   const [areaPolygon, setAreaPolygon] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
   const [osmBasemapEnabled, setOsmBasemapEnabledState] = useState(false);
+  const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.ALL);
   const [panelCollapsed, setPanelCollapsed] = useState({});
+  const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
   const hadFoundYearPropertyFilterRef = useRef(false);
 
   const isPanelCollapsed = useCallback(
@@ -186,6 +194,12 @@ export default function MapView() {
   );
 
   useEffect(() => {
+    if (activeModule !== MODULE_IDS.SUBMIT) {
+      setSubmissionCoordinates(null);
+    }
+  }, [activeModule]);
+
+  useEffect(() => {
     if (hasFoundYearPropertyFilter) {
       hadFoundYearPropertyFilterRef.current = true;
       setYearFilterEnabled(false);
@@ -215,6 +229,12 @@ export default function MapView() {
     bufferSelectionMode,
     activeModule,
     bufferDockedWithFeature
+  };
+
+  const submissionStateRef = useRef({});
+  submissionStateRef.current = {
+    active: activeModule === MODULE_IDS.SUBMIT,
+    setCoordinates: setSubmissionCoordinates
   };
 
   const expandedLeavesRef = useRef(null);
@@ -289,6 +309,20 @@ export default function MapView() {
 
     return filters;
   }, [propertyFilters, statusFilters, yearFilterEnabled, yearRange]);
+
+  const handleUserFindingSaved = useCallback(
+    (userpointsCollection) => {
+      const mapInstance = map.current;
+      if (!mapInstance || !mapReady) {
+        return;
+      }
+
+      setUserPointsCollection(userpointsCollection);
+      reloadLocationsData(mapInstance);
+      updateHeatmapData(mapInstance, buildLocationFilters());
+    },
+    [buildLocationFilters, mapReady]
+  );
 
   const areaContainedPoints = useMemo(() => {
     if (!areaPolygon || !mapReady) {
@@ -423,6 +457,19 @@ export default function MapView() {
 
     setOsmBasemapEnabled(map.current, osmBasemapEnabled);
   }, [osmBasemapEnabled, mapReady]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    setDataSourceFilter(dataSourceMode);
+    reloadLocationsData(map.current);
+    updateHeatmapData(map.current, buildLocationFilters());
+    refreshAreal();
+    setPopupData(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- перестраиваем слои только при смене источника данных
+  }, [dataSourceMode, mapReady, refreshAreal]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -721,6 +768,14 @@ export default function MapView() {
               return;
             }
 
+            if (submissionStateRef.current.active) {
+              const coords = feature?.geometry?.coordinates;
+              if (coords) {
+                submissionStateRef.current.setCoordinates(coords);
+              }
+              return;
+            }
+
             dismissArealPointHintOnPointClick(feature);
             setPopupData(feature);
             // Если какая-то панель уже открыта, оставляем её открытой — просто обновляем
@@ -755,8 +810,16 @@ export default function MapView() {
               }
             }
           },
-          onMapBackgroundClick: () => {
+          onMapBackgroundClick: (event) => {
             if (isAreaDrawingActive()) {
+              return;
+            }
+
+            if (submissionStateRef.current.active && event?.lngLat) {
+              submissionStateRef.current.setCoordinates([
+                event.lngLat.lng,
+                event.lngLat.lat
+              ]);
               return;
             }
 
@@ -795,6 +858,8 @@ export default function MapView() {
         onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
         osmBasemapEnabled={osmBasemapEnabled}
         onOsmBasemapEnabledChange={setOsmBasemapEnabledState}
+        dataSourceMode={dataSourceMode}
+        onDataSourceModeChange={setDataSourceModeState}
       />
       <div ref={ref} className="map-container" />
       {activeModule !== null && (
@@ -904,6 +969,16 @@ export default function MapView() {
               collapsed={isPanelCollapsed(PANEL_IDS.AREA)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.AREA)}
             />
+          )}
+          {activeModule === MODULE_IDS.SUBMIT && (
+            <Suspense fallback={null}>
+              <UserSubmissionPanel
+                coordinates={submissionCoordinates}
+                collapsed={isPanelCollapsed(PANEL_IDS.SUBMIT)}
+                onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.SUBMIT)}
+                onSaved={handleUserFindingSaved}
+              />
+            </Suspense>
           )}
         </div>
       )}

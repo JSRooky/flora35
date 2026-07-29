@@ -1,6 +1,5 @@
 import mapboxgl from "mapbox-gl";
-import points from "../locations/points.json";
-import { expandFindingsToFeatures } from "../locations/expandFindings";
+import { getFeatureCollection } from "../locations/loadPoints";
 
 const PUBLIC_URL = process.env.PUBLIC_URL || "";
 const PLANT_IMAGE = `${PUBLIC_URL}/images/plant.svg`;
@@ -817,7 +816,7 @@ function attachLocationsInteractions(map) {
     });
 
     if (!features.length) {
-      onMapBackgroundClickCallback?.();
+      onMapBackgroundClickCallback?.(event);
     }
   };
 
@@ -1205,7 +1204,7 @@ export function addLocationsLayer(
     markersVisible: initialMarkersVisible = true
   } = {}
 ) {
-  locationsData = enrichWithImages(expandFindingsToFeatures(points));
+  locationsData = enrichWithImages(getFeatureCollection());
   clusterByRegnum = initialClusterByRegnum;
   clusteringEnabled = initialClusteringEnabled;
   clusterPieChartsEnabled = initialClusterPieChartsEnabled;
@@ -1213,5 +1212,11 @@ export function addLocationsLayer(
   onClusterExpandedCallback = onClusterExpanded;
   onPointClickCallback = onPointClick;
   onMapBackgroundClickCallback = onMapBackgroundClick;
+  rebuildLocationsLayers(map);
+}
+
+/** Перечитывает points.json + userpoints.json и перестраивает слой маркеров. */
+export function reloadLocationsData(map) {
+  locationsData = enrichWithImages(getFeatureCollection());
   rebuildLocationsLayers(map);
 }

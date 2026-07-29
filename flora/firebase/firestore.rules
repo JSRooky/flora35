@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// Правила для тестового модуля ввода данных.
+// Для первоначальной проверки можно включить test mode в консоли Firestore (30 дней).
+// Перед публикацией замените на ограничения с аутентификацией или модерацией.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /user_submissions/{submissionId} {
+      allow read: if false;
+      allow create: if request.resource.data.keys().hasAll([
+          'name_ru',
+          'name_latin',
+          'regnum',
+          'found_year',
+          'found_by',
+          'coordinates',
+          'source'
+        ])
+        && request.resource.data.source == 'flora35-test'
+        && request.resource.data.coordinates is list
+        && request.resource.data.coordinates.size() == 2;
+      allow update, delete: if false;
+    }
+  }
+}

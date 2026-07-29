@@ -1,0 +1,67 @@
+import points from "./points.json";
+import userpoints from "./userpoints.json";
+import { expandFindingsToFeatures } from "./expandFindings";
+import { mergeSpeciesCollections } from "./mergeSpeciesCollections";
+
+export const DATA_SOURCE_MODES = {
+  ALL: "all",
+  POINTS: "points",
+  USERPOINTS: "userpoints"
+};
+
+export const DATA_SOURCE_OPTIONS = [
+  {
+    value: DATA_SOURCE_MODES.ALL,
+    label: "Все",
+    title: "Проверенные и пользовательские данные"
+  },
+  {
+    value: DATA_SOURCE_MODES.POINTS,
+    label: "Проверенные",
+    title: "Только данные из points.json"
+  },
+  {
+    value: DATA_SOURCE_MODES.USERPOINTS,
+    label: "Пользовательские",
+    title: "Только данные из userpoints.json"
+  }
+];
+
+let userpointsOverride = userpoints;
+let dataSourceFilter = DATA_SOURCE_MODES.ALL;
+
+/** Подменяет данные userpoints.json в памяти (после сохранения через API). */
+export function setUserPointsCollection(collection) {
+  userpointsOverride = collection;
+}
+
+/** Задаёт, какие источники данных показывать на карте. */
+export function setDataSourceFilter(mode) {
+  dataSourceFilter = mode;
+}
+
+export function getDataSourceFilter() {
+  return dataSourceFilter;
+}
+
+/** Всегда возвращает объединённую коллекцию (для подсказок при вводе). */
+export function getAllSpeciesCollection() {
+  return mergeSpeciesCollections(points, userpointsOverride);
+}
+
+/** Возвращает коллекцию с учётом текущего фильтра источника данных. */
+export function getSpeciesCollection() {
+  switch (dataSourceFilter) {
+    case DATA_SOURCE_MODES.POINTS:
+      return points;
+    case DATA_SOURCE_MODES.USERPOINTS:
+      return userpointsOverride;
+    default:
+      return getAllSpeciesCollection();
+  }
+}
+
+/** Разворачивает активную коллекцию в GeoJSON FeatureCollection для карты. */
+export function getFeatureCollection() {
+  return expandFindingsToFeatures(getSpeciesCollection());
+}
