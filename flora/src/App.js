@@ -139,6 +139,64 @@ export default function MapView() {
     []
   );
 
+  const expandPanel = useCallback((panelId) => {
+    setPanelCollapsed((prev) => {
+      if (!prev[panelId]) {
+        return prev;
+      }
+
+      return { ...prev, [panelId]: false };
+    });
+  }, []);
+
+  useEffect(() => {
+    switch (activeModule) {
+      case MODULE_IDS.FEATURE:
+        expandPanel(PANEL_IDS.FEATURE);
+        break;
+      case MODULE_IDS.STATUS:
+        expandPanel(PANEL_IDS.STATUS);
+        break;
+      case MODULE_IDS.MAP:
+        expandPanel(PANEL_IDS.MAP);
+        break;
+      case MODULE_IDS.YEAR:
+        expandPanel(PANEL_IDS.YEAR);
+        break;
+      case MODULE_IDS.POLYGON:
+        expandPanel(PANEL_IDS.POLYGON);
+        break;
+      case MODULE_IDS.AREAL:
+        expandPanel(PANEL_IDS.AREAL);
+        break;
+      case MODULE_IDS.BUFFER:
+        expandPanel(PANEL_IDS.BUFFER);
+        break;
+      case MODULE_IDS.AREA:
+        expandPanel(PANEL_IDS.AREA);
+        break;
+      case MODULE_IDS.SUBMIT:
+        expandPanel(PANEL_IDS.SUBMIT);
+        break;
+      default:
+        break;
+    }
+
+    if (
+      activeModule === MODULE_IDS.AREAL ||
+      (activeModule === MODULE_IDS.FEATURE && arealDockedWithFeature)
+    ) {
+      expandPanel(PANEL_IDS.AREAL);
+    }
+
+    if (
+      activeModule === MODULE_IDS.BUFFER ||
+      (activeModule === MODULE_IDS.FEATURE && bufferDockedWithFeature)
+    ) {
+      expandPanel(PANEL_IDS.BUFFER);
+    }
+  }, [activeModule, arealDockedWithFeature, bufferDockedWithFeature, expandPanel]);
+
   const handleModuleSelect = useCallback((moduleId) => {
     if (moduleId === MODULE_IDS.ABOUT) {
       setAboutOpen(true);

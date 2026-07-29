@@ -11,9 +11,9 @@ const CLUSTER_OPTIONS = {
 };
 
 const REGNUM_COLORS = {
-  plantae: "#27ae60",
-  animalia: "#ff6600",
-  fungi: "#9b59b6"
+  plantae: "#588f38",
+  animalia: "#c98263",
+  fungi: "#7a5d8f"
 };
 
 const DEFAULT_CLUSTER_COLOR = "#4a90e2";
@@ -596,30 +596,38 @@ export function getPointColorForRegnum(regnum) {
   return REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR;
 }
 
+function getLocationSourceIds(map) {
+  const sources = map.getStyle()?.sources;
+  if (!sources) {
+    return [];
+  }
+
+  return Object.keys(sources).filter(
+    (sourceId) => sourceId === "locations" || sourceId.startsWith("locations-")
+  );
+}
+
 function removeLocationsFromMap(map) {
   detachClusterPieChartMarkers(map);
 
-  [getLayerIds().clusters, getLayerIds().clusterCount, getLayerIds().unclustered].forEach(
-    (layerId) => {
-      if (map.getLayer(layerId)) {
-        map.removeLayer(layerId);
-      }
-    }
-  );
-
-  if (map.getSource("locations")) {
-    map.removeSource("locations");
+  const style = map.getStyle();
+  if (!style?.layers) {
+    return;
   }
 
-  getRegnumValues().forEach((regnum) => {
-    const layerIds = getLayerIds(regnum);
-    [layerIds.clusters, layerIds.clusterCount, layerIds.unclustered].forEach((layerId) => {
-      if (map.getLayer(layerId)) {
-        map.removeLayer(layerId);
-      }
-    });
+  const locationSourceIds = getLocationSourceIds(map);
+  const layerIdsToRemove = style.layers
+    .filter((layer) => locationSourceIds.includes(layer.source))
+    .map((layer) => layer.id)
+    .reverse();
 
-    const sourceId = getSourceId(regnum);
+  layerIdsToRemove.forEach((layerId) => {
+    if (map.getLayer(layerId)) {
+      map.removeLayer(layerId);
+    }
+  });
+
+  locationSourceIds.forEach((sourceId) => {
     if (map.getSource(sourceId)) {
       map.removeSource(sourceId);
     }
@@ -1215,7 +1223,7 @@ export function addLocationsLayer(
   rebuildLocationsLayers(map);
 }
 
-/** Перечитывает points.json + userpoints.json и перестраивает слой маркеров. */
+/** Перечитывает активную коллекцию (с учётом фильтра источника) и перестраивает слой маркеров. */
 export function reloadLocationsData(map) {
   locationsData = enrichWithImages(getFeatureCollection());
   rebuildLocationsLayers(map);

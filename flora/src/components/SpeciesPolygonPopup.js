@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { getPointsForSpecies } from "./addSpeciesPolygonLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
@@ -107,6 +107,7 @@ export default function SpeciesPolygonPopup({
 }) {
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## polygon в docs/moduleHelp.md
+  const [listVisible, setListVisible] = useState(false);
   const speciesLabel =
     feature?.properties?.name_ru ||
     feature?.properties?.name_latin ||
@@ -116,6 +117,10 @@ export default function SpeciesPolygonPopup({
   const canBuild = Boolean(feature) && pointCount > 0;
   const hasContainedSpecies = polygonInfo?.built;
   const hasSpeciesInPolygon = containedSpecies?.count > 0;
+
+  useEffect(() => {
+    setListVisible(false);
+  }, [polygonInfo?.built, polygonInfo?.nameLatin, containedSpecies?.count]);
 
   return (
     <div className={`species-polygon-popup ${collapsed ? "species-polygon-popup--collapsed" : ""}`}>
@@ -181,12 +186,22 @@ export default function SpeciesPolygonPopup({
 
           {hasContainedSpecies && (
             <div className="areal-contained-points">
-              <p className="areal-contained-points-title">
-                В полигоне:{" "}
-                <strong>{formatSpeciesCount(containedSpecies?.count ?? 0)}</strong>
-              </p>
+              <div className="species-polygon-contained-header">
+                <p className="areal-contained-points-title">
+                  В полигоне:{" "}
+                  <strong>{formatSpeciesCount(containedSpecies?.count ?? 0)}</strong>
+                </p>
+                <button
+                  type="button"
+                  className="species-polygon-list-toggle"
+                  onClick={() => setListVisible((visible) => !visible)}
+                  aria-expanded={listVisible}
+                >
+                  {listVisible ? "Скрыть" : "Показать"}
+                </button>
+              </div>
 
-              {hasSpeciesInPolygon ? (
+              {listVisible && hasSpeciesInPolygon ? (
                 <ul className="areal-contained-points-list">
                   {containedSpecies.species.map((species) => (
                     <li key={species.nameLatin || species.nameRu}>
@@ -200,11 +215,13 @@ export default function SpeciesPolygonPopup({
                     </li>
                   ))}
                 </ul>
-              ) : (
+              ) : null}
+
+              {listVisible && !hasSpeciesInPolygon ? (
                 <p className="species-polygon-popup-status">
                   Ни один другой вид не попал в полигон.
                 </p>
-              )}
+              ) : null}
             </div>
           )}
         </div>

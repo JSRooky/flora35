@@ -12,8 +12,8 @@
         {
           "id": "rhododendron-tomentosum-001",
           "coordinates": [
-            41.7924,
-            60.2925
+            37.6211,
+            58.6736
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -22,8 +22,8 @@
         {
           "id": "rhododendron-tomentosum-002",
           "coordinates": [
-            38.2763,
-            59.2078
+            36.0231,
+            60.9885
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -43,8 +43,8 @@
         {
           "id": "meles-meles-001",
           "coordinates": [
-            43.0524,
-            60.9524
+            40.5065,
+            61.8087
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -53,8 +53,8 @@
         {
           "id": "meles-meles-002",
           "coordinates": [
-            43.0372,
-            60.9304
+            36.3894,
+            61.1208
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -63,8 +63,8 @@
         {
           "id": "meles-meles-003",
           "coordinates": [
-            43.0386,
-            60.9482
+            41.3007,
+            59.9737
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -73,8 +73,8 @@
         {
           "id": "meles-meles-004",
           "coordinates": [
-            37.5822,
-            59.5605
+            42.1077,
+            60.9563
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -94,8 +94,8 @@
         {
           "id": "sciurus-vulgaris-001",
           "coordinates": [
-            43.5523,
-            59.2212
+            44.2533,
+            58.3065
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -104,8 +104,8 @@
         {
           "id": "sciurus-vulgaris-002",
           "coordinates": [
-            43.2254,
-            58.9118
+            40.7859,
+            60.6171
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -114,8 +114,8 @@
         {
           "id": "sciurus-vulgaris-003",
           "coordinates": [
-            37.4089,
-            60.1602
+            42.9754,
+            59.5543
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -135,8 +135,8 @@
         {
           "id": "boletus-edulis-001",
           "coordinates": [
-            42.6525,
-            60.1125
+            41.4407,
+            57.9476
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -156,8 +156,8 @@
         {
           "id": "betula-pendula-001",
           "coordinates": [
-            40.2214,
-            59.8455
+            41.2953,
+            59.0962
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлова",
@@ -166,8 +166,8 @@
         {
           "id": "betula-pendula-002",
           "coordinates": [
-            40.221,
-            59.8513
+            38.4981,
+            57.6266
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -176,8 +176,8 @@
         {
           "id": "betula-pendula-003",
           "coordinates": [
-            41.1449,
-            59.4514
+            36.6216,
+            58.6441
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -197,8 +197,8 @@
         {
           "id": "amanita-phalloides-001",
           "coordinates": [
-            44.8725,
-            58.8124
+            35.8071,
+            59.2083
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -207,8 +207,8 @@
         {
           "id": "amanita-phalloides-002",
           "coordinates": [
-            44.4451,
-            58.9532
+            44.8253,
+            61.1593
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -217,8 +217,8 @@
         {
           "id": "amanita-phalloides-003",
           "coordinates": [
-            44.948,
-            58.9203
+            41.0538,
+            58.5207
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -238,8 +238,8 @@
         {
           "id": "castor-fiber-001",
           "coordinates": [
-            40.3322,
-            59.3325
+            39.8595,
+            59.9093
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -248,8 +248,8 @@
         {
           "id": "castor-fiber-002",
           "coordinates": [
-            40.2951,
-            59.3324
+            41.9275,
+            57.8739
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -258,8 +258,8 @@
         {
           "id": "castor-fiber-003",
           "coordinates": [
-            38.8076,
-            59.9018
+            42.8256,
+            60.1944
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -279,8 +279,8 @@
         {
           "id": "parus-major-001",
           "coordinates": [
-            39.9725,
-            58.7324
+            44.0635,
+            60.6697
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -289,8 +289,8 @@
         {
           "id": "parus-major-002",
           "coordinates": [
-            39.9272,
-            59.5209
+            43.0621,
+            58.1065
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -299,8 +299,8 @@
         {
           "id": "parus-major-003",
           "coordinates": [
-            38.0652,
-            60.3625
+            45.2432,
+            58.4261
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -320,8 +320,8 @@
         {
           "id": "dendrocopos-major-001",
           "coordinates": [
-            41.1124,
-            60.3321
+            41.8482,
+            58.2669
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -330,8 +330,8 @@
         {
           "id": "dendrocopos-major-002",
           "coordinates": [
-            41.1017,
-            60.3276
+            41.1795,
+            57.4294
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -340,8 +340,8 @@
         {
           "id": "dendrocopos-major-003",
           "coordinates": [
-            41.484,
-            60.3197
+            38.0736,
+            58.7027
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -361,8 +361,8 @@
         {
           "id": "heracleum-sibiricum-001",
           "coordinates": [
-            44.5523,
-            58.3322
+            41.8039,
+            58.2513
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -371,8 +371,8 @@
         {
           "id": "heracleum-sibiricum-002",
           "coordinates": [
-            36.9731,
-            58.7563
+            36.2579,
+            61.268
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -392,8 +392,8 @@
         {
           "id": "vaccinium-vitis-idaea-001",
           "coordinates": [
-            42.0725,
-            58.7325
+            35.6025,
+            60.9677
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -402,12 +402,42 @@
         {
           "id": "vaccinium-vitis-idaea-002",
           "coordinates": [
-            42.0567,
-            58.7146
+            40.5359,
+            59.5947
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
           "found_year": 2014
+        },
+        {
+          "id": "vaccinium-vitis-idaea-003",
+          "coordinates": [
+            41.2516,
+            58.3676
+          ],
+          "found_by": "Павлов",
+          "identified_by": "Морозов",
+          "found_year": 1997
+        },
+        {
+          "id": "vaccinium-vitis-idaea-004",
+          "coordinates": [
+            36.2588,
+            61.201
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Соколов",
+          "found_year": 1978
+        },
+        {
+          "id": "vaccinium-vitis-idaea-005",
+          "coordinates": [
+            41.6727,
+            59.8091
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Волков",
+          "found_year": 2009
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -423,8 +453,8 @@
         {
           "id": "ursus-arctos-001",
           "coordinates": [
-            42.0125,
-            60.2123
+            40.5947,
+            59.4342
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -433,8 +463,8 @@
         {
           "id": "ursus-arctos-002",
           "coordinates": [
-            42.029,
-            60.2009
+            41.422,
+            59.7052
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -454,8 +484,8 @@
         {
           "id": "pleurotus-ostreatus-001",
           "coordinates": [
-            43.6124,
-            58.4525
+            40.2113,
+            60.2296
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -464,12 +494,42 @@
         {
           "id": "pleurotus-ostreatus-002",
           "coordinates": [
-            43.7351,
-            58.1109
+            43.1164,
+            61.7832
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
           "found_year": 1998
+        },
+        {
+          "id": "pleurotus-ostreatus-003",
+          "coordinates": [
+            42.3168,
+            58.3511
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Козлов",
+          "found_year": 1983
+        },
+        {
+          "id": "pleurotus-ostreatus-004",
+          "coordinates": [
+            36.4295,
+            61.0329
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Лебедев",
+          "found_year": 1999
+        },
+        {
+          "id": "pleurotus-ostreatus-005",
+          "coordinates": [
+            37.8225,
+            57.6176
+          ],
+          "found_by": "Кузнецов",
+          "identified_by": "Смирнов",
+          "found_year": 2023
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -485,8 +545,8 @@
         {
           "id": "myotis-daubentonii-001",
           "coordinates": [
-            41.3725,
-            60.0723
+            36.9027,
+            59.5364
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -495,8 +555,8 @@
         {
           "id": "myotis-daubentonii-002",
           "coordinates": [
-            41.5022,
-            60.0799
+            36.5622,
+            61.8312
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -505,8 +565,8 @@
         {
           "id": "myotis-daubentonii-003",
           "coordinates": [
-            41.4261,
-            60.0719
+            40.5081,
+            60.1295
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -515,8 +575,8 @@
         {
           "id": "myotis-daubentonii-004",
           "coordinates": [
-            36.8046,
-            58.7207
+            43.3471,
+            59.5921
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -536,8 +596,8 @@
         {
           "id": "canis-lupus-001",
           "coordinates": [
-            42.8523,
-            60.6524
+            37.2131,
+            60.3751
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -546,8 +606,8 @@
         {
           "id": "canis-lupus-002",
           "coordinates": [
-            42.9655,
-            60.5894
+            40.5545,
+            58.4271
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -556,8 +616,8 @@
         {
           "id": "canis-lupus-003",
           "coordinates": [
-            42.8444,
-            60.6564
+            41.862,
+            60.7242
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -577,8 +637,8 @@
         {
           "id": "corvus-cornix-001",
           "coordinates": [
-            41.1123,
-            58.7422
+            37.1903,
+            60.5085
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -598,8 +658,8 @@
         {
           "id": "paris-quadrifolia-001",
           "coordinates": [
-            40.9724,
-            60.2125
+            38.0682,
+            57.7012
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -608,8 +668,8 @@
         {
           "id": "paris-quadrifolia-002",
           "coordinates": [
-            37.4438,
-            58.4049
+            43.8928,
+            57.8502
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -629,8 +689,8 @@
         {
           "id": "lutra-lutra-001",
           "coordinates": [
-            42.2123,
-            60.5124
+            39.4584,
+            61.8483
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -639,12 +699,42 @@
         {
           "id": "lutra-lutra-002",
           "coordinates": [
-            42.9234,
-            60.3181
+            39.9553,
+            60.666
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
           "found_year": 1989
+        },
+        {
+          "id": "lutra-lutra-003",
+          "coordinates": [
+            36.6621,
+            59.5933
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Морозов",
+          "found_year": 1995
+        },
+        {
+          "id": "lutra-lutra-004",
+          "coordinates": [
+            39.283,
+            59.8821
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Лебедев",
+          "found_year": 1982
+        },
+        {
+          "id": "lutra-lutra-005",
+          "coordinates": [
+            44.6575,
+            59.7614
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Морозов",
+          "found_year": 1977
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -660,8 +750,8 @@
         {
           "id": "ulmus-glabra-001",
           "coordinates": [
-            43.5524,
-            60.5521
+            44.7434,
+            58.2609
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -670,8 +760,8 @@
         {
           "id": "ulmus-glabra-002",
           "coordinates": [
-            43.5437,
-            60.5467
+            38.8095,
+            59.9115
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -680,8 +770,8 @@
         {
           "id": "ulmus-glabra-003",
           "coordinates": [
-            43.6058,
-            60.4995
+            39.8028,
+            61.6932
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -701,8 +791,8 @@
         {
           "id": "pinguinus-impennis-001",
           "coordinates": [
-            39.9124,
-            58.2725
+            38.1735,
+            58.5892
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -711,8 +801,8 @@
         {
           "id": "pinguinus-impennis-002",
           "coordinates": [
-            37.075,
-            58.9697
+            44.0212,
+            59.6959
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -732,8 +822,8 @@
         {
           "id": "dianthus-deltoides-001",
           "coordinates": [
-            41.5522,
-            60.5523
+            37.8123,
+            59.7297
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -742,8 +832,8 @@
         {
           "id": "dianthus-deltoides-002",
           "coordinates": [
-            39.1244,
-            58.9322
+            45.0179,
+            60.8524
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -763,8 +853,8 @@
         {
           "id": "tetrao-urogallus-001",
           "coordinates": [
-            44.1723,
-            58.7326
+            36.6143,
+            58.0549
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -773,8 +863,8 @@
         {
           "id": "tetrao-urogallus-002",
           "coordinates": [
-            43.5126,
-            58.7314
+            38.5061,
+            58.9462
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -783,12 +873,42 @@
         {
           "id": "tetrao-urogallus-003",
           "coordinates": [
-            38.2629,
-            58.9787
+            39.929,
+            60.3391
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
           "found_year": 1992
+        },
+        {
+          "id": "tetrao-urogallus-004",
+          "coordinates": [
+            38.3204,
+            61.2965
+          ],
+          "found_by": "Павлов",
+          "identified_by": "Соколов",
+          "found_year": 1979
+        },
+        {
+          "id": "tetrao-urogallus-005",
+          "coordinates": [
+            42.3054,
+            60.543
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Соколов",
+          "found_year": 1983
+        },
+        {
+          "id": "tetrao-urogallus-006",
+          "coordinates": [
+            43.4958,
+            59.7843
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Петров",
+          "found_year": 1979
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -804,8 +924,8 @@
         {
           "id": "fagopyrum-esculentum-001",
           "coordinates": [
-            42.5523,
-            58.1124
+            42.025,
+            61.5666
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -814,8 +934,8 @@
         {
           "id": "fagopyrum-esculentum-002",
           "coordinates": [
-            42.2214,
-            58.3307
+            42.9555,
+            58.3047
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -824,8 +944,8 @@
         {
           "id": "fagopyrum-esculentum-003",
           "coordinates": [
-            42.5995,
-            58.127
+            39.359,
+            61.5328
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -845,8 +965,8 @@
         {
           "id": "grifola-frondosa-001",
           "coordinates": [
-            42.3525,
-            58.9924
+            42.1483,
+            57.3981
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -855,8 +975,8 @@
         {
           "id": "grifola-frondosa-002",
           "coordinates": [
-            41.5181,
-            58.7601
+            39.9654,
+            58.3349
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -865,8 +985,8 @@
         {
           "id": "grifola-frondosa-003",
           "coordinates": [
-            42.4769,
-            59.0561
+            43.7259,
+            59.6289
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -875,8 +995,8 @@
         {
           "id": "grifola-frondosa-004",
           "coordinates": [
-            37.9155,
-            59.6076
+            42.8941,
+            59.3707
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -896,8 +1016,8 @@
         {
           "id": "lactarius-resimus-001",
           "coordinates": [
-            40.2524,
-            59.8725
+            43.0722,
+            61.2002
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -917,8 +1037,8 @@
         {
           "id": "hirundo-rustica-001",
           "coordinates": [
-            43.1122,
-            60.3324
+            43.6254,
+            61.7967
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -927,8 +1047,8 @@
         {
           "id": "hirundo-rustica-002",
           "coordinates": [
-            37.1175,
-            58.4946
+            37.549,
+            60.2967
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -948,8 +1068,8 @@
         {
           "id": "coccothraustes-coccothraustes-001",
           "coordinates": [
-            42.2324,
-            60.8724
+            36.3037,
+            61.845
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -958,8 +1078,8 @@
         {
           "id": "coccothraustes-coccothraustes-002",
           "coordinates": [
-            42.1898,
-            60.743
+            37.9431,
+            60.0355
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -968,8 +1088,8 @@
         {
           "id": "coccothraustes-coccothraustes-003",
           "coordinates": [
-            42.2402,
-            60.864
+            44.0173,
+            58.1344
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -978,8 +1098,8 @@
         {
           "id": "coccothraustes-coccothraustes-004",
           "coordinates": [
-            38.2394,
-            60.3372
+            38.919,
+            60.7242
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -999,8 +1119,8 @@
         {
           "id": "capreolus-capreolus-001",
           "coordinates": [
-            41.5521,
-            59.1123
+            45.1805,
+            59.1867
           ],
           "found_by": "Павлов",
           "identified_by": "Смирнов",
@@ -1009,8 +1129,8 @@
         {
           "id": "capreolus-capreolus-002",
           "coordinates": [
-            36.7925,
-            59.8832
+            44.433,
+            58.1505
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -1030,8 +1150,8 @@
         {
           "id": "erinaceus-europaeus-001",
           "coordinates": [
-            45.0125,
-            58.3724
+            44.8897,
+            61.0671
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -1040,8 +1160,8 @@
         {
           "id": "erinaceus-europaeus-002",
           "coordinates": [
-            45.3143,
-            58.5355
+            38.4334,
+            59.2684
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -1061,8 +1181,8 @@
         {
           "id": "picea-abies-001",
           "coordinates": [
-            44.5522,
-            60.9124
+            42.8942,
+            57.6724
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -1071,8 +1191,8 @@
         {
           "id": "picea-abies-002",
           "coordinates": [
-            45.017,
-            60.7001
+            38.6478,
+            61.2785
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -1081,12 +1201,42 @@
         {
           "id": "picea-abies-003",
           "coordinates": [
-            37.9751,
-            59.3763
+            38.926,
+            59.5419
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
           "found_year": 2005
+        },
+        {
+          "id": "picea-abies-004",
+          "coordinates": [
+            42.1433,
+            60.2277
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Петров",
+          "found_year": 2006
+        },
+        {
+          "id": "picea-abies-005",
+          "coordinates": [
+            40.9363,
+            59.7287
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Орлова",
+          "found_year": 1993
+        },
+        {
+          "id": "picea-abies-006",
+          "coordinates": [
+            44.6742,
+            59.1841
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Орлова",
+          "found_year": 1986
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -1102,12 +1252,42 @@
         {
           "id": "lepus-timidus-001",
           "coordinates": [
-            42.1122,
-            58.3321
+            36.2109,
+            58.1792
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
           "found_year": 2021
+        },
+        {
+          "id": "lepus-timidus-002",
+          "coordinates": [
+            44.5895,
+            59.9512
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Орлова",
+          "found_year": 1995
+        },
+        {
+          "id": "lepus-timidus-003",
+          "coordinates": [
+            39.163,
+            58.2119
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Волков",
+          "found_year": 1982
+        },
+        {
+          "id": "lepus-timidus-004",
+          "coordinates": [
+            40.7038,
+            57.9738
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Козлов",
+          "found_year": 1973
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -1123,8 +1303,8 @@
         {
           "id": "lepus-europaeus-001",
           "coordinates": [
-            41.1724,
-            59.7725
+            43.4343,
+            59.2104
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -1133,8 +1313,8 @@
         {
           "id": "lepus-europaeus-002",
           "coordinates": [
-            41.1725,
-            59.7701
+            36.7809,
+            58.4614
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -1154,8 +1334,8 @@
         {
           "id": "stellaria-holostea-001",
           "coordinates": [
-            41.8125,
-            60.6525
+            44.6033,
+            60.2693
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -1164,8 +1344,8 @@
         {
           "id": "stellaria-holostea-002",
           "coordinates": [
-            41.7799,
-            61.7837
+            37.2612,
+            61.5964
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -1185,8 +1365,8 @@
         {
           "id": "bison-bonasus-001",
           "coordinates": [
-            40.7524,
-            59.2125
+            38.2973,
+            57.5567
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -1195,8 +1375,8 @@
         {
           "id": "bison-bonasus-002",
           "coordinates": [
-            36.0899,
-            59.9149
+            42.4436,
+            60.0654
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -1216,8 +1396,8 @@
         {
           "id": "fringilla-coelebs-001",
           "coordinates": [
-            44.1123,
-            60.7423
+            45.2675,
+            60.4815
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -1226,8 +1406,8 @@
         {
           "id": "fringilla-coelebs-002",
           "coordinates": [
-            44.1193,
-            60.7413
+            43.7898,
+            58.5352
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -1236,8 +1416,8 @@
         {
           "id": "fringilla-coelebs-003",
           "coordinates": [
-            44.1968,
-            60.8141
+            36.6622,
+            61.061
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -1257,8 +1437,8 @@
         {
           "id": "salix-alba-001",
           "coordinates": [
-            44.1124,
-            59.5121
+            43.6153,
+            59.1188
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -1278,8 +1458,8 @@
         {
           "id": "chamaenerion-angustifolium-001",
           "coordinates": [
-            41.2324,
-            58.1925
+            43.7864,
+            61.4292
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -1299,8 +1479,8 @@
         {
           "id": "sus-scrofa-001",
           "coordinates": [
-            45.0124,
-            60.3322
+            42.3461,
+            60.2789
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -1309,8 +1489,8 @@
         {
           "id": "sus-scrofa-002",
           "coordinates": [
-            39.0147,
-            59.4246
+            44.4743,
+            61.5401
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -1330,8 +1510,8 @@
         {
           "id": "viburnum-opulus-001",
           "coordinates": [
-            41.5925,
-            59.9924
+            36.3646,
+            60.7206
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -1340,8 +1520,8 @@
         {
           "id": "viburnum-opulus-002",
           "coordinates": [
-            41.5983,
-            59.9846
+            39.3523,
+            61.0485
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -1361,8 +1541,8 @@
         {
           "id": "phragmites-australis-001",
           "coordinates": [
-            43.4723,
-            59.1925
+            36.3898,
+            61.6792
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -1371,8 +1551,8 @@
         {
           "id": "phragmites-australis-002",
           "coordinates": [
-            43.1341,
-            58.4865
+            38.9979,
+            61.1295
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -1392,8 +1572,8 @@
         {
           "id": "trifolium-pratense-001",
           "coordinates": [
-            41.5524,
-            58.5123
+            42.6014,
+            59.5166
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -1402,8 +1582,8 @@
         {
           "id": "trifolium-pratense-002",
           "coordinates": [
-            37.0088,
-            60.1773
+            38.0701,
+            60.0108
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -1423,8 +1603,8 @@
         {
           "id": "vaccinium-oxycoccos-001",
           "coordinates": [
-            42.9123,
-            58.3725
+            42.1795,
+            60.2417
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -1433,8 +1613,8 @@
         {
           "id": "vaccinium-oxycoccos-002",
           "coordinates": [
-            43.4412,
-            58.79
+            40.519,
+            61.2677
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -1443,8 +1623,8 @@
         {
           "id": "vaccinium-oxycoccos-003",
           "coordinates": [
-            43.0015,
-            58.4808
+            39.027,
+            58.1832
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -1453,8 +1633,8 @@
         {
           "id": "vaccinium-oxycoccos-004",
           "coordinates": [
-            37.3333,
-            60.4334
+            36.6763,
+            57.8181
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -1474,8 +1654,8 @@
         {
           "id": "urtica-dioica-001",
           "coordinates": [
-            44.9523,
-            60.7725
+            44.1179,
+            59.5988
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -1484,8 +1664,8 @@
         {
           "id": "urtica-dioica-002",
           "coordinates": [
-            44.9677,
-            60.7205
+            37.4271,
+            61.1916
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -1494,8 +1674,8 @@
         {
           "id": "urtica-dioica-003",
           "coordinates": [
-            45.5042,
-            60.1548
+            43.106,
+            59.4583
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -1515,8 +1695,8 @@
         {
           "id": "anas-platyrhynchos-001",
           "coordinates": [
-            45.0122,
-            58.1123
+            36.2802,
+            59.8983
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -1525,8 +1705,8 @@
         {
           "id": "anas-platyrhynchos-002",
           "coordinates": [
-            45.2248,
-            57.4081
+            39.9295,
+            58.6056
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -1535,8 +1715,8 @@
         {
           "id": "anas-platyrhynchos-003",
           "coordinates": [
-            45.0019,
-            58.1205
+            44.3511,
+            59.5188
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -1545,12 +1725,42 @@
         {
           "id": "anas-platyrhynchos-004",
           "coordinates": [
-            38.0439,
-            60.3751
+            35.9268,
+            58.5101
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
           "found_year": 2012
+        },
+        {
+          "id": "anas-platyrhynchos-005",
+          "coordinates": [
+            36.4762,
+            61.7529
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Морозов",
+          "found_year": 1988
+        },
+        {
+          "id": "anas-platyrhynchos-006",
+          "coordinates": [
+            38.7603,
+            60.174
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Орлова",
+          "found_year": 2020
+        },
+        {
+          "id": "anas-platyrhynchos-007",
+          "coordinates": [
+            45.3946,
+            57.4135
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Петров",
+          "found_year": 1980
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -1566,8 +1776,8 @@
         {
           "id": "nymphaea-alba-001",
           "coordinates": [
-            45.1524,
-            60.0725
+            42.5404,
+            61.3567
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -1576,8 +1786,8 @@
         {
           "id": "nymphaea-alba-002",
           "coordinates": [
-            45.1661,
-            60.0729
+            41.2689,
+            60.5382
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -1586,8 +1796,8 @@
         {
           "id": "nymphaea-alba-003",
           "coordinates": [
-            45.1483,
-            60.0744
+            42.1028,
+            59.5444
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -1596,8 +1806,8 @@
         {
           "id": "nymphaea-alba-004",
           "coordinates": [
-            37.8312,
-            58.4919
+            44.3672,
+            59.2647
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -1617,8 +1827,8 @@
         {
           "id": "convallaria-majalis-001",
           "coordinates": [
-            39.5524,
-            58.9125
+            40.1015,
+            57.4364
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -1627,8 +1837,8 @@
         {
           "id": "convallaria-majalis-002",
           "coordinates": [
-            39.6481,
-            58.9653
+            37.0598,
+            60.5742
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -1637,12 +1847,42 @@
         {
           "id": "convallaria-majalis-003",
           "coordinates": [
-            40.7482,
-            58.9543
+            40.4282,
+            60.5874
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
           "found_year": 1979
+        },
+        {
+          "id": "convallaria-majalis-004",
+          "coordinates": [
+            44.8397,
+            57.6033
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Козлов",
+          "found_year": 1982
+        },
+        {
+          "id": "convallaria-majalis-005",
+          "coordinates": [
+            36.1905,
+            59.6946
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Соколов",
+          "found_year": 2018
+        },
+        {
+          "id": "convallaria-majalis-006",
+          "coordinates": [
+            37.719,
+            59.8303
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Волков",
+          "found_year": 2024
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -1658,8 +1898,8 @@
         {
           "id": "cygnus-olor-001",
           "coordinates": [
-            39.7125,
-            59.5524
+            41.6208,
+            58.7396
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -1668,8 +1908,8 @@
         {
           "id": "cygnus-olor-002",
           "coordinates": [
-            39.6257,
-            59.5011
+            43.5179,
+            59.5462
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -1678,8 +1918,8 @@
         {
           "id": "cygnus-olor-003",
           "coordinates": [
-            39.7023,
-            59.552
+            41.2504,
+            58.1865
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -1688,8 +1928,8 @@
         {
           "id": "cygnus-olor-004",
           "coordinates": [
-            38.7843,
-            59.6341
+            43.2721,
+            60.298
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -1709,8 +1949,8 @@
         {
           "id": "corylus-avellana-001",
           "coordinates": [
-            40.7523,
-            59.5526
+            37.6219,
+            59.4273
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -1719,8 +1959,8 @@
         {
           "id": "corylus-avellana-002",
           "coordinates": [
-            40.7277,
-            59.5568
+            36.9658,
+            60.2895
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -1729,8 +1969,8 @@
         {
           "id": "corylus-avellana-003",
           "coordinates": [
-            41.4529,
-            60.1934
+            42.0453,
+            58.2125
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -1750,8 +1990,8 @@
         {
           "id": "vulpes-vulpes-001",
           "coordinates": [
-            42.5522,
-            59.7422
+            44.4223,
+            59.1207
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -1760,8 +2000,8 @@
         {
           "id": "vulpes-vulpes-002",
           "coordinates": [
-            42.8996,
-            59.6412
+            36.2066,
+            61.688
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -1770,8 +2010,8 @@
         {
           "id": "vulpes-vulpes-003",
           "coordinates": [
-            42.5535,
-            59.7418
+            41.6707,
+            61.1344
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -1791,8 +2031,8 @@
         {
           "id": "cantharellus-cibarius-001",
           "coordinates": [
-            43.9125,
-            60.7724
+            43.0705,
+            59.5764
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -1801,12 +2041,42 @@
         {
           "id": "cantharellus-cibarius-002",
           "coordinates": [
-            39.0009,
-            59.2238
+            45.5493,
+            60.144
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
           "found_year": 2017
+        },
+        {
+          "id": "cantharellus-cibarius-003",
+          "coordinates": [
+            39.1422,
+            59.2968
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Петров",
+          "found_year": 1983
+        },
+        {
+          "id": "cantharellus-cibarius-004",
+          "coordinates": [
+            38.6409,
+            61.2016
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Морозов",
+          "found_year": 1982
+        },
+        {
+          "id": "cantharellus-cibarius-005",
+          "coordinates": [
+            35.9989,
+            58.0269
+          ],
+          "found_by": "Павлов",
+          "identified_by": "Петров",
+          "found_year": 1976
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -1822,8 +2092,8 @@
         {
           "id": "arctium-lappa-001",
           "coordinates": [
-            44.5925,
-            58.5525
+            43.9855,
+            57.9916
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -1843,8 +2113,8 @@
         {
           "id": "alces-alces-001",
           "coordinates": [
-            43.8925,
-            59.4124
+            35.8461,
+            60.1637
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -1864,8 +2134,8 @@
         {
           "id": "equus-przewalskii-001",
           "coordinates": [
-            41.1725,
-            59.4324
+            37.9586,
+            61.1438
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -1874,8 +2144,8 @@
         {
           "id": "equus-przewalskii-002",
           "coordinates": [
-            41.1705,
-            59.4384
+            45.2221,
+            59.2464
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -1884,8 +2154,8 @@
         {
           "id": "equus-przewalskii-003",
           "coordinates": [
-            41.1745,
-            59.429
+            38.5037,
+            58.7089
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -1894,8 +2164,8 @@
         {
           "id": "equus-przewalskii-004",
           "coordinates": [
-            38.4422,
-            59.1463
+            44.2543,
+            58.0695
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -1915,8 +2185,8 @@
         {
           "id": "platanthera-bifolia-001",
           "coordinates": [
-            40.1324,
-            59.7725
+            36.0931,
+            59.8077
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -1925,12 +2195,42 @@
         {
           "id": "platanthera-bifolia-002",
           "coordinates": [
-            40.2636,
-            59.8104
+            37.9154,
+            60.45
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
           "found_year": 2004
+        },
+        {
+          "id": "platanthera-bifolia-003",
+          "coordinates": [
+            38.054,
+            60.0605
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Соколов",
+          "found_year": 1976
+        },
+        {
+          "id": "platanthera-bifolia-004",
+          "coordinates": [
+            39.7492,
+            58.7627
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Козлов",
+          "found_year": 2011
+        },
+        {
+          "id": "platanthera-bifolia-005",
+          "coordinates": [
+            36.4728,
+            59.7117
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Петров",
+          "found_year": 2015
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -1946,8 +2246,8 @@
         {
           "id": "ranunculus-acris-001",
           "coordinates": [
-            40.3321,
-            58.9123
+            38.2139,
+            57.9712
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -1956,8 +2256,8 @@
         {
           "id": "ranunculus-acris-002",
           "coordinates": [
-            40.4731,
-            59.602
+            37.5006,
+            59.9139
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -1966,8 +2266,8 @@
         {
           "id": "ranunculus-acris-003",
           "coordinates": [
-            40.4688,
-            58.8854
+            42.9869,
+            60.8284
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -1976,8 +2276,8 @@
         {
           "id": "ranunculus-acris-004",
           "coordinates": [
-            37.8368,
-            59.3409
+            38.3829,
+            58.231
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -1997,12 +2297,42 @@
         {
           "id": "suillus-luteus-001",
           "coordinates": [
-            39.8325,
-            59.6524
+            45.4583,
+            59.6124
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
           "found_year": 2004
+        },
+        {
+          "id": "suillus-luteus-002",
+          "coordinates": [
+            37.2606,
+            60.6258
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Волков",
+          "found_year": 2019
+        },
+        {
+          "id": "suillus-luteus-003",
+          "coordinates": [
+            36.104,
+            59.9288
+          ],
+          "found_by": "Павлов",
+          "identified_by": "Соколов",
+          "found_year": 1991
+        },
+        {
+          "id": "suillus-luteus-004",
+          "coordinates": [
+            45.2375,
+            61.5848
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Петров",
+          "found_year": 2013
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -2018,8 +2348,8 @@
         {
           "id": "juniperus-communis-001",
           "coordinates": [
-            40.3924,
-            58.5525
+            44.8056,
+            57.4212
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -2028,8 +2358,8 @@
         {
           "id": "juniperus-communis-002",
           "coordinates": [
-            39.9991,
-            58.6305
+            35.874,
+            58.4281
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -2038,8 +2368,8 @@
         {
           "id": "juniperus-communis-003",
           "coordinates": [
-            38.3257,
-            59.161
+            43.7589,
+            60.7272
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -2059,8 +2389,8 @@
         {
           "id": "hydrodamalis-gigas-001",
           "coordinates": [
-            40.3325,
-            58.9924
+            44.3187,
+            61.488
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -2069,8 +2399,8 @@
         {
           "id": "hydrodamalis-gigas-002",
           "coordinates": [
-            39.1997,
-            59.9275
+            44.1571,
+            61.1419
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -2090,8 +2420,8 @@
         {
           "id": "suillus-bovinus-001",
           "coordinates": [
-            45.1724,
-            59.4325
+            41.4927,
+            59.9501
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -2100,8 +2430,8 @@
         {
           "id": "suillus-bovinus-002",
           "coordinates": [
-            45.1361,
-            59.4613
+            42.6579,
+            58.7891
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -2110,8 +2440,8 @@
         {
           "id": "suillus-bovinus-003",
           "coordinates": [
-            45.2381,
-            59.4671
+            40.4712,
+            60.1601
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -2120,8 +2450,8 @@
         {
           "id": "suillus-bovinus-004",
           "coordinates": [
-            36.6137,
-            58.7458
+            39.9721,
+            59.8602
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -2141,8 +2471,8 @@
         {
           "id": "amanita-muscaria-001",
           "coordinates": [
-            44.4524,
-            58.9925
+            37.9518,
+            59.1949
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -2151,8 +2481,8 @@
         {
           "id": "amanita-muscaria-002",
           "coordinates": [
-            44.4876,
-            58.0455
+            42.9204,
+            60.2024
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -2161,8 +2491,8 @@
         {
           "id": "amanita-muscaria-003",
           "coordinates": [
-            37.2505,
-            58.7528
+            40.9274,
+            59.4252
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -2182,8 +2512,8 @@
         {
           "id": "mentha-arvensis-001",
           "coordinates": [
-            42.5521,
-            60.9122
+            40.6829,
+            61.4067
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -2192,8 +2522,8 @@
         {
           "id": "mentha-arvensis-002",
           "coordinates": [
-            42.3285,
-            61.0689
+            36.0251,
+            58.1726
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -2213,8 +2543,8 @@
         {
           "id": "poa-pratensis-001",
           "coordinates": [
-            44.5521,
-            59.7424
+            44.8868,
+            60.1067
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -2223,8 +2553,8 @@
         {
           "id": "poa-pratensis-002",
           "coordinates": [
-            44.4428,
-            59.84
+            40.8695,
+            59.5744
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -2233,8 +2563,8 @@
         {
           "id": "poa-pratensis-003",
           "coordinates": [
-            37.4458,
-            60.3363
+            38.1339,
+            59.7313
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -2254,8 +2584,8 @@
         {
           "id": "coprinus-comatus-001",
           "coordinates": [
-            44.0325,
-            58.2724
+            38.1236,
+            59.4753
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -2264,8 +2594,8 @@
         {
           "id": "coprinus-comatus-002",
           "coordinates": [
-            43.8572,
-            58.6748
+            42.5492,
+            58.0451
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -2285,8 +2615,8 @@
         {
           "id": "mustela-nivalis-001",
           "coordinates": [
-            39.8842,
-            59.7321
+            42.8521,
+            60.0408
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -2306,8 +2636,8 @@
         {
           "id": "talpa-europaea-001",
           "coordinates": [
-            40.5324,
-            59.6325
+            43.7004,
+            60.5668
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -2316,8 +2646,8 @@
         {
           "id": "talpa-europaea-002",
           "coordinates": [
-            40.4672,
-            59.1436
+            41.218,
+            60.6166
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -2326,8 +2656,8 @@
         {
           "id": "talpa-europaea-003",
           "coordinates": [
-            38.0382,
-            60.4719
+            38.5854,
+            60.9337
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -2347,8 +2677,8 @@
         {
           "id": "taraxacum-officinale-001",
           "coordinates": [
-            41.1029,
-            59.5124
+            44.6143,
+            60.0159
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -2357,8 +2687,8 @@
         {
           "id": "taraxacum-officinale-002",
           "coordinates": [
-            41.0594,
-            59.5458
+            41.6538,
+            57.9811
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -2367,8 +2697,8 @@
         {
           "id": "taraxacum-officinale-003",
           "coordinates": [
-            41.0689,
-            59.0247
+            45.2313,
+            60.1627
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -2388,8 +2718,8 @@
         {
           "id": "larus-ridibundus-001",
           "coordinates": [
-            40.5525,
-            59.9924
+            35.9362,
+            57.5974
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -2398,8 +2728,8 @@
         {
           "id": "larus-ridibundus-002",
           "coordinates": [
-            38.8161,
-            58.9565
+            37.7344,
+            59.2254
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -2419,8 +2749,8 @@
         {
           "id": "alnus-glutinosa-001",
           "coordinates": [
-            42.6325,
-            60.7325
+            40.9736,
+            58.2798
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -2429,8 +2759,8 @@
         {
           "id": "alnus-glutinosa-002",
           "coordinates": [
-            36.9194,
-            58.9483
+            43.7239,
+            60.33
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -2450,8 +2780,8 @@
         {
           "id": "armillaria-mellea-001",
           "coordinates": [
-            44.3324,
-            60.9925
+            38.9398,
+            58.7565
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -2460,8 +2790,8 @@
         {
           "id": "armillaria-mellea-002",
           "coordinates": [
-            44.3343,
-            60.9921
+            43.187,
+            57.5089
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -2481,8 +2811,8 @@
         {
           "id": "aquila-chrysaetos-001",
           "coordinates": [
-            45.0123,
-            59.9121
+            38.4579,
+            61.4906
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -2491,8 +2821,8 @@
         {
           "id": "aquila-chrysaetos-002",
           "coordinates": [
-            44.9419,
-            59.8485
+            39.3695,
+            60.8632
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -2512,8 +2842,8 @@
         {
           "id": "populus-tremula-001",
           "coordinates": [
-            39.9124,
-            59.1125
+            42.4458,
+            59.4887
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -2522,12 +2852,42 @@
         {
           "id": "populus-tremula-002",
           "coordinates": [
-            37.9141,
-            58.5406
+            40.3389,
+            61.0601
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
           "found_year": 1953
+        },
+        {
+          "id": "populus-tremula-003",
+          "coordinates": [
+            44.4071,
+            58.0168
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Смирнов",
+          "found_year": 2010
+        },
+        {
+          "id": "populus-tremula-004",
+          "coordinates": [
+            43.2747,
+            58.9748
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Орлова",
+          "found_year": 1980
+        },
+        {
+          "id": "populus-tremula-005",
+          "coordinates": [
+            44.2669,
+            61.808
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Петров",
+          "found_year": 1972
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -2543,8 +2903,8 @@
         {
           "id": "pteridium-aquilinum-001",
           "coordinates": [
-            40.9523,
-            59.8524
+            43.9182,
+            59.1634
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -2553,8 +2913,8 @@
         {
           "id": "pteridium-aquilinum-002",
           "coordinates": [
-            40.5652,
-            58.7364
+            40.9915,
+            58.0117
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -2563,8 +2923,8 @@
         {
           "id": "pteridium-aquilinum-003",
           "coordinates": [
-            40.8578,
-            59.7499
+            43.6424,
+            61.7334
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -2573,8 +2933,8 @@
         {
           "id": "pteridium-aquilinum-004",
           "coordinates": [
-            37.6983,
-            60.4634
+            40.6644,
+            60.3396
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -2594,8 +2954,8 @@
         {
           "id": "coturnix-coturnix-001",
           "coordinates": [
-            42.4924,
-            58.5524
+            43.235,
+            57.8709
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -2604,8 +2964,8 @@
         {
           "id": "coturnix-coturnix-002",
           "coordinates": [
-            38.2563,
-            58.1301
+            37.8423,
+            59.4625
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -2625,8 +2985,8 @@
         {
           "id": "leccinum-scabrum-001",
           "coordinates": [
-            43.0724,
-            60.3326
+            38.0004,
+            60.0724
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -2646,8 +3006,8 @@
         {
           "id": "plantago-major-001",
           "coordinates": [
-            44.1125,
-            60.3325
+            41.897,
+            60.954
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -2656,8 +3016,8 @@
         {
           "id": "plantago-major-002",
           "coordinates": [
-            36.2327,
-            59.0768
+            41.1676,
+            57.7794
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -2677,8 +3037,8 @@
         {
           "id": "leccinum-aurantiacum-001",
           "coordinates": [
-            43.4923,
-            60.5525
+            37.4454,
+            59.4291
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -2687,8 +3047,8 @@
         {
           "id": "leccinum-aurantiacum-002",
           "coordinates": [
-            43.4963,
-            60.5146
+            45.5581,
+            60.4432
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -2697,8 +3057,8 @@
         {
           "id": "leccinum-aurantiacum-003",
           "coordinates": [
-            43.4899,
-            60.5565
+            38.9503,
+            59.6748
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -2718,8 +3078,8 @@
         {
           "id": "microtus-arvalis-001",
           "coordinates": [
-            44.1122,
-            58.5124
+            37.3373,
+            61.83
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -2739,8 +3099,8 @@
         {
           "id": "alauda-arvensis-001",
           "coordinates": [
-            41.6523,
-            58.9126
+            38.6443,
+            58.1858
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -2749,8 +3109,8 @@
         {
           "id": "alauda-arvensis-002",
           "coordinates": [
-            41.69,
-            58.9123
+            36.93,
+            59.4767
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -2759,8 +3119,8 @@
         {
           "id": "alauda-arvensis-003",
           "coordinates": [
-            41.295,
-            58.2735
+            40.5002,
+            58.7092
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -2769,8 +3129,8 @@
         {
           "id": "alauda-arvensis-004",
           "coordinates": [
-            36.6867,
-            58.6268
+            37.8188,
+            61.6518
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -2790,8 +3150,8 @@
         {
           "id": "typha-latifolia-001",
           "coordinates": [
-            44.3124,
-            59.6325
+            45.5546,
+            58.5569
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -2811,8 +3171,8 @@
         {
           "id": "matricaria-chamomilla-001",
           "coordinates": [
-            43.7524,
-            58.9125
+            37.7649,
+            61.6078
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -2821,8 +3181,8 @@
         {
           "id": "matricaria-chamomilla-002",
           "coordinates": [
-            43.6366,
-            58.8595
+            35.5392,
+            61.1439
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -2842,8 +3202,8 @@
         {
           "id": "lactarius-deliciosus-001",
           "coordinates": [
-            40.6725,
-            60.0924
+            42.922,
+            60.0306
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -2852,8 +3212,8 @@
         {
           "id": "lactarius-deliciosus-002",
           "coordinates": [
-            40.6314,
-            60.197
+            38.9466,
+            60.1502
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -2873,8 +3233,8 @@
         {
           "id": "lynx-lynx-001",
           "coordinates": [
-            42.1123,
-            60.7421
+            39.0253,
+            59.3299
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -2883,8 +3243,8 @@
         {
           "id": "lynx-lynx-002",
           "coordinates": [
-            41.6353,
-            60.8456
+            37.0264,
+            59.9698
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -2893,12 +3253,42 @@
         {
           "id": "lynx-lynx-003",
           "coordinates": [
-            41.3349,
-            60.5379
+            36.9107,
+            59.3854
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
           "found_year": 1956
+        },
+        {
+          "id": "lynx-lynx-004",
+          "coordinates": [
+            43.0107,
+            57.5787
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Волков",
+          "found_year": 1979
+        },
+        {
+          "id": "lynx-lynx-005",
+          "coordinates": [
+            41.1606,
+            57.6711
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Лебедев",
+          "found_year": 1981
+        },
+        {
+          "id": "lynx-lynx-006",
+          "coordinates": [
+            39.2353,
+            60.5906
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Козлов",
+          "found_year": 2005
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -2914,8 +3304,8 @@
         {
           "id": "sorbus-aucuparia-001",
           "coordinates": [
-            43.2725,
-            60.8723
+            38.3902,
+            60.5528
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -2924,8 +3314,8 @@
         {
           "id": "sorbus-aucuparia-002",
           "coordinates": [
-            43.4073,
-            60.9188
+            42.9581,
+            61.1831
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -2934,8 +3324,8 @@
         {
           "id": "sorbus-aucuparia-003",
           "coordinates": [
-            43.9081,
-            60.49
+            36.0009,
+            57.3732
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -2944,12 +3334,42 @@
         {
           "id": "sorbus-aucuparia-004",
           "coordinates": [
-            36.2303,
-            59.1597
+            36.668,
+            60.2695
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
           "found_year": 1986
+        },
+        {
+          "id": "sorbus-aucuparia-005",
+          "coordinates": [
+            41.89,
+            57.7348
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Лебедев",
+          "found_year": 1995
+        },
+        {
+          "id": "sorbus-aucuparia-006",
+          "coordinates": [
+            38.8407,
+            60.4272
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Морозов",
+          "found_year": 1980
+        },
+        {
+          "id": "sorbus-aucuparia-007",
+          "coordinates": [
+            39.2116,
+            59.0552
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Волков",
+          "found_year": 2010
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -2965,8 +3385,8 @@
         {
           "id": "strix-aluco-001",
           "coordinates": [
-            43.6924,
-            60.1126
+            41.2285,
+            60.3348
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -2975,8 +3395,8 @@
         {
           "id": "strix-aluco-002",
           "coordinates": [
-            44.3746,
-            59.9737
+            39.2376,
+            59.6032
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -2985,12 +3405,42 @@
         {
           "id": "strix-aluco-003",
           "coordinates": [
-            43.6897,
-            60.0982
+            41.8289,
+            57.7511
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
           "found_year": 1952
+        },
+        {
+          "id": "strix-aluco-004",
+          "coordinates": [
+            36.5764,
+            57.5682
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Соколов",
+          "found_year": 2015
+        },
+        {
+          "id": "strix-aluco-005",
+          "coordinates": [
+            42.7841,
+            59.3626
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Козлов",
+          "found_year": 1974
+        },
+        {
+          "id": "strix-aluco-006",
+          "coordinates": [
+            37.1546,
+            57.5658
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Смирнов",
+          "found_year": 2009
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -3006,8 +3456,8 @@
         {
           "id": "anser-anser-001",
           "coordinates": [
-            44.7325,
-            59.8524
+            37.8874,
+            59.2328
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -3016,8 +3466,8 @@
         {
           "id": "anser-anser-002",
           "coordinates": [
-            36.9154,
-            60.3763
+            37.0721,
+            57.5159
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -3037,8 +3487,8 @@
         {
           "id": "sturnus-vulgaris-001",
           "coordinates": [
-            40.8125,
-            58.3724
+            40.7315,
+            59.1316
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -3047,8 +3497,8 @@
         {
           "id": "sturnus-vulgaris-002",
           "coordinates": [
-            40.7996,
-            58.3713
+            44.2018,
+            59.7781
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -3068,8 +3518,8 @@
         {
           "id": "morchella-esculenta-001",
           "coordinates": [
-            41.0924,
-            60.3125
+            35.7149,
+            61.1868
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -3078,8 +3528,8 @@
         {
           "id": "morchella-esculenta-002",
           "coordinates": [
-            37.8048,
-            60.0217
+            41.6429,
+            59.2632
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -3099,8 +3549,8 @@
         {
           "id": "pyrrhula-pyrrhula-001",
           "coordinates": [
-            45.3724,
-            60.9924
+            41.3638,
+            58.7053
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -3120,8 +3570,8 @@
         {
           "id": "garrulus-glandarius-001",
           "coordinates": [
-            44.5324,
-            60.5526
+            39.9092,
+            57.9572
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -3130,8 +3580,8 @@
         {
           "id": "garrulus-glandarius-002",
           "coordinates": [
-            43.9898,
-            59.687
+            43.6773,
+            57.5781
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -3151,8 +3601,8 @@
         {
           "id": "luscinia-luscinia-001",
           "coordinates": [
-            41.3923,
-            60.4324
+            41.663,
+            61.8082
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -3161,8 +3611,8 @@
         {
           "id": "luscinia-luscinia-002",
           "coordinates": [
-            42.3022,
-            60.0994
+            40.676,
+            61.2251
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -3171,8 +3621,8 @@
         {
           "id": "luscinia-luscinia-003",
           "coordinates": [
-            41.3973,
-            60.4419
+            45.1128,
+            58.906
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -3192,12 +3642,42 @@
         {
           "id": "pinus-sylvestris-001",
           "coordinates": [
-            43.1121,
-            59.9123
+            39.6383,
+            58.1756
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
           "found_year": 2007
+        },
+        {
+          "id": "pinus-sylvestris-002",
+          "coordinates": [
+            42.0612,
+            59.8314
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Петров",
+          "found_year": 2004
+        },
+        {
+          "id": "pinus-sylvestris-003",
+          "coordinates": [
+            41.079,
+            61.3846
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Соколов",
+          "found_year": 2021
+        },
+        {
+          "id": "pinus-sylvestris-004",
+          "coordinates": [
+            38.3343,
+            61.2362
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Лебедев",
+          "found_year": 2024
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -3213,8 +3693,8 @@
         {
           "id": "helvella-crispa-001",
           "coordinates": [
-            41.5125,
-            60.5324
+            37.6343,
+            59.8781
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -3223,8 +3703,8 @@
         {
           "id": "helvella-crispa-002",
           "coordinates": [
-            41.5215,
-            60.4933
+            35.6351,
+            60.697
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -3233,8 +3713,8 @@
         {
           "id": "helvella-crispa-003",
           "coordinates": [
-            41.5099,
-            60.5309
+            36.4239,
+            61.654
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -3254,8 +3734,8 @@
         {
           "id": "barbarea-vulgaris-001",
           "coordinates": [
-            43.5521,
-            58.7423
+            42.1844,
+            58.3608
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -3264,8 +3744,8 @@
         {
           "id": "barbarea-vulgaris-002",
           "coordinates": [
-            36.4234,
-            58.6274
+            36.5092,
+            57.6483
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -3285,8 +3765,8 @@
         {
           "id": "russula-emetica-001",
           "coordinates": [
-            44.7525,
-            59.2126
+            41.2739,
+            59.5041
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -3295,12 +3775,42 @@
         {
           "id": "russula-emetica-002",
           "coordinates": [
-            44.5649,
-            60.3744
+            43.9624,
+            61.2519
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
           "found_year": 2009
+        },
+        {
+          "id": "russula-emetica-003",
+          "coordinates": [
+            42.8675,
+            60.8489
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Волков",
+          "found_year": 2004
+        },
+        {
+          "id": "russula-emetica-004",
+          "coordinates": [
+            37.4829,
+            58.7346
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Волков",
+          "found_year": 2003
+        },
+        {
+          "id": "russula-emetica-005",
+          "coordinates": [
+            36.3387,
+            58.8896
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Козлов",
+          "found_year": 1972
         }
       ],
       "description_md": "species/primula_veris.md"
@@ -3316,8 +3826,8 @@
         {
           "id": "equus-ferus-ferus-001",
           "coordinates": [
-            39.4925,
-            58.4524
+            38.1276,
+            57.9098
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -3326,8 +3836,8 @@
         {
           "id": "equus-ferus-ferus-002",
           "coordinates": [
-            39.467,
-            58.4347
+            41.7254,
+            58.1454
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -3347,8 +3857,8 @@
         {
           "id": "lyrurus-tetrix-001",
           "coordinates": [
-            43.3325,
-            58.1924
+            42.3271,
+            58.7779
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -3357,8 +3867,8 @@
         {
           "id": "lyrurus-tetrix-002",
           "coordinates": [
-            43.3338,
-            58.182
+            37.1794,
+            59.2858
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -3367,8 +3877,8 @@
         {
           "id": "lyrurus-tetrix-003",
           "coordinates": [
-            44.0479,
-            58.9224
+            45.1503,
+            58.4571
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -3377,8 +3887,8 @@
         {
           "id": "lyrurus-tetrix-004",
           "coordinates": [
-            38.7186,
-            58.705
+            36.0733,
+            59.4598
           ],
           "found_by": "Новиков",
           "identified_by": "Смирнов",
@@ -3398,8 +3908,8 @@
         {
           "id": "fomes-fomentarius-001",
           "coordinates": [
-            41.9324,
-            60.7525
+            40.5324,
+            58.9298
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -3408,8 +3918,8 @@
         {
           "id": "fomes-fomentarius-002",
           "coordinates": [
-            37.0267,
-            60.2989
+            41.4875,
+            60.8917
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -3429,8 +3939,8 @@
         {
           "id": "bos-primigenius-001",
           "coordinates": [
-            45.2924,
-            58.6325
+            43.871,
+            61.6222
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -3439,8 +3949,8 @@
         {
           "id": "bos-primigenius-002",
           "coordinates": [
-            45.3942,
-            58.7316
+            37.107,
+            60.8754
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -3460,8 +3970,8 @@
         {
           "id": "viola-tricolor-001",
           "coordinates": [
-            40.5523,
-            60.1124
+            40.7002,
+            59.7622
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -3470,8 +3980,8 @@
         {
           "id": "viola-tricolor-002",
           "coordinates": [
-            40.4069,
-            59.3769
+            43.8667,
+            57.9598
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -3480,8 +3990,8 @@
         {
           "id": "viola-tricolor-003",
           "coordinates": [
-            38.8163,
-            60.3444
+            41.2618,
+            58.2467
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -3501,8 +4011,8 @@
         {
           "id": "bubo-bubo-001",
           "coordinates": [
-            43.1124,
-            58.9122
+            38.6926,
+            61.609
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -3511,8 +4021,8 @@
         {
           "id": "bubo-bubo-002",
           "coordinates": [
-            38.481,
-            60.3004
+            42.5499,
+            60.5213
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -3532,8 +4042,8 @@
         {
           "id": "equisetum-sylvaticum-001",
           "coordinates": [
-            40.1125,
-            59.4124
+            43.7159,
+            60.8823
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -3542,8 +4052,8 @@
         {
           "id": "equisetum-sylvaticum-002",
           "coordinates": [
-            40.9307,
-            59.6778
+            44.1332,
+            61.3938
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -3552,8 +4062,8 @@
         {
           "id": "equisetum-sylvaticum-003",
           "coordinates": [
-            40.1102,
-            59.4131
+            38.7689,
+            60.6354
           ],
           "found_by": "Сидоров",
           "identified_by": "Волков",
@@ -3573,8 +4083,8 @@
         {
           "id": "prunus-padus-001",
           "coordinates": [
-            42.4324,
-            60.4325
+            37.8217,
+            58.0878
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -3583,8 +4093,8 @@
         {
           "id": "prunus-padus-002",
           "coordinates": [
-            39.1229,
-            60.1548
+            40.494,
+            58.2471
           ],
           "found_by": "Иванов",
           "identified_by": "Орлова",
@@ -3604,8 +4114,8 @@
         {
           "id": "vaccinium-myrtillus-001",
           "coordinates": [
-            42.1123,
-            59.3321
+            43.2119,
+            58.1224
           ],
           "found_by": "Иванов",
           "identified_by": "Петров",
@@ -3625,8 +4135,8 @@
         {
           "id": "agaricus-silvaticus-001",
           "coordinates": [
-            43.1925,
-            58.6324
+            39.8479,
+            59.3201
           ],
           "found_by": "Павлов",
           "identified_by": "Орлова",
@@ -3635,8 +4145,8 @@
         {
           "id": "agaricus-silvaticus-002",
           "coordinates": [
-            43.558,
-            58.8592
+            45.1051,
+            58.0822
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -3645,8 +4155,8 @@
         {
           "id": "agaricus-silvaticus-003",
           "coordinates": [
-            37.2348,
-            60.3841
+            35.9592,
+            60.8058
           ],
           "found_by": "Павлов",
           "identified_by": "Морозов",
@@ -3666,8 +4176,8 @@
         {
           "id": "agaricus-campestris-001",
           "coordinates": [
-            42.7724,
-            58.8125
+            40.0853,
+            57.5078
           ],
           "found_by": "Сидоров",
           "identified_by": "Орлов",
@@ -3676,8 +4186,8 @@
         {
           "id": "agaricus-campestris-002",
           "coordinates": [
-            42.7864,
-            58.7653
+            44.9716,
+            59.0153
           ],
           "found_by": "Федоров",
           "identified_by": "Петров",
@@ -3686,8 +4196,8 @@
         {
           "id": "agaricus-campestris-003",
           "coordinates": [
-            42.7939,
-            58.8102
+            45.4218,
+            59.7872
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -3696,8 +4206,8 @@
         {
           "id": "agaricus-campestris-004",
           "coordinates": [
-            36.8639,
-            60.1462
+            38.8577,
+            60.2029
           ],
           "found_by": "Кузнецов",
           "identified_by": "Орлов",
@@ -3717,8 +4227,8 @@
         {
           "id": "rosa-majalis-001",
           "coordinates": [
-            40.9123,
-            59.2211
+            37.8369,
+            58.8688
           ],
           "found_by": "Кузнецов",
           "identified_by": "Смирнов",
@@ -3726,6 +4236,1326 @@
         }
       ],
       "description_md": "species/primula_veris.md"
+    },
+    {
+      "id": "calluna-vulgaris",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Ericaceae",
+      "name_ru": "Вереск обыкновенный",
+      "name_latin": "Calluna vulgaris",
+      "findings": [
+        {
+          "id": "calluna-vulgaris-001",
+          "coordinates": [
+            38.8997,
+            60.3377
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Петров",
+          "found_year": 2008
+        },
+        {
+          "id": "calluna-vulgaris-002",
+          "coordinates": [
+            45.0359,
+            59.5314
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Морозов",
+          "found_year": 1989
+        },
+        {
+          "id": "calluna-vulgaris-003",
+          "coordinates": [
+            38.1253,
+            61.2442
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Лебедев",
+          "found_year": 1978
+        }
+      ]
+    },
+    {
+      "id": "ledum-palustre",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Ericaceae",
+      "name_ru": "Багульник болотный",
+      "name_latin": "Ledum palustre",
+      "findings": [
+        {
+          "id": "ledum-palustre-001",
+          "coordinates": [
+            41.9938,
+            57.9819
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Морозов",
+          "found_year": 2018
+        },
+        {
+          "id": "ledum-palustre-002",
+          "coordinates": [
+            40.5695,
+            59.9934
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Волков",
+          "found_year": 1980
+        },
+        {
+          "id": "ledum-palustre-003",
+          "coordinates": [
+            45.2631,
+            59.386
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Морозов",
+          "found_year": 1972
+        }
+      ]
+    },
+    {
+      "id": "quercus-robur",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Fagaceae",
+      "name_ru": "Дуб черешчатый",
+      "name_latin": "Quercus robur",
+      "findings": [
+        {
+          "id": "quercus-robur-001",
+          "coordinates": [
+            43.0668,
+            59.2441
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Лебедев",
+          "found_year": 1997
+        },
+        {
+          "id": "quercus-robur-002",
+          "coordinates": [
+            45.5282,
+            61.1086
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Лебедев",
+          "found_year": 2018
+        },
+        {
+          "id": "quercus-robur-003",
+          "coordinates": [
+            42.6618,
+            57.5935
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Морозов",
+          "found_year": 1992
+        }
+      ]
+    },
+    {
+      "id": "filipendula-ulmaria",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Rosaceae",
+      "name_ru": "Таволга обыкновенная",
+      "name_latin": "Filipendula ulmaria",
+      "findings": [
+        {
+          "id": "filipendula-ulmaria-001",
+          "coordinates": [
+            39.5551,
+            61.4278
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Смирнов",
+          "found_year": 1988
+        },
+        {
+          "id": "filipendula-ulmaria-002",
+          "coordinates": [
+            35.8423,
+            57.7644
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Лебедев",
+          "found_year": 1979
+        },
+        {
+          "id": "filipendula-ulmaria-003",
+          "coordinates": [
+            39.3437,
+            58.6988
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Козлов",
+          "found_year": 1976
+        }
+      ]
+    },
+    {
+      "id": "carex-acutiformis",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Cyperaceae",
+      "name_ru": "Осока острая",
+      "name_latin": "Carex acutiformis",
+      "findings": [
+        {
+          "id": "carex-acutiformis-001",
+          "coordinates": [
+            38.4067,
+            58.7274
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Орлова",
+          "found_year": 1976
+        },
+        {
+          "id": "carex-acutiformis-002",
+          "coordinates": [
+            35.9232,
+            59.495
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Лебедев",
+          "found_year": 1997
+        },
+        {
+          "id": "carex-acutiformis-003",
+          "coordinates": [
+            45.0477,
+            59.5795
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Соколов",
+          "found_year": 1981
+        }
+      ]
+    },
+    {
+      "id": "trollius-europaeus",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Ranunculaceae",
+      "name_ru": "Садовник европейский",
+      "name_latin": "Trollius europaeus",
+      "findings": [
+        {
+          "id": "trollius-europaeus-001",
+          "coordinates": [
+            41.5748,
+            60.1814
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Волков",
+          "found_year": 1994
+        },
+        {
+          "id": "trollius-europaeus-002",
+          "coordinates": [
+            43.6589,
+            58.3108
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Морозов",
+          "found_year": 1970
+        },
+        {
+          "id": "trollius-europaeus-003",
+          "coordinates": [
+            42.3965,
+            57.8953
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Волков",
+          "found_year": 2014
+        }
+      ]
+    },
+    {
+      "id": "cypripedium-calceolus",
+      "regnum": "plantae",
+      "status": "EN",
+      "family": "Orchidaceae",
+      "name_ru": "Башмачок настоящий",
+      "name_latin": "Cypripedium calceolus",
+      "findings": [
+        {
+          "id": "cypripedium-calceolus-001",
+          "coordinates": [
+            39.4219,
+            59.4624
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Волков",
+          "found_year": 1971
+        },
+        {
+          "id": "cypripedium-calceolus-002",
+          "coordinates": [
+            42.1843,
+            57.6423
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Орлова",
+          "found_year": 1974
+        },
+        {
+          "id": "cypripedium-calceolus-003",
+          "coordinates": [
+            35.6095,
+            60.6051
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Лебедев",
+          "found_year": 2010
+        }
+      ]
+    },
+    {
+      "id": "nymphaea-candida",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Nymphaeaceae",
+      "name_ru": "Кувшинка белая",
+      "name_latin": "Nymphaea candida",
+      "findings": [
+        {
+          "id": "nymphaea-candida-001",
+          "coordinates": [
+            40.7738,
+            60.2704
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Соколов",
+          "found_year": 1973
+        },
+        {
+          "id": "nymphaea-candida-002",
+          "coordinates": [
+            43.7052,
+            61.3553
+          ],
+          "found_by": "Кузнецов",
+          "identified_by": "Петров",
+          "found_year": 2003
+        },
+        {
+          "id": "nymphaea-candida-003",
+          "coordinates": [
+            39.819,
+            58.508
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Соколов",
+          "found_year": 1993
+        }
+      ]
+    },
+    {
+      "id": "equisetum-fluviatile",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Equisetaceae",
+      "name_ru": "Хвощ речной",
+      "name_latin": "Equisetum fluviatile",
+      "findings": [
+        {
+          "id": "equisetum-fluviatile-001",
+          "coordinates": [
+            38.9333,
+            61.2165
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Смирнов",
+          "found_year": 2016
+        },
+        {
+          "id": "equisetum-fluviatile-002",
+          "coordinates": [
+            42.8033,
+            59.2576
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Смирнов",
+          "found_year": 1973
+        },
+        {
+          "id": "equisetum-fluviatile-003",
+          "coordinates": [
+            39.2776,
+            58.0167
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Петров",
+          "found_year": 2000
+        }
+      ]
+    },
+    {
+      "id": "martes-martes",
+      "regnum": "animalia",
+      "status": "LC",
+      "family": "Mustelidae",
+      "name_ru": "Куница лесная",
+      "name_latin": "Martes martes",
+      "findings": [
+        {
+          "id": "martes-martes-001",
+          "coordinates": [
+            42.2399,
+            59.3579
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Орлова",
+          "found_year": 1997
+        },
+        {
+          "id": "martes-martes-002",
+          "coordinates": [
+            41.5905,
+            61.6015
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Лебедев",
+          "found_year": 2006
+        },
+        {
+          "id": "martes-martes-003",
+          "coordinates": [
+            36.329,
+            58.1581
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Лебедев",
+          "found_year": 1977
+        }
+      ]
+    },
+    {
+      "id": "grus-grus",
+      "regnum": "animalia",
+      "status": "LC",
+      "family": "Gruidae",
+      "name_ru": "Журавль-серый",
+      "name_latin": "Grus grus",
+      "findings": [
+        {
+          "id": "grus-grus-001",
+          "coordinates": [
+            45.2269,
+            57.8453
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Морозов",
+          "found_year": 1986
+        },
+        {
+          "id": "grus-grus-002",
+          "coordinates": [
+            41.7512,
+            58.7659
+          ],
+          "found_by": "Павлов",
+          "identified_by": "Петров",
+          "found_year": 2024
+        },
+        {
+          "id": "grus-grus-003",
+          "coordinates": [
+            38.8105,
+            61.5211
+          ],
+          "found_by": "Кузнецов",
+          "identified_by": "Волков",
+          "found_year": 1971
+        }
+      ]
+    },
+    {
+      "id": "perca-fluviatilis",
+      "regnum": "animalia",
+      "status": "LC",
+      "family": "Percidae",
+      "name_ru": "Окунь речной",
+      "name_latin": "Perca fluviatilis",
+      "findings": [
+        {
+          "id": "perca-fluviatilis-001",
+          "coordinates": [
+            41.4973,
+            59.1395
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Лебедев",
+          "found_year": 2023
+        },
+        {
+          "id": "perca-fluviatilis-002",
+          "coordinates": [
+            39.7735,
+            60.9269
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Волков",
+          "found_year": 2001
+        },
+        {
+          "id": "perca-fluviatilis-003",
+          "coordinates": [
+            45.5226,
+            60.7986
+          ],
+          "found_by": "Кузнецов",
+          "identified_by": "Морозов",
+          "found_year": 2007
+        }
+      ]
+    },
+    {
+      "id": "rana-temporaria",
+      "regnum": "animalia",
+      "status": "LC",
+      "family": "Ranidae",
+      "name_ru": "Лягушка травяная",
+      "name_latin": "Rana temporaria",
+      "findings": [
+        {
+          "id": "rana-temporaria-001",
+          "coordinates": [
+            43.8765,
+            59.9102
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Петров",
+          "found_year": 1995
+        },
+        {
+          "id": "rana-temporaria-002",
+          "coordinates": [
+            37.8445,
+            58.9479
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Волков",
+          "found_year": 2013
+        },
+        {
+          "id": "rana-temporaria-003",
+          "coordinates": [
+            35.8806,
+            58.5545
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Петров",
+          "found_year": 2013
+        }
+      ]
+    },
+    {
+      "id": "corvus-corax",
+      "regnum": "animalia",
+      "status": "LC",
+      "family": "Corvidae",
+      "name_ru": "Ворон",
+      "name_latin": "Corvus corax",
+      "findings": [
+        {
+          "id": "corvus-corax-001",
+          "coordinates": [
+            44.1968,
+            59.3453
+          ],
+          "found_by": "Павлов",
+          "identified_by": "Козлов",
+          "found_year": 1994
+        },
+        {
+          "id": "corvus-corax-002",
+          "coordinates": [
+            37.2272,
+            59.663
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Морозов",
+          "found_year": 1980
+        },
+        {
+          "id": "corvus-corax-003",
+          "coordinates": [
+            42.0965,
+            59.1745
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Волков",
+          "found_year": 2014
+        }
+      ]
+    },
+    {
+      "id": "leccinum-versipelle",
+      "regnum": "fungi",
+      "status": "LC",
+      "family": "Boletaceae",
+      "name_ru": "Подберёзовик жёлтый",
+      "name_latin": "Leccinum versipelle",
+      "findings": [
+        {
+          "id": "leccinum-versipelle-001",
+          "coordinates": [
+            37.3344,
+            61.6124
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Волков",
+          "found_year": 1988
+        },
+        {
+          "id": "leccinum-versipelle-002",
+          "coordinates": [
+            44.1159,
+            60.6873
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Морозов",
+          "found_year": 1996
+        },
+        {
+          "id": "leccinum-versipelle-003",
+          "coordinates": [
+            44.9507,
+            59.3163
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Волков",
+          "found_year": 2006
+        }
+      ]
+    },
+    {
+      "id": "lactarius-rufus",
+      "regnum": "fungi",
+      "status": "LC",
+      "family": "Russulaceae",
+      "name_ru": "Груздь рыжий",
+      "name_latin": "Lactarius rufus",
+      "findings": [
+        {
+          "id": "lactarius-rufus-001",
+          "coordinates": [
+            43.4843,
+            61.3238
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Морозов",
+          "found_year": 2008
+        },
+        {
+          "id": "lactarius-rufus-002",
+          "coordinates": [
+            41.7656,
+            61.2659
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Козлов",
+          "found_year": 1973
+        },
+        {
+          "id": "lactarius-rufus-003",
+          "coordinates": [
+            40.0182,
+            61.1984
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Смирнов",
+          "found_year": 1987
+        }
+      ]
+    },
+    {
+      "id": "hydnum-repandum",
+      "regnum": "fungi",
+      "status": "LC",
+      "family": "Hydnaceae",
+      "name_ru": "Ежовик жёлтый",
+      "name_latin": "Hydnum repandum",
+      "findings": [
+        {
+          "id": "hydnum-repandum-001",
+          "coordinates": [
+            42.6183,
+            57.5822
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Волков",
+          "found_year": 2024
+        },
+        {
+          "id": "hydnum-repandum-002",
+          "coordinates": [
+            42.5559,
+            58.702
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Смирнов",
+          "found_year": 2016
+        },
+        {
+          "id": "hydnum-repandum-003",
+          "coordinates": [
+            37.2185,
+            60.931
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Соколов",
+          "found_year": 1983
+        }
+      ]
+    },
+    {
+      "id": "pholiota-adiposa",
+      "regnum": "fungi",
+      "status": "LC",
+      "family": "Hymenogastraceae",
+      "name_ru": "Филло́та масляная",
+      "name_latin": "Pholiota adiposa",
+      "findings": [
+        {
+          "id": "pholiota-adiposa-001",
+          "coordinates": [
+            42.049,
+            60.3416
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Соколов",
+          "found_year": 1997
+        },
+        {
+          "id": "pholiota-adiposa-002",
+          "coordinates": [
+            36.738,
+            57.6965
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Лебедев",
+          "found_year": 2019
+        },
+        {
+          "id": "pholiota-adiposa-003",
+          "coordinates": [
+            36.5326,
+            58.8853
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Смирнов",
+          "found_year": 1981
+        }
+      ]
+    },
+    {
+      "id": "alnus-incana",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Betulaceae",
+      "name_ru": "Ольха серая",
+      "name_latin": "Alnus incana",
+      "findings": [
+        {
+          "id": "alnus-incana-001",
+          "coordinates": [
+            36.7434,
+            58.3162
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Смирнов",
+          "found_year": 2015
+        },
+        {
+          "id": "alnus-incana-002",
+          "coordinates": [
+            43.7111,
+            61.6103
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Волков",
+          "found_year": 2016
+        },
+        {
+          "id": "alnus-incana-003",
+          "coordinates": [
+            40.5879,
+            60.1721
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Морозов",
+          "found_year": 2009
+        }
+      ]
+    },
+    {
+      "id": "salix-caprea",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Salicaceae",
+      "name_ru": "Ива козья",
+      "name_latin": "Salix caprea",
+      "findings": [
+        {
+          "id": "salix-caprea-001",
+          "coordinates": [
+            39.2987,
+            59.9605
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Козлов",
+          "found_year": 1996
+        },
+        {
+          "id": "salix-caprea-002",
+          "coordinates": [
+            42.5553,
+            57.511
+          ],
+          "found_by": "Павлов",
+          "identified_by": "Соколов",
+          "found_year": 2012
+        },
+        {
+          "id": "salix-caprea-003",
+          "coordinates": [
+            42.9173,
+            58.08
+          ],
+          "found_by": "Павлов",
+          "identified_by": "Смирнов",
+          "found_year": 2017
+        }
+      ]
+    },
+    {
+      "id": "trientalis-europaea",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Primulaceae",
+      "name_ru": "Триentalis европейский",
+      "name_latin": "Trientalis europaea",
+      "findings": [
+        {
+          "id": "trientalis-europaea-001",
+          "coordinates": [
+            41.7633,
+            61.7167
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Волков",
+          "found_year": 2022
+        },
+        {
+          "id": "trientalis-europaea-002",
+          "coordinates": [
+            45.4162,
+            59.62
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Волков",
+          "found_year": 1977
+        },
+        {
+          "id": "trientalis-europaea-003",
+          "coordinates": [
+            38.162,
+            58.55
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Лебедев",
+          "found_year": 2013
+        }
+      ]
+    },
+    {
+      "id": "linnaea-borealis",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Caprifoliaceae",
+      "name_ru": "Линнея северная",
+      "name_latin": "Linnaea borealis",
+      "findings": [
+        {
+          "id": "linnaea-borealis-001",
+          "coordinates": [
+            39.1355,
+            61.2176
+          ],
+          "found_by": "Павлов",
+          "identified_by": "Морозов",
+          "found_year": 2008
+        },
+        {
+          "id": "linnaea-borealis-002",
+          "coordinates": [
+            39.7496,
+            61.3641
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Смирнов",
+          "found_year": 2016
+        },
+        {
+          "id": "linnaea-borealis-003",
+          "coordinates": [
+            38.973,
+            58.839
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Волков",
+          "found_year": 1998
+        }
+      ]
+    },
+    {
+      "id": "pyrola-rotundifolia",
+      "regnum": "plantae",
+      "status": "LC",
+      "family": "Ericaceae",
+      "name_ru": "Подорожник круглолистный",
+      "name_latin": "Pyrola rotundifolia",
+      "findings": [
+        {
+          "id": "pyrola-rotundifolia-001",
+          "coordinates": [
+            42.3208,
+            59.7748
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Соколов",
+          "found_year": 2016
+        },
+        {
+          "id": "pyrola-rotundifolia-002",
+          "coordinates": [
+            40.1059,
+            61.6452
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Смирнов",
+          "found_year": 1998
+        },
+        {
+          "id": "pyrola-rotundifolia-003",
+          "coordinates": [
+            41.3643,
+            60.0232
+          ],
+          "found_by": "Павлов",
+          "identified_by": "Орлова",
+          "found_year": 1974
+        }
+      ]
+    },
+    {
+      "id": "drosera-rotundifolia",
+      "regnum": "plantae",
+      "status": "NT",
+      "family": "Droseraceae",
+      "name_ru": "Росянка круглолистная",
+      "name_latin": "Drosera rotundifolia",
+      "findings": [
+        {
+          "id": "drosera-rotundifolia-001",
+          "coordinates": [
+            41.291,
+            58.4973
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Волков",
+          "found_year": 1985
+        },
+        {
+          "id": "drosera-rotundifolia-002",
+          "coordinates": [
+            40.718,
+            60.7374
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Соколов",
+          "found_year": 2007
+        },
+        {
+          "id": "drosera-rotundifolia-003",
+          "coordinates": [
+            42.2408,
+            58.0378
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Волков",
+          "found_year": 1990
+        }
+      ]
+    },
+    {
+      "id": "accipiter-gentilis",
+      "regnum": "animalia",
+      "status": "LC",
+      "family": "Accipitridae",
+      "name_ru": "Тетеревятник",
+      "name_latin": "Accipiter gentilis",
+      "findings": [
+        {
+          "id": "accipiter-gentilis-001",
+          "coordinates": [
+            43.7648,
+            61.539
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Орлова",
+          "found_year": 1972
+        },
+        {
+          "id": "accipiter-gentilis-002",
+          "coordinates": [
+            43.8692,
+            60.8467
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Смирнов",
+          "found_year": 2004
+        },
+        {
+          "id": "accipiter-gentilis-003",
+          "coordinates": [
+            38.0553,
+            58.162
+          ],
+          "found_by": "Иванов",
+          "identified_by": "Волков",
+          "found_year": 1984
+        }
+      ]
+    },
+    {
+      "id": "picus-viridis",
+      "regnum": "animalia",
+      "status": "LC",
+      "family": "Picidae",
+      "name_ru": "Зелёный дятел",
+      "name_latin": "Picus viridis",
+      "findings": [
+        {
+          "id": "picus-viridis-001",
+          "coordinates": [
+            43.3631,
+            58.0272
+          ],
+          "found_by": "Павлов",
+          "identified_by": "Морозов",
+          "found_year": 1984
+        },
+        {
+          "id": "picus-viridis-002",
+          "coordinates": [
+            38.8356,
+            60.8128
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Смирнов",
+          "found_year": 1983
+        },
+        {
+          "id": "picus-viridis-003",
+          "coordinates": [
+            42.5996,
+            61.4837
+          ],
+          "found_by": "Кузнецов",
+          "identified_by": "Козлов",
+          "found_year": 2004
+        }
+      ]
+    },
+    {
+      "id": "erithacus-rubecula",
+      "regnum": "animalia",
+      "status": "LC",
+      "family": "Muscicapidae",
+      "name_ru": "Зарянка",
+      "name_latin": "Erithacus rubecula",
+      "findings": [
+        {
+          "id": "erithacus-rubecula-001",
+          "coordinates": [
+            43.1207,
+            58.8492
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Козлов",
+          "found_year": 1972
+        },
+        {
+          "id": "erithacus-rubecula-002",
+          "coordinates": [
+            35.5889,
+            57.9872
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Морозов",
+          "found_year": 2008
+        },
+        {
+          "id": "erithacus-rubecula-003",
+          "coordinates": [
+            36.0903,
+            60.4816
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Козлов",
+          "found_year": 1993
+        }
+      ]
+    },
+    {
+      "id": "gavia-arctica",
+      "regnum": "animalia",
+      "status": "LC",
+      "family": "Gaviidae",
+      "name_ru": "Чернозобая гагара",
+      "name_latin": "Gavia arctica",
+      "findings": [
+        {
+          "id": "gavia-arctica-001",
+          "coordinates": [
+            45.3934,
+            61.6256
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Морозов",
+          "found_year": 1977
+        },
+        {
+          "id": "gavia-arctica-002",
+          "coordinates": [
+            39.8203,
+            59.5036
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Волков",
+          "found_year": 1989
+        },
+        {
+          "id": "gavia-arctica-003",
+          "coordinates": [
+            41.2371,
+            60.0655
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Соколов",
+          "found_year": 2000
+        }
+      ]
+    },
+    {
+      "id": "columba-palumbus",
+      "regnum": "animalia",
+      "status": "LC",
+      "family": "Columbidae",
+      "name_ru": "Вяхирь",
+      "name_latin": "Columba palumbus",
+      "findings": [
+        {
+          "id": "columba-palumbus-001",
+          "coordinates": [
+            42.5765,
+            59.2881
+          ],
+          "found_by": "Федоров",
+          "identified_by": "Соколов",
+          "found_year": 2003
+        },
+        {
+          "id": "columba-palumbus-002",
+          "coordinates": [
+            38.8625,
+            60.4882
+          ],
+          "found_by": "Кузнецов",
+          "identified_by": "Соколов",
+          "found_year": 1989
+        },
+        {
+          "id": "columba-palumbus-003",
+          "coordinates": [
+            41.9238,
+            58.4818
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Лебедев",
+          "found_year": 2022
+        }
+      ]
+    },
+    {
+      "id": "clitocybe-nebularis",
+      "regnum": "fungi",
+      "status": "LC",
+      "family": "Tricholomataceae",
+      "name_ru": "Говорушка дымчатая",
+      "name_latin": "Clitocybe nebularis",
+      "findings": [
+        {
+          "id": "clitocybe-nebularis-001",
+          "coordinates": [
+            41.1258,
+            58.9456
+          ],
+          "found_by": "Суслова",
+          "identified_by": "Лебедев",
+          "found_year": 1976
+        },
+        {
+          "id": "clitocybe-nebularis-002",
+          "coordinates": [
+            35.5778,
+            59.6386
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Петров",
+          "found_year": 1974
+        },
+        {
+          "id": "clitocybe-nebularis-003",
+          "coordinates": [
+            44.0773,
+            57.5245
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Морозов",
+          "found_year": 1991
+        }
+      ]
+    },
+    {
+      "id": "cortinarius-violaceus",
+      "regnum": "fungi",
+      "status": "LC",
+      "family": "Cortinariaceae",
+      "name_ru": "Паутинник фиолетовый",
+      "name_latin": "Cortinarius violaceus",
+      "findings": [
+        {
+          "id": "cortinarius-violaceus-001",
+          "coordinates": [
+            39.4835,
+            59.6345
+          ],
+          "found_by": "Павлов",
+          "identified_by": "Петров",
+          "found_year": 2018
+        },
+        {
+          "id": "cortinarius-violaceus-002",
+          "coordinates": [
+            35.7367,
+            58.2214
+          ],
+          "found_by": "Кузнецов",
+          "identified_by": "Морозов",
+          "found_year": 2006
+        },
+        {
+          "id": "cortinarius-violaceus-003",
+          "coordinates": [
+            38.7703,
+            59.0999
+          ],
+          "found_by": "Сидоров",
+          "identified_by": "Морозов",
+          "found_year": 2007
+        }
+      ]
+    },
+    {
+      "id": "macrolepiota-procera",
+      "regnum": "fungi",
+      "status": "LC",
+      "family": "Agaricaceae",
+      "name_ru": "Зонтик пёстрый",
+      "name_latin": "Macrolepiota procera",
+      "findings": [
+        {
+          "id": "macrolepiota-procera-001",
+          "coordinates": [
+            40.6236,
+            61.022
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Петров",
+          "found_year": 1992
+        },
+        {
+          "id": "macrolepiota-procera-002",
+          "coordinates": [
+            40.618,
+            59.3396
+          ],
+          "found_by": "Морозова",
+          "identified_by": "Смирнов",
+          "found_year": 1990
+        },
+        {
+          "id": "macrolepiota-procera-003",
+          "coordinates": [
+            45.0022,
+            59.8861
+          ],
+          "found_by": "Волкова",
+          "identified_by": "Петров",
+          "found_year": 1995
+        }
+      ]
+    },
+    {
+      "id": "tricholoma-equestre",
+      "regnum": "fungi",
+      "status": "LC",
+      "family": "Tricholomataceae",
+      "name_ru": "Рядовка жёлтая",
+      "name_latin": "Tricholoma equestre",
+      "findings": [
+        {
+          "id": "tricholoma-equestre-001",
+          "coordinates": [
+            37.5018,
+            59.7119
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Лебедев",
+          "found_year": 2004
+        },
+        {
+          "id": "tricholoma-equestre-002",
+          "coordinates": [
+            45.3842,
+            61.4815
+          ],
+          "found_by": "Орлов",
+          "identified_by": "Лебедев",
+          "found_year": 1972
+        },
+        {
+          "id": "tricholoma-equestre-003",
+          "coordinates": [
+            37.8853,
+            57.8458
+          ],
+          "found_by": "Новиков",
+          "identified_by": "Орлова",
+          "found_year": 1990
+        }
+      ]
     }
   ]
 }

@@ -28,6 +28,16 @@
           "found_by": "Суслова",
           "identified_by": "Суслова",
           "found_year": 2003
+        },
+        {
+          "id": "orchis-militaris-003",
+          "coordinates": [
+            38.09168228913333,
+            59.37110766711524
+          ],
+          "found_by": "Паланов",
+          "identified_by": "Паланов",
+          "found_year": 2004
         }
       ]
     }

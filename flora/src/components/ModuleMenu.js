@@ -114,25 +114,24 @@ export default function ModuleMenu({
           {TEST_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator" aria-hidden="true" />
           <li className="module-menu-toggle-item module-menu-data-source">
-            <span className="module-menu-data-source-label">Данные на карте</span>
-            <div className="module-menu-data-source-options" role="radiogroup" aria-label="Данные на карте">
-              {DATA_SOURCE_OPTIONS.map(({ value, label, title }) => (
-                <label
-                  key={value}
-                  className="module-menu-data-source-option"
-                  title={title}
-                >
-                  <input
-                    type="radio"
-                    name="data-source"
-                    value={value}
-                    checked={dataSourceMode === value}
-                    onChange={(event) => onDataSourceModeChange?.(event.target.value)}
-                  />
-                  <span>{label}</span>
-                </label>
-              ))}
-            </div>
+            <label className="module-menu-data-source-field" htmlFor="module-menu-data-source-select">
+              <span className="module-menu-data-source-label">Точки</span>
+              <select
+                id="module-menu-data-source-select"
+                className="module-menu-data-source-select"
+                value={dataSourceMode}
+                title={
+                  DATA_SOURCE_OPTIONS.find(({ value }) => value === dataSourceMode)?.title
+                }
+                onChange={(event) => onDataSourceModeChange?.(event.target.value)}
+              >
+                {DATA_SOURCE_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </li>
           <li className="module-menu-toggle-item">
             <label className="module-menu-switch" title="Использовать подложку OpenStreetMap вместо стандартной карты">
