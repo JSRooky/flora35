@@ -46,6 +46,20 @@ let pointHoverPopup = null;
 let pointHoverPopupHideTimer = null;
 let clusterHoverRequestId = 0;
 let hoverTooltipsEnabled = true;
+let mapCursorOverride = null;
+
+function applyMapCursor(map, cursor) {
+  map.getCanvas().style.cursor = mapCursorOverride ?? cursor;
+}
+
+/** Принудительный курсор карты (например, crosshair при указании места находки). */
+export function setMapCursorOverride(map, cursor) {
+  mapCursorOverride = cursor;
+
+  if (map?.getCanvas()) {
+    applyMapCursor(map, cursor ?? "");
+  }
+}
 
 const POINT_TOOLTIP_FADE_MS = 180;
 
@@ -718,7 +732,9 @@ function attachLocationsInteractions(map) {
   };
 
   const clusterEnter = (event) => {
-    map.getCanvas().style.cursor = "pointer";
+    if (!mapCursorOverride) {
+      map.getCanvas().style.cursor = "pointer";
+    }
 
     if (!hoverTooltipsEnabled) {
       return;
@@ -747,7 +763,7 @@ function attachLocationsInteractions(map) {
   };
 
   const clusterLeave = () => {
-    map.getCanvas().style.cursor = "";
+    applyMapCursor(map, "");
     cancelClusterHoverRequest();
     removePointHoverPopup();
   };
@@ -760,7 +776,9 @@ function attachLocationsInteractions(map) {
   };
 
   const pointEnter = (event) => {
-    map.getCanvas().style.cursor = "pointer";
+    if (!mapCursorOverride) {
+      map.getCanvas().style.cursor = "pointer";
+    }
 
     if (!hoverTooltipsEnabled) {
       return;
@@ -784,7 +802,7 @@ function attachLocationsInteractions(map) {
   };
 
   const pointLeave = () => {
-    map.getCanvas().style.cursor = "";
+    applyMapCursor(map, "");
     removePointHoverPopup();
   };
 

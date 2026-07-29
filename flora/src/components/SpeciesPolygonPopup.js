@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { getPointsForSpecies } from "./addSpeciesPolygonLayer";
+import { getPointsForSpecies, POLYGON_BUILD_MODES } from "./addSpeciesPolygonLayer";
+import { formatPointCount } from "./featurePropertyLabels";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/SpeciesPolygonPopup.css";
@@ -19,22 +20,6 @@ function formatSpeciesCount(count) {
   }
 
   return `${count} видов`;
-}
-
-/** Склонение «N точка/точки/точек» для русского интерфейса. */
-function formatPointCount(count) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-
-  if (mod10 === 1 && mod100 !== 11) {
-    return `${count} точка`;
-  }
-
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${count} точки`;
-  }
-
-  return `${count} точек`;
 }
 
 function getSpeciesLabel(species, speciesList) {
@@ -84,6 +69,10 @@ function getStatusMessage(feature, polygonInfo) {
   }
 
   if (polygonInfo.built) {
+    if (polygonInfo.mode === POLYGON_BUILD_MODES.ALL_POINTS) {
+      return "Полигон построен по всем точкам вида (может быть вогнутым).";
+    }
+
     return "Полигон построен по точкам вида (выпуклая оболочка).";
   }
 
@@ -100,6 +89,7 @@ export default function SpeciesPolygonPopup({
   polygonInfo,
   containedSpecies = null,
   onBuild,
+  onBuildAllPoints,
   onReset,
   onSpeciesSelect,
   collapsed = false,
@@ -115,6 +105,7 @@ export default function SpeciesPolygonPopup({
   const speciesLatin = feature?.properties?.name_latin;
   const pointCount = feature ? getPointsForSpecies(feature).length : 0;
   const canBuild = Boolean(feature) && pointCount > 0;
+  const canBuildAllPoints = canBuild && pointCount >= 3;
   const hasContainedSpecies = polygonInfo?.built;
   const hasSpeciesInPolygon = containedSpecies?.count > 0;
 
@@ -173,6 +164,19 @@ export default function SpeciesPolygonPopup({
               disabled={!canBuild}
             >
               Построить
+            </button>
+            <button
+              type="button"
+              className="species-polygon-build-all-btn"
+              onClick={onBuildAllPoints}
+              disabled={!canBuildAllPoints}
+              title={
+                canBuildAllPoints
+                  ? "Построить полигон через все точки вида"
+                  : "Нужно не менее трёх точек вида"
+              }
+            >
+              Все точки
             </button>
             <button
               type="button"

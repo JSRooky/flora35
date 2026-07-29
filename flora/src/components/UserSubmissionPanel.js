@@ -35,7 +35,7 @@ function formatCoordinates(coordinates) {
   }
 
   const [lng, lat] = coordinates;
-  return `${lat.toFixed(5)}, ${lng.toFixed(5)} (шир, долг)`;
+  return `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
 }
 
 function applySpeciesToForm(species) {
@@ -50,9 +50,12 @@ function applySpeciesToForm(species) {
 
 export default function UserSubmissionPanel({
   coordinates,
+  locationPickingActive = false,
+  onLocationPickingChange,
   collapsed: collapsedProp,
   onCollapsedChange,
-  onSaved
+  onSaved,
+  onReset
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
   const isControlled = collapsedProp !== undefined;
@@ -110,12 +113,21 @@ export default function UserSubmissionPanel({
     setMessage(null);
   }, []);
 
+  const handleReset = useCallback(() => {
+    setForm(EMPTY_FORM);
+    setMessage(null);
+    onReset?.();
+  }, [onReset]);
+
   const handleSubmit = useCallback(
     async (event) => {
       event.preventDefault();
 
       if (!coordinates) {
-        setMessage({ type: "error", text: "Кликните по карте, чтобы указать место находки." });
+        setMessage({
+          type: "error",
+          text: "Нажмите «Указать место» и кликните по карте."
+        });
         return;
       }
 
@@ -267,14 +279,28 @@ export default function UserSubmissionPanel({
             <fieldset className="user-submission-fieldset">
               <legend className="user-submission-legend">Находка</legend>
 
-              <label className="user-submission-field">
+              <div className="user-submission-field user-submission-location-field">
                 <span>Место находки *</span>
-                <output className="user-submission-coordinates">
-                  {coordinates
-                    ? formatCoordinates(coordinates)
-                    : "Кликните по карте или по существующей точке"}
-                </output>
-              </label>
+                <div className="user-submission-location-row">
+                  <output className="user-submission-coordinates">
+                    {coordinates
+                      ? formatCoordinates(coordinates)
+                      : locationPickingActive
+                        ? "Кликните по карте"
+                        : "Не указано"}
+                  </output>
+                  <button
+                    type="button"
+                    className={`user-submission-location-btn${
+                      locationPickingActive ? " user-submission-location-btn--active" : ""
+                    }`}
+                    onClick={() => onLocationPickingChange?.(!locationPickingActive)}
+                    aria-pressed={locationPickingActive}
+                  >
+                    {locationPickingActive ? "Отмена" : "Указать место"}
+                  </button>
+                </div>
+              </div>
 
               <SubmissionAutocompleteField
                 label="Год находки *"
@@ -313,13 +339,23 @@ export default function UserSubmissionPanel({
               </p>
             )}
 
-            <button
-              type="submit"
-              className="user-submission-submit"
-              disabled={submitting}
-            >
-              {submitting ? "Сохранение…" : "Сохранить"}
-            </button>
+            <div className="user-submission-actions">
+              <button
+                type="submit"
+                className="user-submission-submit"
+                disabled={submitting}
+              >
+                {submitting ? "Сохранение…" : "Сохранить"}
+              </button>
+              <button
+                type="button"
+                className="user-submission-reset"
+                onClick={handleReset}
+                disabled={submitting}
+              >
+                Сброс
+              </button>
+            </div>
           </form>
         </div>
       )}

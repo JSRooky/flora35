@@ -20,7 +20,8 @@ import {
   setClusteringEnabled,
   setClusterPieChartsEnabled,
   setMarkersVisible,
-  setHoverTooltipsEnabled
+  setHoverTooltipsEnabled,
+  setMapCursorOverride
 } from "./components/addLocationsLayer";
 import {
   addHeatmapLayer,
@@ -36,7 +37,8 @@ import {
   addSpeciesPolygonLayer,
   clearSpeciesPolygonLayer,
   getSpeciesPolygonContainedSummary,
-  updateSpeciesPolygonLayer
+  updateSpeciesPolygonLayer,
+  POLYGON_BUILD_MODES
 } from "./components/addSpeciesPolygonLayer";
 import {
   addBufferLayer,
@@ -65,6 +67,7 @@ import YearFilterPanel from "./components/YearFilterPanel";
 import AboutProject from "./components/AboutProject";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
+import { GET_LOCATION_CURSOR } from "./mapCursors";
 import "./MapView.css";
 
 const UserSubmissionPanel = lazy(() => import("./components/UserSubmissionPanel"));
@@ -125,6 +128,7 @@ export default function MapView() {
   const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.ALL);
   const [panelCollapsed, setPanelCollapsed] = useState({});
   const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
+  const [submissionLocationPicking, setSubmissionLocationPicking] = useState(false);
   const hadFoundYearPropertyFilterRef = useRef(false);
 
   const isPanelCollapsed = useCallback(
@@ -254,8 +258,25 @@ export default function MapView() {
   useEffect(() => {
     if (activeModule !== MODULE_IDS.SUBMIT) {
       setSubmissionCoordinates(null);
+      setSubmissionLocationPicking(false);
     }
   }, [activeModule]);
+
+  useEffect(() => {
+    const mapInstance = map.current;
+    if (!mapInstance || !mapReady) {
+      return;
+    }
+
+    setMapCursorOverride(
+      mapInstance,
+      submissionLocationPicking ? GET_LOCATION_CURSOR : null
+    );
+
+    return () => {
+      setMapCursorOverride(mapInstance, null);
+    };
+  }, [submissionLocationPicking, mapReady]);
 
   useEffect(() => {
     if (hasFoundYearPropertyFilter) {
@@ -292,7 +313,14 @@ export default function MapView() {
   const submissionStateRef = useRef({});
   submissionStateRef.current = {
     active: activeModule === MODULE_IDS.SUBMIT,
-    setCoordinates: setSubmissionCoordinates
+    pickingLocation: submissionLocationPicking,
+    setCoordinates: (coords) => {
+      setSubmissionCoordinates([
+        Number(coords[0].toFixed(3)),
+        Number(coords[1].toFixed(3))
+      ]);
+      setSubmissionLocationPicking(false);
+    }
   };
 
   const expandedLeavesRef = useRef(null);
@@ -679,7 +707,20 @@ export default function MapView() {
       return;
     }
 
-    const info = updateSpeciesPolygonLayer(map.current, popupData);
+    const info = updateSpeciesPolygonLayer(map.current, popupData, {
+      mode: POLYGON_BUILD_MODES.CONVEX
+    });
+    setSpeciesPolygonInfo(info);
+  }, [popupData]);
+
+  const handleSpeciesPolygonBuildAllPoints = useCallback(() => {
+    if (!map.current || !popupData) {
+      return;
+    }
+
+    const info = updateSpeciesPolygonLayer(map.current, popupData, {
+      mode: POLYGON_BUILD_MODES.ALL_POINTS
+    });
     setSpeciesPolygonInfo(info);
   }, [popupData]);
 
@@ -826,7 +867,10 @@ export default function MapView() {
               return;
             }
 
-            if (submissionStateRef.current.active) {
+            if (
+              submissionStateRef.current.active &&
+              submissionStateRef.current.pickingLocation
+            ) {
               const coords = feature?.geometry?.coordinates;
               if (coords) {
                 submissionStateRef.current.setCoordinates(coords);
@@ -873,7 +917,11 @@ export default function MapView() {
               return;
             }
 
-            if (submissionStateRef.current.active && event?.lngLat) {
+            if (
+              submissionStateRef.current.active &&
+              submissionStateRef.current.pickingLocation &&
+              event?.lngLat
+            ) {
               submissionStateRef.current.setCoordinates([
                 event.lngLat.lng,
                 event.lngLat.lat
@@ -994,6 +1042,7 @@ export default function MapView() {
               polygonInfo={speciesPolygonInfo}
               containedSpecies={speciesPolygonContainedSpecies}
               onBuild={handleSpeciesPolygonBuild}
+              onBuildAllPoints={handleSpeciesPolygonBuildAllPoints}
               onReset={handleSpeciesPolygonReset}
               onSpeciesSelect={handleSpeciesPolygonSpeciesSelect}
               collapsed={isPanelCollapsed(PANEL_IDS.POLYGON)}
@@ -1032,9 +1081,15 @@ export default function MapView() {
             <Suspense fallback={null}>
               <UserSubmissionPanel
                 coordinates={submissionCoordinates}
+                locationPickingActive={submissionLocationPicking}
+                onLocationPickingChange={setSubmissionLocationPicking}
                 collapsed={isPanelCollapsed(PANEL_IDS.SUBMIT)}
                 onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.SUBMIT)}
                 onSaved={handleUserFindingSaved}
+                onReset={() => {
+                  setSubmissionCoordinates(null);
+                  setSubmissionLocationPicking(false);
+                }}
               />
             </Suspense>
           )}

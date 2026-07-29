@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { getPointsForSpecies } from "./addSpeciesPolygonLayer";
 import FeatureImagesPopup from "./FeatureImagesPopup";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import SpeciesDescriptionPopup from "./SpeciesDescriptionPopup";
 import {
+  formatPointCount,
   formatPropertyValue,
   getPropertyLabel,
   sortPropertyEntries
@@ -57,9 +59,8 @@ export default function FeaturePopup({
       "Точка данных"
     : "Точка не выбрана";
 
-  const geometry = feature?.geometry;
   const properties = feature?.properties;
-  const [lng, lat] = geometry?.coordinates ?? [0, 0];
+  const speciesPointCount = feature ? getPointsForSpecies(feature).length : 0;
   const images = properties ? getImages(properties) : [];
   const descriptionPath = properties?.description_md;
   // status выводится отдельно — у него свой фильтр через StatusFilterPanel.
@@ -110,13 +111,8 @@ export default function FeaturePopup({
             {feature ? (
               <>
                 <div className="popup-item">
-                  <strong>Широта:</strong>
-                  <span>{lat.toFixed(4)}</span>
-                </div>
-
-                <div className="popup-item">
-                  <strong>Долгота:</strong>
-                  <span>{lng.toFixed(4)}</span>
+                  <strong>Точек вида на карте:</strong>
+                  <span>{formatPointCount(speciesPointCount)}</span>
                 </div>
 
                 {displayProperties.length > 0 && (

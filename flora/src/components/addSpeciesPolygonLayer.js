@@ -1,4 +1,4 @@
-import { booleanPointInPolygon, buffer, convex, featureCollection, lineString, point } from "@turf/turf";
+import { booleanPointInPolygon, buffer, convex, featureCollection, lineString, point, polygon } from "@turf/turf";
 import { getFilteredFeatures, getPointColorForRegnum } from "./addLocationsLayer";
 
 const EMPTY_COLLECTION = {
@@ -7,6 +7,11 @@ const EMPTY_COLLECTION = {
 };
 
 const SOURCE_ID = "species-polygon";
+
+export const POLYGON_BUILD_MODES = {
+  CONVEX: "convex",
+  ALL_POINTS: "all_points"
+};
 
 /** Ключ вида — латинское название. */
 export function getSpeciesKey(feature) {
@@ -29,7 +34,22 @@ export function getPointsForSpecies(feature) {
  * Строит GeoJSON-полигон по набору координат.
  * Turf convex требует минимум три точки; для одной и двух — буфер вокруг точки/отрезка.
  */
-function buildPolygonFromCoordinates(coordinates) {
+function dedupeCoordinates(coordinates) {
+  const seen = new Set();
+
+  return coordinates.filter(([lon, lat]) => {
+    const key = `${lon.toFixed(6)},${lat.toFixed(6)}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function buildConvexPolygon(coordinates) {
   if (coordinates.length === 0) {
     return null;
   }
@@ -43,6 +63,41 @@ function buildPolygonFromCoordinates(coordinates) {
   }
 
   return convex(featureCollection(coordinates.map((coords) => point(coords))));
+}
+
+/** Полигон через все точки: вершины упорядочены по углу относительно центра. */
+function buildAllPointsPolygon(coordinates) {
+  const uniqueCoordinates = dedupeCoordinates(coordinates);
+
+  if (uniqueCoordinates.length === 0) {
+    return null;
+  }
+
+  if (uniqueCoordinates.length <= 2) {
+    return buildConvexPolygon(uniqueCoordinates);
+  }
+
+  const centroid = uniqueCoordinates.reduce(
+    (accumulator, [lon, lat]) => [accumulator[0] + lon, accumulator[1] + lat],
+    [0, 0]
+  ).map((value) => value / uniqueCoordinates.length);
+
+  const sortedCoordinates = [...uniqueCoordinates].sort((a, b) => {
+    const angleA = Math.atan2(a[1] - centroid[1], a[0] - centroid[0]);
+    const angleB = Math.atan2(b[1] - centroid[1], b[0] - centroid[0]);
+    return angleA - angleB;
+  });
+
+  const ring = [...sortedCoordinates, sortedCoordinates[0]];
+  return polygon([ring]);
+}
+
+function buildPolygonFromCoordinates(coordinates, mode = POLYGON_BUILD_MODES.CONVEX) {
+  if (mode === POLYGON_BUILD_MODES.ALL_POINTS) {
+    return buildAllPointsPolygon(coordinates);
+  }
+
+  return buildConvexPolygon(coordinates);
 }
 
 /** Добавляет на карту слой полигона вида (изначально пустой). */
@@ -80,9 +135,13 @@ export function addSpeciesPolygonLayer(map) {
 /**
  * Строит полигон (выпуклая оболочка Turf.js) по всем точкам выбранного вида
  * и отображает его на карте.
- * Возвращает сводку для панели модуля: built, pointCount, nameRu, nameLatin.
+ * Возвращает сводку для панели модуля: built, pointCount, nameRu, nameLatin, mode.
  */
-export function updateSpeciesPolygonLayer(map, feature) {
+export function updateSpeciesPolygonLayer(
+  map,
+  feature,
+  { mode = POLYGON_BUILD_MODES.CONVEX } = {}
+) {
   const source = map.getSource(SOURCE_ID);
   if (!source) {
     return { built: false, pointCount: 0 };
@@ -93,7 +152,7 @@ export function updateSpeciesPolygonLayer(map, feature) {
     .map((speciesFeature) => speciesFeature.geometry?.coordinates)
     .filter(Boolean);
 
-  const polygon = buildPolygonFromCoordinates(coordinates);
+  const polygon = buildPolygonFromCoordinates(coordinates, mode);
 
   if (!polygon) {
     source.setData(EMPTY_COLLECTION);
@@ -101,7 +160,8 @@ export function updateSpeciesPolygonLayer(map, feature) {
       built: false,
       pointCount: coordinates.length,
       nameRu: feature.properties?.name_ru,
-      nameLatin: feature.properties?.name_latin
+      nameLatin: feature.properties?.name_latin,
+      mode
     };
   }
 
@@ -125,7 +185,8 @@ export function updateSpeciesPolygonLayer(map, feature) {
     pointCount: coordinates.length,
     nameRu: feature.properties?.name_ru,
     nameLatin: feature.properties?.name_latin,
-    polygon
+    polygon,
+    mode
   };
 }
 
