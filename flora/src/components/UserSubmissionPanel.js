@@ -164,11 +164,18 @@ export default function UserSubmissionPanel({
         });
 
         setForm(EMPTY_FORM);
-        onSaved?.(collection);
-        setMessage({
-          type: "success",
-          text: "Данные сохранены в src/locations/userpoints.json и добавлены на карту."
-        });
+        if (collection) {
+          onSaved?.(collection);
+          setMessage({
+            type: "success",
+            text: "Данные сохранены в src/locations/userpoints.json и добавлены на карту."
+          });
+        } else {
+          setMessage({
+            type: "success",
+            text: "Данные отправлены в Firebase (коллекция user_submissions)."
+          });
+        }
       } catch (error) {
         setMessage({
           type: "error",
