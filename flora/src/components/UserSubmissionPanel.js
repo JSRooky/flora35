@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { saveUserFinding } from "../locations/saveUserFinding";
+import { isFirebaseConfigured } from "../firebase/config";
 import {
   buildSubmissionSuggestionData,
   filterSpeciesByNameLatin,
@@ -164,18 +165,13 @@ export default function UserSubmissionPanel({
         });
 
         setForm(EMPTY_FORM);
-        if (collection) {
-          onSaved?.(collection);
-          setMessage({
-            type: "success",
-            text: "Данные сохранены в src/locations/userpoints.json и добавлены на карту."
-          });
-        } else {
-          setMessage({
-            type: "success",
-            text: "Данные отправлены в Firebase (коллекция user_submissions)."
-          });
-        }
+        onSaved?.(collection);
+        setMessage({
+          type: "success",
+          text: isFirebaseConfigured()
+            ? "Данные отправлены в Firebase и добавлены на карту."
+            : "Данные сохранены в src/locations/userpoints.json и добавлены на карту."
+        });
       } catch (error) {
         setMessage({
           type: "error",

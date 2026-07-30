@@ -21,7 +21,11 @@
     "build": "cross-env GENERATE_SOURCEMAP=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy:firestore-rules": "firebase deploy --only firestore:rules"
+    "deploy:firestore-rules": "firebase deploy --only firestore:rules",
+    "import:firestore-locations": "node scripts/import-locations-to-firestore.mjs",
+    "import:firestore-locations:dry-run": "node scripts/import-locations-to-firestore.mjs --dry-run",
+    "import:firestore-submissions": "node scripts/import-user-submissions-to-firestore.mjs",
+    "import:firestore-submissions:dry-run": "node scripts/import-user-submissions-to-firestore.mjs --dry-run"
   },
   "eslintConfig": {
     "extends": [
@@ -43,6 +47,7 @@
   },
   "devDependencies": {
     "cross-env": "^10.1.0",
+    "firebase-admin": "^13.0.0",
     "firebase-tools": "^15.0.0",
     "worker-loader": "^3.0.8"
   }
