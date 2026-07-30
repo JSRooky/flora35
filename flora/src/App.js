@@ -65,6 +65,7 @@ import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
 import YearFilterPanel from "./components/YearFilterPanel";
 import AboutProject from "./components/AboutProject";
+import FeedbackWidget from "./components/FeedbackWidget";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
@@ -1096,6 +1097,7 @@ export default function MapView() {
         </div>
       )}
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
+      <FeedbackWidget />
     </>
   );
 }

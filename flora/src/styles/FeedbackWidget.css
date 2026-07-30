@@ -1,0 +1,92 @@
+.feedback-widget {
+  position: fixed;
+  left: 20px;
+  bottom: 16px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.feedback-widget-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  pointer-events: auto;
+  transition: background-color 0.2s ease;
+}
+
+.feedback-widget-bar:hover {
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.feedback-widget-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 6px;
+  color: #8e8e93;
+  text-decoration: none;
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+
+.feedback-widget-icon:hover {
+  color: #007aff;
+  background: rgba(0, 122, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.feedback-widget-icon-image {
+  display: block;
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.feedback-widget-icon-image path {
+  fill: currentColor;
+}
+
+.feedback-widget-icon--disabled {
+  color: #8e8e93;
+  opacity: 0.35;
+  cursor: default;
+}
+
+.feedback-widget-icon--disabled:hover {
+  color: #8e8e93;
+  background: transparent;
+  transform: none;
+}
+
+@media (max-width: 768px) {
+  .feedback-widget {
+    left: 10px;
+    bottom: 12px;
+  }
+
+  .feedback-widget-bar {
+    padding: 3px 5px;
+  }
+
+  .feedback-widget-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .feedback-widget-icon-image {
+    width: 20px;
+    height: 20px;
+  }
+}

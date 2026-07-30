@@ -7,6 +7,10 @@ const EMPTY_COLLECTION = {
 };
 
 const SOURCE_ID = "species-polygon";
+const DOT_PATTERN_ID = "species-polygon-dots";
+const DOT_PATTERN_SIZE = 10;
+const DOT_RADIUS = 1.35;
+const DOT_PATTERN_OPACITY = 0.72;
 
 export const POLYGON_BUILD_MODES = {
   CONVEX: "convex",
@@ -100,11 +104,45 @@ function buildPolygonFromCoordinates(coordinates, mode = POLYGON_BUILD_MODES.CON
   return buildConvexPolygon(coordinates);
 }
 
+function createDotPatternImage(red, green, blue, alpha = 255) {
+  const size = DOT_PATTERN_SIZE;
+  const data = new Uint8Array(size * size * 4);
+  const center = size / 2;
+  const radiusSquared = DOT_RADIUS * DOT_RADIUS;
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const index = (y * size + x) * 4;
+      const deltaX = x + 0.5 - center;
+      const deltaY = y + 0.5 - center;
+
+      if (deltaX * deltaX + deltaY * deltaY <= radiusSquared) {
+        data[index] = red;
+        data[index + 1] = green;
+        data[index + 2] = blue;
+        data[index + 3] = alpha;
+      }
+    }
+  }
+
+  return { width: size, height: size, data };
+}
+
+function ensureSpeciesPolygonDotPattern(map) {
+  if (map.hasImage(DOT_PATTERN_ID)) {
+    return;
+  }
+
+  map.addImage(DOT_PATTERN_ID, createDotPatternImage(29, 29, 31), { pixelRatio: 2 });
+}
+
 /** Добавляет на карту слой полигона вида (изначально пустой). */
 export function addSpeciesPolygonLayer(map) {
   if (map.getSource(SOURCE_ID)) {
     return;
   }
+
+  ensureSpeciesPolygonDotPattern(map);
 
   map.addSource(SOURCE_ID, {
     type: "geojson",
@@ -116,8 +154,9 @@ export function addSpeciesPolygonLayer(map) {
     type: "fill",
     source: SOURCE_ID,
     paint: {
-      "fill-color": ["get", "color"],
-      "fill-opacity": 0.25
+      "fill-pattern": DOT_PATTERN_ID,
+      "fill-opacity": DOT_PATTERN_OPACITY,
+      "fill-antialias": true
     }
   });
 
@@ -126,8 +165,9 @@ export function addSpeciesPolygonLayer(map) {
     type: "line",
     source: SOURCE_ID,
     paint: {
-      "line-color": ["get", "color"],
-      "line-width": 2
+      "line-color": ["get", "outlineColor"],
+      "line-width": 2,
+      "line-opacity": 0.9
     }
   });
 }
@@ -169,7 +209,7 @@ export function updateSpeciesPolygonLayer(
 
   polygon.properties = {
     ...polygon.properties,
-    color,
+    outlineColor: color,
     name_latin: feature.properties?.name_latin,
     name_ru: feature.properties?.name_ru,
     pointCount: coordinates.length
