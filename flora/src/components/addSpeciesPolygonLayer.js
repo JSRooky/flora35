@@ -7,10 +7,14 @@ const EMPTY_COLLECTION = {
 };
 
 const SOURCE_ID = "species-polygon";
-const DOT_PATTERN_ID = "species-polygon-dots";
-const DOT_PATTERN_SIZE = 10;
+const DOT_SPACING = 9;
+const DOT_PATTERN_ID = `species-polygon-dots-staggered-${DOT_SPACING}`;
+const DOT_PATTERN_WIDTH = DOT_SPACING;
+const DOT_PATTERN_HEIGHT = DOT_SPACING * 2;
 const DOT_RADIUS = 1.35;
 const DOT_PATTERN_OPACITY = 0.72;
+const OUTLINE_WIDTH = 2;
+const OUTLINE_DASHARRAY = [2, 2];
 
 export const POLYGON_BUILD_MODES = {
   CONVEX: "convex",
@@ -104,28 +108,46 @@ function buildPolygonFromCoordinates(coordinates, mode = POLYGON_BUILD_MODES.CON
   return buildConvexPolygon(coordinates);
 }
 
-function createDotPatternImage(red, green, blue, alpha = 255) {
-  const size = DOT_PATTERN_SIZE;
-  const data = new Uint8Array(size * size * 4);
-  const center = size / 2;
+function drawDotInPattern(data, width, height, centerX, centerY, red, green, blue, alpha) {
   const radiusSquared = DOT_RADIUS * DOT_RADIUS;
+  const minX = Math.floor(centerX - DOT_RADIUS - 1);
+  const maxX = Math.ceil(centerX + DOT_RADIUS + 1);
+  const minY = Math.floor(centerY - DOT_RADIUS - 1);
+  const maxY = Math.ceil(centerY + DOT_RADIUS + 1);
 
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const index = (y * size + x) * 4;
-      const deltaX = x + 0.5 - center;
-      const deltaY = y + 0.5 - center;
+  for (let y = minY; y <= maxY; y += 1) {
+    if (y < 0 || y >= height) {
+      continue;
+    }
 
-      if (deltaX * deltaX + deltaY * deltaY <= radiusSquared) {
-        data[index] = red;
-        data[index + 1] = green;
-        data[index + 2] = blue;
-        data[index + 3] = alpha;
+    for (let x = minX; x <= maxX; x += 1) {
+      const deltaX = x + 0.5 - centerX;
+      const deltaY = y + 0.5 - centerY;
+
+      if (deltaX * deltaX + deltaY * deltaY > radiusSquared) {
+        continue;
       }
+
+      const wrappedX = ((x % width) + width) % width;
+      const index = (y * width + wrappedX) * 4;
+      data[index] = red;
+      data[index + 1] = green;
+      data[index + 2] = blue;
+      data[index + 3] = alpha;
     }
   }
+}
 
-  return { width: size, height: size, data };
+/** Повторяющийся паттерн точек в шахматном порядке (смещение каждого второго ряда). */
+function createDotPatternImage(red, green, blue, alpha = 255) {
+  const width = DOT_PATTERN_WIDTH;
+  const height = DOT_PATTERN_HEIGHT;
+  const data = new Uint8Array(width * height * 4);
+
+  drawDotInPattern(data, width, height, width / 2, height / 4, red, green, blue, alpha);
+  drawDotInPattern(data, width, height, 0, (height * 3) / 4, red, green, blue, alpha);
+
+  return { width, height, data };
 }
 
 function ensureSpeciesPolygonDotPattern(map) {
@@ -139,6 +161,9 @@ function ensureSpeciesPolygonDotPattern(map) {
 /** Добавляет на карту слой полигона вида (изначально пустой). */
 export function addSpeciesPolygonLayer(map) {
   if (map.getSource(SOURCE_ID)) {
+    if (map.getLayer("species-polygon-outline")) {
+      map.setPaintProperty("species-polygon-outline", "line-dasharray", OUTLINE_DASHARRAY);
+    }
     return;
   }
 
@@ -166,8 +191,9 @@ export function addSpeciesPolygonLayer(map) {
     source: SOURCE_ID,
     paint: {
       "line-color": ["get", "outlineColor"],
-      "line-width": 2,
-      "line-opacity": 0.9
+      "line-width": OUTLINE_WIDTH,
+      "line-opacity": 0.9,
+      "line-dasharray": OUTLINE_DASHARRAY
     }
   });
 }

@@ -19,6 +19,21 @@ const REGNUM_COLORS = {
 const DEFAULT_CLUSTER_COLOR = "#4a90e2";
 const DEFAULT_POINT_COLOR = "#4a90e2";
 
+const MARKER_RADIUS = 5;
+const SELECTED_MARKER_SCALE = 2;
+const SELECTED_MARKER_RADIUS = MARKER_RADIUS * SELECTED_MARKER_SCALE;
+const SELECTED_MARKER_PULSE_PERIOD_S = 1.4;
+const SELECTED_MARKER_PULSE_AMPLITUDE_RATIO = 0.14;
+
+const SELECTED_POINT_SOURCE_ID = "locations-selected-point";
+const SELECTED_MARKER_LAYER_ID = "locations-selected-marker";
+const SELECTED_POINT_LAYER_IDS = [SELECTED_MARKER_LAYER_ID];
+
+const EMPTY_FEATURE_COLLECTION = {
+  type: "FeatureCollection",
+  features: []
+};
+
 const CLUSTER_REGNUM_KEYS = ["plantae", "animalia", "fungi"];
 
 const CLUSTER_REGNUM_PROPERTIES = Object.fromEntries(
@@ -47,6 +62,9 @@ let pointHoverPopupHideTimer = null;
 let clusterHoverRequestId = 0;
 let hoverTooltipsEnabled = true;
 let mapCursorOverride = null;
+let selectedPointFeature = null;
+let selectedPointPulseFrameId = null;
+let selectedPointPulseMap = null;
 
 function applyMapCursor(map, cursor) {
   map.getCanvas().style.cursor = mapCursorOverride ?? cursor;
@@ -592,6 +610,12 @@ function applyMarkersVisibility(map) {
     }
   });
 
+  SELECTED_POINT_LAYER_IDS.forEach((layerId) => {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", visibility);
+    }
+  });
+
   setClusterPieChartMarkersVisibility(markersVisible);
 }
 
@@ -608,6 +632,150 @@ function getPointColorExpression() {
 
 export function getPointColorForRegnum(regnum) {
   return REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR;
+}
+
+function stopSelectedPointPulse() {
+  if (selectedPointPulseFrameId !== null) {
+    cancelAnimationFrame(selectedPointPulseFrameId);
+    selectedPointPulseFrameId = null;
+  }
+
+  const map = selectedPointPulseMap;
+  selectedPointPulseMap = null;
+
+  if (map?.getLayer(SELECTED_MARKER_LAYER_ID)) {
+    map.setPaintProperty(SELECTED_MARKER_LAYER_ID, "circle-radius", SELECTED_MARKER_RADIUS);
+  }
+}
+
+function startSelectedPointPulse(map) {
+  stopSelectedPointPulse();
+
+  if (!map?.getLayer(SELECTED_MARKER_LAYER_ID) || !selectedPointFeature) {
+    return;
+  }
+
+  selectedPointPulseMap = map;
+  const amplitude = SELECTED_MARKER_RADIUS * SELECTED_MARKER_PULSE_AMPLITUDE_RATIO;
+  const startedAt = performance.now();
+
+  const tick = (now) => {
+    if (
+      selectedPointPulseMap !== map ||
+      !map.getLayer(SELECTED_MARKER_LAYER_ID) ||
+      !selectedPointFeature
+    ) {
+      stopSelectedPointPulse();
+      return;
+    }
+
+    const phase = ((now - startedAt) / 1000 / SELECTED_MARKER_PULSE_PERIOD_S) * Math.PI * 2;
+    const radius = SELECTED_MARKER_RADIUS + Math.sin(phase) * amplitude;
+
+    map.setPaintProperty(SELECTED_MARKER_LAYER_ID, "circle-radius", radius);
+    selectedPointPulseFrameId = requestAnimationFrame(tick);
+  };
+
+  selectedPointPulseFrameId = requestAnimationFrame(tick);
+}
+
+function buildSelectedPointFeature(feature) {
+  const coordinates = feature?.geometry?.coordinates;
+  if (!coordinates) {
+    return null;
+  }
+
+  return {
+    type: "Feature",
+    geometry: {
+      type: "Point",
+      coordinates
+    },
+    properties: {
+      color: getPointColorForRegnum(feature.properties?.regnum)
+    }
+  };
+}
+
+function ensureSelectedPointLayers(map) {
+  if (map.getLayer("locations-selected-glow")) {
+    map.removeLayer("locations-selected-glow");
+  }
+
+  if (!map.getSource(SELECTED_POINT_SOURCE_ID)) {
+    map.addSource(SELECTED_POINT_SOURCE_ID, {
+      type: "geojson",
+      data: EMPTY_FEATURE_COLLECTION
+    });
+  }
+
+  if (!map.getLayer(SELECTED_MARKER_LAYER_ID)) {
+    map.addLayer({
+      id: SELECTED_MARKER_LAYER_ID,
+      type: "circle",
+      source: SELECTED_POINT_SOURCE_ID,
+      paint: {
+        "circle-radius": SELECTED_MARKER_RADIUS,
+        "circle-color": ["get", "color"],
+        "circle-stroke-width": 1,
+        "circle-stroke-color": "#ffffff"
+      }
+    });
+  } else {
+    map.setPaintProperty(SELECTED_MARKER_LAYER_ID, "circle-radius", SELECTED_MARKER_RADIUS);
+  }
+}
+
+function repositionSelectedPointLayers(map) {
+  if (!map.getLayer(SELECTED_MARKER_LAYER_ID)) {
+    return;
+  }
+
+  map.moveLayer(SELECTED_MARKER_LAYER_ID);
+}
+
+function refreshSelectedPointHighlight(map) {
+  if (!selectedPointFeature) {
+    return;
+  }
+
+  updateSelectedPointHighlight(map, selectedPointFeature);
+}
+
+/** Выделяет выбранный маркер: увеличение в 2 раза с белой обводкой и пульсацией. */
+export function updateSelectedPointHighlight(map, feature) {
+  selectedPointFeature = feature ?? null;
+
+  if (!map?.getStyle()) {
+    return;
+  }
+
+  const selectedFeature = buildSelectedPointFeature(feature);
+  if (!selectedFeature) {
+    clearSelectedPointHighlight(map);
+    return;
+  }
+
+  ensureSelectedPointLayers(map);
+
+  map.getSource(SELECTED_POINT_SOURCE_ID).setData({
+    type: "FeatureCollection",
+    features: [selectedFeature]
+  });
+
+  repositionSelectedPointLayers(map);
+  startSelectedPointPulse(map);
+}
+
+/** Снимает подсветку выбранного маркера. */
+export function clearSelectedPointHighlight(map) {
+  stopSelectedPointPulse();
+  selectedPointFeature = null;
+
+  const source = map?.getSource(SELECTED_POINT_SOURCE_ID);
+  if (source) {
+    source.setData(EMPTY_FEATURE_COLLECTION);
+  }
 }
 
 function getLocationSourceIds(map) {
@@ -873,7 +1041,7 @@ function addUnclusteredLayer(map, sourceId, regnum = null) {
       "circle-color": regnum
         ? REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR
         : getPointColorExpression(),
-      "circle-radius": 5,
+      "circle-radius": MARKER_RADIUS,
       "circle-stroke-width": 1,
       "circle-stroke-color": "#ffffff"
     }
@@ -995,6 +1163,7 @@ function rebuildLocationsLayers(map) {
   attachLocationsInteractions(map);
   applyMarkersVisibility(map);
   attachClusterPieChartMarkers(map);
+  refreshSelectedPointHighlight(map);
 }
 
 /** Фильтрует GeoJSON-объекты по properties; массив значений — логика «любой из». */

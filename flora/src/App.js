@@ -13,6 +13,7 @@ import {
 import {
   addLocationsLayer,
   applyLocationsFilter,
+  clearSelectedPointHighlight,
   featureMatchesFilters,
   isFeatureUnclusteredOnMap,
   reloadLocationsData,
@@ -21,7 +22,8 @@ import {
   setClusterPieChartsEnabled,
   setMarkersVisible,
   setHoverTooltipsEnabled,
-  setMapCursorOverride
+  setMapCursorOverride,
+  updateSelectedPointHighlight
 } from "./components/addLocationsLayer";
 import {
   addHeatmapLayer,
@@ -557,6 +559,18 @@ export default function MapView() {
     setPopupData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- перестраиваем слои только при смене источника данных
   }, [dataSourceMode, mapReady, refreshAreal]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    if (popupData) {
+      updateSelectedPointHighlight(map.current, popupData);
+    } else {
+      clearSelectedPointHighlight(map.current);
+    }
+  }, [popupData, mapReady]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
