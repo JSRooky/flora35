@@ -193,7 +193,7 @@ function buildNav(sections, activeSection) {
 
 function showSection(sectionId, markdown, sections) {
   const label = HELP_SECTION_LABELS[sectionId] || sectionId;
-  document.title = `${label} — Flora`;
+  document.title = `${label} — Как это работает`;
 
   const body = extractMarkdownSection(markdown, sectionId);
   const content = document.getElementById("help-content");
