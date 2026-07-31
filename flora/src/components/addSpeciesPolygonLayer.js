@@ -132,7 +132,7 @@ function buildAllPointsPolygon(coordinates) {
   return polygon([ring]);
 }
 
-function buildPolygonFromCoordinates(coordinates, mode = POLYGON_BUILD_MODES.CONVEX) {
+export function buildPolygonFromCoordinates(coordinates, mode = POLYGON_BUILD_MODES.CONVEX) {
   if (mode === POLYGON_BUILD_MODES.ALL_POINTS) {
     return buildAllPointsPolygon(coordinates);
   }

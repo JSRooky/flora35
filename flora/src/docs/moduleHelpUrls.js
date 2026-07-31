@@ -6,6 +6,7 @@ export const HELP_SECTION_LABELS = {
   buffer: "Буфер",
   area: "Область",
   year: "Год находки",
+  "areal-dynamics": "Динамика ареала",
   status: "Статус МСОП",
   map: "Группы точек",
   submit: "Ввод данных о находке"

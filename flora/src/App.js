@@ -49,6 +49,15 @@ import {
   POLYGON_BUILD_MODES
 } from "./components/addSpeciesPolygonLayer";
 import {
+  addArealDynamicsLayer,
+  clearArealDynamicsLayer,
+  syncArealDynamicsLayer
+} from "./components/addArealDynamicsLayer";
+import {
+  buildArealDynamicsSlices,
+  filterSlicesUpToYear
+} from "./components/buildArealDynamicsSlices";
+import {
   addBufferLayer,
   clearBufferLayer,
   updateBufferLayer,
@@ -74,6 +83,7 @@ import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
 import YearFilterPanel from "./components/YearFilterPanel";
 import TimelineSlider from "./components/TimelineSlider";
+import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
 import FeedbackWidget from "./components/FeedbackWidget";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
@@ -127,6 +137,11 @@ export default function MapView() {
   const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
   const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
   const [timelineYear, setTimelineYear] = useState(YEAR_BOUNDS.max);
+  const [arealDynamicsEnabled, setArealDynamicsEnabled] = useState(false);
+  const [arealDynamicsFeature, setArealDynamicsFeature] = useState(null);
+  const [arealDynamicsSlices, setArealDynamicsSlices] = useState([]);
+  const [arealDynamicsComputing, setArealDynamicsComputing] = useState(false);
+  const [arealDynamicsHideOthers, setArealDynamicsHideOthers] = useState(false);
   // Построенные полигоны видов (один на name_latin); activePolygonId — выбранный в списке.
   const [speciesPolygons, setSpeciesPolygons] = useState([]);
   const [activePolygonId, setActivePolygonId] = useState(null);
@@ -431,8 +446,27 @@ export default function MapView() {
       }
     }
 
+    if (
+      activeModule === MODULE_IDS.TIMELINE &&
+      arealDynamicsEnabled &&
+      arealDynamicsHideOthers &&
+      arealDynamicsFeature?.properties?.name_latin
+    ) {
+      filters.name_latin = arealDynamicsFeature.properties.name_latin;
+    }
+
     return filters;
-  }, [propertyFilters, statusFilters, yearFilterEnabled, yearRange, activeModule, timelineYear]);
+  }, [
+    propertyFilters,
+    statusFilters,
+    yearFilterEnabled,
+    yearRange,
+    activeModule,
+    timelineYear,
+    arealDynamicsEnabled,
+    arealDynamicsHideOthers,
+    arealDynamicsFeature
+  ]);
 
   const handleUserFindingSaved = useCallback(
     (userpointsCollection) => {
@@ -540,12 +574,85 @@ export default function MapView() {
   }, [activeModule, clearIntersectionState]);
 
   useEffect(() => {
+    if (activeModule !== MODULE_IDS.TIMELINE) {
+      setArealDynamicsEnabled(false);
+      setArealDynamicsFeature(null);
+      setArealDynamicsSlices([]);
+      setArealDynamicsComputing(false);
+      setArealDynamicsHideOthers(false);
+    }
+  }, [activeModule]);
+
+  useEffect(() => {
+    if (activeModule !== MODULE_IDS.TIMELINE || !arealDynamicsEnabled || !popupData) {
+      return;
+    }
+
+    setArealDynamicsFeature(popupData);
+  }, [activeModule, arealDynamicsEnabled, popupData]);
+
+  useEffect(() => {
+    if (!arealDynamicsEnabled || !arealDynamicsFeature) {
+      setArealDynamicsSlices([]);
+      setArealDynamicsComputing(false);
+      return undefined;
+    }
+
+    setArealDynamicsComputing(true);
+    const timer = window.setTimeout(() => {
+      setArealDynamicsSlices(buildArealDynamicsSlices(arealDynamicsFeature));
+      setArealDynamicsComputing(false);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [arealDynamicsEnabled, arealDynamicsFeature]);
+
+  useEffect(() => {
     if (!map.current || !mapReady) {
       return;
     }
 
-    syncSpeciesPolygonLayer(map.current, speciesPolygons);
-  }, [speciesPolygons, mapReady]);
+    let polygonsToSync = speciesPolygons;
+
+    if (
+      activeModule === MODULE_IDS.TIMELINE &&
+      arealDynamicsEnabled &&
+      arealDynamicsFeature?.properties?.name_latin
+    ) {
+      const activeLatin = arealDynamicsFeature.properties.name_latin;
+      polygonsToSync = speciesPolygons.map((entry) =>
+        entry.nameLatin === activeLatin ? { ...entry, hidden: true } : entry
+      );
+    }
+
+    syncSpeciesPolygonLayer(map.current, polygonsToSync);
+  }, [speciesPolygons, mapReady, activeModule, arealDynamicsEnabled, arealDynamicsFeature]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    if (
+      activeModule === MODULE_IDS.TIMELINE &&
+      arealDynamicsEnabled &&
+      arealDynamicsSlices.length > 0
+    ) {
+      syncArealDynamicsLayer(
+        map.current,
+        filterSlicesUpToYear(arealDynamicsSlices, timelineYear)
+      );
+      return;
+    }
+
+    clearArealDynamicsLayer(map.current);
+  }, [
+    activeModule,
+    arealDynamicsEnabled,
+    arealDynamicsSlices,
+    timelineYear,
+    mapReady
+  ]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -935,6 +1042,50 @@ export default function MapView() {
     setPolygonAddMode(enabled);
   }, []);
 
+  const handleArealDynamicsEnabledChange = useCallback((enabled) => {
+    setArealDynamicsEnabled(enabled);
+
+    if (enabled && popupData) {
+      setArealDynamicsFeature(popupData);
+    }
+
+    if (!enabled) {
+      setArealDynamicsFeature(null);
+      setArealDynamicsSlices([]);
+      setArealDynamicsHideOthers(false);
+    }
+  }, [popupData]);
+
+  const handleArealDynamicsHideOthersChange = useCallback((hideOthers) => {
+    setArealDynamicsHideOthers(hideOthers);
+  }, []);
+
+  const handleArealDynamicsReset = useCallback(() => {
+    setArealDynamicsEnabled(false);
+    setArealDynamicsFeature(null);
+    setArealDynamicsSlices([]);
+    setArealDynamicsHideOthers(false);
+
+    if (map.current) {
+      clearArealDynamicsLayer(map.current);
+    }
+  }, []);
+
+  const handleArealDynamicsYearSelect = useCallback((year) => {
+    setTimelineYear(year);
+  }, []);
+
+  const arealDynamicsSpeciesLabel = useMemo(() => {
+    if (!arealDynamicsFeature) {
+      return "";
+    }
+
+    const nameRu = arealDynamicsFeature.properties?.name_ru || "Без названия";
+    const nameLatin = arealDynamicsFeature.properties?.name_latin;
+
+    return nameLatin ? `${nameRu} (${nameLatin})` : nameRu;
+  }, [arealDynamicsFeature]);
+
   const applySpeciesPolygonBuild = useCallback((feature, mode) => {
     if (!feature) {
       return;
@@ -1237,6 +1388,7 @@ export default function MapView() {
         });
         addArealLayer(map.current);
         addSpeciesPolygonLayer(map.current); // слой экспериментального модуля «Полигон»
+        addArealDynamicsLayer(map.current);
         addBufferLayer(map.current);
         addAreaSelectionLayer(map.current);
         addHeatmapLayer(map.current);
@@ -1415,7 +1567,21 @@ export default function MapView() {
         visible={activeModule === MODULE_IDS.TIMELINE}
         year={timelineYear}
         onYearChange={setTimelineYear}
-      />
+      >
+        <ArealDynamicsPanel
+          enabled={arealDynamicsEnabled}
+          onEnabledChange={handleArealDynamicsEnabledChange}
+          speciesLabel={arealDynamicsSpeciesLabel}
+          speciesLatin={arealDynamicsFeature?.properties?.name_latin ?? ""}
+          slices={arealDynamicsSlices}
+          timelineYear={timelineYear}
+          onYearSelect={handleArealDynamicsYearSelect}
+          onReset={handleArealDynamicsReset}
+          hideOthers={arealDynamicsHideOthers}
+          onHideOthersChange={handleArealDynamicsHideOthersChange}
+          computing={arealDynamicsComputing}
+        />
+      </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
       <FeedbackWidget />
     </>
