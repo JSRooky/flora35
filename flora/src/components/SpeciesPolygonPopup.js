@@ -34,70 +34,61 @@ function getSpeciesLabel(species, speciesList) {
   return species.nameRu;
 }
 
-/** Краткая подпись для свёрнутой панели — по построенному полигону, а не по выбранной точке. */
-function getCollapsedSummary(polygonInfo, containedSpecies) {
-  if (!polygonInfo?.built) {
+function getArealLabel(entry, polygons) {
+  const hasDuplicateName = polygons.filter((item) => item.nameRu === entry.nameRu).length > 1;
+
+  if (hasDuplicateName && entry.nameLatin) {
+    return `Ареал — ${entry.nameRu} (${entry.nameLatin})`;
+  }
+
+  return `Ареал — ${entry.nameRu || entry.nameLatin || "Без названия"}`;
+}
+
+/** Краткая подпись для свёрнутой панели. */
+function getCollapsedSummary(polygons, containedSpecies) {
+  const built = polygons.filter((entry) => entry.built);
+
+  if (built.length === 0) {
     return "Полигон не построен";
   }
 
-  if (containedSpecies?.count > 0) {
-    return `В полигоне: ${formatSpeciesCount(containedSpecies.count)}`;
-  }
-
-  return polygonInfo.nameRu || polygonInfo.nameLatin || "Полигон вида";
-}
-
-/**
- * Текст статуса в панели: различает «ещё не построен», «построен для выбранного вида»
- * и «на карте другой вид, чем выбран сейчас».
- */
-function getStatusMessage(feature, polygonInfo) {
-  if (!feature) {
-    return "Выберите точку на карте.";
-  }
-
-  if (!polygonInfo?.built) {
-    return "Нажмите «Построить», чтобы построить полигон по точкам выбранного вида.";
-  }
-
-  const selectedSpecies = feature.properties?.name_latin;
-  const builtSpecies = polygonInfo.nameLatin;
-
-  if (selectedSpecies && builtSpecies && selectedSpecies !== builtSpecies) {
-    const builtLabel = polygonInfo.nameRu || polygonInfo.nameLatin;
-    return `На карте отображается полигон вида «${builtLabel}». «Построить» заменит его полигоном выбранного вида.`;
-  }
-
-  if (polygonInfo.built) {
-    if (polygonInfo.mode === POLYGON_BUILD_MODES.ALL_POINTS) {
-      return "Полигон построен по всем точкам вида (может быть вогнутым).";
+  if (built.length === 1) {
+    if (containedSpecies?.count > 0) {
+      return `В полигоне: ${formatSpeciesCount(containedSpecies.count)}`;
     }
 
-    return "Полигон построен по точкам вида (выпуклая оболочка).";
+    return getArealLabel(built[0], built);
   }
 
-  return "Не удалось построить полигон для выбранного вида.";
+  return `Ареалы: ${formatSpeciesCount(built.length)}`;
 }
 
 /**
  * Панель экспериментального модуля «Полигон».
- * feature — текущая выбранная точка; polygonInfo — что уже отображено на карте.
- * Полигон не перестраивается автоматически при смене точки — только по кнопкам.
+ * feature — текущая выбранная точка; polygons — построенные ареалы на карте.
  */
 export default function SpeciesPolygonPopup({
   feature,
-  polygonInfo,
+  polygons = [],
+  activePolygonId = null,
+  addMode = false,
   containedSpecies = null,
   onBuild,
   onBuildAllPoints,
-  onReset,
+  onResetAll,
+  onResetOne,
+  onToggleHidden,
+  onSelectPolygon,
+  onAddModeChange,
   onSpeciesSelect,
   collapsed = false,
   onCollapsedChange
 }) {
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
-  const [helpOpen, setHelpOpen] = useState(false); // раздел ## polygon в docs/moduleHelp.md
+  const [helpOpen, setHelpOpen] = useState(false);
   const [listVisible, setListVisible] = useState(false);
+  const builtPolygons = polygons.filter((entry) => entry.built);
+  const visibleBuiltPolygons = builtPolygons.filter((entry) => !entry.hidden);
   const speciesLabel =
     feature?.properties?.name_ru ||
     feature?.properties?.name_latin ||
@@ -106,12 +97,18 @@ export default function SpeciesPolygonPopup({
   const pointCount = feature ? getPointsForSpecies(feature).length : 0;
   const canBuild = Boolean(feature) && pointCount > 0;
   const canBuildAllPoints = canBuild && pointCount >= 3;
-  const hasContainedSpecies = polygonInfo?.built;
+  const currentSpeciesEntry = speciesLatin
+    ? builtPolygons.find((entry) => entry.nameLatin === speciesLatin)
+    : null;
+  const isAllPointsMode =
+    currentSpeciesEntry?.mode === POLYGON_BUILD_MODES.ALL_POINTS;
+  const showContainedSpecies = visibleBuiltPolygons.length === 1;
+  const hasContainedSpecies = showContainedSpecies && builtPolygons.length > 0;
   const hasSpeciesInPolygon = containedSpecies?.count > 0;
 
   useEffect(() => {
     setListVisible(false);
-  }, [polygonInfo?.built, polygonInfo?.nameLatin, containedSpecies?.count]);
+  }, [builtPolygons.length, activePolygonId, containedSpecies?.count]);
 
   return (
     <div className={`species-polygon-popup ${collapsed ? "species-polygon-popup--collapsed" : ""}`}>
@@ -134,7 +131,7 @@ export default function SpeciesPolygonPopup({
 
       {collapsed ? (
         <p className="popup-collapsed-summary">
-          {getCollapsedSummary(polygonInfo, containedSpecies)}
+          {getCollapsedSummary(polygons, containedSpecies)}
         </p>
       ) : (
         <div className="species-polygon-popup-content">
@@ -152,10 +149,6 @@ export default function SpeciesPolygonPopup({
             </p>
           )}
 
-          <p className="species-polygon-popup-status">
-            {getStatusMessage(feature, polygonInfo)}
-          </p>
-
           <div className="species-polygon-actions">
             <button
               type="button"
@@ -167,25 +160,98 @@ export default function SpeciesPolygonPopup({
             </button>
             <button
               type="button"
-              className="species-polygon-build-all-btn"
+              className={`species-polygon-build-all-btn${
+                isAllPointsMode ? " species-polygon-build-all-btn--active" : ""
+              }`}
               onClick={onBuildAllPoints}
               disabled={!canBuildAllPoints}
               title={
                 canBuildAllPoints
-                  ? "Построить полигон через все точки вида"
+                  ? isAllPointsMode
+                    ? "Вернуть выпуклую оболочку (как «Построить»)"
+                    : "Построить полигон через все точки вида"
                   : "Нужно не менее трёх точек вида"
               }
             >
               Все точки
             </button>
+          </div>
+
+          {builtPolygons.length > 0 && (
+            <div className="species-polygon-areals-section">
+              <button
+                type="button"
+                className="species-polygon-reset-all-btn"
+                onClick={onResetAll}
+              >
+                Сбросить всё
+              </button>
+
+              <p className="species-polygon-areals-title">
+                Ареалы на карте: <strong>{formatSpeciesCount(builtPolygons.length)}</strong>
+              </p>
+
+              <ul className="species-polygon-areals-list">
+                {builtPolygons.map((entry) => {
+                  const isActive = entry.id === activePolygonId;
+                  const isHidden = entry.hidden;
+
+                  return (
+                    <li
+                      key={entry.id}
+                      className={`species-polygon-areal-item${
+                        isActive ? " species-polygon-areal-item--active" : ""
+                      }${isHidden ? " species-polygon-areal-item--hidden" : ""}`}
+                    >
+                      <button
+                        type="button"
+                        className="species-polygon-areal-select-btn"
+                        onClick={() => onSelectPolygon?.(entry.id)}
+                        title="Выбрать ареал"
+                      >
+                        {getArealLabel(entry, builtPolygons)}
+                      </button>
+                      <div className="species-polygon-areal-actions">
+                        <button
+                          type="button"
+                          className="species-polygon-visibility-btn"
+                          onClick={() => onToggleHidden?.(entry.id)}
+                          aria-label={isHidden ? "Показать на карте" : "Скрыть на карте"}
+                          title={isHidden ? "Показать на карте" : "Скрыть на карте"}
+                        >
+                          {isHidden ? "Показать" : "Скрыть"}
+                        </button>
+                        <button
+                          type="button"
+                          className="species-polygon-areal-reset-btn"
+                          onClick={() => onResetOne?.(entry.id)}
+                          aria-label={`Сбросить ${getArealLabel(entry, builtPolygons)}`}
+                        >
+                          Сбросить
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          <div className="species-polygon-add-section">
             <button
               type="button"
-              className="species-polygon-reset-btn"
-              onClick={onReset}
-              disabled={!polygonInfo?.built}
+              className={`species-polygon-add-btn${
+                addMode ? " species-polygon-add-btn--active" : ""
+              }`}
+              onClick={() => onAddModeChange?.(!addMode)}
             >
-              Сбросить
+              {addMode ? "Отменить выбор" : "Добавить полигон"}
             </button>
+            {addMode && (
+              <p className="species-polygon-popup-status">
+                Выберите точку вида на карте. Клик по точке того же вида обновит его ареал.
+              </p>
+            )}
           </div>
 
           {hasContainedSpecies && (
