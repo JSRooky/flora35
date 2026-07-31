@@ -77,3 +77,21 @@
   font-size: 13px;
   color: #666;
 }
+
+.module-help-panel-full-link-wrap {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.module-help-panel-full-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a90e2;
+  text-decoration: none;
+}
+
+.module-help-panel-full-link:hover {
+  color: #3a78c2;
+  text-decoration: underline;
+}

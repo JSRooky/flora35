@@ -33,6 +33,10 @@ function renderBlock(block, blockIndex) {
     return <h3 key={blockIndex}>{renderInline(firstLine.slice(3).trim())}</h3>;
   }
 
+  if (firstLine.startsWith("### ")) {
+    return <h4 key={blockIndex}>{renderInline(firstLine.slice(4).trim())}</h4>;
+  }
+
   if (/^(-{3,}|\*{3,}|_{3,})$/.test(firstLine.trim()) && lines.length === 1) {
     return <hr key={blockIndex} />;
   }

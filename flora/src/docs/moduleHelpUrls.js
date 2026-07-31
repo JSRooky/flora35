@@ -1,0 +1,29 @@
+/** Человекочитаемые названия разделов полной справки (ключ = sectionId). */
+export const HELP_SECTION_LABELS = {
+  feature: "Сведения о точке",
+  areal: "Ареал",
+  polygon: "Полигон",
+  buffer: "Буфер",
+  area: "Область",
+  year: "Год находки",
+  status: "Статус МСОП",
+  map: "Группы точек",
+  submit: "Ввод данных о находке"
+};
+
+export const HELP_SECTION_IDS = Object.keys(HELP_SECTION_LABELS);
+
+/** URL страницы подробной справки для модуля (новая вкладка). */
+export function getModuleHelpPageUrl(sectionId) {
+  const base = process.env.PUBLIC_URL || "";
+  const params = new URLSearchParams({ section: sectionId });
+  return `${base}/help/index.html?${params.toString()}`;
+}
+
+export function getModuleHelpSectionLabel(sectionId) {
+  return HELP_SECTION_LABELS[sectionId] ?? sectionId;
+}
+
+export function hasModuleHelpFullSection(sectionId) {
+  return HELP_SECTION_IDS.includes(sectionId);
+}

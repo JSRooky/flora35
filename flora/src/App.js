@@ -927,18 +927,21 @@ export default function MapView() {
       hideArealPointHint();
       clearArealLayer(map.current);
       clearBufferLayer(map.current);
+      clearSpeciesPolygonLayer(map.current);
     }
 
     setPopupData(null);
     setPropertyFilters({});
     setArealEnabled(false);
     setArealAllMarkers(false);
+    setSpeciesPolygons([]);
+    setActivePolygonId(null);
     setBufferDiameters(DEFAULT_BUFFER_DIAMETERS_KM);
     setBufferEnabled(false);
     setBufferSelectedPoints([]);
     setBufferSelectionMode(false);
     setPolygonAddMode(false);
-    setActiveModule(null);
+    setActiveModule((current) => (current === MODULE_IDS.POLYGON ? current : null));
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature(false);
   }, []);

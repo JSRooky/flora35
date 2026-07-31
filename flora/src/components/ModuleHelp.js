@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { loadModuleHelpSection } from "../docs/loadModuleHelp";
+import {
+  getModuleHelpPageUrl,
+  getModuleHelpSectionLabel,
+  hasModuleHelpFullSection
+} from "../docs/moduleHelpUrls";
 import { renderMarkdown } from "../docs/renderMarkdown";
 import "../styles/ModuleHelp.css";
 
@@ -71,7 +76,21 @@ export function ModuleHelpPanel({ sectionId, open }) {
       ) : error ? (
         <p className="module-help-panel-error">Не удалось загрузить справку.</p>
       ) : (
-        <div className="module-help-panel-content">{renderMarkdown(content)}</div>
+        <>
+          <div className="module-help-panel-content">{renderMarkdown(content)}</div>
+          {hasModuleHelpFullSection(sectionId) && (
+            <p className="module-help-panel-full-link-wrap">
+              <a
+                className="module-help-panel-full-link"
+                href={getModuleHelpPageUrl(sectionId)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Подробная справка: {getModuleHelpSectionLabel(sectionId)}
+              </a>
+            </p>
+          )}
+        </>
       )}
     </aside>
   );
