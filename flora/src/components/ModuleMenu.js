@@ -6,6 +6,7 @@ export const MODULE_IDS = {
   STATUS: "status",
   MAP: "map",
   YEAR: "year",
+  TIMELINE: "timeline",
   FEATURE: "feature",
   AREAL: "areal",
   // Совпадает с заголовком ## polygon в docs/moduleHelp.md.
@@ -22,6 +23,7 @@ export const MODULE_IDS = {
 const FILTER_MODULE_ITEMS = [
   { id: MODULE_IDS.FEATURE, label: "Сведения о точке" },
   { id: MODULE_IDS.YEAR, label: "Год находки" },
+  { id: MODULE_IDS.TIMELINE, label: "Таймлайн" },
   { id: MODULE_IDS.STATUS, label: "Статус МСОП" }
 ];
 

@@ -53,6 +53,7 @@ let clusterPieChartMarkersOnScreen = {};
 let clusterPieChartRenderHandler = null;
 let clusterPieChartMap = null;
 let currentFilters = {};
+let currentFilteredFeatures = [];
 let interactionHandlers = null;
 let onClusterExpandedCallback = null;
 let onPointClickCallback = null;
@@ -1101,6 +1102,158 @@ function addClusterLayers(map, sourceId, regnum = null) {
   addUnclusteredLayer(map, sourceId, regnum);
 }
 
+function getFeatureKey(feature) {
+  if (feature.id != null) {
+    return String(feature.id);
+  }
+
+  const findingId = feature.properties?.finding_id;
+  const coordinates = feature.geometry?.coordinates;
+
+  if (findingId != null) {
+    return String(findingId);
+  }
+
+  if (Array.isArray(coordinates)) {
+    return coordinates.join(",");
+  }
+
+  return JSON.stringify(feature.properties ?? {});
+}
+
+function filterValueEqual(a, b) {
+  if (a === b) {
+    return true;
+  }
+
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((value, index) => value === b[index]);
+  }
+
+  if (a && b && typeof a === "object" && typeof b === "object") {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+
+    if (keysA.length !== keysB.length) {
+      return false;
+    }
+
+    return keysA.every((key) => filterValueEqual(a[key], b[key]));
+  }
+
+  return false;
+}
+
+/** Изменился только верхний предел found_year (типичное движение слайдера таймлайна). */
+function isTimelineYearMaxOnlyChange(prevFilters, nextFilters) {
+  const prevYear = prevFilters.found_year;
+  const nextYear = nextFilters.found_year;
+
+  if (
+    !prevYear ||
+    !nextYear ||
+    typeof prevYear !== "object" ||
+    typeof nextYear !== "object" ||
+    !("min" in prevYear) ||
+    !("max" in prevYear) ||
+    !("min" in nextYear) ||
+    !("max" in nextYear) ||
+    prevYear.min !== nextYear.min ||
+    prevYear.max === nextYear.max
+  ) {
+    return false;
+  }
+
+  const prevRest = { ...prevFilters };
+  const nextRest = { ...nextFilters };
+  delete prevRest.found_year;
+  delete nextRest.found_year;
+
+  const prevKeys = Object.keys(prevRest).sort();
+  const nextKeys = Object.keys(nextRest).sort();
+
+  if (prevKeys.join("|") !== nextKeys.join("|")) {
+    return false;
+  }
+
+  return prevKeys.every((key) => filterValueEqual(prevRest[key], nextRest[key]));
+}
+
+function locationsSourcesExist(map) {
+  if (!clusteringEnabled) {
+    return Boolean(map.getSource("locations"));
+  }
+
+  if (clusterByRegnum) {
+    return getRegnumValues().some((regnum) => map.getSource(getSourceId(regnum)));
+  }
+
+  return Boolean(map.getSource("locations"));
+}
+
+function updateLocationsSourceData(map, filteredFeatures) {
+  const collection = {
+    type: "FeatureCollection",
+    features: filteredFeatures
+  };
+
+  if (!clusteringEnabled) {
+    map.getSource("locations")?.setData(collection);
+    return;
+  }
+
+  if (clusterByRegnum) {
+    getRegnumValues().forEach((regnum) => {
+      const source = map.getSource(getSourceId(regnum));
+      if (!source) {
+        return;
+      }
+
+      source.setData({
+        type: "FeatureCollection",
+        features: filteredFeatures.filter((feature) => feature.properties.regnum === regnum)
+      });
+    });
+    return;
+  }
+
+  map.getSource("locations")?.setData(collection);
+}
+
+/** Добавляет или убирает точки при изменении года таймлайна без пересборки слоёв. */
+function applyTimelineYearChange(map, prevFilters, nextFilters) {
+  const prevMax = prevFilters.found_year.max;
+  const nextMax = nextFilters.found_year.max;
+
+  const baseFilters = { ...nextFilters };
+  delete baseFilters.found_year;
+
+  let newFilteredFeatures;
+
+  if (nextMax > prevMax) {
+    const toAdd = filterFeatures(locationsData.features, {
+      ...baseFilters,
+      found_year: { min: prevMax + 1, max: nextMax }
+    });
+    const existingKeys = new Set(currentFilteredFeatures.map(getFeatureKey));
+
+    newFilteredFeatures = [
+      ...currentFilteredFeatures,
+      ...toAdd.filter((feature) => !existingKeys.has(getFeatureKey(feature)))
+    ];
+  } else {
+    newFilteredFeatures = currentFilteredFeatures.filter((feature) => {
+      const year = feature.properties?.found_year;
+      return typeof year === "number" && year <= nextMax;
+    });
+  }
+
+  currentFilteredFeatures = newFilteredFeatures;
+  currentFilters = nextFilters;
+  updateLocationsSourceData(map, newFilteredFeatures);
+  refreshSelectedPointHighlight(map);
+}
+
 /**
  * Полностью пересоздаёт источники и слои точек.
  * Вызывается при смене фильтров, режима кластеризации или группировки по regnum.
@@ -1114,6 +1267,7 @@ function rebuildLocationsLayers(map) {
   removeLocationsFromMap(map);
 
   const filteredFeatures = filterFeatures(locationsData.features, currentFilters);
+  currentFilteredFeatures = filteredFeatures;
 
   if (!clusteringEnabled) {
     map.addSource("locations", {
@@ -1324,6 +1478,15 @@ export function featureMatchesFilters(feature, filters = {}) {
 }
 
 export function applyLocationsFilter(map, filters = {}) {
+  if (
+    map &&
+    locationsSourcesExist(map) &&
+    isTimelineYearMaxOnlyChange(currentFilters, filters)
+  ) {
+    applyTimelineYearChange(map, currentFilters, filters);
+    return;
+  }
+
   currentFilters = filters;
   rebuildLocationsLayers(map);
 }

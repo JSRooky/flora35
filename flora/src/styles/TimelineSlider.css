@@ -1,0 +1,129 @@
+.timeline-slider {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50%;
+  min-width: 280px;
+  max-width: calc(100vw - 40px);
+  z-index: 10;
+  box-sizing: border-box;
+  background-color: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 12px 20px;
+  font-family: Arial, sans-serif;
+  animation: timelineSliderSlideIn 0.3s ease-out;
+}
+
+@keyframes timelineSliderSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.timeline-slider-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.timeline-slider-label {
+  margin: 0;
+  font-size: 13px;
+  color: #555;
+  text-align: center;
+}
+
+.timeline-slider-label strong {
+  color: #007AFF;
+}
+
+.timeline-slider-track {
+  position: relative;
+  height: 24px;
+}
+
+.timeline-slider-track::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: #ddd;
+}
+
+.timeline-slider-track::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: var(--range-progress);
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: #007AFF;
+}
+
+.timeline-slider-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.timeline-slider-input::-webkit-slider-runnable-track {
+  height: 4px;
+  background: transparent;
+}
+
+.timeline-slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #007AFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.timeline-slider-input::-moz-range-track {
+  height: 4px;
+  background: transparent;
+}
+
+.timeline-slider-input::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #007AFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.timeline-slider-bounds {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888;
+}

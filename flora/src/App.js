@@ -66,6 +66,7 @@ import AreaSelectionPopup from "./components/AreaSelectionPopup";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
 import YearFilterPanel from "./components/YearFilterPanel";
+import TimelineSlider from "./components/TimelineSlider";
 import AboutProject from "./components/AboutProject";
 import FeedbackWidget from "./components/FeedbackWidget";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
@@ -117,6 +118,7 @@ export default function MapView() {
   const [arealRadius, setArealRadius] = useState(5);
   const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
   const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
+  const [timelineYear, setTimelineYear] = useState(YEAR_BOUNDS.max);
   // Сводка о полигоне, уже отображённом на карте (не путать с выбранной точкой).
   const [speciesPolygonInfo, setSpeciesPolygonInfo] = useState(null);
   // Буфер: диаметры зон (красная/жёлтая/зелёная), км; bufferEnabled — включён ли переключатель.
@@ -303,7 +305,9 @@ export default function MapView() {
     propertyFilters,
     statusFilters,
     yearFilterEnabled,
-    yearRange
+    yearRange,
+    activeModule,
+    timelineYear
   };
 
   const bufferStateRef = useRef({});
@@ -338,7 +342,9 @@ export default function MapView() {
       propertyFilters: filters,
       statusFilters: selectedStatuses,
       yearFilterEnabled: yearEnabled,
-      yearRange: selectedYearRange
+      yearRange: selectedYearRange,
+      activeModule: currentModule,
+      timelineYear: selectedTimelineYear
     } = arealStateRef.current;
 
     if (!mapInstance) {
@@ -349,8 +355,12 @@ export default function MapView() {
     if (selectedStatuses.length > 0) {
       combinedFilters.status = selectedStatuses;
     }
-    if (yearEnabled && !Object.prototype.hasOwnProperty.call(filters, "found_year")) {
-      combinedFilters.found_year = selectedYearRange;
+    if (!Object.prototype.hasOwnProperty.call(filters, "found_year")) {
+      if (currentModule === MODULE_IDS.TIMELINE) {
+        combinedFilters.found_year = { min: YEAR_BOUNDS.min, max: selectedTimelineYear };
+      } else if (yearEnabled) {
+        combinedFilters.found_year = selectedYearRange;
+      }
     }
 
     refreshArealDisplay(mapInstance, {
@@ -392,12 +402,16 @@ export default function MapView() {
       filters.status = statusFilters;
     }
 
-    if (yearFilterEnabled && !Object.prototype.hasOwnProperty.call(propertyFilters, "found_year")) {
-      filters.found_year = yearRange;
+    if (!Object.prototype.hasOwnProperty.call(propertyFilters, "found_year")) {
+      if (activeModule === MODULE_IDS.TIMELINE) {
+        filters.found_year = { min: YEAR_BOUNDS.min, max: timelineYear };
+      } else if (yearFilterEnabled) {
+        filters.found_year = yearRange;
+      }
     }
 
     return filters;
-  }, [propertyFilters, statusFilters, yearFilterEnabled, yearRange]);
+  }, [propertyFilters, statusFilters, yearFilterEnabled, yearRange, activeModule, timelineYear]);
 
   const handleUserFindingSaved = useCallback(
     (userpointsCollection) => {
@@ -614,7 +628,7 @@ export default function MapView() {
 
   useEffect(() => {
     refreshAreal();
-  }, [popupData, arealEnabled, arealAllMarkers, arealRadius, propertyFilters, statusFilters, yearFilterEnabled, yearRange, refreshAreal]);
+  }, [popupData, arealEnabled, arealAllMarkers, arealRadius, propertyFilters, statusFilters, yearFilterEnabled, yearRange, activeModule, timelineYear, refreshAreal]);
 
   useEffect(() => {
     const mapInstance = map.current;
@@ -983,7 +997,7 @@ export default function MapView() {
         onDataSourceModeChange={setDataSourceModeState}
       />
       <div ref={ref} className="map-container" />
-      {activeModule !== null && (
+      {activeModule !== null && activeModule !== MODULE_IDS.TIMELINE && (
         <div className="module-panel-stack">
           {activeModule === MODULE_IDS.FEATURE && (
             <FeaturePopup
@@ -1109,6 +1123,9 @@ export default function MapView() {
             </Suspense>
           )}
         </div>
+      )}
+      {activeModule === MODULE_IDS.TIMELINE && (
+        <TimelineSlider year={timelineYear} onYearChange={setTimelineYear} />
       )}
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
       <FeedbackWidget />
