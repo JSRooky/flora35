@@ -41,7 +41,7 @@
   margin: 0;
   font-size: 15px;
   color: #333;
-  border-bottom: 2px solid #e74c3c;
+  border-bottom: 2px solid var(--map-tool-accent);
   padding-bottom: 6px;
   flex: 1;
 }
@@ -59,7 +59,7 @@
 }
 
 .buffer-popup-status--selection {
-  color: #c0392b;
+  color: var(--map-tool-accent-dark);
 }
 
 .buffer-popup-status strong {
@@ -110,7 +110,7 @@
 }
 
 .buffer-switch input:checked + .buffer-switch-slider {
-  background: #e74c3c;
+  background: var(--map-tool-accent);
 }
 
 .buffer-switch input:checked + .buffer-switch-slider::after {
@@ -170,8 +170,8 @@
   border-radius: 3px;
   background: linear-gradient(
     to right,
-    var(--range-color, #4a90e2) 0%,
-    var(--range-color, #4a90e2) var(--range-progress, 0%),
+    var(--range-color, var(--map-tool-accent)) 0%,
+    var(--range-color, var(--map-tool-accent)) var(--range-progress, 0%),
     #ddd var(--range-progress, 0%),
     #ddd 100%
   );
@@ -184,7 +184,7 @@
   height: 14px;
   margin-top: -5px;
   border-radius: 50%;
-  background: var(--range-color, #4a90e2);
+  background: var(--range-color, var(--map-tool-accent));
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
@@ -199,14 +199,14 @@
 .buffer-zone input[type="range"]::-moz-range-progress {
   height: 5px;
   border-radius: 3px 0 0 3px;
-  background: var(--range-color, #4a90e2);
+  background: var(--range-color, var(--map-tool-accent));
 }
 
 .buffer-zone input[type="range"]::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: var(--range-color, #4a90e2);
+  background: var(--range-color, var(--map-tool-accent));
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
@@ -222,9 +222,9 @@
 .buffer-selection-btn {
   padding: 5px 12px;
   border-radius: 5px;
-  border: 1px solid #e74c3c;
-  background: rgba(231, 76, 60, 0.12);
-  color: #c0392b;
+  border: 1px solid var(--map-tool-accent);
+  background: var(--map-tool-accent-soft);
+  color: var(--map-tool-accent-dark);
   font-family: inherit;
   font-size: 12px;
   font-weight: 600;
@@ -233,18 +233,18 @@
 }
 
 .buffer-selection-btn:hover {
-  background: rgba(231, 76, 60, 0.22);
-  border-color: #c0392b;
+  background: var(--map-tool-accent-soft-hover);
+  border-color: var(--map-tool-accent-dark);
 }
 
 .buffer-selection-btn--active {
-  background: #e74c3c;
-  border-color: #c0392b;
+  background: var(--map-tool-accent);
+  border-color: var(--map-tool-accent-dark);
   color: #fff;
 }
 
 .buffer-selection-btn--active:hover {
-  background: #d44333;
+  background: var(--map-tool-accent-hover);
 }
 
 .buffer-reset-btn {

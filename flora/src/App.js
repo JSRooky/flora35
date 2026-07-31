@@ -38,8 +38,14 @@ import {
 import {
   addSpeciesPolygonLayer,
   clearSpeciesPolygonLayer,
+  clearSpeciesPolygonIntersectionLayer,
+  computeSpeciesPolygonIntersection,
+  getPolygonIntersectionContainedSummary,
   getSpeciesPolygonContainedSummary,
-  updateSpeciesPolygonLayer,
+  syncSpeciesPolygonLayer,
+  toggleSpeciesPolygonBuildMode,
+  updateSpeciesPolygonIntersectionLayer,
+  upsertSpeciesPolygon,
   POLYGON_BUILD_MODES
 } from "./components/addSpeciesPolygonLayer";
 import {
@@ -50,6 +56,7 @@ import {
 } from "./components/addBufferLayer";
 import {
   addAreaSelectionLayer,
+  AREA_DRAW_MODES,
   clearAreaSelectionLayer,
   getAreaContainedPointsSummary,
   isAreaDrawingActive,
@@ -72,6 +79,7 @@ import FeedbackWidget from "./components/FeedbackWidget";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
+import "./styles/mapToolsTheme.css";
 import "./MapView.css";
 
 const UserSubmissionPanel = lazy(() => import("./components/UserSubmissionPanel"));
@@ -119,14 +127,21 @@ export default function MapView() {
   const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
   const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
   const [timelineYear, setTimelineYear] = useState(YEAR_BOUNDS.max);
-  // Сводка о полигоне, уже отображённом на карте (не путать с выбранной точкой).
-  const [speciesPolygonInfo, setSpeciesPolygonInfo] = useState(null);
+  // Построенные полигоны видов (один на name_latin); activePolygonId — выбранный в списке.
+  const [speciesPolygons, setSpeciesPolygons] = useState([]);
+  const [activePolygonId, setActivePolygonId] = useState(null);
+  const [polygonAddMode, setPolygonAddMode] = useState(false);
+  const [intersectionSpeciesA, setIntersectionSpeciesA] = useState(null);
+  const [intersectionSpeciesB, setIntersectionSpeciesB] = useState(null);
+  const [intersectionResult, setIntersectionResult] = useState(null);
+  const [intersectionPinned, setIntersectionPinned] = useState(false);
   // Буфер: диаметры зон (красная/жёлтая/зелёная), км; bufferEnabled — включён ли переключатель.
   const [bufferDiameters, setBufferDiameters] = useState(DEFAULT_BUFFER_DIAMETERS_KM);
   const [bufferEnabled, setBufferEnabled] = useState(false);
   const [bufferSelectionMode, setBufferSelectionMode] = useState(false);
   const [bufferSelectedPoints, setBufferSelectedPoints] = useState([]);
-  const [areaDrawingMode, setAreaDrawingMode] = useState(false);
+  const [areaDrawTool, setAreaDrawTool] = useState(AREA_DRAW_MODES.FREEHAND);
+  const [areaDrawingActive, setAreaDrawingActive] = useState(false);
   const [areaPolygon, setAreaPolygon] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
   const [osmBasemapEnabled, setOsmBasemapEnabledState] = useState(false);
@@ -317,6 +332,12 @@ export default function MapView() {
     bufferDockedWithFeature
   };
 
+  const polygonStateRef = useRef({});
+  polygonStateRef.current = {
+    polygonAddMode,
+    activeModule
+  };
+
   const submissionStateRef = useRef({});
   submissionStateRef.current = {
     active: activeModule === MODULE_IDS.SUBMIT,
@@ -435,21 +456,153 @@ export default function MapView() {
     return getAreaContainedPointsSummary(areaPolygon, buildLocationFilters());
   }, [areaPolygon, buildLocationFilters, mapReady]);
 
+  const visibleBuiltPolygons = useMemo(
+    () => speciesPolygons.filter((entry) => entry.built && !entry.hidden),
+    [speciesPolygons]
+  );
+
+  const builtSpeciesPolygons = useMemo(
+    () => speciesPolygons.filter((entry) => entry.built),
+    [speciesPolygons]
+  );
+
+  const activePolygon = useMemo(() => {
+    if (activePolygonId) {
+      const selected = speciesPolygons.find((entry) => entry.id === activePolygonId);
+      if (selected?.built) {
+        return selected;
+      }
+    }
+
+    return visibleBuiltPolygons[0] ?? null;
+  }, [speciesPolygons, activePolygonId, visibleBuiltPolygons]);
+
   const speciesPolygonContainedSpecies = useMemo(() => {
-    if (!speciesPolygonInfo?.built || !speciesPolygonInfo.polygon || !mapReady) {
+    if (
+      visibleBuiltPolygons.length !== 1 ||
+      !activePolygon?.polygon ||
+      !mapReady
+    ) {
       return null;
     }
 
     return getSpeciesPolygonContainedSummary(
-      speciesPolygonInfo.polygon,
-      speciesPolygonInfo.nameLatin,
+      activePolygon.polygon,
+      activePolygon.nameLatin,
       buildLocationFilters()
     );
-  }, [speciesPolygonInfo, buildLocationFilters, mapReady]);
+  }, [visibleBuiltPolygons, activePolygon, buildLocationFilters, mapReady]);
+
+  const intersectionContainedPoints = useMemo(() => {
+    if (!intersectionResult?.hasIntersection || !intersectionResult.feature || !mapReady) {
+      return null;
+    }
+
+    return getPolygonIntersectionContainedSummary(
+      intersectionResult.feature,
+      buildLocationFilters()
+    );
+  }, [intersectionResult, buildLocationFilters, mapReady]);
+
+  const clearIntersectionState = useCallback(() => {
+    setIntersectionResult(null);
+    setIntersectionPinned(false);
+
+    if (map.current) {
+      clearSpeciesPolygonIntersectionLayer(map.current);
+    }
+  }, []);
+
+  const computeIntersectionFromSelection = useCallback(() => {
+    if (!intersectionSpeciesA || !intersectionSpeciesB || intersectionSpeciesA === intersectionSpeciesB) {
+      return null;
+    }
+
+    const entryA = builtSpeciesPolygons.find((entry) => entry.nameLatin === intersectionSpeciesA);
+    const entryB = builtSpeciesPolygons.find((entry) => entry.nameLatin === intersectionSpeciesB);
+
+    if (!entryA?.polygon || !entryB?.polygon) {
+      return null;
+    }
+
+    return {
+      ...computeSpeciesPolygonIntersection(entryA.polygon, entryB.polygon),
+      speciesA: entryA,
+      speciesB: entryB
+    };
+  }, [builtSpeciesPolygons, intersectionSpeciesA, intersectionSpeciesB]);
+
+  useEffect(() => {
+    if (activeModule !== MODULE_IDS.POLYGON) {
+      setPolygonAddMode(false);
+      clearIntersectionState();
+    }
+  }, [activeModule, clearIntersectionState]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    syncSpeciesPolygonLayer(map.current, speciesPolygons);
+  }, [speciesPolygons, mapReady]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    if (intersectionResult?.hasIntersection && intersectionResult.feature) {
+      updateSpeciesPolygonIntersectionLayer(map.current, intersectionResult.feature);
+      return;
+    }
+
+    clearSpeciesPolygonIntersectionLayer(map.current);
+  }, [intersectionResult, mapReady]);
+
+  useEffect(() => {
+    if (builtSpeciesPolygons.length < 2) {
+      setIntersectionSpeciesA(null);
+      setIntersectionSpeciesB(null);
+      clearIntersectionState();
+      return;
+    }
+
+    setIntersectionSpeciesA((current) => {
+      if (current && builtSpeciesPolygons.some((entry) => entry.nameLatin === current)) {
+        return current;
+      }
+
+      return builtSpeciesPolygons[0]?.nameLatin ?? null;
+    });
+
+    setIntersectionSpeciesB((current) => {
+      if (current && builtSpeciesPolygons.some((entry) => entry.nameLatin === current)) {
+        return current;
+      }
+
+      return builtSpeciesPolygons[1]?.nameLatin ?? null;
+    });
+  }, [builtSpeciesPolygons, clearIntersectionState]);
+
+  useEffect(() => {
+    if (!intersectionPinned) {
+      return;
+    }
+
+    const nextResult = computeIntersectionFromSelection();
+
+    if (!nextResult) {
+      clearIntersectionState();
+      return;
+    }
+
+    setIntersectionResult(nextResult);
+  }, [speciesPolygons, intersectionPinned, computeIntersectionFromSelection, clearIntersectionState]);
 
   useEffect(() => {
     if (activeModule !== MODULE_IDS.AREA) {
-      setAreaDrawingMode(false);
+      setAreaDrawingActive(false);
     }
   }, [activeModule]);
 
@@ -467,32 +620,42 @@ export default function MapView() {
 
   useEffect(() => {
     const mapInstance = map.current;
-    if (!mapInstance || !mapReady || activeModule !== MODULE_IDS.AREA || !areaDrawingMode) {
+    if (!mapInstance || !mapReady || activeModule !== MODULE_IDS.AREA || !areaDrawingActive) {
       stopActiveAreaDrawing();
       return;
     }
 
-    startAreaDrawing(mapInstance, {
+    startAreaDrawing(mapInstance, areaDrawTool, {
       onPreview: (coordinates) => {
         updateAreaSelectionPreview(mapInstance, coordinates);
       },
       onComplete: (ringCoordinates) => {
         setAreaPolygon(ringCoordinates);
-        setAreaDrawingMode(false);
+        setAreaDrawingActive(false);
+      },
+      onCancel: () => {
+        setAreaDrawingActive(false);
+        updateAreaSelectionPreview(mapInstance, []);
       }
     });
 
     return () => {
       stopActiveAreaDrawing();
     };
-  }, [areaDrawingMode, activeModule, mapReady]);
+  }, [areaDrawingActive, areaDrawTool, activeModule, mapReady]);
 
-  const handleAreaDrawingModeChange = useCallback(() => {
-    setAreaDrawingMode((prev) => !prev);
-  }, []);
+  const handleAreaDrawToolChange = useCallback((nextTool) => {
+    if (areaDrawTool === nextTool && areaDrawingActive) {
+      setAreaDrawingActive(false);
+      return;
+    }
+
+    setAreaDrawTool(nextTool);
+    setAreaDrawingActive(true);
+  }, [areaDrawTool, areaDrawingActive]);
 
   const handleAreaReset = useCallback(() => {
-    setAreaDrawingMode(false);
+    setAreaDrawingActive(false);
     setAreaPolygon(null);
     if (map.current) {
       clearAreaSelectionLayer(map.current);
@@ -719,12 +882,73 @@ export default function MapView() {
     }
   }, [popupData]);
 
-  const handleSpeciesPolygonReset = useCallback(() => {
+  const handleSpeciesPolygonResetAll = useCallback(() => {
+    setSpeciesPolygons([]);
+    setActivePolygonId(null);
+    setPolygonAddMode(false);
+    setIntersectionSpeciesA(null);
+    setIntersectionSpeciesB(null);
+    setIntersectionResult(null);
+
     if (map.current) {
       clearSpeciesPolygonLayer(map.current);
     }
+  }, []);
 
-    setSpeciesPolygonInfo(null);
+  const handleSpeciesPolygonResetOne = useCallback((polygonId) => {
+    setSpeciesPolygons((prev) => prev.filter((entry) => entry.id !== polygonId));
+    setActivePolygonId((prev) => (prev === polygonId ? null : prev));
+
+    if (
+      intersectionSpeciesA === polygonId ||
+      intersectionSpeciesB === polygonId ||
+      intersectionResult?.speciesA?.nameLatin === polygonId ||
+      intersectionResult?.speciesB?.nameLatin === polygonId
+    ) {
+      clearIntersectionState();
+    }
+  }, [
+    clearIntersectionState,
+    intersectionResult,
+    intersectionSpeciesA,
+    intersectionSpeciesB
+  ]);
+
+  const handleSpeciesPolygonToggleHidden = useCallback((polygonId) => {
+    setSpeciesPolygons((prev) =>
+      prev.map((entry) =>
+        entry.id === polygonId ? { ...entry, hidden: !entry.hidden } : entry
+      )
+    );
+  }, []);
+
+  const handleSpeciesPolygonSelect = useCallback((polygonId) => {
+    setActivePolygonId(polygonId);
+  }, []);
+
+  const handleSpeciesPolygonToggleBuildMode = useCallback((polygonId) => {
+    setSpeciesPolygons((prev) => toggleSpeciesPolygonBuildMode(prev, polygonId));
+    setActivePolygonId(polygonId);
+  }, []);
+
+  const handleSpeciesPolygonAddModeChange = useCallback((enabled) => {
+    setPolygonAddMode(enabled);
+  }, []);
+
+  const applySpeciesPolygonBuild = useCallback((feature, mode) => {
+    if (!feature) {
+      return;
+    }
+
+    const nameLatin = feature.properties?.name_latin;
+
+    setSpeciesPolygons((prev) => upsertSpeciesPolygon(prev, feature, mode));
+
+    if (nameLatin) {
+      setActivePolygonId(nameLatin);
+    }
+
+    setPolygonAddMode(false);
   }, []);
 
   /**
@@ -732,26 +956,53 @@ export default function MapView() {
    * Смена точки сама по себе полигон не меняет — только явный вызов этой функции.
    */
   const handleSpeciesPolygonBuild = useCallback(() => {
-    if (!map.current || !popupData) {
+    if (!popupData) {
       return;
     }
 
-    const info = updateSpeciesPolygonLayer(map.current, popupData, {
-      mode: POLYGON_BUILD_MODES.CONVEX
-    });
-    setSpeciesPolygonInfo(info);
-  }, [popupData]);
+    applySpeciesPolygonBuild(popupData, POLYGON_BUILD_MODES.CONVEX);
+  }, [popupData, applySpeciesPolygonBuild]);
 
   const handleSpeciesPolygonBuildAllPoints = useCallback(() => {
-    if (!map.current || !popupData) {
+    if (!popupData) {
       return;
     }
 
-    const info = updateSpeciesPolygonLayer(map.current, popupData, {
-      mode: POLYGON_BUILD_MODES.ALL_POINTS
-    });
-    setSpeciesPolygonInfo(info);
-  }, [popupData]);
+    const selectedSpecies = popupData.properties?.name_latin;
+    const existing = speciesPolygons.find((entry) => entry.nameLatin === selectedSpecies);
+    const isAllPointsActive =
+      existing?.built && existing.mode === POLYGON_BUILD_MODES.ALL_POINTS;
+
+    applySpeciesPolygonBuild(
+      popupData,
+      isAllPointsActive ? POLYGON_BUILD_MODES.CONVEX : POLYGON_BUILD_MODES.ALL_POINTS
+    );
+  }, [popupData, speciesPolygons, applySpeciesPolygonBuild]);
+
+  const handleIntersectionSpeciesAChange = useCallback((nameLatin) => {
+    setIntersectionSpeciesA(nameLatin);
+    clearIntersectionState();
+  }, [clearIntersectionState]);
+
+  const handleIntersectionSpeciesBChange = useCallback((nameLatin) => {
+    setIntersectionSpeciesB(nameLatin);
+    clearIntersectionState();
+  }, [clearIntersectionState]);
+
+  const handleIntersectionCompute = useCallback(() => {
+    const nextResult = computeIntersectionFromSelection();
+
+    if (!nextResult) {
+      return;
+    }
+
+    setIntersectionResult(nextResult);
+    setIntersectionPinned(true);
+  }, [computeIntersectionFromSelection]);
+
+  const handleIntersectionReset = useCallback(() => {
+    clearIntersectionState();
+  }, [clearIntersectionState]);
 
   /**
    * Меняет диаметр одной зоны буфера, поддерживая порядок «каждая следующая зона не меньше
@@ -836,20 +1087,22 @@ export default function MapView() {
     if (map.current) {
       hideArealPointHint();
       clearArealLayer(map.current);
-      clearSpeciesPolygonLayer(map.current);
       clearBufferLayer(map.current);
+      clearSpeciesPolygonLayer(map.current);
     }
 
     setPopupData(null);
     setPropertyFilters({});
     setArealEnabled(false);
     setArealAllMarkers(false);
-    setSpeciesPolygonInfo(null);
+    setSpeciesPolygons([]);
+    setActivePolygonId(null);
     setBufferDiameters(DEFAULT_BUFFER_DIAMETERS_KM);
     setBufferEnabled(false);
     setBufferSelectedPoints([]);
     setBufferSelectionMode(false);
-    setActiveModule(null);
+    setPolygonAddMode(false);
+    setActiveModule((current) => (current === MODULE_IDS.POLYGON ? current : null));
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature(false);
   }, []);
@@ -939,6 +1192,23 @@ export default function MapView() {
               } else {
                 setBufferSelectedPoints([]);
               }
+            }
+
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+              polygonStateRef.current;
+
+            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+              const nameLatin = feature.properties?.name_latin;
+
+              setSpeciesPolygons((prev) =>
+                upsertSpeciesPolygon(prev, feature, POLYGON_BUILD_MODES.CONVEX)
+              );
+
+              if (nameLatin) {
+                setActivePolygonId(nameLatin);
+              }
+
+              setPolygonAddMode(false);
             }
           },
           onMapBackgroundClick: (event) => {
@@ -1068,12 +1338,28 @@ export default function MapView() {
           {activeModule === MODULE_IDS.POLYGON && (
             <SpeciesPolygonPopup
               feature={popupData}
-              polygonInfo={speciesPolygonInfo}
+              polygons={speciesPolygons}
+              activePolygonId={activePolygon?.id ?? null}
+              addMode={polygonAddMode}
               containedSpecies={speciesPolygonContainedSpecies}
               onBuild={handleSpeciesPolygonBuild}
               onBuildAllPoints={handleSpeciesPolygonBuildAllPoints}
-              onReset={handleSpeciesPolygonReset}
+              onResetAll={handleSpeciesPolygonResetAll}
+              onResetOne={handleSpeciesPolygonResetOne}
+              onToggleHidden={handleSpeciesPolygonToggleHidden}
+              onToggleBuildMode={handleSpeciesPolygonToggleBuildMode}
+              onSelectPolygon={handleSpeciesPolygonSelect}
+              onAddModeChange={handleSpeciesPolygonAddModeChange}
               onSpeciesSelect={handleSpeciesPolygonSpeciesSelect}
+              intersectionSpeciesA={intersectionSpeciesA}
+              intersectionSpeciesB={intersectionSpeciesB}
+              intersectionResult={intersectionResult}
+              intersectionContainedPoints={intersectionContainedPoints}
+              onIntersectionSpeciesAChange={handleIntersectionSpeciesAChange}
+              onIntersectionSpeciesBChange={handleIntersectionSpeciesBChange}
+              onIntersectionCompute={handleIntersectionCompute}
+              onIntersectionReset={handleIntersectionReset}
+              onIntersectionPointSelect={handleAreaPointSelect}
               collapsed={isPanelCollapsed(PANEL_IDS.POLYGON)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.POLYGON)}
             />
@@ -1096,10 +1382,11 @@ export default function MapView() {
           ) : null}
           {activeModule === MODULE_IDS.AREA && (
             <AreaSelectionPopup
-              drawingMode={areaDrawingMode}
+              drawTool={areaDrawTool}
+              onDrawToolChange={handleAreaDrawToolChange}
+              drawingActive={areaDrawingActive}
               hasArea={Boolean(areaPolygon)}
               containedPoints={areaContainedPoints}
-              onDrawingModeChange={handleAreaDrawingModeChange}
               onPointSelect={handleAreaPointSelect}
               onReset={handleAreaReset}
               collapsed={isPanelCollapsed(PANEL_IDS.AREA)}
@@ -1124,9 +1411,11 @@ export default function MapView() {
           )}
         </div>
       )}
-      {activeModule === MODULE_IDS.TIMELINE && (
-        <TimelineSlider year={timelineYear} onYearChange={setTimelineYear} />
-      )}
+      <TimelineSlider
+        visible={activeModule === MODULE_IDS.TIMELINE}
+        year={timelineYear}
+        onYearChange={setTimelineYear}
+      />
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
       <FeedbackWidget />
     </>

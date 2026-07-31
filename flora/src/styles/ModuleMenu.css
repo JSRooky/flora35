@@ -99,6 +99,38 @@
   background: rgba(0, 122, 255, 0.16);
 }
 
+.module-menu-btn--time:hover {
+  background: rgba(43, 158, 8, 0.1);
+}
+
+.module-menu-btn--time.module-menu-btn--active {
+  color: #2b9e08;
+}
+
+.module-menu-btn--time.module-menu-btn--active::after {
+  background: #2b9e08;
+}
+
+.module-menu-btn--time.module-menu-btn--active:hover {
+  background: rgba(43, 158, 8, 0.16);
+}
+
+.module-menu-btn--map-tool:hover {
+  background: var(--map-tool-accent-soft);
+}
+
+.module-menu-btn--map-tool.module-menu-btn--active {
+  color: var(--map-tool-accent);
+}
+
+.module-menu-btn--map-tool.module-menu-btn--active::after {
+  background: var(--map-tool-accent);
+}
+
+.module-menu-btn--map-tool.module-menu-btn--active:hover {
+  background: var(--map-tool-accent-soft-hover);
+}
+
 .module-menu-btn--disabled,
 .module-menu-btn:disabled {
   color: rgba(29, 29, 31, 0.35);

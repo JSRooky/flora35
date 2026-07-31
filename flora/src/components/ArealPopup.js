@@ -74,7 +74,7 @@ export default function ArealPopup({
       <div className="areal-popup-header">
         <h3 className="areal-popup-title">Ареал</h3>
         <div className="popup-panel-header-actions">
-          <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
           <button
             type="button"
             className="popup-panel-toggle"
@@ -154,7 +154,7 @@ export default function ArealPopup({
         )}
         </div>
       )}
-      <ModuleHelpPanel sectionId={MODULE_IDS.AREAL} open={helpOpen} />
+      <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.AREAL} open={helpOpen} />
     </div>
   );
 }

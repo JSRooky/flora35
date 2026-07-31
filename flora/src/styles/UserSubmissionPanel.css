@@ -38,24 +38,6 @@
   flex: 1;
 }
 
-.user-submission-panel-toggle {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.6);
-  color: #333;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.user-submission-panel-toggle:hover {
-  background: rgba(255, 255, 255, 0.9);
-}
-
 .user-submission-panel-content {
   margin-top: 12px;
 }

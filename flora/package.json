@@ -17,6 +17,9 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
+    "copy-help-docs": "node scripts/copy-help-docs.js",
+    "prestart": "npm run copy-help-docs",
+    "prebuild": "npm run copy-help-docs",
     "start": "cross-env GENERATE_SOURCEMAP=false react-scripts start",
     "build": "cross-env GENERATE_SOURCEMAP=false react-scripts build",
     "test": "react-scripts test",

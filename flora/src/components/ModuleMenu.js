@@ -20,19 +20,22 @@ export const MODULE_IDS = {
   ABOUT: "about"
 };
 
-const FILTER_MODULE_ITEMS = [
+const POINT_MODULE_ITEMS = [
   { id: MODULE_IDS.FEATURE, label: "Сведения о точке" },
-  { id: MODULE_IDS.YEAR, label: "Год находки" },
-  { id: MODULE_IDS.TIMELINE, label: "Таймлайн" },
   { id: MODULE_IDS.STATUS, label: "Статус МСОП" }
 ];
 
+const TIME_MODULE_ITEMS = [
+  { id: MODULE_IDS.YEAR, label: "Год находки", timeAccent: true },
+  { id: MODULE_IDS.TIMELINE, label: "Таймлайн", timeAccent: true }
+];
+
 const MAP_MODULE_ITEMS = [
-  { id: MODULE_IDS.MAP, label: "Группы точек" },
-  { id: MODULE_IDS.AREAL, label: "Ареал" },
-  { id: MODULE_IDS.POLYGON, label: "Полигон" },
-  { id: MODULE_IDS.BUFFER, label: "Буфер" },
-  { id: MODULE_IDS.AREA, label: "Область" }
+  { id: MODULE_IDS.MAP, label: "Группы точек", mapToolAccent: true },
+  { id: MODULE_IDS.AREAL, label: "Ареал", mapToolAccent: true },
+  { id: MODULE_IDS.BUFFER, label: "Буфер", mapToolAccent: true },
+  { id: MODULE_IDS.POLYGON, label: "Полигон", mapToolAccent: true },
+  { id: MODULE_IDS.AREA, label: "Область", mapToolAccent: true }
 ];
 
 const TEST_MODULE_ITEMS = [
@@ -42,9 +45,7 @@ const TEST_MODULE_ITEMS = [
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
 
 function isPointRequiredModule(id) {
-  return (
-    id === MODULE_IDS.AREAL || id === MODULE_IDS.POLYGON || id === MODULE_IDS.BUFFER
-  );
+  return id === MODULE_IDS.AREAL || id === MODULE_IDS.BUFFER;
 }
 
 const DISABLED_POINT_REQUIRED_TITLE = "Выберите точку";
@@ -55,13 +56,15 @@ function ModuleMenuButton({
   activeModule,
   onModuleSelect,
   className = "",
-  // Некоторые модули (например, «Полигон») требуют предварительного выбора точки.
+  timeAccent = false,
+  mapToolAccent = false,
+  // Некоторые модули (например, «Ареал») требуют предварительного выбора точки.
   disabled = false
 }) {
   const button = (
     <button
       type="button"
-      className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${disabled ? " module-menu-btn--disabled" : ""}${className ? ` ${className}` : ""}`}
+      className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${timeAccent ? " module-menu-btn--time" : ""}${mapToolAccent ? " module-menu-btn--map-tool" : ""}${disabled ? " module-menu-btn--disabled" : ""}${className ? ` ${className}` : ""}`}
       onClick={() => !disabled && onModuleSelect(id)}
       aria-pressed={activeModule === id}
       disabled={disabled}
@@ -93,13 +96,15 @@ export default function ModuleMenu({
   dataSourceMode,
   onDataSourceModeChange
 }) {
-  const renderModuleItem = ({ id, label }) => (
+  const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => (
     <li key={id}>
       <ModuleMenuButton
         id={id}
         label={label}
         activeModule={activeModule}
         onModuleSelect={onModuleSelect}
+        timeAccent={timeAccent}
+        mapToolAccent={mapToolAccent}
         disabled={isPointRequiredModule(id) && !pointSelected}
       />
     </li>
@@ -109,7 +114,9 @@ export default function ModuleMenu({
     <nav className="module-menu" aria-label="Модули приложения">
       <div className="module-menu-dock">
         <ul className="module-menu-list">
-          {FILTER_MODULE_ITEMS.map(renderModuleItem)}
+          {POINT_MODULE_ITEMS.map(renderModuleItem)}
+          <li className="module-menu-separator" aria-hidden="true" />
+          {TIME_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator" aria-hidden="true" />
           {MAP_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />

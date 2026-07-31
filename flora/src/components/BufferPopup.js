@@ -81,7 +81,7 @@ export default function BufferPopup({
       <div className="buffer-popup-header">
         <h3 className="buffer-popup-title">Буфер</h3>
         <div className="popup-panel-header-actions">
-          <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
           <button
             type="button"
             className="popup-panel-toggle"
@@ -178,7 +178,7 @@ export default function BufferPopup({
           </div>
         </div>
       )}
-      <ModuleHelpPanel sectionId={MODULE_IDS.BUFFER} open={helpOpen} />
+      <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.BUFFER} open={helpOpen} />
     </div>
   );
 }

@@ -1,0 +1,20 @@
+/**
+ * Единая палитра инструментов карты:
+ * «Группы точек», «Ареал», «Буфер», «Полигон», «Область».
+ * Отдельно от «Сведения о точке» (#007bff) и «Таймлайн».
+ */
+:root {
+  --map-tool-accent: #2a9d8f;
+  --map-tool-accent-dark: #1f756b;
+  --map-tool-accent-hover: #248f82;
+  --map-tool-accent-soft: rgba(42, 157, 143, 0.12);
+  --map-tool-accent-soft-hover: rgba(42, 157, 143, 0.22);
+  --map-tool-accent-border-soft: rgba(42, 157, 143, 0.45);
+  --map-tool-accent-text: #1a6b62;
+  --map-tool-accent-text-muted: #2d7a70;
+  --polygon-intersection-accent: #8b5cf6;
+  --polygon-intersection-soft: rgba(139, 92, 246, 0.1);
+  --polygon-intersection-border: rgba(139, 92, 246, 0.22);
+  --polygon-surface: rgba(255, 255, 255, 0.42);
+  --polygon-surface-border: rgba(0, 0, 0, 0.06);
+}
