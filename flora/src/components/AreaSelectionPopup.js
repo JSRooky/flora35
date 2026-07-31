@@ -1,15 +1,28 @@
 import React, { useState } from "react";
 import { getArealPointKey } from "./addArealLayer";
-import { AREA_DRAW_MODES } from "./addAreaSelectionLayer";
+import { AREA_DRAW_MODES, AREA_OPERATION_MODES } from "./addAreaSelectionLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import { ReactComponent as DrawFreeIcon } from "../images/draw-free.svg";
+import { ReactComponent as DrawRectIcon } from "../images/draw-rect.svg";
+import { ReactComponent as DrawPolyIcon } from "../images/draw-poly.svg";
 import "../styles/AreaSelectionPopup.css";
 
 const DRAW_TOOL_OPTIONS = [
-  { id: AREA_DRAW_MODES.FREEHAND, label: "Произвольная", Icon: FreehandToolIcon },
-  { id: AREA_DRAW_MODES.RECTANGLE, label: "Прямоугольник", Icon: RectangleToolIcon },
-  { id: AREA_DRAW_MODES.POLYGON, label: "Полигон", Icon: PolygonToolIcon }
+  { id: AREA_DRAW_MODES.FREEHAND, label: "Произвольная", Icon: DrawFreeIcon },
+  { id: AREA_DRAW_MODES.RECTANGLE, label: "Прямоугольник", Icon: DrawRectIcon },
+  { id: AREA_DRAW_MODES.POLYGON, label: "Полигон", Icon: DrawPolyIcon }
 ];
+
+const OPERATION_TOOL_OPTIONS = [
+  { id: AREA_OPERATION_MODES.ADD, label: "Добавить область", symbol: "+" },
+  { id: AREA_OPERATION_MODES.SUBTRACT, label: "Вычесть область", symbol: "−" }
+];
+
+const OPERATION_MODE_LABELS = {
+  [AREA_OPERATION_MODES.ADD]: "добавление",
+  [AREA_OPERATION_MODES.SUBTRACT]: "вычитание"
+};
 
 const DRAW_TOOL_LABELS = {
   [AREA_DRAW_MODES.FREEHAND]: "произвольная",
@@ -45,84 +58,42 @@ function getPointLabel(feature, points) {
   return nameRu;
 }
 
-function getStatusText(drawTool, drawingActive) {
+function getStatusText(drawTool, operationMode, drawingActive, hasArea) {
   if (drawingActive) {
+    const operationHint =
+      operationMode === AREA_OPERATION_MODES.SUBTRACT
+        ? "Новая область будет вычтена из текущей."
+        : hasArea
+          ? "Новая область объединится с текущей."
+          : "Будет создана новая область.";
+
     if (drawTool === AREA_DRAW_MODES.RECTANGLE) {
-      return "Потяните мышью по карте, чтобы задать прямоугольник. Повторное нажатие кнопки — отмена.";
+      return `Потяните мышью по карте, чтобы задать прямоугольник. ${operationHint} Повторное нажатие кнопки — отмена.`;
     }
 
     if (drawTool === AREA_DRAW_MODES.POLYGON) {
-      return "Щёлкайте по карте для вершин. Двойной левый клик или правая кнопка мыши — завершить, Esc — отмена.";
+      return `Щёлкайте по карте для вершин. ${operationHint} Двойной левый клик или правая кнопка мыши — завершить, Esc — отмена.`;
     }
 
-    return "Зажмите левую кнопку мыши и обведите область на карте. Повторное нажатие кнопки — отмена.";
+    return `Зажмите левую кнопку мыши и обведите область на карте. ${operationHint} Повторное нажатие кнопки — отмена.`;
   }
 
-  return "Нажмите иконку инструмента и нарисуйте область на карте.";
+  if (operationMode === AREA_OPERATION_MODES.SUBTRACT) {
+    return hasArea
+      ? "Режим «−»: нарисованная область вычитается из текущей."
+      : "Режим «−» доступен после создания первой области.";
+  }
+
+  return hasArea
+    ? "Режим «+»: новая область объединится с текущей."
+    : "Нажмите иконку инструмента и нарисуйте область на карте.";
 }
 
-function AreaSelectionToolIcon({ children }) {
-  return (
-    <svg
-      className="area-selection-tool-icon-svg"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {children}
-    </svg>
-  );
-}
-
-function FreehandToolIcon() {
-  return (
-    <AreaSelectionToolIcon>
-      <path
-        d="M4 17c3-6 5-8 8-10s5-1 8 1-3 6-5 8-6 4-9 3-2-2-2-2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </AreaSelectionToolIcon>
-  );
-}
-
-function RectangleToolIcon() {
-  return (
-    <AreaSelectionToolIcon>
-      <rect
-        x="5"
-        y="7"
-        width="14"
-        height="12"
-        rx="1"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-    </AreaSelectionToolIcon>
-  );
-}
-
-function PolygonToolIcon() {
-  return (
-    <AreaSelectionToolIcon>
-      <polygon
-        points="12,4 20,9 17,19 7,19 4,9"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </AreaSelectionToolIcon>
-  );
-}
-
-function getCollapsedSummary(drawTool, drawingActive, hasArea, containedPoints) {
+function getCollapsedSummary(drawTool, operationMode, drawingActive, hasArea, containedPoints) {
   if (drawingActive) {
-    return `Рисование: ${DRAW_TOOL_LABELS[drawTool] ?? "область"}`;
+    return `Рисование (${OPERATION_MODE_LABELS[operationMode] ?? "область"}): ${
+      DRAW_TOOL_LABELS[drawTool] ?? "область"
+    }`;
   }
 
   if (!hasArea) {
@@ -141,7 +112,9 @@ function getCollapsedSummary(drawTool, drawingActive, hasArea, containedPoints) 
  */
 export default function AreaSelectionPopup({
   drawTool = AREA_DRAW_MODES.FREEHAND,
+  operationMode = AREA_OPERATION_MODES.ADD,
   onDrawToolChange,
+  onOperationModeChange,
   drawingActive = false,
   hasArea = false,
   containedPoints = null,
@@ -176,34 +149,64 @@ export default function AreaSelectionPopup({
       <div className="area-selection-popup-body">
         {collapsed ? (
           <p className="popup-collapsed-summary">
-            {getCollapsedSummary(drawTool, drawingActive, hasArea, containedPoints)}
+            {getCollapsedSummary(drawTool, operationMode, drawingActive, hasArea, containedPoints)}
           </p>
         ) : (
           <div className="area-selection-popup-content">
-            <div className="area-selection-tool-group" role="group" aria-label="Инструмент выделения">
-              {DRAW_TOOL_OPTIONS.map(({ id, label, Icon }) => {
-                const isDrawing = drawingActive && drawTool === id;
+            <div className="area-selection-tool-row">
+              <div className="area-selection-tool-group" role="group" aria-label="Инструмент выделения">
+                {DRAW_TOOL_OPTIONS.map(({ id, label, Icon }) => {
+                  const isDrawing = drawingActive && drawTool === id;
 
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`area-selection-tool-btn${isDrawing ? " area-selection-tool-btn--drawing" : ""}`}
-                    onClick={() => onDrawToolChange?.(id)}
-                    aria-pressed={isDrawing}
-                    aria-label={label}
-                    title={label}
-                  >
-                    <Icon />
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      className={`area-selection-tool-btn${isDrawing ? " area-selection-tool-btn--drawing" : ""}`}
+                      onClick={() => onDrawToolChange?.(id)}
+                      aria-pressed={isDrawing}
+                      aria-label={label}
+                      title={label}
+                    >
+                      <Icon className="area-selection-tool-icon-svg" aria-hidden="true" focusable="false" />
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div
+                className="area-selection-tool-group area-selection-tool-group--operations"
+                role="group"
+                aria-label="Операция с областью"
+              >
+                {OPERATION_TOOL_OPTIONS.map(({ id, label, symbol }) => {
+                  const isActive = drawingActive && operationMode === id;
+                  const isDisabled = id === AREA_OPERATION_MODES.SUBTRACT && !hasArea;
+
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      className={`area-selection-tool-btn area-selection-tool-btn--symbol${
+                        isActive ? " area-selection-tool-btn--drawing" : ""
+                      }`}
+                      onClick={() => onOperationModeChange?.(id)}
+                      aria-pressed={operationMode === id}
+                      aria-label={label}
+                      title={label}
+                      disabled={isDisabled}
+                    >
+                      {symbol}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <p
               className={`area-selection-popup-status${drawingActive ? " area-selection-popup-status--drawing" : ""}`}
             >
-              {getStatusText(drawTool, drawingActive)}
+              {getStatusText(drawTool, operationMode, drawingActive, hasArea)}
             </p>
 
             <div className="area-selection-actions">

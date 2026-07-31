@@ -1,4 +1,12 @@
-import { booleanPointInPolygon, point, polygon } from "@turf/turf";
+import {
+  booleanPointInPolygon,
+  cleanCoords,
+  difference,
+  featureCollection,
+  point,
+  polygon,
+  union
+} from "@turf/turf";
 import { getFilteredFeatures } from "./addLocationsLayer";
 
 const SOURCE_ID = "area-selection";
@@ -22,11 +30,74 @@ export const AREA_DRAW_MODES = {
   POLYGON: "polygon"
 };
 
+export const AREA_OPERATION_MODES = {
+  ADD: "add",
+  SUBTRACT: "subtract"
+};
+
 let drawingActive = false;
 let drawingMap = null;
 let drawingHandlers = null;
 let drawingKeyHandler = null;
 let drawingInteractionState = null;
+
+function isValidAreaGeometry(geometry) {
+  if (!geometry) {
+    return false;
+  }
+
+  if (geometry.type === "Polygon") {
+    return geometry.coordinates?.[0]?.length >= 4;
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates.some((rings) => rings[0]?.length >= 4);
+  }
+
+  return false;
+}
+
+function ringToPolygonFeature(ringCoordinates) {
+  return polygon([ringCoordinates]);
+}
+
+function geometryToFeature(geometry) {
+  return {
+    type: "Feature",
+    geometry,
+    properties: {}
+  };
+}
+
+/** Объединяет или вычитает нарисованное кольцо из текущей области. */
+export function applyAreaGeometryOperation(
+  existingGeometry,
+  ringCoordinates,
+  operation = AREA_OPERATION_MODES.ADD
+) {
+  const nextPolygon = ringToPolygonFeature(ringCoordinates);
+
+  if (!existingGeometry) {
+    if (operation === AREA_OPERATION_MODES.SUBTRACT) {
+      return null;
+    }
+
+    return cleanCoords(nextPolygon).geometry;
+  }
+
+  if (operation === AREA_OPERATION_MODES.ADD) {
+    const merged = union(featureCollection([geometryToFeature(existingGeometry), nextPolygon]));
+    return merged ? cleanCoords(merged).geometry : existingGeometry;
+  }
+
+  const subtracted = difference(featureCollection([geometryToFeature(existingGeometry), nextPolygon]));
+
+  if (!subtracted || !isValidAreaGeometry(subtracted.geometry)) {
+    return null;
+  }
+
+  return cleanCoords(subtracted).geometry;
+}
 
 function distancePx(map, coordA, coordB) {
   const pointA = map.project(coordA);
@@ -165,8 +236,8 @@ export function updateAreaSelectionPreview(map, coordinates) {
   });
 }
 
-/** Рисует завершённую область на карте. ringCoordinates — замкнутое кольцо [lng, lat]. */
-export function updateAreaSelectionLayer(map, ringCoordinates) {
+/** Рисует завершённую область на карте. */
+export function updateAreaSelectionLayer(map, areaGeometry) {
   const source = map.getSource(SOURCE_ID);
   const previewSource = map.getSource(PREVIEW_SOURCE_ID);
 
@@ -176,7 +247,7 @@ export function updateAreaSelectionLayer(map, ringCoordinates) {
 
   previewSource?.setData(EMPTY_COLLECTION);
 
-  if (!ringCoordinates || ringCoordinates.length < 4) {
+  if (!isValidAreaGeometry(areaGeometry)) {
     source.setData(EMPTY_COLLECTION);
     return;
   }
@@ -186,10 +257,8 @@ export function updateAreaSelectionLayer(map, ringCoordinates) {
     features: [
       {
         type: "Feature",
-        geometry: {
-          type: "Polygon",
-          coordinates: [ringCoordinates]
-        }
+        geometry: areaGeometry,
+        properties: {}
       }
     ]
   });
@@ -205,12 +274,12 @@ export function clearAreaSelectionLayer(map) {
 }
 
 /** Возвращает точки из отфильтрованного набора, попавшие внутрь полигона. */
-export function getPointsWithinArea(ringCoordinates, filters = {}) {
-  if (!ringCoordinates || ringCoordinates.length < 4) {
+export function getPointsWithinArea(areaGeometry, filters = {}) {
+  if (!isValidAreaGeometry(areaGeometry)) {
     return [];
   }
 
-  const areaPolygon = polygon([ringCoordinates]);
+  const areaFeature = geometryToFeature(areaGeometry);
 
   return getFilteredFeatures(filters).filter((feature) => {
     const coordinates = feature.geometry?.coordinates;
@@ -218,13 +287,13 @@ export function getPointsWithinArea(ringCoordinates, filters = {}) {
       return false;
     }
 
-    return booleanPointInPolygon(point(coordinates), areaPolygon);
+    return booleanPointInPolygon(point(coordinates), areaFeature);
   });
 }
 
 /** Сводка по точкам внутри области: количество и отсортированный список. */
-export function getAreaContainedPointsSummary(ringCoordinates, filters = {}) {
-  const points = getPointsWithinArea(ringCoordinates, filters).sort((a, b) => {
+export function getAreaContainedPointsSummary(areaGeometry, filters = {}) {
+  const points = getPointsWithinArea(areaGeometry, filters).sort((a, b) => {
     const nameA = a.properties?.name_ru ?? "";
     const nameB = b.properties?.name_ru ?? "";
     return nameA.localeCompare(nameB, "ru");

@@ -295,10 +295,13 @@ export default function SpeciesPolygonPopup({
   intersectionSpeciesB = null,
   intersectionResult = null,
   intersectionContainedPoints = null,
+  intersectionOnlyMode = false,
+  intersectionActionsLocked = false,
   onIntersectionSpeciesAChange,
   onIntersectionSpeciesBChange,
   onIntersectionCompute,
   onIntersectionReset,
+  onIntersectionOnlyToggle,
   onIntersectionPointSelect,
   collapsed = false,
   onCollapsedChange
@@ -333,6 +336,10 @@ export default function SpeciesPolygonPopup({
   const canComputeIntersection =
     canIntersect && intersectionSpeciesA && intersectionSpeciesB && !sameIntersectionSpecies;
   const hasIntersectionResult = Boolean(intersectionResult);
+  const addPolygonDisabled = intersectionActionsLocked;
+  const computeIntersectionDisabled = !canComputeIntersection || intersectionActionsLocked;
+  const intersectionLockedHint =
+    "Удалите хотя бы один из двух ареалов пересечения, чтобы снова вычислить пересечение или добавить полигон";
   const hasIntersectionGeometry = intersectionResult?.hasIntersection;
   const hasIntersectionPoints = intersectionContainedPoints?.count > 0;
   const [intersectionListVisible, setIntersectionListVisible] = useState(false);
@@ -556,15 +563,27 @@ export default function SpeciesPolygonPopup({
                 <div className="species-polygon-intersection-actions">
                   <button
                     type="button"
-                    className="species-polygon-build-btn"
+                    className="species-polygon-intersection-action-btn"
                     onClick={onIntersectionCompute}
-                    disabled={!canComputeIntersection}
+                    disabled={computeIntersectionDisabled}
+                    title={intersectionActionsLocked ? intersectionLockedHint : undefined}
                   >
                     Вычислить
                   </button>
                   <button
                     type="button"
-                    className="species-polygon-intersection-reset-btn"
+                    className={`species-polygon-intersection-action-btn${
+                      intersectionOnlyMode ? " species-polygon-intersection-action-btn--active" : ""
+                    }`}
+                    onClick={onIntersectionOnlyToggle}
+                    disabled={!hasIntersectionGeometry}
+                    aria-pressed={intersectionOnlyMode}
+                  >
+                    Пересечение
+                  </button>
+                  <button
+                    type="button"
+                    className="species-polygon-intersection-action-btn"
                     onClick={onIntersectionReset}
                     disabled={!hasIntersectionResult}
                   >
@@ -677,10 +696,12 @@ export default function SpeciesPolygonPopup({
                 addMode ? " species-polygon-add-btn--active" : ""
               }`}
               onClick={() => onAddModeChange?.(!addMode)}
+              disabled={addPolygonDisabled}
+              title={addPolygonDisabled ? intersectionLockedHint : undefined}
             >
               {addMode ? "Отменить выбор" : "Добавить полигон"}
             </button>
-            {addMode && (
+            {addMode && !addPolygonDisabled && (
               <p className="species-polygon-popup-status">
                 Выберите точку вида на карте. Клик по точке того же вида обновит его ареал.
               </p>
