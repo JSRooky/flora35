@@ -20,11 +20,14 @@ export const MODULE_IDS = {
   ABOUT: "about"
 };
 
-const FILTER_MODULE_ITEMS = [
+const POINT_MODULE_ITEMS = [
   { id: MODULE_IDS.FEATURE, label: "Сведения о точке" },
-  { id: MODULE_IDS.YEAR, label: "Год находки" },
-  { id: MODULE_IDS.TIMELINE, label: "Таймлайн" },
   { id: MODULE_IDS.STATUS, label: "Статус МСОП" }
+];
+
+const TIME_MODULE_ITEMS = [
+  { id: MODULE_IDS.YEAR, label: "Год находки", timeAccent: true },
+  { id: MODULE_IDS.TIMELINE, label: "Таймлайн", timeAccent: true }
 ];
 
 const MAP_MODULE_ITEMS = [
@@ -55,13 +58,14 @@ function ModuleMenuButton({
   activeModule,
   onModuleSelect,
   className = "",
+  timeAccent = false,
   // Некоторые модули (например, «Полигон») требуют предварительного выбора точки.
   disabled = false
 }) {
   const button = (
     <button
       type="button"
-      className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${disabled ? " module-menu-btn--disabled" : ""}${className ? ` ${className}` : ""}`}
+      className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${timeAccent ? " module-menu-btn--time" : ""}${disabled ? " module-menu-btn--disabled" : ""}${className ? ` ${className}` : ""}`}
       onClick={() => !disabled && onModuleSelect(id)}
       aria-pressed={activeModule === id}
       disabled={disabled}
@@ -93,13 +97,14 @@ export default function ModuleMenu({
   dataSourceMode,
   onDataSourceModeChange
 }) {
-  const renderModuleItem = ({ id, label }) => (
+  const renderModuleItem = ({ id, label, timeAccent = false }) => (
     <li key={id}>
       <ModuleMenuButton
         id={id}
         label={label}
         activeModule={activeModule}
         onModuleSelect={onModuleSelect}
+        timeAccent={timeAccent}
         disabled={isPointRequiredModule(id) && !pointSelected}
       />
     </li>
@@ -109,7 +114,9 @@ export default function ModuleMenu({
     <nav className="module-menu" aria-label="Модули приложения">
       <div className="module-menu-dock">
         <ul className="module-menu-list">
-          {FILTER_MODULE_ITEMS.map(renderModuleItem)}
+          {POINT_MODULE_ITEMS.map(renderModuleItem)}
+          <li className="module-menu-separator" aria-hidden="true" />
+          {TIME_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator" aria-hidden="true" />
           {MAP_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />

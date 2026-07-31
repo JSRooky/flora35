@@ -1124,9 +1124,11 @@ export default function MapView() {
           )}
         </div>
       )}
-      {activeModule === MODULE_IDS.TIMELINE && (
-        <TimelineSlider year={timelineYear} onYearChange={setTimelineYear} />
-      )}
+      <TimelineSlider
+        visible={activeModule === MODULE_IDS.TIMELINE}
+        year={timelineYear}
+        onYearChange={setTimelineYear}
+      />
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
       <FeedbackWidget />
     </>
