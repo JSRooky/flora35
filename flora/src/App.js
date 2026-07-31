@@ -70,6 +70,7 @@ import TimelineSlider from "./components/TimelineSlider";
 import AboutProject from "./components/AboutProject";
 import FeedbackWidget from "./components/FeedbackWidget";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
+import { FEATURE_FLAGS } from "./config/featureFlags";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
 import "./MapView.css";
@@ -231,6 +232,10 @@ export default function MapView() {
       setArealDockedWithFeature(false);
       setBufferDockedWithFeature(false);
       setActiveModule((current) => (current === moduleId ? null : moduleId));
+      return;
+    }
+
+    if (moduleId === MODULE_IDS.SUBMIT && FEATURE_FLAGS.submitModuleDisabled) {
       return;
     }
 

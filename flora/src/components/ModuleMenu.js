@@ -1,5 +1,6 @@
 import React from "react";
 import { DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
+import { FEATURE_FLAGS, FEATURE_UNAVAILABLE_TITLE } from "../config/featureFlags";
 import "../styles/ModuleMenu.css";
 
 export const MODULE_IDS = {
@@ -60,7 +61,8 @@ function ModuleMenuButton({
   className = "",
   timeAccent = false,
   // Некоторые модули (например, «Полигон») требуют предварительного выбора точки.
-  disabled = false
+  disabled = false,
+  disabledTitle = DISABLED_POINT_REQUIRED_TITLE,
 }) {
   const button = (
     <button
@@ -77,7 +79,7 @@ function ModuleMenuButton({
   // У disabled-кнопок не срабатывает title, поэтому оборачиваем в span.
   if (disabled) {
     return (
-      <span className="module-menu-btn-wrap" title={DISABLED_POINT_REQUIRED_TITLE}>
+      <span className="module-menu-btn-wrap" title={disabledTitle}>
         {button}
       </span>
     );
@@ -97,7 +99,13 @@ export default function ModuleMenu({
   dataSourceMode,
   onDataSourceModeChange
 }) {
-  const renderModuleItem = ({ id, label, timeAccent = false }) => (
+  const renderModuleItem = ({
+    id,
+    label,
+    timeAccent = false,
+    forceDisabled = false,
+    disabledTitle,
+  }) => (
     <li key={id}>
       <ModuleMenuButton
         id={id}
@@ -105,7 +113,8 @@ export default function ModuleMenu({
         activeModule={activeModule}
         onModuleSelect={onModuleSelect}
         timeAccent={timeAccent}
-        disabled={isPointRequiredModule(id) && !pointSelected}
+        disabled={forceDisabled || (isPointRequiredModule(id) && !pointSelected)}
+        disabledTitle={disabledTitle}
       />
     </li>
   );
@@ -120,17 +129,33 @@ export default function ModuleMenu({
           <li className="module-menu-separator" aria-hidden="true" />
           {MAP_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />
-          {TEST_MODULE_ITEMS.map(renderModuleItem)}
+          {TEST_MODULE_ITEMS.map((item) =>
+            renderModuleItem({
+              ...item,
+              forceDisabled: FEATURE_FLAGS.submitModuleDisabled,
+              disabledTitle: FEATURE_FLAGS.submitModuleDisabled
+                ? FEATURE_UNAVAILABLE_TITLE
+                : undefined,
+            })
+          )}
           <li className="module-menu-separator" aria-hidden="true" />
-          <li className="module-menu-toggle-item module-menu-data-source">
+          <li
+            className={`module-menu-toggle-item module-menu-data-source${
+              FEATURE_FLAGS.dataSourceSelectDisabled ? " module-menu-data-source--disabled" : ""
+            }`}
+            title={FEATURE_FLAGS.dataSourceSelectDisabled ? FEATURE_UNAVAILABLE_TITLE : undefined}
+          >
             <label className="module-menu-data-source-field" htmlFor="module-menu-data-source-select">
               <span className="module-menu-data-source-label">Точки</span>
               <select
                 id="module-menu-data-source-select"
                 className="module-menu-data-source-select"
                 value={dataSourceMode}
+                disabled={FEATURE_FLAGS.dataSourceSelectDisabled}
                 title={
-                  DATA_SOURCE_OPTIONS.find(({ value }) => value === dataSourceMode)?.title
+                  FEATURE_FLAGS.dataSourceSelectDisabled
+                    ? FEATURE_UNAVAILABLE_TITLE
+                    : DATA_SOURCE_OPTIONS.find(({ value }) => value === dataSourceMode)?.title
                 }
                 onChange={(event) => onDataSourceModeChange?.(event.target.value)}
               >

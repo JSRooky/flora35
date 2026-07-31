@@ -247,6 +247,19 @@
   box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
 }
 
+.module-menu-data-source--disabled .module-menu-data-source-field {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.module-menu-data-source--disabled .module-menu-data-source-field:hover {
+  background: transparent;
+}
+
+.module-menu-data-source-select:disabled {
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .module-menu {
     padding: 8px 10px 0;
