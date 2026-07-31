@@ -269,7 +269,7 @@ export default function SpeciesPolygonPopup({
       <div className="species-polygon-popup-header">
         <h3 className="species-polygon-popup-title">Полигон</h3>
         <div className="popup-panel-header-actions">
-          <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
           <button
             type="button"
             className="popup-panel-toggle"
@@ -474,7 +474,7 @@ export default function SpeciesPolygonPopup({
           </div>
         </div>
       )}
-      <ModuleHelpPanel sectionId={MODULE_IDS.POLYGON} open={helpOpen} />
+      <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.POLYGON} open={helpOpen} />
     </div>
   );
 }

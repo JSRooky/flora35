@@ -9,11 +9,11 @@ import { renderMarkdown } from "../docs/renderMarkdown";
 import "../styles/ModuleHelp.css";
 
 /** Кнопка «?» в заголовке панели модуля; переключает блок справки ниже. */
-export function ModuleHelpButton({ open, onClick, className = "" }) {
+export function ModuleHelpButton({ open, onClick, className = "", mapToolAccent = false }) {
   return (
     <button
       type="button"
-      className={`module-help-btn${open ? " module-help-btn--active" : ""}${className ? ` ${className}` : ""}`}
+      className={`module-help-btn${open ? " module-help-btn--active" : ""}${mapToolAccent ? " module-help-btn--map-tool" : ""}${className ? ` ${className}` : ""}`}
       onClick={onClick}
       aria-expanded={open}
       aria-label="Помощь"
@@ -28,7 +28,7 @@ export function ModuleHelpButton({ open, onClick, className = "" }) {
  * Блок справки под панелью модуля.
  * sectionId должен совпадать с заголовком ## sectionId в docs/moduleHelp.md.
  */
-export function ModuleHelpPanel({ sectionId, open }) {
+export function ModuleHelpPanel({ sectionId, open, mapToolAccent = false }) {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -70,7 +70,7 @@ export function ModuleHelpPanel({ sectionId, open }) {
   }
 
   return (
-    <aside className="module-help-panel" aria-label="Справка по модулю">
+    <aside className={`module-help-panel${mapToolAccent ? " module-help-panel--map-tool" : ""}`} aria-label="Справка по модулю">
       {loading ? (
         <p className="module-help-panel-loading">Загрузка...</p>
       ) : error ? (

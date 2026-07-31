@@ -52,6 +52,7 @@ import {
 } from "./components/addBufferLayer";
 import {
   addAreaSelectionLayer,
+  AREA_DRAW_MODES,
   clearAreaSelectionLayer,
   getAreaContainedPointsSummary,
   isAreaDrawingActive,
@@ -74,6 +75,7 @@ import FeedbackWidget from "./components/FeedbackWidget";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
+import "./styles/mapToolsTheme.css";
 import "./MapView.css";
 
 const UserSubmissionPanel = lazy(() => import("./components/UserSubmissionPanel"));
@@ -130,7 +132,8 @@ export default function MapView() {
   const [bufferEnabled, setBufferEnabled] = useState(false);
   const [bufferSelectionMode, setBufferSelectionMode] = useState(false);
   const [bufferSelectedPoints, setBufferSelectedPoints] = useState([]);
-  const [areaDrawingMode, setAreaDrawingMode] = useState(false);
+  const [areaDrawTool, setAreaDrawTool] = useState(AREA_DRAW_MODES.FREEHAND);
+  const [areaDrawingActive, setAreaDrawingActive] = useState(false);
   const [areaPolygon, setAreaPolygon] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
   const [osmBasemapEnabled, setOsmBasemapEnabledState] = useState(false);
@@ -493,7 +496,7 @@ export default function MapView() {
 
   useEffect(() => {
     if (activeModule !== MODULE_IDS.AREA) {
-      setAreaDrawingMode(false);
+      setAreaDrawingActive(false);
     }
   }, [activeModule]);
 
@@ -511,32 +514,42 @@ export default function MapView() {
 
   useEffect(() => {
     const mapInstance = map.current;
-    if (!mapInstance || !mapReady || activeModule !== MODULE_IDS.AREA || !areaDrawingMode) {
+    if (!mapInstance || !mapReady || activeModule !== MODULE_IDS.AREA || !areaDrawingActive) {
       stopActiveAreaDrawing();
       return;
     }
 
-    startAreaDrawing(mapInstance, {
+    startAreaDrawing(mapInstance, areaDrawTool, {
       onPreview: (coordinates) => {
         updateAreaSelectionPreview(mapInstance, coordinates);
       },
       onComplete: (ringCoordinates) => {
         setAreaPolygon(ringCoordinates);
-        setAreaDrawingMode(false);
+        setAreaDrawingActive(false);
+      },
+      onCancel: () => {
+        setAreaDrawingActive(false);
+        updateAreaSelectionPreview(mapInstance, []);
       }
     });
 
     return () => {
       stopActiveAreaDrawing();
     };
-  }, [areaDrawingMode, activeModule, mapReady]);
+  }, [areaDrawingActive, areaDrawTool, activeModule, mapReady]);
 
-  const handleAreaDrawingModeChange = useCallback(() => {
-    setAreaDrawingMode((prev) => !prev);
-  }, []);
+  const handleAreaDrawToolChange = useCallback((nextTool) => {
+    if (areaDrawTool === nextTool && areaDrawingActive) {
+      setAreaDrawingActive(false);
+      return;
+    }
+
+    setAreaDrawTool(nextTool);
+    setAreaDrawingActive(true);
+  }, [areaDrawTool, areaDrawingActive]);
 
   const handleAreaReset = useCallback(() => {
-    setAreaDrawingMode(false);
+    setAreaDrawingActive(false);
     setAreaPolygon(null);
     if (map.current) {
       clearAreaSelectionLayer(map.current);
@@ -1212,10 +1225,11 @@ export default function MapView() {
           ) : null}
           {activeModule === MODULE_IDS.AREA && (
             <AreaSelectionPopup
-              drawingMode={areaDrawingMode}
+              drawTool={areaDrawTool}
+              onDrawToolChange={handleAreaDrawToolChange}
+              drawingActive={areaDrawingActive}
               hasArea={Boolean(areaPolygon)}
               containedPoints={areaContainedPoints}
-              onDrawingModeChange={handleAreaDrawingModeChange}
               onPointSelect={handleAreaPointSelect}
               onReset={handleAreaReset}
               collapsed={isPanelCollapsed(PANEL_IDS.AREA)}

@@ -60,7 +60,7 @@
   margin: 0;
   font-size: 15px;
   color: #333;
-  border-bottom: 2px solid #3498db;
+  border-bottom: 2px solid var(--map-tool-accent);
   padding-bottom: 6px;
   flex: 1;
 }
@@ -79,44 +79,59 @@
 }
 
 .area-selection-popup-status--drawing {
-  color: #2471a3;
+  color: var(--map-tool-accent-text-muted);
+}
+
+.area-selection-tool-group {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.area-selection-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.65);
+  color: #444;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.area-selection-tool-icon-svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.area-selection-tool-btn:hover {
+  background: var(--map-tool-accent-soft);
+  border-color: var(--map-tool-accent-border-soft);
+  color: var(--map-tool-accent-dark);
+}
+
+.area-selection-tool-btn--drawing {
+  background: var(--map-tool-accent);
+  border-color: var(--map-tool-accent-dark);
+  color: #fff;
+}
+
+.area-selection-tool-btn--drawing:hover {
+  background: var(--map-tool-accent-hover);
 }
 
 .area-selection-actions {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px;
   padding-top: 10px;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
   flex-shrink: 0;
-}
-
-.area-selection-draw-btn {
-  padding: 5px 12px;
-  border-radius: 5px;
-  border: 1px solid #3498db;
-  background: rgba(52, 152, 219, 0.12);
-  color: #2471a3;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.area-selection-draw-btn:hover {
-  background: rgba(52, 152, 219, 0.22);
-  border-color: #2471a3;
-}
-
-.area-selection-draw-btn--active {
-  background: #3498db;
-  border-color: #2471a3;
-  color: #fff;
-}
-
-.area-selection-draw-btn--active:hover {
-  background: #2f89cc;
 }
 
 .area-selection-reset-btn {
@@ -161,7 +176,7 @@
 }
 
 .area-selection-contained-points-title strong {
-  color: #2471a3;
+  color: var(--map-tool-accent-dark);
 }
 
 .area-selection-contained-points-list {
@@ -182,15 +197,15 @@
   background: none;
   font: inherit;
   font-size: 13px;
-  color: #1f618d;
+  color: var(--map-tool-accent-text);
   text-align: left;
   line-height: 1.5;
   cursor: pointer;
   text-decoration: underline;
-  text-decoration-color: rgba(31, 97, 141, 0.35);
+  text-decoration-color: rgba(26, 107, 98, 0.35);
 }
 
 .area-selection-contained-points-item:hover {
-  color: #154360;
+  color: var(--map-tool-accent-dark);
   text-decoration-color: currentColor;
 }

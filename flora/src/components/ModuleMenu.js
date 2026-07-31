@@ -31,11 +31,11 @@ const TIME_MODULE_ITEMS = [
 ];
 
 const MAP_MODULE_ITEMS = [
-  { id: MODULE_IDS.MAP, label: "Группы точек" },
-  { id: MODULE_IDS.AREAL, label: "Ареал" },
-  { id: MODULE_IDS.BUFFER, label: "Буфер" },
-  { id: MODULE_IDS.POLYGON, label: "Полигон" },
-  { id: MODULE_IDS.AREA, label: "Область" }
+  { id: MODULE_IDS.MAP, label: "Группы точек", mapToolAccent: true },
+  { id: MODULE_IDS.AREAL, label: "Ареал", mapToolAccent: true },
+  { id: MODULE_IDS.BUFFER, label: "Буфер", mapToolAccent: true },
+  { id: MODULE_IDS.POLYGON, label: "Полигон", mapToolAccent: true },
+  { id: MODULE_IDS.AREA, label: "Область", mapToolAccent: true }
 ];
 
 const TEST_MODULE_ITEMS = [
@@ -57,13 +57,14 @@ function ModuleMenuButton({
   onModuleSelect,
   className = "",
   timeAccent = false,
+  mapToolAccent = false,
   // Некоторые модули (например, «Ареал») требуют предварительного выбора точки.
   disabled = false
 }) {
   const button = (
     <button
       type="button"
-      className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${timeAccent ? " module-menu-btn--time" : ""}${disabled ? " module-menu-btn--disabled" : ""}${className ? ` ${className}` : ""}`}
+      className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${timeAccent ? " module-menu-btn--time" : ""}${mapToolAccent ? " module-menu-btn--map-tool" : ""}${disabled ? " module-menu-btn--disabled" : ""}${className ? ` ${className}` : ""}`}
       onClick={() => !disabled && onModuleSelect(id)}
       aria-pressed={activeModule === id}
       disabled={disabled}
@@ -95,7 +96,7 @@ export default function ModuleMenu({
   dataSourceMode,
   onDataSourceModeChange
 }) {
-  const renderModuleItem = ({ id, label, timeAccent = false }) => (
+  const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => (
     <li key={id}>
       <ModuleMenuButton
         id={id}
@@ -103,6 +104,7 @@ export default function ModuleMenu({
         activeModule={activeModule}
         onModuleSelect={onModuleSelect}
         timeAccent={timeAccent}
+        mapToolAccent={mapToolAccent}
         disabled={isPointRequiredModule(id) && !pointSelected}
       />
     </li>

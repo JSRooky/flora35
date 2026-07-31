@@ -1,13 +1,13 @@
 .module-help-btn {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border: none;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.6);
   color: #007bff;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -24,11 +24,54 @@
   color: #0056b3;
 }
 
+.module-help-btn--map-tool {
+  color: var(--map-tool-accent);
+}
+
+.module-help-btn--map-tool:hover {
+  color: var(--map-tool-accent-dark);
+}
+
+.module-help-btn--map-tool.module-help-btn--active {
+  background: var(--map-tool-accent-soft);
+  color: var(--map-tool-accent-dark);
+}
+
 .popup-panel-header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
+}
+
+.popup-panel-toggle,
+.map-display-panel-toggle,
+.year-filter-panel-toggle,
+.status-filter-panel-toggle,
+.user-submission-panel-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.6);
+  color: #333;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.popup-panel-toggle:hover,
+.map-display-panel-toggle:hover,
+.year-filter-panel-toggle:hover,
+.status-filter-panel-toggle:hover,
+.user-submission-panel-toggle:hover {
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .module-help-panel {
@@ -94,4 +137,12 @@
 .module-help-panel-full-link:hover {
   color: #3a78c2;
   text-decoration: underline;
+}
+
+.module-help-panel--map-tool .module-help-panel-full-link {
+  color: var(--map-tool-accent);
+}
+
+.module-help-panel--map-tool .module-help-panel-full-link:hover {
+  color: var(--map-tool-accent-hover);
 }
