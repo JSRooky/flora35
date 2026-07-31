@@ -205,14 +205,17 @@
   align-items: center;
   gap: 6px;
   padding: 6px 8px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--polygon-surface-border);
+  border-radius: 8px;
+  background: var(--polygon-surface);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .species-polygon-areal-item--active {
-  border-color: var(--map-tool-accent);
-  background: rgba(42, 157, 143, 0.08);
+  border-color: var(--map-tool-accent-border-soft);
+  background: rgba(42, 157, 143, 0.06);
+  box-shadow: 0 1px 4px rgba(42, 157, 143, 0.08);
 }
 
 .species-polygon-areal-item--hidden {
@@ -393,4 +396,93 @@
 
 .species-polygon-popup .areal-contained-points-list::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+.species-polygon-intersection-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--polygon-intersection-border);
+  border-radius: 10px;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.52) 0%,
+    var(--polygon-intersection-soft) 100%
+  );
+  backdrop-filter: blur(10px);
+}
+
+.species-polygon-intersection-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--polygon-intersection-accent);
+}
+
+.species-polygon-intersection-selects {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.species-polygon-intersection-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.species-polygon-intersection-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.species-polygon-intersection-select {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--polygon-surface-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  font-family: inherit;
+  font-size: 12px;
+  color: #333;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.species-polygon-intersection-select:focus {
+  outline: none;
+  border-color: var(--polygon-intersection-border);
+  box-shadow: 0 0 0 2px var(--polygon-intersection-soft);
+}
+
+.species-polygon-intersection-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.species-polygon-intersection-reset-btn {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border: 1px solid var(--polygon-surface-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #555;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.species-polygon-intersection-reset-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: var(--polygon-intersection-border);
+  color: var(--polygon-intersection-accent);
+}
+
+.species-polygon-intersection-reset-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

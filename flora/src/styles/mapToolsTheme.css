@@ -12,4 +12,9 @@
   --map-tool-accent-border-soft: rgba(42, 157, 143, 0.45);
   --map-tool-accent-text: #1a6b62;
   --map-tool-accent-text-muted: #2d7a70;
+  --polygon-intersection-accent: #8b5cf6;
+  --polygon-intersection-soft: rgba(139, 92, 246, 0.1);
+  --polygon-intersection-border: rgba(139, 92, 246, 0.22);
+  --polygon-surface: rgba(255, 255, 255, 0.42);
+  --polygon-surface-border: rgba(0, 0, 0, 0.06);
 }

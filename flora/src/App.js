@@ -38,9 +38,13 @@ import {
 import {
   addSpeciesPolygonLayer,
   clearSpeciesPolygonLayer,
+  clearSpeciesPolygonIntersectionLayer,
+  computeSpeciesPolygonIntersection,
+  getPolygonIntersectionContainedSummary,
   getSpeciesPolygonContainedSummary,
   syncSpeciesPolygonLayer,
   toggleSpeciesPolygonBuildMode,
+  updateSpeciesPolygonIntersectionLayer,
   upsertSpeciesPolygon,
   POLYGON_BUILD_MODES
 } from "./components/addSpeciesPolygonLayer";
@@ -127,6 +131,10 @@ export default function MapView() {
   const [speciesPolygons, setSpeciesPolygons] = useState([]);
   const [activePolygonId, setActivePolygonId] = useState(null);
   const [polygonAddMode, setPolygonAddMode] = useState(false);
+  const [intersectionSpeciesA, setIntersectionSpeciesA] = useState(null);
+  const [intersectionSpeciesB, setIntersectionSpeciesB] = useState(null);
+  const [intersectionResult, setIntersectionResult] = useState(null);
+  const [intersectionPinned, setIntersectionPinned] = useState(false);
   // Буфер: диаметры зон (красная/жёлтая/зелёная), км; bufferEnabled — включён ли переключатель.
   const [bufferDiameters, setBufferDiameters] = useState(DEFAULT_BUFFER_DIAMETERS_KM);
   const [bufferEnabled, setBufferEnabled] = useState(false);
@@ -453,6 +461,11 @@ export default function MapView() {
     [speciesPolygons]
   );
 
+  const builtSpeciesPolygons = useMemo(
+    () => speciesPolygons.filter((entry) => entry.built),
+    [speciesPolygons]
+  );
+
   const activePolygon = useMemo(() => {
     if (activePolygonId) {
       const selected = speciesPolygons.find((entry) => entry.id === activePolygonId);
@@ -480,11 +493,51 @@ export default function MapView() {
     );
   }, [visibleBuiltPolygons, activePolygon, buildLocationFilters, mapReady]);
 
+  const intersectionContainedPoints = useMemo(() => {
+    if (!intersectionResult?.hasIntersection || !intersectionResult.feature || !mapReady) {
+      return null;
+    }
+
+    return getPolygonIntersectionContainedSummary(
+      intersectionResult.feature,
+      buildLocationFilters()
+    );
+  }, [intersectionResult, buildLocationFilters, mapReady]);
+
+  const clearIntersectionState = useCallback(() => {
+    setIntersectionResult(null);
+    setIntersectionPinned(false);
+
+    if (map.current) {
+      clearSpeciesPolygonIntersectionLayer(map.current);
+    }
+  }, []);
+
+  const computeIntersectionFromSelection = useCallback(() => {
+    if (!intersectionSpeciesA || !intersectionSpeciesB || intersectionSpeciesA === intersectionSpeciesB) {
+      return null;
+    }
+
+    const entryA = builtSpeciesPolygons.find((entry) => entry.nameLatin === intersectionSpeciesA);
+    const entryB = builtSpeciesPolygons.find((entry) => entry.nameLatin === intersectionSpeciesB);
+
+    if (!entryA?.polygon || !entryB?.polygon) {
+      return null;
+    }
+
+    return {
+      ...computeSpeciesPolygonIntersection(entryA.polygon, entryB.polygon),
+      speciesA: entryA,
+      speciesB: entryB
+    };
+  }, [builtSpeciesPolygons, intersectionSpeciesA, intersectionSpeciesB]);
+
   useEffect(() => {
     if (activeModule !== MODULE_IDS.POLYGON) {
       setPolygonAddMode(false);
+      clearIntersectionState();
     }
-  }, [activeModule]);
+  }, [activeModule, clearIntersectionState]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -493,6 +546,59 @@ export default function MapView() {
 
     syncSpeciesPolygonLayer(map.current, speciesPolygons);
   }, [speciesPolygons, mapReady]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    if (intersectionResult?.hasIntersection && intersectionResult.feature) {
+      updateSpeciesPolygonIntersectionLayer(map.current, intersectionResult.feature);
+      return;
+    }
+
+    clearSpeciesPolygonIntersectionLayer(map.current);
+  }, [intersectionResult, mapReady]);
+
+  useEffect(() => {
+    if (builtSpeciesPolygons.length < 2) {
+      setIntersectionSpeciesA(null);
+      setIntersectionSpeciesB(null);
+      clearIntersectionState();
+      return;
+    }
+
+    setIntersectionSpeciesA((current) => {
+      if (current && builtSpeciesPolygons.some((entry) => entry.nameLatin === current)) {
+        return current;
+      }
+
+      return builtSpeciesPolygons[0]?.nameLatin ?? null;
+    });
+
+    setIntersectionSpeciesB((current) => {
+      if (current && builtSpeciesPolygons.some((entry) => entry.nameLatin === current)) {
+        return current;
+      }
+
+      return builtSpeciesPolygons[1]?.nameLatin ?? null;
+    });
+  }, [builtSpeciesPolygons, clearIntersectionState]);
+
+  useEffect(() => {
+    if (!intersectionPinned) {
+      return;
+    }
+
+    const nextResult = computeIntersectionFromSelection();
+
+    if (!nextResult) {
+      clearIntersectionState();
+      return;
+    }
+
+    setIntersectionResult(nextResult);
+  }, [speciesPolygons, intersectionPinned, computeIntersectionFromSelection, clearIntersectionState]);
 
   useEffect(() => {
     if (activeModule !== MODULE_IDS.AREA) {
@@ -780,6 +886,9 @@ export default function MapView() {
     setSpeciesPolygons([]);
     setActivePolygonId(null);
     setPolygonAddMode(false);
+    setIntersectionSpeciesA(null);
+    setIntersectionSpeciesB(null);
+    setIntersectionResult(null);
 
     if (map.current) {
       clearSpeciesPolygonLayer(map.current);
@@ -789,7 +898,21 @@ export default function MapView() {
   const handleSpeciesPolygonResetOne = useCallback((polygonId) => {
     setSpeciesPolygons((prev) => prev.filter((entry) => entry.id !== polygonId));
     setActivePolygonId((prev) => (prev === polygonId ? null : prev));
-  }, []);
+
+    if (
+      intersectionSpeciesA === polygonId ||
+      intersectionSpeciesB === polygonId ||
+      intersectionResult?.speciesA?.nameLatin === polygonId ||
+      intersectionResult?.speciesB?.nameLatin === polygonId
+    ) {
+      clearIntersectionState();
+    }
+  }, [
+    clearIntersectionState,
+    intersectionResult,
+    intersectionSpeciesA,
+    intersectionSpeciesB
+  ]);
 
   const handleSpeciesPolygonToggleHidden = useCallback((polygonId) => {
     setSpeciesPolygons((prev) =>
@@ -855,6 +978,31 @@ export default function MapView() {
       isAllPointsActive ? POLYGON_BUILD_MODES.CONVEX : POLYGON_BUILD_MODES.ALL_POINTS
     );
   }, [popupData, speciesPolygons, applySpeciesPolygonBuild]);
+
+  const handleIntersectionSpeciesAChange = useCallback((nameLatin) => {
+    setIntersectionSpeciesA(nameLatin);
+    clearIntersectionState();
+  }, [clearIntersectionState]);
+
+  const handleIntersectionSpeciesBChange = useCallback((nameLatin) => {
+    setIntersectionSpeciesB(nameLatin);
+    clearIntersectionState();
+  }, [clearIntersectionState]);
+
+  const handleIntersectionCompute = useCallback(() => {
+    const nextResult = computeIntersectionFromSelection();
+
+    if (!nextResult) {
+      return;
+    }
+
+    setIntersectionResult(nextResult);
+    setIntersectionPinned(true);
+  }, [computeIntersectionFromSelection]);
+
+  const handleIntersectionReset = useCallback(() => {
+    clearIntersectionState();
+  }, [clearIntersectionState]);
 
   /**
    * Меняет диаметр одной зоны буфера, поддерживая порядок «каждая следующая зона не меньше
@@ -1203,6 +1351,15 @@ export default function MapView() {
               onSelectPolygon={handleSpeciesPolygonSelect}
               onAddModeChange={handleSpeciesPolygonAddModeChange}
               onSpeciesSelect={handleSpeciesPolygonSpeciesSelect}
+              intersectionSpeciesA={intersectionSpeciesA}
+              intersectionSpeciesB={intersectionSpeciesB}
+              intersectionResult={intersectionResult}
+              intersectionContainedPoints={intersectionContainedPoints}
+              onIntersectionSpeciesAChange={handleIntersectionSpeciesAChange}
+              onIntersectionSpeciesBChange={handleIntersectionSpeciesBChange}
+              onIntersectionCompute={handleIntersectionCompute}
+              onIntersectionReset={handleIntersectionReset}
+              onIntersectionPointSelect={handleAreaPointSelect}
               collapsed={isPanelCollapsed(PANEL_IDS.POLYGON)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.POLYGON)}
             />
