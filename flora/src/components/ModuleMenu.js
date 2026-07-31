@@ -33,8 +33,8 @@ const TIME_MODULE_ITEMS = [
 const MAP_MODULE_ITEMS = [
   { id: MODULE_IDS.MAP, label: "Группы точек" },
   { id: MODULE_IDS.AREAL, label: "Ареал" },
-  { id: MODULE_IDS.POLYGON, label: "Полигон" },
   { id: MODULE_IDS.BUFFER, label: "Буфер" },
+  { id: MODULE_IDS.POLYGON, label: "Полигон" },
   { id: MODULE_IDS.AREA, label: "Область" }
 ];
 
@@ -45,9 +45,7 @@ const TEST_MODULE_ITEMS = [
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
 
 function isPointRequiredModule(id) {
-  return (
-    id === MODULE_IDS.AREAL || id === MODULE_IDS.POLYGON || id === MODULE_IDS.BUFFER
-  );
+  return id === MODULE_IDS.AREAL || id === MODULE_IDS.BUFFER;
 }
 
 const DISABLED_POINT_REQUIRED_TITLE = "Выберите точку";
@@ -59,7 +57,7 @@ function ModuleMenuButton({
   onModuleSelect,
   className = "",
   timeAccent = false,
-  // Некоторые модули (например, «Полигон») требуют предварительного выбора точки.
+  // Некоторые модули (например, «Ареал») требуют предварительного выбора точки.
   disabled = false
 }) {
   const button = (

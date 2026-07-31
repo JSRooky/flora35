@@ -40,6 +40,7 @@ import {
   clearSpeciesPolygonLayer,
   getSpeciesPolygonContainedSummary,
   syncSpeciesPolygonLayer,
+  toggleSpeciesPolygonBuildMode,
   upsertSpeciesPolygon,
   POLYGON_BUILD_MODES
 } from "./components/addSpeciesPolygonLayer";
@@ -789,6 +790,11 @@ export default function MapView() {
     setActivePolygonId(polygonId);
   }, []);
 
+  const handleSpeciesPolygonToggleBuildMode = useCallback((polygonId) => {
+    setSpeciesPolygons((prev) => toggleSpeciesPolygonBuildMode(prev, polygonId));
+    setActivePolygonId(polygonId);
+  }, []);
+
   const handleSpeciesPolygonAddModeChange = useCallback((enabled) => {
     setPolygonAddMode(enabled);
   }, []);
@@ -1177,6 +1183,7 @@ export default function MapView() {
               onResetAll={handleSpeciesPolygonResetAll}
               onResetOne={handleSpeciesPolygonResetOne}
               onToggleHidden={handleSpeciesPolygonToggleHidden}
+              onToggleBuildMode={handleSpeciesPolygonToggleBuildMode}
               onSelectPolygon={handleSpeciesPolygonSelect}
               onAddModeChange={handleSpeciesPolygonAddModeChange}
               onSpeciesSelect={handleSpeciesPolygonSpeciesSelect}

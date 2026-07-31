@@ -198,62 +198,128 @@ export function addSpeciesPolygonLayer(map) {
   });
 }
 
-/**
- * Строит полигон (выпуклая оболочка Turf.js) по всем точкам выбранного вида
- * и отображает его на карте.
- * Возвращает сводку для панели модуля: built, pointCount, nameRu, nameLatin, mode.
- */
-export function updateSpeciesPolygonLayer(
-  map,
-  feature,
-  { mode = POLYGON_BUILD_MODES.CONVEX } = {}
-) {
-  const source = map.getSource(SOURCE_ID);
-  if (!source) {
-    return { built: false, pointCount: 0 };
+/** Первая точка вида — для перестроения полигона по name_latin. */
+export function getRepresentativeFeatureForSpecies(nameLatin) {
+  if (!nameLatin) {
+    return null;
   }
 
+  return getFilteredFeatures().find(
+    (candidate) => candidate.properties?.name_latin === nameLatin
+  ) ?? null;
+}
+
+/** Переключает режим построения полигона: выпуклая оболочка ↔ все точки. */
+export function toggleSpeciesPolygonBuildMode(polygons, polygonId) {
+  const existing = polygons.find((entry) => entry.id === polygonId);
+  if (!existing) {
+    return polygons;
+  }
+
+  const feature = getRepresentativeFeatureForSpecies(existing.nameLatin);
+  if (!feature) {
+    return polygons;
+  }
+
+  const nextMode =
+    existing.mode === POLYGON_BUILD_MODES.ALL_POINTS
+      ? POLYGON_BUILD_MODES.CONVEX
+      : POLYGON_BUILD_MODES.ALL_POINTS;
+
+  if (nextMode === POLYGON_BUILD_MODES.ALL_POINTS && existing.pointCount < 3) {
+    return polygons;
+  }
+
+  return upsertSpeciesPolygon(polygons, feature, nextMode);
+}
+
+/**
+ * Строит запись полигона вида без обновления карты.
+ * id совпадает с name_latin — один полигон на вид.
+ */
+export function buildSpeciesPolygonEntry(
+  feature,
+  { mode = POLYGON_BUILD_MODES.CONVEX, hidden = false } = {}
+) {
+  const nameLatin = feature.properties?.name_latin ?? "";
+  const nameRu = feature.properties?.name_ru ?? "";
   const speciesPoints = getPointsForSpecies(feature);
   const coordinates = speciesPoints
     .map((speciesFeature) => speciesFeature.geometry?.coordinates)
     .filter(Boolean);
 
-  const polygon = buildPolygonFromCoordinates(coordinates, mode);
+  const polygonFeature = buildPolygonFromCoordinates(coordinates, mode);
 
-  if (!polygon) {
-    source.setData(EMPTY_COLLECTION);
-    return {
-      built: false,
-      pointCount: coordinates.length,
-      nameRu: feature.properties?.name_ru,
-      nameLatin: feature.properties?.name_latin,
-      mode
-    };
+  if (!polygonFeature || !nameLatin) {
+    return null;
   }
 
-  const color = getPointColorForRegnum(feature.properties?.regnum);
+  const outlineColor = getPointColorForRegnum(feature.properties?.regnum);
 
-  polygon.properties = {
-    ...polygon.properties,
-    outlineColor: color,
-    name_latin: feature.properties?.name_latin,
-    name_ru: feature.properties?.name_ru,
-    pointCount: coordinates.length
+  polygonFeature.properties = {
+    ...polygonFeature.properties,
+    outlineColor,
+    name_latin: nameLatin,
+    name_ru: nameRu,
+    pointCount: coordinates.length,
+    polygonId: nameLatin
   };
+
+  return {
+    id: nameLatin,
+    built: true,
+    pointCount: coordinates.length,
+    nameRu,
+    nameLatin,
+    polygon: polygonFeature,
+    mode,
+    outlineColor,
+    hidden
+  };
+}
+
+/** Добавляет или обновляет полигон вида в массиве (ключ — name_latin). */
+export function upsertSpeciesPolygon(polygons, feature, mode) {
+  const nameLatin = feature.properties?.name_latin ?? "";
+  const existingIndex = polygons.findIndex((entry) => entry.nameLatin === nameLatin);
+  const existing = existingIndex >= 0 ? polygons[existingIndex] : null;
+  const entry = buildSpeciesPolygonEntry(feature, {
+    mode,
+    hidden: existing?.hidden ?? false
+  });
+
+  if (!entry) {
+    if (existingIndex >= 0) {
+      return polygons.filter((_, index) => index !== existingIndex);
+    }
+
+    return polygons;
+  }
+
+  if (existingIndex >= 0) {
+    const next = [...polygons];
+    next[existingIndex] = entry;
+    return next;
+  }
+
+  return [...polygons, entry];
+}
+
+/** Синхронизирует GeoJSON-источник с массивом полигонов (скрытые не отображаются). */
+export function syncSpeciesPolygonLayer(map, polygons) {
+  const source = map.getSource(SOURCE_ID);
+  if (!source) {
+    return;
+  }
+
+  const features = polygons
+    .filter((entry) => entry.built && entry.polygon && !entry.hidden)
+    .map((entry) => entry.polygon);
 
   source.setData({
     type: "FeatureCollection",
-    features: [polygon]
+    features
   });
-
-  return {
-    built: true,
-    pointCount: coordinates.length,
-    nameRu: feature.properties?.name_ru,
-    nameLatin: feature.properties?.name_latin,
-    polygon,
-    mode
-  };
 }
 
 /**

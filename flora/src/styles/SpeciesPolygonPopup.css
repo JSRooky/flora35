@@ -17,7 +17,7 @@
 .species-polygon-popup:not(.species-polygon-popup--collapsed) {
   display: flex;
   flex-direction: column;
-  max-height: 70vh;
+  max-height: min(70vh, calc(100vh - 88px));
   overflow: hidden;
 }
 
@@ -80,11 +80,46 @@
 .species-polygon-popup-content {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   margin-top: 8px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.species-polygon-popup-top {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.species-polygon-popup-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.species-polygon-popup-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.species-polygon-popup-scroll::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.species-polygon-popup-scroll::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.species-polygon-popup-scroll::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }
 
 .species-polygon-popup-species {
@@ -114,16 +149,22 @@
   line-height: 1.45;
 }
 
+.species-polygon-popup-empty-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.45;
+}
+
 .species-polygon-actions {
   display: flex;
   flex-wrap: nowrap;
+  align-items: center;
   gap: 4px;
   flex-shrink: 0;
 }
 
-.species-polygon-build-btn,
-.species-polygon-build-all-btn,
-.species-polygon-reset-btn {
+.species-polygon-build-btn {
   flex: 1 1 0;
   min-width: 0;
   padding: 5px 6px;
@@ -136,9 +177,6 @@
   white-space: nowrap;
   cursor: pointer;
   transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.species-polygon-build-btn {
   border: 1px solid #4a90e2;
   background: #4a90e2;
   color: #fff;
@@ -154,74 +192,15 @@
   cursor: not-allowed;
 }
 
-.species-polygon-build-all-btn {
-  border: 1px solid #4a90e2;
-  background: #fff;
-  color: #4a90e2;
-}
-
-.species-polygon-build-all-btn:hover:not(:disabled) {
-  background: rgba(74, 144, 226, 0.1);
-  border-color: #3a78c2;
-  color: #3a78c2;
-}
-
-.species-polygon-build-all-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.species-polygon-build-all-btn--active {
-  background: #4a90e2;
-  color: #fff;
-}
-
-.species-polygon-build-all-btn--active:hover:not(:disabled) {
-  background: #3a78c2;
-  border-color: #3a78c2;
-  color: #fff;
-}
-
-.species-polygon-reset-btn {
-  border: 1px solid #ccc;
-  background: #fff;
-  color: #333;
-}
-
-.species-polygon-reset-btn:hover:not(:disabled) {
-  background: #f5f5f5;
-  border-color: #999;
-}
-
-.species-polygon-reset-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .species-polygon-areals-section {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  flex-shrink: 0;
-}
-
-.species-polygon-reset-all-btn {
-  align-self: flex-start;
-  padding: 5px 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  background: #fff;
-  color: #333;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .species-polygon-reset-all-btn:hover {
-  background: #f5f5f5;
-  border-color: #999;
+  background: rgba(220, 53, 69, 0.1);
+  color: #c82333;
 }
 
 .species-polygon-areals-title {
@@ -237,15 +216,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 160px;
-  overflow-y: auto;
 }
 
 .species-polygon-areal-item {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
   border: 1px solid #ddd;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.7);
@@ -261,6 +238,8 @@
 }
 
 .species-polygon-areal-select-btn {
+  flex: 1 1 auto;
+  min-width: 0;
   border: none;
   background: none;
   padding: 0;
@@ -279,28 +258,59 @@
 
 .species-polygon-areal-actions {
   display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
-.species-polygon-visibility-btn,
-.species-polygon-areal-reset-btn {
-  padding: 3px 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #fff;
-  color: #333;
-  font-family: inherit;
-  font-size: 10px;
-  font-weight: 600;
+.species-polygon-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #555;
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.species-polygon-visibility-btn:hover,
+.species-polygon-icon-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #333;
+}
+
 .species-polygon-areal-reset-btn:hover {
-  background: #f5f5f5;
-  border-color: #999;
+  background: rgba(220, 53, 69, 0.1);
+  color: #c82333;
+}
+
+.species-polygon-mode-btn--active {
+  background: rgba(74, 144, 226, 0.15);
+  color: #4a90e2;
+}
+
+.species-polygon-mode-btn--active:hover {
+  background: rgba(74, 144, 226, 0.22);
+  color: #3a78c2;
+}
+
+.species-polygon-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.species-polygon-icon-btn:disabled:hover {
+  background: transparent;
+  color: #555;
+}
+
+.species-polygon-icon-svg {
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 
 .species-polygon-add-section {
@@ -308,6 +318,8 @@
   flex-direction: column;
   gap: 6px;
   flex-shrink: 0;
+  padding-top: 2px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .species-polygon-add-btn {
@@ -342,11 +354,8 @@
 }
 
 .species-polygon-popup .areal-contained-points {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   gap: 8px;
 }
 
@@ -382,10 +391,8 @@
 }
 
 .species-polygon-popup .areal-contained-points-list {
-  flex: 1;
-  min-height: 0;
   max-height: none;
-  overflow-y: auto;
+  overflow-y: visible;
 }
 
 .species-polygon-popup .areal-contained-points-list::-webkit-scrollbar {
