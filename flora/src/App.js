@@ -281,12 +281,12 @@ export default function MapView() {
 
   const handleOpenArealFromFeature = useCallback(() => {
     setActiveModule(MODULE_IDS.FEATURE);
-    setArealDockedWithFeature(true);
+    setArealDockedWithFeature((open) => !open);
   }, []);
 
   const handleOpenBufferFromFeature = useCallback(() => {
     setActiveModule(MODULE_IDS.FEATURE);
-    setBufferDockedWithFeature(true);
+    setBufferDockedWithFeature((open) => !open);
   }, []);
 
   const handleYearRangeChange = useCallback((nextRange) => {
