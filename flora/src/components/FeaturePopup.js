@@ -10,6 +10,7 @@ import {
   getPropertyLabel,
   sortPropertyEntries
 } from "./featurePropertyLabels";
+import { copySharePointLink } from "./sharePointLink";
 import "../styles/FeaturePopup.css";
 
 // Служебные поля, добавленные слоем карты; не показываем в списке свойств.
@@ -31,6 +32,22 @@ function getImages(properties) {
   return [];
 }
 
+function ShareIcon() {
+  return (
+    <svg
+      className="feature-popup-share-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7a3.27 3.27 0 0 0 0-1.39l7.05-4.11A2.991 2.991 0 1 0 14.05 6l-7.05 4.11a3 3 0 1 0 0 4.78l7.05 4.11a2.995 2.995 0 1 0 .9-1.92z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 export default function FeaturePopup({
   feature,
   collapsed = false,
@@ -48,10 +65,29 @@ export default function FeaturePopup({
   const [showImages, setShowImages] = useState(false);
   const [showSpeciesDescription, setShowSpeciesDescription] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false); // блок справки из docs/moduleHelp.md, раздел ## feature
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     setShowSpeciesDescription(false);
+    setShareCopied(false);
   }, [feature?.id, feature?.properties?.finding_id]);
+
+  useEffect(() => {
+    if (!shareCopied) {
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => setShareCopied(false), 2000);
+    return () => window.clearTimeout(timerId);
+  }, [shareCopied]);
+
+  const handleShareClick = async () => {
+    const copied = await copySharePointLink(feature);
+
+    if (copied) {
+      setShareCopied(true);
+    }
+  };
 
   const collapsedSummary = feature
     ? feature.properties?.name_ru ||
@@ -171,7 +207,11 @@ export default function FeaturePopup({
                   </>
                 )}
 
-                {(descriptionPath || images.length > 0 || onOpenAreal || onOpenBuffer) && (
+                {(descriptionPath ||
+                  images.length > 0 ||
+                  onOpenAreal ||
+                  onOpenBuffer ||
+                  feature) && (
                   <div className="feature-popup-actions">
                     {descriptionPath && (
                       <button
@@ -211,6 +251,15 @@ export default function FeaturePopup({
                         {bufferDockedOpen ? "Буфер открыт" : "Буфер"}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className={`feature-popup-share-btn${shareCopied ? " feature-popup-share-btn--copied" : ""}`}
+                      onClick={handleShareClick}
+                      aria-label={shareCopied ? "Ссылка скопирована" : "Поделиться точкой"}
+                      title={shareCopied ? "Ссылка скопирована" : "Поделиться точкой"}
+                    >
+                      <ShareIcon />
+                    </button>
                   </div>
                 )}
               </>

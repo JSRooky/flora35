@@ -30,7 +30,7 @@ import {
   setHeatmapEnabled,
   updateHeatmapData
 } from "./components/addHeatmapLayer";
-import { setUserPointsCollection, setDataSourceFilter, DATA_SOURCE_MODES } from "./locations/loadPoints";
+import { setUserPointsCollection, setDataSourceFilter, DATA_SOURCE_MODES, findFeatureByFindingId, isFindingInDataSource } from "./locations/loadPoints";
 import {
   addOsmBasemapLayer,
   setOsmBasemapEnabled
@@ -59,6 +59,10 @@ import {
   updateAreaSelectionPreview
 } from "./components/addAreaSelectionLayer";
 import FeaturePopup from "./components/FeaturePopup";
+import {
+  focusMapOnSharedPoint,
+  parseSharePointParams
+} from "./components/sharePointLink";
 import ArealPopup from "./components/ArealPopup";
 import SpeciesPolygonPopup from "./components/SpeciesPolygonPopup";
 import BufferPopup from "./components/BufferPopup";
@@ -136,6 +140,7 @@ export default function MapView() {
   const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
   const [submissionLocationPicking, setSubmissionLocationPicking] = useState(false);
   const hadFoundYearPropertyFilterRef = useRef(false);
+  const pendingSharePointRef = useRef(parseSharePointParams(window.location.search));
 
   const isPanelCollapsed = useCallback(
     (panelId) => panelCollapsed[panelId] ?? false,
@@ -879,6 +884,37 @@ export default function MapView() {
       clearBufferLayer(mapInstance);
     }
   }, [bufferEnabled, popupData, bufferSelectedPoints, bufferDiameters, mapReady]);
+
+  useEffect(() => {
+    const pendingShare = pendingSharePointRef.current;
+
+    if (!mapReady || !map.current || !pendingShare?.findingId) {
+      return;
+    }
+
+    const { findingId, zoom } = pendingShare;
+
+    if (!isFindingInDataSource(findingId, dataSourceMode)) {
+      if (dataSourceMode !== DATA_SOURCE_MODES.ALL) {
+        setDataSourceModeState(DATA_SOURCE_MODES.ALL);
+      } else {
+        pendingSharePointRef.current = null;
+      }
+      return;
+    }
+
+    const feature = findFeatureByFindingId(findingId);
+
+    if (!feature) {
+      pendingSharePointRef.current = null;
+      return;
+    }
+
+    pendingSharePointRef.current = null;
+    focusMapOnSharedPoint(map.current, feature, { zoom });
+    setPopupData(feature);
+    setActiveModule(MODULE_IDS.FEATURE);
+  }, [mapReady, dataSourceMode]);
 
   useEffect(() => {
     if (!map.current && ref.current) {
