@@ -1,6 +1,9 @@
 import React from "react";
+import { ReactComponent as MainLogo } from "../images/main_logo.svg";
 import { DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
 import "../styles/ModuleMenu.css";
+
+const HOME_URL = `${process.env.PUBLIC_URL || ""}/`;
 
 export const MODULE_IDS = {
   STATUS: "status",
@@ -113,6 +116,14 @@ export default function ModuleMenu({
   return (
     <nav className="module-menu" aria-label="Модули приложения">
       <div className="module-menu-dock">
+        <a
+          href={HOME_URL}
+          className="module-menu-logo-link"
+          aria-label="На главную страницу"
+          title="На главную страницу"
+        >
+          <MainLogo className="module-menu-logo" aria-hidden="true" focusable="false" />
+        </a>
         <ul className="module-menu-list">
           {POINT_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator" aria-hidden="true" />
