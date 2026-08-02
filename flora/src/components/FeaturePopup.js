@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { getPointsForSpecies } from "./addSpeciesPolygonLayer";
 import FeatureImagesPopup from "./FeatureImagesPopup";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
@@ -10,7 +10,7 @@ import {
   getPropertyLabel,
   sortPropertyEntries
 } from "./featurePropertyLabels";
-import { copySharePointLink } from "./sharePointLink";
+import { buildSharePointUrl, copyTextToClipboard } from "./sharePointLink";
 import "../styles/FeaturePopup.css";
 
 // Служебные поля, добавленные слоем карты; не показываем в списке свойств.
@@ -35,13 +35,45 @@ function getImages(properties) {
 function ShareIcon() {
   return (
     <svg
-      className="feature-popup-share-icon"
+      className="feature-popup-action-icon"
       viewBox="0 0 24 24"
       aria-hidden="true"
       focusable="false"
     >
       <path
         d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7a3.27 3.27 0 0 0 0-1.39l7.05-4.11A2.991 2.991 0 1 0 14.05 6l-7.05 4.11a3 3 0 1 0 0 4.78l7.05 4.11a2.995 2.995 0 1 0 .9-1.92z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg
+      className="feature-popup-action-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      className="feature-popup-action-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
         fill="currentColor"
       />
     </svg>
@@ -65,10 +97,14 @@ export default function FeaturePopup({
   const [showImages, setShowImages] = useState(false);
   const [showSpeciesDescription, setShowSpeciesDescription] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false); // блок справки из docs/moduleHelp.md, раздел ## feature
+  const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+
+  const shareUrl = useMemo(() => buildSharePointUrl(feature), [feature]);
 
   useEffect(() => {
     setShowSpeciesDescription(false);
+    setSharePanelOpen(false);
     setShareCopied(false);
   }, [feature?.id, feature?.properties?.finding_id]);
 
@@ -81,12 +117,22 @@ export default function FeaturePopup({
     return () => window.clearTimeout(timerId);
   }, [shareCopied]);
 
-  const handleShareClick = async () => {
-    const copied = await copySharePointLink(feature);
-
-    if (copied) {
-      setShareCopied(true);
+  const handleShareClick = () => {
+    if (!shareUrl) {
+      return;
     }
+
+    setSharePanelOpen((open) => !open);
+    setShareCopied(false);
+  };
+
+  const handleCopyShareUrl = async () => {
+    if (!shareUrl) {
+      return;
+    }
+
+    await copyTextToClipboard(shareUrl);
+    setShareCopied(true);
   };
 
   const collapsedSummary = feature
@@ -253,10 +299,12 @@ export default function FeaturePopup({
                     )}
                     <button
                       type="button"
-                      className={`feature-popup-share-btn${shareCopied ? " feature-popup-share-btn--copied" : ""}`}
+                      className={`feature-popup-share-btn${sharePanelOpen ? " feature-popup-share-btn--active" : ""}`}
                       onClick={handleShareClick}
-                      aria-label={shareCopied ? "Ссылка скопирована" : "Поделиться точкой"}
-                      title={shareCopied ? "Ссылка скопирована" : "Поделиться точкой"}
+                      aria-label="Поделиться точкой"
+                      aria-expanded={sharePanelOpen}
+                      title="Поделиться точкой"
+                      disabled={!shareUrl}
                     >
                       <ShareIcon />
                     </button>
@@ -268,6 +316,31 @@ export default function FeaturePopup({
         )}
         <ModuleHelpPanel sectionId={MODULE_IDS.FEATURE} open={helpOpen} />
       </div>
+
+      {sharePanelOpen && shareUrl && !collapsed && (
+        <div className="feature-share-panel">
+          <p className="feature-share-panel-title">Ссылка на точку</p>
+          <div className="feature-share-panel-row">
+            <input
+              type="text"
+              className="feature-share-panel-url"
+              value={shareUrl}
+              readOnly
+              aria-label="Ссылка на точку"
+              onFocus={(event) => event.target.select()}
+            />
+            <button
+              type="button"
+              className={`feature-share-panel-copy${shareCopied ? " feature-share-panel-copy--copied" : ""}`}
+              onClick={handleCopyShareUrl}
+              aria-label={shareCopied ? "Ссылка скопирована" : "Скопировать ссылку"}
+              title={shareCopied ? "Ссылка скопирована" : "Скопировать ссылку"}
+            >
+              {shareCopied ? <CheckIcon /> : <CopyIcon />}
+            </button>
+          </div>
+        </div>
+      )}
 
       {showImages && images.length > 0 && (
         <FeatureImagesPopup

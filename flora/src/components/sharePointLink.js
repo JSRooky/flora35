@@ -46,7 +46,7 @@ export function buildSharePointUrl(feature) {
   return url.toString();
 }
 
-async function copyTextToClipboard(text) {
+export async function copyTextToClipboard(text) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
     return;
