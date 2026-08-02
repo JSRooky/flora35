@@ -1,6 +1,6 @@
 export const SHARE_POINT_PARAM = "point";
 export const SHARE_ZOOM_PARAM = "z";
-export const DEFAULT_SHARE_ZOOM = 11;
+export const DEFAULT_SHARE_ZOOM = 10;
 
 /** Параметры ссылки на точку из query string. */
 export function parseSharePointParams(search) {
