@@ -21,6 +21,12 @@ export function getModuleHelpPageUrl(sectionId) {
   return `${base}/help/index.html?${params.toString()}`;
 }
 
+/** URL полной справки по всем модулям (новая вкладка). */
+export function getFullHelpPageUrl() {
+  const base = process.env.PUBLIC_URL || "";
+  return `${base}/help/index.html`;
+}
+
 export function getModuleHelpSectionLabel(sectionId) {
   return HELP_SECTION_LABELS[sectionId] ?? sectionId;
 }
