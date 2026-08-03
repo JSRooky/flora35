@@ -34,6 +34,13 @@ import {
   updateHeatmapData
 } from "./components/addHeatmapLayer";
 import {
+  addBoundsLayers,
+  clearBoundsLayerCache,
+  syncBoundsLayersVisibility
+} from "./components/addBoundsLayers";
+import BoundsTestPanel, { createInitialBoundsVisibility } from "./components/BoundsTestPanel";
+import { isFirebaseConfigured } from "./firebase/config";
+import {
   setDataSourceFilter,
   DATA_SOURCE_MODES,
   findFeatureByFindingId,
@@ -141,6 +148,9 @@ export default function MapView() {
   const [markersVisible, setMarkersVisibleState] = useState(DEFAULT_MARKERS_VISIBLE);
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
+  const [boundsLayerVisibility, setBoundsLayerVisibility] = useState(createInitialBoundsVisibility);
+  const [boundsLayerLoading, setBoundsLayerLoading] = useState({});
+  const [boundsLayerErrors, setBoundsLayerErrors] = useState({});
   const [activeModule, setActiveModule] = useState(null);
   // Радиус, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
   const [arealDockedWithFeature, setArealDockedWithFeature] = useState(false);
@@ -1111,6 +1121,40 @@ export default function MapView() {
   }, [heatmapEnabled, buildLocationFilters]);
 
   useEffect(() => {
+    if (!mapReady || !map.current || !isFirebaseConfigured()) {
+      return;
+    }
+
+    let cancelled = false;
+    const loadingIds = Object.entries(boundsLayerVisibility)
+      .filter(([, visible]) => visible)
+      .map(([layerId]) => layerId);
+
+    setBoundsLayerLoading(Object.fromEntries(loadingIds.map((layerId) => [layerId, true])));
+
+    syncBoundsLayersVisibility(map.current, boundsLayerVisibility)
+      .then((errors) => {
+        if (!cancelled) {
+          setBoundsLayerErrors(errors);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setBoundsLayerErrors({ _global: error?.message || String(error) });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBoundsLayerLoading({});
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [boundsLayerVisibility, mapReady]);
+
+  useEffect(() => {
     refreshAreal();
   }, [popupData, arealEnabled, arealAllMarkers, arealRadius, propertyFilters, statusFilters, yearFilterEnabled, yearRange, activeModule, timelineYear, refreshAreal]);
 
@@ -1709,6 +1753,7 @@ export default function MapView() {
           clusterPieChartsEnabled: DEFAULT_CLUSTER_PIE_CHARTS,
           markersVisible: DEFAULT_MARKERS_VISIBLE
         });
+        addBoundsLayers(map.current);
         addArealLayer(map.current);
         addSpeciesPolygonLayer(map.current); // слой экспериментального модуля «Полигон»
         addArealDynamicsLayer(map.current);
@@ -1722,6 +1767,7 @@ export default function MapView() {
     return () => {
       setMapReady(false);
       arealRefreshScheduledRef.current = false;
+      clearBoundsLayerCache();
       if (map.current) {
         map.current.remove();
         map.current = null;
@@ -1928,6 +1974,13 @@ export default function MapView() {
         />
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
+      <BoundsTestPanel
+        visibility={boundsLayerVisibility}
+        onVisibilityChange={setBoundsLayerVisibility}
+        loadingById={boundsLayerLoading}
+        errorsById={boundsLayerErrors}
+        firebaseConfigured={isFirebaseConfigured()}
+      />
       <FeedbackWidget />
     </>
   );
