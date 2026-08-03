@@ -35,7 +35,7 @@ const TIME_MODULE_ITEMS = [
 
 const MAP_MODULE_ITEMS = [
   { id: MODULE_IDS.MAP, label: "Группы точек", mapToolAccent: true },
-  { id: MODULE_IDS.AREAL, label: "Ареал", mapToolAccent: true },
+  { id: MODULE_IDS.AREAL, label: "Радиус", mapToolAccent: true },
   { id: MODULE_IDS.BUFFER, label: "Буфер", mapToolAccent: true },
   { id: MODULE_IDS.POLYGON, label: "Полигон", mapToolAccent: true },
   { id: MODULE_IDS.AREA, label: "Область", mapToolAccent: true }
@@ -61,7 +61,7 @@ function ModuleMenuButton({
   className = "",
   timeAccent = false,
   mapToolAccent = false,
-  // Некоторые модули (например, «Ареал») требуют предварительного выбора точки.
+  // Некоторые модули (например, «Радиус») требуют предварительного выбора точки.
   disabled = false
 }) {
   const button = (

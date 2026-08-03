@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   BUFFER_ZONES,
-  BUFFER_MIN_DIAMETER_KM,
-  BUFFER_DIAMETER_STEP_KM
+  BUFFER_MIN_RADIUS_KM,
+  BUFFER_RADIUS_STEP_KM,
+  DEFAULT_BUFFER_RADII_KM
 } from "./addBufferLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
@@ -17,7 +18,7 @@ function getRangeProgress(value, min, max) {
   return ((value - min) / (max - min)) * 100;
 }
 
-function formatDiameter(value) {
+function formatRadius(value) {
   return `${value.toFixed(1)} км`;
 }
 
@@ -36,7 +37,7 @@ function formatSelectedPointsCount(count) {
   return `${count} точек`;
 }
 
-function getCollapsedSummary(enabled, feature, selectedCount, diametersKm) {
+function getCollapsedSummary(enabled, feature, selectedCount, radiiKm) {
   if (!feature && selectedCount === 0) {
     return "Точка не выбрана";
   }
@@ -48,25 +49,25 @@ function getCollapsedSummary(enabled, feature, selectedCount, diametersKm) {
   const pointsLabel =
     selectedCount > 1 ? `${formatSelectedPointsCount(selectedCount)}, ` : "";
 
-  return `${pointsLabel}Буфер: ${diametersKm.map(formatDiameter).join(" / ")}`;
+  return `${pointsLabel}Буфер: ${radiiKm.map(formatRadius).join(" / ")}`;
 }
 
 /**
  * Панель модуля «Буфер»: набор окружностей (красная/жёлтая/зелёная) вокруг выбранной
  * или нескольких точек. Кнопка «Добавить» включает режим, в котором клик по точке
  * добавляет или убирает её из выделения.
- * Диаметр каждой окружности задаётся отдельным слайдером; переключатель включает
+ * Радиус каждой окружности задаётся отдельным слайдером; переключатель включает
  * построение буфера; «Сброс» убирает его с карты и сбрасывает настройки.
  */
 export default function BufferPopup({
   feature,
   enabled,
-  diametersKm,
+  radiiKm = DEFAULT_BUFFER_RADII_KM,
   selectionMode = false,
   selectedCount = 0,
   onEnabledChange,
   onSelectionModeChange,
-  onDiameterChange,
+  onRadiusChange,
   onReset,
   collapsed = false,
   onCollapsedChange
@@ -75,6 +76,14 @@ export default function BufferPopup({
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## buffer в docs/moduleHelp.md
   const hasPoints = Boolean(feature) || selectedCount > 0;
   const selectionToggleLabel = selectionMode ? "Режим добавления и удаления" : "Добавить";
+  const zoneRadii = useMemo(
+    () =>
+      BUFFER_ZONES.map((_, index) => {
+        const value = radiiKm[index];
+        return typeof value === "number" && !Number.isNaN(value) ? value : BUFFER_MIN_RADIUS_KM;
+      }),
+    [radiiKm]
+  );
 
   return (
     <div className={`buffer-popup ${collapsed ? "buffer-popup--collapsed" : ""}`}>
@@ -97,7 +106,7 @@ export default function BufferPopup({
 
       {collapsed ? (
         <p className="popup-collapsed-summary">
-          {getCollapsedSummary(enabled, feature, selectedCount, diametersKm)}
+          {getCollapsedSummary(enabled, feature, selectedCount, zoneRadii)}
         </p>
       ) : (
         <div className="buffer-popup-content">
@@ -129,30 +138,30 @@ export default function BufferPopup({
           )}
 
           {BUFFER_ZONES.map((zone, index) => {
-            const minDiameter = index === 0 ? BUFFER_MIN_DIAMETER_KM : diametersKm[index - 1];
-            const value = diametersKm[index];
+            const minRadius = index === 0 ? BUFFER_MIN_RADIUS_KM : zoneRadii[index - 1];
+            const value = zoneRadii[index];
             const zoneDisabled = !hasPoints || !enabled;
 
             return (
               <div className={`buffer-zone${zoneDisabled ? " buffer-zone--disabled" : ""}`} key={zone.id}>
                 <label htmlFor={`buffer-zone-${zone.id}`}>
-                  {zone.label}: <strong>{formatDiameter(value)}</strong>
+                  {zone.label}: <strong>{formatRadius(value)}</strong>
                 </label>
                 <input
                   id={`buffer-zone-${zone.id}`}
                   type="range"
-                  min={minDiameter}
-                  max={zone.maxDiameterKm}
-                  step={BUFFER_DIAMETER_STEP_KM}
+                  min={minRadius}
+                  max={zone.maxRadiusKm}
+                  step={BUFFER_RADIUS_STEP_KM}
                   value={value}
                   disabled={zoneDisabled}
                   style={{
-                    "--range-progress": `${getRangeProgress(value, minDiameter, zone.maxDiameterKm)}%`,
+                    "--range-progress": `${getRangeProgress(value, minRadius, zone.maxRadiusKm)}%`,
                     "--range-color": zone.color
                   }}
-                  onChange={(e) => onDiameterChange(index, Number(e.target.value))}
+                  onChange={(e) => onRadiusChange?.(index, Number(e.target.value))}
                 />
-                <span className="buffer-zone-max">до {zone.maxDiameterKm} км</span>
+                <span className="buffer-zone-max">до {zone.maxRadiusKm} км</span>
               </div>
             );
           })}

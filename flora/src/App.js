@@ -61,7 +61,7 @@ import {
   addBufferLayer,
   clearBufferLayer,
   updateBufferLayer,
-  DEFAULT_BUFFER_DIAMETERS_KM
+  DEFAULT_BUFFER_RADII_KM
 } from "./components/addBufferLayer";
 import {
   addAreaSelectionLayer,
@@ -132,7 +132,7 @@ export default function MapView() {
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
   const [activeModule, setActiveModule] = useState(null);
-  // Ареал, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
+  // Радиус, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
   const [arealDockedWithFeature, setArealDockedWithFeature] = useState(false);
   // Буфер, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
   const [bufferDockedWithFeature, setBufferDockedWithFeature] = useState(false);
@@ -158,8 +158,8 @@ export default function MapView() {
   const [intersectionPinned, setIntersectionPinned] = useState(false);
   const [intersectionOnlyMode, setIntersectionOnlyMode] = useState(false);
   const [intersectionLockedPair, setIntersectionLockedPair] = useState(null);
-  // Буфер: диаметры зон (красная/жёлтая/зелёная), км; bufferEnabled — включён ли переключатель.
-  const [bufferDiameters, setBufferDiameters] = useState(DEFAULT_BUFFER_DIAMETERS_KM);
+  // Буфер: радиусы зон (красная/жёлтая/зелёная), км; bufferEnabled — включён ли переключатель.
+  const [bufferRadii, setBufferRadii] = useState(DEFAULT_BUFFER_RADII_KM);
   const [bufferEnabled, setBufferEnabled] = useState(false);
   const [bufferSelectionMode, setBufferSelectionMode] = useState(false);
   const [bufferSelectedPoints, setBufferSelectedPoints] = useState([]);
@@ -253,7 +253,7 @@ export default function MapView() {
     }
 
     if (moduleId === MODULE_IDS.AREAL) {
-      // Из меню «Ареал» открывается отдельно — панель точки не остаётся в стеке.
+      // Из меню «Радиус» открывается отдельно — панель точки не остаётся в стеке.
       setArealDockedWithFeature(false);
       setActiveModule((current) => (current === moduleId ? null : moduleId));
       return;
@@ -1004,7 +1004,7 @@ export default function MapView() {
       return;
     }
 
-    // Ареал для одной точки требует выбранную точку; режим "ко всем маркерам"
+    // Радиус для одной точки требует выбранную точку; режим "ко всем маркерам"
     // работает и без неё.
     if (!arealAllMarkers && (!arealEnabled || !popupData)) {
       return;
@@ -1265,11 +1265,11 @@ export default function MapView() {
   }, []);
 
   /**
-   * Меняет диаметр одной зоны буфера, поддерживая порядок «каждая следующая зона не меньше
+   * Меняет радиус одной зоны буфера, поддерживая порядок «каждая следующая зона не меньше
    * предыдущей» — иначе кольца буфера накладывались бы некорректно.
    */
-  const handleBufferDiameterChange = useCallback((index, value) => {
-    setBufferDiameters((prev) => {
+  const handleBufferRadiusChange = useCallback((index, value) => {
+    setBufferRadii((prev) => {
       const next = [...prev];
       next[index] = value;
 
@@ -1291,7 +1291,7 @@ export default function MapView() {
 
   const handleBufferReset = useCallback(() => {
     setBufferEnabled(false);
-    setBufferDiameters(DEFAULT_BUFFER_DIAMETERS_KM);
+    setBufferRadii(DEFAULT_BUFFER_RADII_KM);
     setBufferSelectedPoints([]);
     setBufferSelectionMode(false);
   }, []);
@@ -1357,7 +1357,7 @@ export default function MapView() {
     setArealAllMarkers(false);
     setSpeciesPolygons([]);
     setActivePolygonId(null);
-    setBufferDiameters(DEFAULT_BUFFER_DIAMETERS_KM);
+    setBufferRadii(DEFAULT_BUFFER_RADII_KM);
     setBufferEnabled(false);
     setBufferSelectedPoints([]);
     setBufferSelectionMode(false);
@@ -1382,11 +1382,11 @@ export default function MapView() {
           : [];
 
     if (bufferEnabled && bufferFeatures.length > 0) {
-      updateBufferLayer(mapInstance, bufferFeatures, bufferDiameters);
+      updateBufferLayer(mapInstance, bufferFeatures, bufferRadii);
     } else {
       clearBufferLayer(mapInstance);
     }
-  }, [bufferEnabled, popupData, bufferSelectedPoints, bufferDiameters, mapReady]);
+  }, [bufferEnabled, popupData, bufferSelectedPoints, bufferRadii, mapReady]);
 
   useEffect(() => {
     const pendingShare = pendingSharePointRef.current;
@@ -1664,12 +1664,12 @@ export default function MapView() {
             <BufferPopup
               feature={popupData}
               enabled={bufferEnabled}
-              diametersKm={bufferDiameters}
+              radiiKm={bufferRadii}
               selectionMode={bufferSelectionMode}
               selectedCount={bufferSelectedPoints.length}
               onEnabledChange={handleBufferEnabledChange}
               onSelectionModeChange={handleBufferSelectionModeChange}
-              onDiameterChange={handleBufferDiameterChange}
+              onRadiusChange={handleBufferRadiusChange}
               onReset={handleBufferReset}
               collapsed={isPanelCollapsed(PANEL_IDS.BUFFER)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.BUFFER)}

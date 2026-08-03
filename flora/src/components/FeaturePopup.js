@@ -284,7 +284,7 @@ export default function FeaturePopup({
                         onClick={onOpenAreal}
                         aria-pressed={arealDockedOpen}
                       >
-                        Ареал
+                        Радиус
                       </button>
                     )}
                     {onOpenBuffer && (

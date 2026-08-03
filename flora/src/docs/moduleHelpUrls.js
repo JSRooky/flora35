@@ -1,7 +1,7 @@
 /** Человекочитаемые названия разделов полной справки (ключ = sectionId). */
 export const HELP_SECTION_LABELS = {
   feature: "Сведения о точке",
-  areal: "Ареал",
+  areal: "Радиус",
   polygon: "Полигон",
   buffer: "Буфер",
   area: "Область",
