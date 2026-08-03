@@ -1,6 +1,11 @@
 import React from "react";
 import { getBoundsFeatureTitle } from "../firebase/boundsCollectionFirestore";
-import { BOUNDS_DISPLAY_FIELDS, formatBoundsPropertyValue, getBoundsFeatureFillColor } from "./boundsPropertyLabels";
+import {
+  BOUNDS_DISPLAY_FIELDS,
+  formatBoundsPropertyValue,
+  getBoundsFeatureAreaDisplay,
+  getBoundsFeatureFillColor
+} from "./boundsPropertyLabels";
 import "../styles/FeaturePopup.css";
 import "../styles/OoptFeaturePanel.css";
 
@@ -22,6 +27,7 @@ export default function OoptFeaturePanel({
       value: formatBoundsPropertyValue(field, properties)
     }))
     .filter((field) => field.value != null && !TITLE_PROPERTY_KEYS.has(field.key));
+  const areaDisplay = getBoundsFeatureAreaDisplay(layerDefinition?.id, feature);
 
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
 
@@ -74,6 +80,16 @@ export default function OoptFeaturePanel({
                   <span>{field.value}</span>
                 </div>
               ))}
+            </>
+          ) : null}
+
+          {areaDisplay ? (
+            <>
+              <hr />
+              <div className="popup-item">
+                <strong>Площадь:</strong>
+                <span>{areaDisplay}</span>
+              </div>
             </>
           ) : null}
         </div>

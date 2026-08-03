@@ -1769,14 +1769,17 @@ export default function MapView() {
             }
 
             clearSharedPointPin(map.current);
-            setSelectedBoundsFeature(null);
 
             const boundsHit = getBoundsFeatureAtClick(map.current, event);
-            if (boundsHit && activeModuleRef.current === MODULE_IDS.OOPT) {
+            if (boundsHit) {
+              setPopupData(null);
+              updateSelectedPointHighlight(map.current, null);
               setSelectedBoundsFeature(boundsHit);
+              setActiveModule(MODULE_IDS.OOPT);
               return;
             }
 
+            setSelectedBoundsFeature(null);
             clearPointSelection();
           },
           clusteringEnabled: DEFAULT_CLUSTERING_ENABLED,

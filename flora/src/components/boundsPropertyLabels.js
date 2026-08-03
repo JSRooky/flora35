@@ -1,3 +1,5 @@
+import { area } from "@turf/turf";
+
 const BOUNDARY_LABELS = {
   national_park: "Национальный парк",
   protected_area: "ООПТ",
@@ -51,4 +53,41 @@ export function formatBoundsPropertyValue(field, properties) {
   }
 
   return String(rawValue);
+}
+
+function formatAreaKm2(areaKm2) {
+  if (areaKm2 < 0.01) {
+    return `${(areaKm2 * 1_000_000).toFixed(0)} м²`;
+  }
+
+  if (areaKm2 < 1) {
+    return `${(areaKm2 * 100).toFixed(2)} га`;
+  }
+
+  return `${areaKm2.toFixed(2)} км²`;
+}
+
+/** Площадь объекта bounds для панели сведений (или null, если не удалось определить). */
+export function getBoundsFeatureAreaDisplay(layerId, feature) {
+  const properties = feature?.properties ?? {};
+
+  if (layerId === "oopt_pol") {
+    const hectares = Number(properties.area);
+    if (!Number.isFinite(hectares) || hectares <= 0) {
+      return null;
+    }
+
+    return formatAreaKm2(hectares / 100);
+  }
+
+  if (layerId === "nature_reserve_polygon" && feature?.geometry) {
+    const areaKm2 = area(feature) / 1_000_000;
+    if (!Number.isFinite(areaKm2) || areaKm2 <= 0) {
+      return null;
+    }
+
+    return formatAreaKm2(areaKm2);
+  }
+
+  return null;
 }
