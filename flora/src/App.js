@@ -33,7 +33,14 @@ import {
   setHeatmapEnabled,
   updateHeatmapData
 } from "./components/addHeatmapLayer";
-import { setUserPointsCollection, setDataSourceFilter, DATA_SOURCE_MODES, findFeatureByFindingId, isFindingInDataSource } from "./locations/loadPoints";
+import {
+  setUserPointsCollection,
+  setDataSourceFilter,
+  DATA_SOURCE_MODES,
+  findFeatureByFindingId,
+  isFindingInDataSource,
+  initLocationsFromFirestore
+} from "./locations/loadPoints";
 import {
   addOsmBasemapLayer,
   setOsmBasemapEnabled
@@ -1538,7 +1545,9 @@ export default function MapView() {
     if (!map.current && ref.current) {
       map.current = initMap(ref.current);
 
-      map.current.on("load", () => {
+      map.current.on("load", async () => {
+        await initLocationsFromFirestore();
+
         addOsmBasemapLayer(map.current);
         addLocationsLayer(map.current, {
           onClusterExpanded: (leaves) => {
