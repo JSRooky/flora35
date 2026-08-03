@@ -14,6 +14,7 @@ import {
   addLocationsLayer,
   applyLocationsFilter,
   clearSelectedPointHighlight,
+  clearSharedPointPin,
   featureMatchesFilters,
   isFeatureUnclusteredOnMap,
   reloadLocationsData,
@@ -23,6 +24,8 @@ import {
   setMarkersVisible,
   setHoverTooltipsEnabled,
   setMapCursorOverride,
+  showSharedPointPin,
+  showSharedPointPopup,
   updateSelectedPointHighlight
 } from "./components/addLocationsLayer";
 import {
@@ -955,6 +958,7 @@ export default function MapView() {
     reloadLocationsData(map.current);
     updateHeatmapData(map.current, buildLocationFilters());
     refreshAreal();
+    clearSharedPointPin(map.current);
     setPopupData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- перестраиваем слои только при смене источника данных
   }, [dataSourceMode, mapReady, refreshAreal]);
@@ -1383,6 +1387,7 @@ export default function MapView() {
     }
 
     if (map.current) {
+      clearSharedPointPin(map.current);
       hideArealPointHint();
       clearArealLayer(map.current);
       clearBufferLayer(map.current);
@@ -1453,8 +1458,15 @@ export default function MapView() {
 
     pendingSharePointRef.current = null;
     focusMapOnSharedPoint(map.current, feature, { zoom });
-    setPopupData(feature);
-    setActiveModule(MODULE_IDS.FEATURE);
+    showSharedPointPin(map.current, feature);
+    showSharedPointPopup(map.current, feature, {
+      onOpenDetails: (sharedFeature) => {
+        clearSharedPointPin(map.current);
+        setPopupData(sharedFeature);
+        setActiveModule(MODULE_IDS.FEATURE);
+        updateSelectedPointHighlight(map.current, sharedFeature);
+      }
+    });
   }, [mapReady, dataSourceMode]);
 
   useEffect(() => {
@@ -1490,7 +1502,9 @@ export default function MapView() {
             }
 
             dismissArealPointHintOnPointClick(feature);
+            clearSharedPointPin(map.current);
             setPopupData(feature);
+            updateSelectedPointHighlight(map.current, feature);
             // Если какая-то панель уже открыта, оставляем её открытой — просто обновляем
             // данные точки. «Сведения о точке» открываются только если панелей ещё нет.
             setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
@@ -1557,6 +1571,7 @@ export default function MapView() {
               return;
             }
 
+            clearSharedPointPin(map.current);
             clearPointSelection();
           },
           clusteringEnabled: DEFAULT_CLUSTERING_ENABLED,

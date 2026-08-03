@@ -1,9 +1,19 @@
 import mapboxgl from "mapbox-gl";
+import {
+  formatPropertyValue,
+  getPropertyLabel
+} from "./featurePropertyLabels";
 import { getFeatureCollection } from "../locations/loadPoints";
 
 const PUBLIC_URL = process.env.PUBLIC_URL || "";
 const PLANT_IMAGE = `${PUBLIC_URL}/images/plant.svg`;
 const ANIMAL_IMAGE = `${PUBLIC_URL}/images/animal.svg`;
+const MAP_PIN_IMAGE = `${PUBLIC_URL}/images/map_pin.svg`;
+const MAP_PIN_SIZE_PX = 32;
+/** Исходный цвет центра булавки в map_pin.svg (заменяется при открытии по share-ссылке). */
+const MAP_PIN_CENTER_FILL = "#e51e1e";
+/** Смещение якоря: точка привязки на 4 px выше нижнего края (остриё — на координатах). */
+const MAP_PIN_ANCHOR_OFFSET_Y_PX = 4;
 
 const CLUSTER_OPTIONS = {
   clusterMaxZoom: 14,
@@ -15,6 +25,19 @@ const REGNUM_COLORS = {
   animalia: "#c98263",
   fungi: "#7a5d8f"
 };
+
+const SHARE_PIN_CENTER_COLORS = [
+  REGNUM_COLORS.plantae,
+  REGNUM_COLORS.animalia,
+  REGNUM_COLORS.fungi,
+  MAP_PIN_CENTER_FILL,
+  "#2563eb",
+  "#ca8a04",
+  "#9333ea",
+  "#0891b2",
+  "#db2777",
+  "#059669"
+];
 
 const DEFAULT_CLUSTER_COLOR = "#4a90e2";
 const DEFAULT_POINT_COLOR = "#4a90e2";
@@ -66,6 +89,15 @@ let mapCursorOverride = null;
 let selectedPointFeature = null;
 let selectedPointPulseFrameId = null;
 let selectedPointPulseMap = null;
+let sharedPointPinMarker = null;
+let sharedPointPinFeatureKey = null;
+let sharedPointPinObjectUrl = null;
+let sharedPointPopup = null;
+let sharedPointPopupDetailsHandler = null;
+
+/** Поля, показываемые в компактном окне при открытии share-ссылки. */
+const SHARED_POINT_POPUP_FIELDS = ["regnum", "family", "found_year", "status"];
+let mapPinSvgTemplatePromise = null;
 
 function applyMapCursor(map, cursor) {
   map.getCanvas().style.cursor = mapCursorOverride ?? cursor;
@@ -105,6 +137,45 @@ function buildPointTooltipHtml(nameRu, nameLatin) {
   if (lines.length === 0) {
     return '<div class="point-tooltip-name-ru">Точка данных</div>';
   }
+
+  return lines.join("");
+}
+
+/** HTML компактной карточки точки (share-ссылка). */
+function buildSharedPointPopupHtml(feature) {
+  const properties = feature?.properties ?? {};
+  const { name_ru: nameRu, name_latin: nameLatin } = properties;
+  const title = nameRu || nameLatin || "Точка данных";
+  const lines = [`<div class="shared-point-popup-title">${escapeHtml(title)}</div>`];
+
+  if (nameRu && nameLatin) {
+    lines.push(`<div class="shared-point-popup-subtitle">${escapeHtml(nameLatin)}</div>`);
+  }
+
+  const detailRows = SHARED_POINT_POPUP_FIELDS.flatMap((key) => {
+    const value = properties[key];
+
+    if (value == null || value === "") {
+      return [];
+    }
+
+    return [
+      `<div class="shared-point-popup-row">`,
+      `<span class="shared-point-popup-label">${escapeHtml(getPropertyLabel(key))}:</span>`,
+      `<span class="shared-point-popup-value">${escapeHtml(formatPropertyValue(key, value))}</span>`,
+      `</div>`
+    ];
+  });
+
+  if (detailRows.length > 0) {
+    lines.push(`<div class="shared-point-popup-details">${detailRows.join("")}</div>`);
+  }
+
+  lines.push(
+    '<div class="feature-popup-actions shared-point-popup-actions">',
+    '<button type="button" class="feature-popup-action-btn" data-shared-point-details>Подробнее</button>',
+    "</div>"
+  );
 
   return lines.join("");
 }
@@ -565,6 +636,47 @@ export function getUnclusteredLayerIds() {
   return [getLayerIds().unclustered];
 }
 
+function buildUnclusteredLayerFilter() {
+  const parts = [];
+
+  if (clusteringEnabled) {
+    parts.push(["!", ["has", "point_count"]]);
+  }
+
+  if (sharedPointPinFeatureKey) {
+    parts.push([
+      "!",
+      [
+        "==",
+        ["to-string", ["coalesce", ["get", "finding_id"], ["id"]]],
+        sharedPointPinFeatureKey
+      ]
+    ]);
+  }
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  if (parts.length === 1) {
+    return parts[0];
+  }
+
+  return ["all", ...parts];
+}
+
+function applyUnclusteredLayerFilters(map) {
+  const filter = buildUnclusteredLayerFilter();
+
+  getUnclusteredLayerIds().forEach((layerId) => {
+    if (!map.getLayer(layerId)) {
+      return;
+    }
+
+    map.setFilter(layerId, filter);
+  });
+}
+
 export function getFirstLocationsLayerId(map) {
   const layerIds = [...getClusterLayerIds(), ...getUnclusteredLayerIds()];
   return layerIds.find((layerId) => map.getLayer(layerId));
@@ -743,8 +855,192 @@ function refreshSelectedPointHighlight(map) {
   updateSelectedPointHighlight(map, selectedPointFeature);
 }
 
+function pickSharePinCenterColor() {
+  return SHARE_PIN_CENTER_COLORS[
+    Math.floor(Math.random() * SHARE_PIN_CENTER_COLORS.length)
+  ];
+}
+
+function loadMapPinSvgTemplate() {
+  if (!mapPinSvgTemplatePromise) {
+    mapPinSvgTemplatePromise = fetch(MAP_PIN_IMAGE).then((response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to load map pin SVG: ${response.status}`);
+      }
+
+      return response.text();
+    });
+  }
+
+  return mapPinSvgTemplatePromise;
+}
+
+function colorizeMapPinSvg(svgText, centerColor) {
+  const escapedDefaultFill = MAP_PIN_CENTER_FILL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  return svgText.replace(new RegExp(`fill:${escapedDefaultFill}`, "i"), `fill:${centerColor}`);
+}
+
+function revokeSharedPointPinObjectUrl() {
+  if (sharedPointPinObjectUrl) {
+    URL.revokeObjectURL(sharedPointPinObjectUrl);
+    sharedPointPinObjectUrl = null;
+  }
+}
+
+function createSharedPointPinElement(imageUrl) {
+  const element = document.createElement("img");
+  element.src = imageUrl;
+  element.width = MAP_PIN_SIZE_PX;
+  element.height = MAP_PIN_SIZE_PX;
+  element.alt = "";
+  element.draggable = false;
+  element.className = "shared-point-pin-marker";
+  element.style.pointerEvents = "none";
+  return element;
+}
+
+function removeSharedPointPopup() {
+  if (!sharedPointPopup) {
+    return;
+  }
+
+  const popup = sharedPointPopup;
+  sharedPointPopup = null;
+  sharedPointPopupDetailsHandler = null;
+  popup.remove();
+}
+
+function removeSharedPointPinMarker(map) {
+  if (sharedPointPinMarker) {
+    sharedPointPinMarker.remove();
+    sharedPointPinMarker = null;
+  }
+
+  revokeSharedPointPinObjectUrl();
+  sharedPointPinFeatureKey = null;
+
+  if (map?.getStyle()) {
+    applyUnclusteredLayerFilters(map);
+  }
+}
+
+/** Компактное окно с основными данными рядом с маркером (share-ссылка). */
+export function showSharedPointPopup(map, feature, { onOpenDetails } = {}) {
+  const coordinates = feature?.geometry?.coordinates;
+
+  if (!map || !coordinates) {
+    return;
+  }
+
+  removeSharedPointPopup();
+
+  const popup = new mapboxgl.Popup({
+    closeButton: true,
+    closeOnClick: false,
+    className: "shared-point-popup",
+    offset: [0, -(MAP_PIN_SIZE_PX + 10)],
+    maxWidth: "280px"
+  });
+
+  popup.setLngLat(coordinates).setHTML(buildSharedPointPopupHtml(feature));
+
+  popup.on("close", () => {
+    if (sharedPointPopup !== popup) {
+      return;
+    }
+
+    sharedPointPopup = null;
+    sharedPointPopupDetailsHandler = null;
+    removeSharedPointPinMarker(map);
+  });
+
+  sharedPointPopup = popup;
+  popup.addTo(map);
+
+  if (onOpenDetails) {
+    const detailsButton = popup.getElement()?.querySelector("[data-shared-point-details]");
+
+    if (detailsButton) {
+      sharedPointPopupDetailsHandler = (event) => {
+        event.preventDefault();
+        onOpenDetails(feature);
+      };
+      detailsButton.addEventListener("click", sharedPointPopupDetailsHandler);
+    }
+  }
+}
+
+/** Временная булавка вместо стандартного маркера (открытие карты по shared-ссылке). */
+export function showSharedPointPin(map, feature) {
+  const coordinates = feature?.geometry?.coordinates;
+
+  if (!map || !coordinates) {
+    return;
+  }
+
+  clearSharedPointPin(map);
+  clearSelectedPointHighlight(map);
+
+  const featureKey = getFeatureKey(feature);
+  sharedPointPinFeatureKey = featureKey;
+  const centerColor = pickSharePinCenterColor();
+
+  applyUnclusteredLayerFilters(map);
+
+  loadMapPinSvgTemplate()
+    .then((svgText) => {
+      if (sharedPointPinFeatureKey !== featureKey) {
+        return;
+      }
+
+      revokeSharedPointPinObjectUrl();
+      sharedPointPinObjectUrl = URL.createObjectURL(
+        new Blob([colorizeMapPinSvg(svgText, centerColor)], { type: "image/svg+xml" })
+      );
+
+      sharedPointPinMarker = new mapboxgl.Marker({
+        element: createSharedPointPinElement(sharedPointPinObjectUrl),
+        anchor: "bottom",
+        offset: [0, MAP_PIN_ANCHOR_OFFSET_Y_PX]
+      })
+        .setLngLat(coordinates)
+        .addTo(map);
+
+      clearSelectedPointHighlight(map);
+    })
+    .catch(() => {
+      if (sharedPointPinFeatureKey !== featureKey) {
+        return;
+      }
+
+      sharedPointPinMarker = new mapboxgl.Marker({
+        element: createSharedPointPinElement(MAP_PIN_IMAGE),
+        anchor: "bottom",
+        offset: [0, MAP_PIN_ANCHOR_OFFSET_Y_PX]
+      })
+        .setLngLat(coordinates)
+        .addTo(map);
+
+      clearSelectedPointHighlight(map);
+    });
+}
+
+export function clearSharedPointPin(map) {
+  removeSharedPointPopup();
+  removeSharedPointPinMarker(map);
+}
+
+function isSharedPointPinActive() {
+  return sharedPointPinFeatureKey != null;
+}
+
 /** Выделяет выбранный маркер: увеличение в 2 раза с белой обводкой и пульсацией. */
 export function updateSelectedPointHighlight(map, feature) {
+  if (isSharedPointPinActive()) {
+    return;
+  }
+
   selectedPointFeature = feature ?? null;
 
   if (!map?.getStyle()) {
@@ -1327,6 +1623,7 @@ function rebuildLocationsLayers(map) {
 
   attachLocationsInteractions(map);
   applyMarkersVisibility(map);
+  applyUnclusteredLayerFilters(map);
   attachClusterPieChartMarkers(map);
   refreshSelectedPointHighlight(map);
 }
