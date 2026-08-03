@@ -34,14 +34,13 @@ function getSliceGeometry(currentHull, previousHull) {
 
   try {
     const delta = difference(featureCollection([currentHull, previousHull]));
-    if (delta?.geometry) {
-      return delta;
-    }
+    // Пустой результат (delta === null) означает, что новых точек за пределами
+    // предыдущего hull нет — прироста в этот год не было, слой не рисуем.
+    return delta?.geometry ? delta : null;
   } catch {
-    // Turf difference может не сработать на вырожденной геометрии — показываем полный hull.
+    // Turf difference не сработал на вырожденной геометрии — показываем полный hull.
+    return currentHull;
   }
-
-  return currentHull;
 }
 
 function hasGeometry(feature) {

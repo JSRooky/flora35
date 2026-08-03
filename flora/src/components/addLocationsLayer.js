@@ -84,6 +84,7 @@ let onMapBackgroundClickCallback = null;
 let pointHoverPopup = null;
 let pointHoverPopupHideTimer = null;
 let clusterHoverRequestId = 0;
+let clusterExpandRequestId = 0;
 let hoverTooltipsEnabled = true;
 let mapCursorOverride = null;
 let selectedPointFeature = null;
@@ -1170,14 +1171,20 @@ function attachLocationsInteractions(map) {
     const clusterId = clusterFeature.properties.cluster_id;
     const source = map.getSource(sourceId);
 
+    // Идентификатор запроса — если пользователь успеет кликнуть по другому кластеру
+    // до завершения анимации, отменяем колбэк устаревшего клика (иначе areal
+    // обновится по leaves не того кластера).
+    clusterExpandRequestId += 1;
+    const requestId = clusterExpandRequestId;
+
     // Сначала получаем точки кластера, затем зумим до уровня их «раскрытия».
     source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
-      if (leavesErr) {
+      if (leavesErr || requestId !== clusterExpandRequestId) {
         return;
       }
 
       source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-        if (err) {
+        if (err || requestId !== clusterExpandRequestId) {
           return;
         }
 
@@ -1188,7 +1195,15 @@ function attachLocationsInteractions(map) {
 
         // Колбэк вызываем после завершения анимации и отрисовки новых точек.
         map.once("moveend", () => {
+          if (requestId !== clusterExpandRequestId) {
+            return;
+          }
+
           map.once("idle", () => {
+            if (requestId !== clusterExpandRequestId) {
+              return;
+            }
+
             onClusterExpandedCallback?.(leaves);
           });
         });

@@ -45,7 +45,11 @@ export function buildSubmissionFindingId(nameLatin) {
     throw new Error("Cannot build finding id without name_latin");
   }
 
-  return `${speciesId}-${Date.now().toString(36)}`;
+  // Добавляем случайный суффикс, чтобы две отправки одного вида в одну и ту же
+  // миллисекунду (например, двойной клик) не получили одинаковый ID и не
+  // перезаписали друг друга при setDoc.
+  const randomSuffix = Math.random().toString(36).slice(2, 8);
+  return `${speciesId}-${Date.now().toString(36)}-${randomSuffix}`;
 }
 
 export function slugifySpeciesId(nameLatin) {
@@ -101,6 +105,10 @@ export function findingDocsToSpeciesCollection(docs, dataset = null) {
     const record = doc.data?.() ?? doc.data ?? doc;
 
     if (!record || (dataset && record.dataset !== dataset)) {
+      return;
+    }
+
+    if (!Array.isArray(record.coordinates) || record.coordinates.length < 2) {
       return;
     }
 

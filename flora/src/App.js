@@ -65,6 +65,7 @@ import {
 } from "./components/addArealDynamicsLayer";
 import {
   buildArealDynamicsSlices,
+  clearArealDynamicsSliceCache,
   filterSlicesUpToYear
 } from "./components/buildArealDynamicsSlices";
 import {
@@ -190,6 +191,7 @@ export default function MapView() {
   const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
   const [submissionLocationPicking, setSubmissionLocationPicking] = useState(false);
   const hadFoundYearPropertyFilterRef = useRef(false);
+  const previousYearFilterEnabledRef = useRef(false);
   const pendingSharePointRef = useRef(parseSharePointParams(window.location.search));
 
   const isPanelCollapsed = useCallback(
@@ -366,14 +368,21 @@ export default function MapView() {
 
   useEffect(() => {
     if (hasFoundYearPropertyFilter) {
-      hadFoundYearPropertyFilterRef.current = true;
-      setYearFilterEnabled(false);
+      if (!hadFoundYearPropertyFilterRef.current) {
+        hadFoundYearPropertyFilterRef.current = true;
+        // Запоминаем состояние переключателя «Год», каким оно было до того, как
+        // фильтр по свойству found_year взял управление годом на себя.
+        setYearFilterEnabled((current) => {
+          previousYearFilterEnabledRef.current = current;
+          return false;
+        });
+      }
       return;
     }
 
     if (hadFoundYearPropertyFilterRef.current) {
       hadFoundYearPropertyFilterRef.current = false;
-      setYearFilterEnabled(true);
+      setYearFilterEnabled(previousYearFilterEnabledRef.current);
     }
   }, [hasFoundYearPropertyFilter]);
 
@@ -548,6 +557,7 @@ export default function MapView() {
     syncYearBounds();
     reloadLocationsData(mapInstance);
     updateHeatmapData(mapInstance, buildLocationFilters());
+    clearArealDynamicsSliceCache();
   }, [buildLocationFilters, mapReady, syncYearBounds]);
 
   const areaContainedPoints = useMemo(() => {
@@ -990,6 +1000,34 @@ export default function MapView() {
     setOsmBasemapEnabled(map.current, osmBasemapEnabled);
   }, [osmBasemapEnabled, mapReady]);
 
+  const handleSpeciesPolygonResetAll = useCallback(() => {
+    setSpeciesPolygons([]);
+    setActivePolygonId(null);
+    setPolygonAddMode(false);
+    setIntersectionSpeciesA(null);
+    setIntersectionSpeciesB(null);
+    setIntersectionResult(null);
+    setIntersectionOnlyMode(false);
+    setIntersectionLockedPair(null);
+
+    if (map.current) {
+      clearSpeciesPolygonLayer(map.current);
+    }
+  }, []);
+
+  const handleArealReset = useCallback(() => {
+    setArealEnabled(false);
+    setArealAllMarkers(false);
+    setArealRadius(DEFAULT_AREAL_RADIUS_KM);
+  }, []);
+
+  const handleBufferReset = useCallback(() => {
+    setBufferEnabled(false);
+    setBufferRadii(DEFAULT_BUFFER_RADII_KM);
+    setBufferSelectedPoints([]);
+    setBufferSelectionMode(false);
+  }, []);
+
   useEffect(() => {
     if (!map.current || !mapReady) {
       return;
@@ -1000,9 +1038,25 @@ export default function MapView() {
     updateHeatmapData(map.current, buildLocationFilters());
     refreshAreal();
     clearSharedPointPin(map.current);
+    clearArealDynamicsSliceCache();
     setPopupData(null);
+    // Точки прежнего источника данных могли пропасть из нового — сбрасываем
+    // инструменты, построенные по ним, иначе радиус/буфер/полигоны будут
+    // ссылаться на точки, которых уже нет в текущей выборке.
+    setArealDockedWithFeature(false);
+    setBufferDockedWithFeature(false);
+    handleArealReset();
+    handleBufferReset();
+    handleSpeciesPolygonResetAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- перестраиваем слои только при смене источника данных
-  }, [dataSourceMode, mapReady, refreshAreal]);
+  }, [
+    dataSourceMode,
+    mapReady,
+    refreshAreal,
+    handleArealReset,
+    handleBufferReset,
+    handleSpeciesPolygonResetAll
+  ]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -1148,21 +1202,6 @@ export default function MapView() {
       setStatusFilters((prev) => prev.filter((value) => value !== status));
     }
   }, [popupData]);
-
-  const handleSpeciesPolygonResetAll = useCallback(() => {
-    setSpeciesPolygons([]);
-    setActivePolygonId(null);
-    setPolygonAddMode(false);
-    setIntersectionSpeciesA(null);
-    setIntersectionSpeciesB(null);
-    setIntersectionResult(null);
-    setIntersectionOnlyMode(false);
-    setIntersectionLockedPair(null);
-
-    if (map.current) {
-      clearSpeciesPolygonLayer(map.current);
-    }
-  }, []);
 
   const handleSpeciesPolygonResetOne = useCallback((polygonId) => {
     setSpeciesPolygons((prev) => prev.filter((entry) => entry.id !== polygonId));
@@ -1337,8 +1376,8 @@ export default function MapView() {
   }, [computeIntersectionFromSelection, intersectionSpeciesA, intersectionSpeciesB]);
 
   const handleIntersectionReset = useCallback(() => {
-    clearIntersectionDisplay();
-  }, [clearIntersectionDisplay]);
+    clearIntersectionState();
+  }, [clearIntersectionState]);
 
   const handleIntersectionOnlyToggle = useCallback(() => {
     setIntersectionOnlyMode((enabled) => !enabled);
@@ -1367,19 +1406,6 @@ export default function MapView() {
 
       return next;
     });
-  }, []);
-
-  const handleArealReset = useCallback(() => {
-    setArealEnabled(false);
-    setArealAllMarkers(false);
-    setArealRadius(DEFAULT_AREAL_RADIUS_KM);
-  }, []);
-
-  const handleBufferReset = useCallback(() => {
-    setBufferEnabled(false);
-    setBufferRadii(DEFAULT_BUFFER_RADII_KM);
-    setBufferSelectedPoints([]);
-    setBufferSelectionMode(false);
   }, []);
 
   const handleBufferEnabledChange = useCallback((enabled) => {
@@ -1695,6 +1721,7 @@ export default function MapView() {
 
     return () => {
       setMapReady(false);
+      arealRefreshScheduledRef.current = false;
       if (map.current) {
         map.current.remove();
         map.current = null;

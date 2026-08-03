@@ -32,6 +32,12 @@
   line-height: 1.2;
   z-index: 10;
   backdrop-filter: blur(4px); /* эффект смазывания заднего фона */
+  max-width: none;
+  white-space: nowrap;
+}
+
+.mapboxgl-ctrl-attrib-inner {
+  white-space: nowrap;
 }
 
 .point-hover-tooltip.mapboxgl-popup {

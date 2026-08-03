@@ -136,14 +136,14 @@ async function main() {
   loadEnvFile(".env.local");
 
   const points = readSpeciesCollection("src/locations/points.json");
-  const userpoints = readSpeciesCollection("src/locations/userpoints.json");
 
-  const pointDocs = speciesCollectionToFindingDocs(points, LOCATION_DATASETS.POINTS);
-  const userpointDocs = speciesCollectionToFindingDocs(
-    userpoints,
-    LOCATION_DATASETS.USERPOINTS
-  );
-  const allDocs = [...pointDocs, ...userpointDocs];
+  // Пользовательские находки (userpoints.json) в приложении читаются из коллекции
+  // user_submissions, а не из findings — импортируйте их скриптом
+  // import-user-submissions-to-firestore.mjs. Импорт userpoints.json сюда раньше
+  // писал документы с dataset: "userpoints" в findings, которые приложение
+  // никогда не показывало (loadLocationsFromFirestore фильтрует findings по
+  // dataset === "points").
+  const allDocs = speciesCollectionToFindingDocs(points, LOCATION_DATASETS.POINTS);
 
   const ids = new Set();
   allDocs.forEach(({ id }) => {
@@ -153,8 +153,7 @@ async function main() {
     ids.add(id);
   });
 
-  console.log(`Prepared ${pointDocs.length} verified findings (points.json)`);
-  console.log(`Prepared ${userpointDocs.length} user findings (userpoints.json)`);
+  console.log(`Prepared ${allDocs.length} verified findings (points.json)`);
   console.log(`Total documents for collection "${FINDINGS_COLLECTION}": ${allDocs.length}`);
 
   if (dryRun) {

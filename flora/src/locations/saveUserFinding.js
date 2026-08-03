@@ -12,5 +12,13 @@ export async function saveUserFinding(payload) {
   }
 
   await submitUserFinding(payload);
-  await refreshLocationsFromFirestore();
+
+  const refreshed = await refreshLocationsFromFirestore();
+  if (!refreshed) {
+    // Запись в Firestore прошла успешно, но перечитать коллекции не удалось —
+    // сообщаем об этом явно, иначе UI покажет «Сохранено», а точка не появится на карте.
+    throw new Error(
+      "Находка сохранена, но не удалось обновить карту. Обновите страницу, чтобы увидеть точку."
+    );
+  }
 }

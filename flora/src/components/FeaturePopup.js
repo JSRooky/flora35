@@ -107,6 +107,7 @@ export default function FeaturePopup({
   const shareUrl = useMemo(() => buildSharePointUrl(feature), [feature]);
 
   useEffect(() => {
+    setShowImages(false);
     setShowSpeciesDescription(false);
     setSharePanelOpen(false);
     setShareCopied(false);

@@ -218,7 +218,12 @@ export function addAreaSelectionLayer(map) {
 /** Обновляет контур области во время рисования. */
 export function updateAreaSelectionPreview(map, coordinates) {
   const source = map.getSource(PREVIEW_SOURCE_ID);
-  if (!source || coordinates.length < 2) {
+  if (!source) {
+    return;
+  }
+
+  if (!coordinates || coordinates.length < 2) {
+    source.setData({ type: "FeatureCollection", features: [] });
     return;
   }
 

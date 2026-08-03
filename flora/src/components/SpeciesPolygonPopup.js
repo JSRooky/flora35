@@ -4,6 +4,7 @@ import { getPointsForSpecies, POLYGON_BUILD_MODES } from "./addSpeciesPolygonLay
 import { formatPointCount } from "./featurePropertyLabels";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PolygonModeIcon from "./PolygonModeIcon";
 import "../styles/SpeciesPolygonPopup.css";
 import "../styles/ArealPopup.css";
 
@@ -208,7 +209,6 @@ function TrashIcon() {
   );
 }
 
-import PolygonModeIcon from "./PolygonModeIcon";
 function getCollapsedSummary(polygons, containedSpecies, intersectionResult, builtPolygons) {
   if (intersectionResult?.hasIntersection && intersectionResult.speciesA && intersectionResult.speciesB) {
     const labelA = getSpeciesOptionLabel(intersectionResult.speciesA, builtPolygons);
