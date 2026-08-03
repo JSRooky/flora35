@@ -91,8 +91,12 @@ export default function FeaturePopup({
   onFiltersReset,
   onOpenAreal,
   arealDockedOpen = false,
+  arealDisabled = false,
+  arealDisabledTitle,
   onOpenBuffer,
-  bufferDockedOpen = false
+  bufferDockedOpen = false,
+  bufferDisabled = false,
+  bufferDisabledTitle
 }) {
   const [showImages, setShowImages] = useState(false);
   const [showSpeciesDescription, setShowSpeciesDescription] = useState(false);
@@ -283,6 +287,8 @@ export default function FeaturePopup({
                         className={`feature-popup-action-btn${arealDockedOpen ? " feature-popup-action-btn--active" : ""}`}
                         onClick={onOpenAreal}
                         aria-pressed={arealDockedOpen}
+                        disabled={arealDisabled}
+                        title={arealDisabled ? arealDisabledTitle : undefined}
                       >
                         Радиус
                       </button>
@@ -293,6 +299,8 @@ export default function FeaturePopup({
                         className={`feature-popup-action-btn${bufferDockedOpen ? " feature-popup-action-btn--active" : ""}`}
                         onClick={onOpenBuffer}
                         aria-pressed={bufferDockedOpen}
+                        disabled={bufferDisabled}
+                        title={bufferDisabled ? bufferDisabledTitle : undefined}
                       >
                         Буфер
                       </button>

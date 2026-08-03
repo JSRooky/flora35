@@ -52,6 +52,8 @@ function isPointRequiredModule(id) {
 }
 
 const DISABLED_POINT_REQUIRED_TITLE = "Выберите точку";
+const DISABLED_AREAL_BY_BUFFER_TITLE = 'Сначала сбросьте инструмент «Буфер»';
+const DISABLED_BUFFER_BY_AREAL_TITLE = 'Сначала сбросьте инструмент «Радиус»';
 
 function ModuleMenuButton({
   id,
@@ -62,7 +64,8 @@ function ModuleMenuButton({
   timeAccent = false,
   mapToolAccent = false,
   // Некоторые модули (например, «Радиус») требуют предварительного выбора точки.
-  disabled = false
+  disabled = false,
+  disabledTitle = DISABLED_POINT_REQUIRED_TITLE
 }) {
   const button = (
     <button
@@ -79,7 +82,7 @@ function ModuleMenuButton({
   // У disabled-кнопок не срабатывает title, поэтому оборачиваем в span.
   if (disabled) {
     return (
-      <span className="module-menu-btn-wrap" title={DISABLED_POINT_REQUIRED_TITLE}>
+      <span className="module-menu-btn-wrap" title={disabledTitle}>
         {button}
       </span>
     );
@@ -92,6 +95,8 @@ export default function ModuleMenu({
   activeModule,
   onModuleSelect,
   pointSelected = false,
+  arealBlocked = false,
+  bufferBlocked = false,
   hoverTooltipsDisabled = false,
   onHoverTooltipsDisabledChange,
   osmBasemapEnabled = false,
@@ -99,19 +104,32 @@ export default function ModuleMenu({
   dataSourceMode,
   onDataSourceModeChange
 }) {
-  const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => (
-    <li key={id}>
-      <ModuleMenuButton
-        id={id}
-        label={label}
-        activeModule={activeModule}
-        onModuleSelect={onModuleSelect}
-        timeAccent={timeAccent}
-        mapToolAccent={mapToolAccent}
-        disabled={isPointRequiredModule(id) && !pointSelected}
-      />
-    </li>
-  );
+  const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => {
+    const pointRequired = isPointRequiredModule(id) && !pointSelected;
+    const blockedByOtherTool =
+      (id === MODULE_IDS.AREAL && arealBlocked) || (id === MODULE_IDS.BUFFER && bufferBlocked);
+    const disabled = pointRequired || blockedByOtherTool;
+    const disabledTitle = pointRequired
+      ? DISABLED_POINT_REQUIRED_TITLE
+      : id === MODULE_IDS.AREAL
+        ? DISABLED_AREAL_BY_BUFFER_TITLE
+        : DISABLED_BUFFER_BY_AREAL_TITLE;
+
+    return (
+      <li key={id}>
+        <ModuleMenuButton
+          id={id}
+          label={label}
+          activeModule={activeModule}
+          onModuleSelect={onModuleSelect}
+          timeAccent={timeAccent}
+          mapToolAccent={mapToolAccent}
+          disabled={disabled}
+          disabledTitle={disabledTitle}
+        />
+      </li>
+    );
+  };
 
   return (
     <nav className="module-menu" aria-label="Модули приложения">

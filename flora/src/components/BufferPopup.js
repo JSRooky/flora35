@@ -53,7 +53,7 @@ function getCollapsedSummary(enabled, feature, selectedCount, radiiKm) {
 }
 
 /**
- * Панель модуля «Буфер»: набор окружностей (красная/жёлтая/зелёная) вокруг выбранной
+ * Панель модуля «Буфер»: набор окружностей (зелёная / серо-голубая / серая) вокруг выбранной
  * или нескольких точек. Кнопка «Добавить» включает режим, в котором клик по точке
  * добавляет или убирает её из выделения.
  * Радиус каждой окружности задаётся отдельным слайдером; переключатель включает
@@ -69,6 +69,8 @@ export default function BufferPopup({
   onSelectionModeChange,
   onRadiusChange,
   onReset,
+  toolBlocked = false,
+  toolBlockedTitle,
   collapsed = false,
   onCollapsedChange
 }) {
@@ -76,6 +78,7 @@ export default function BufferPopup({
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## buffer в docs/moduleHelp.md
   const hasPoints = Boolean(feature) || selectedCount > 0;
   const selectionToggleLabel = selectionMode ? "Режим добавления и удаления" : "Добавить";
+  const buildBlocked = toolBlocked && !enabled;
   const zoneRadii = useMemo(
     () =>
       BUFFER_ZONES.map((_, index) => {
@@ -114,11 +117,17 @@ export default function BufferPopup({
             <p className="buffer-popup-status">Выберите точку на карте или добавьте точки в выделение.</p>
           )}
 
-          <label className={`buffer-switch ${!hasPoints ? "buffer-switch--disabled" : ""}`}>
+          {toolBlocked && (
+            <p className="buffer-popup-status buffer-popup-status--blocked" title={toolBlockedTitle}>
+              {toolBlockedTitle}
+            </p>
+          )}
+
+          <label className={`buffer-switch ${!hasPoints || buildBlocked ? "buffer-switch--disabled" : ""}`}>
             <input
               type="checkbox"
               checked={enabled}
-              disabled={!hasPoints}
+              disabled={!hasPoints || buildBlocked}
               onChange={(e) => onEnabledChange?.(e.target.checked)}
             />
             <span className="buffer-switch-slider" />
@@ -140,7 +149,7 @@ export default function BufferPopup({
           {BUFFER_ZONES.map((zone, index) => {
             const minRadius = index === 0 ? BUFFER_MIN_RADIUS_KM : zoneRadii[index - 1];
             const value = zoneRadii[index];
-            const zoneDisabled = !hasPoints || !enabled;
+            const zoneDisabled = !hasPoints || !enabled || buildBlocked;
 
             return (
               <div className={`buffer-zone${zoneDisabled ? " buffer-zone--disabled" : ""}`} key={zone.id}>
@@ -166,6 +175,22 @@ export default function BufferPopup({
             );
           })}
 
+          <div className="buffer-probability-legend" aria-label="Вероятность следующей находки">
+            <span className="buffer-probability-legend-title">Вероятность следующей находки</span>
+            <ul className="buffer-probability-legend-list">
+              {BUFFER_ZONES.map((zone) => (
+                <li key={zone.id} className="buffer-probability-legend-item">
+                  <span
+                    className="buffer-probability-legend-swatch"
+                    style={{ backgroundColor: zone.color }}
+                    aria-hidden="true"
+                  />
+                  <span className="buffer-probability-legend-label">{zone.probabilityLabel}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
           <div className="buffer-actions">
             <button
               type="button"
@@ -173,6 +198,7 @@ export default function BufferPopup({
               onClick={onSelectionModeChange}
               aria-pressed={selectionMode}
               title={selectionToggleLabel}
+              disabled={buildBlocked}
             >
               Добавить
             </button>

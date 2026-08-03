@@ -5,6 +5,7 @@ import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/ArealPopup.css";
 const RADIUS_MIN = 0.5;
 const RADIUS_MAX = 15;
+export const DEFAULT_AREAL_RADIUS_KM = 5;
 
 /** Процент заполнения слайдера радиуса для CSS-переменной --range-progress. */
 function getRangeProgress(value) {
@@ -60,12 +61,16 @@ export default function ArealPopup({
   onPointSelect,
   onEnabledChange,  onAllMarkersChange,
   onRadiusChange,
+  onReset,
+  toolBlocked = false,
+  toolBlockedTitle,
   collapsed = false,
   onCollapsedChange
 }) {
   // Радиус доступен, если включён для одной точки или для всех маркеров.
   const isActive = enabled || allMarkers;
   const hasContainedPoints = containedPoints?.count > 0;
+  const canReset = isActive || radius !== DEFAULT_AREAL_RADIUS_KM;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## areal в docs/moduleHelp.md
 
@@ -94,22 +99,29 @@ export default function ArealPopup({
         </p>
       ) : (
         <div className="areal-popup-content">
+          {toolBlocked && (
+            <p className="areal-popup-status areal-popup-status--blocked" title={toolBlockedTitle}>
+              {toolBlockedTitle}
+            </p>
+          )}
+
           {/* Режим «одна точка» недоступен, когда включён радиус ко всем маркерам. */}
-          <label className={`areal-switch ${allMarkers ? "areal-switch--disabled" : ""}`}>
+          <label className={`areal-switch ${allMarkers || toolBlocked ? "areal-switch--disabled" : ""}`}>
             <input
             type="checkbox"
             checked={enabled}
-            disabled={allMarkers}
+            disabled={allMarkers || toolBlocked}
             onChange={(e) => onEnabledChange(e.target.checked)}
           />
           <span className="areal-switch-slider" />
           <span className="areal-switch-label">Установить радиус</span>
         </label>
 
-        <label className="areal-switch">
+        <label className={`areal-switch ${toolBlocked ? "areal-switch--disabled" : ""}`}>
           <input
             type="checkbox"
             checked={allMarkers}
+            disabled={toolBlocked}
             onChange={(e) => onAllMarkersChange(e.target.checked)}
           />
           <span className="areal-switch-slider" />
@@ -152,6 +164,17 @@ export default function ArealPopup({
               ))}
             </ul>          </div>
         )}
+
+        <div className="areal-actions">
+          <button
+            type="button"
+            className="areal-reset-btn"
+            onClick={onReset}
+            disabled={!canReset}
+          >
+            Сброс
+          </button>
+        </div>
         </div>
       )}
       <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.AREAL} open={helpOpen} />

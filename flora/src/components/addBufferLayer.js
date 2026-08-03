@@ -8,13 +8,13 @@ const EMPTY_COLLECTION = {
 };
 
 /**
- * Зоны буфера — от внутренней (красной) к внешней (зелёной).
+ * Зоны буфера — от внутренней (зелёной) к внешней (серой).
  * maxRadiusKm первой зоны — 5 км, у каждой следующей на 5 км больше предыдущей.
  */
 export const BUFFER_ZONES = [
-  { id: "red", label: "Красная зона", color: "#e74c3c", maxRadiusKm: 5 },
-  { id: "yellow", label: "Жёлтая зона", color: "#f1c40f", maxRadiusKm: 10 },
-  { id: "green", label: "Зелёная зона", color: "#27ae60", maxRadiusKm: 15 }
+  { id: "inner", label: "Внутренняя зона", color: "#27ae60", probabilityLabel: "высокая", maxRadiusKm: 5 },
+  { id: "middle", label: "Средняя зона", color: "#8fa8bc", probabilityLabel: "средняя", maxRadiusKm: 10 },
+  { id: "outer", label: "Внешняя зона", color: "#9aa0a6", probabilityLabel: "низкая", maxRadiusKm: 15 }
 ];
 
 export const BUFFER_MIN_RADIUS_KM = 0.1;

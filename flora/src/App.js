@@ -84,7 +84,7 @@ import {
   focusMapOnSharedPoint,
   parseSharePointParams
 } from "./components/sharePointLink";
-import ArealPopup from "./components/ArealPopup";
+import ArealPopup, { DEFAULT_AREAL_RADIUS_KM } from "./components/ArealPopup";
 import SpeciesPolygonPopup from "./components/SpeciesPolygonPopup";
 import BufferPopup from "./components/BufferPopup";
 import AreaSelectionPopup from "./components/AreaSelectionPopup";
@@ -142,7 +142,7 @@ export default function MapView() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [arealEnabled, setArealEnabled] = useState(false);
   const [arealAllMarkers, setArealAllMarkers] = useState(false);
-  const [arealRadius, setArealRadius] = useState(5);
+  const [arealRadius, setArealRadius] = useState(DEFAULT_AREAL_RADIUS_KM);
   const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
   const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
   const [timelineYear, setTimelineYear] = useState(YEAR_BOUNDS.max);
@@ -161,11 +161,16 @@ export default function MapView() {
   const [intersectionPinned, setIntersectionPinned] = useState(false);
   const [intersectionOnlyMode, setIntersectionOnlyMode] = useState(false);
   const [intersectionLockedPair, setIntersectionLockedPair] = useState(null);
-  // Буфер: радиусы зон (красная/жёлтая/зелёная), км; bufferEnabled — включён ли переключатель.
+  // Буфер: радиусы зон (зелёная / серо-голубая / серая), км; bufferEnabled — включён ли переключатель.
   const [bufferRadii, setBufferRadii] = useState(DEFAULT_BUFFER_RADII_KM);
   const [bufferEnabled, setBufferEnabled] = useState(false);
   const [bufferSelectionMode, setBufferSelectionMode] = useState(false);
   const [bufferSelectedPoints, setBufferSelectedPoints] = useState([]);
+
+  const isArealApplied = arealEnabled || arealAllMarkers;
+  const isBufferApplied = bufferEnabled;
+  const AREAL_BLOCKED_BY_BUFFER_TITLE = 'Сначала сбросьте инструмент «Буфер»';
+  const BUFFER_BLOCKED_BY_AREAL_TITLE = 'Сначала сбросьте инструмент «Радиус»';
   const [areaDrawTool, setAreaDrawTool] = useState(AREA_DRAW_MODES.FREEHAND);
   const [areaOperationMode, setAreaOperationMode] = useState(AREA_OPERATION_MODES.ADD);
   const [areaDrawingActive, setAreaDrawingActive] = useState(false);
@@ -255,6 +260,14 @@ export default function MapView() {
       return;
     }
 
+    if (moduleId === MODULE_IDS.AREAL && isBufferApplied) {
+      return;
+    }
+
+    if (moduleId === MODULE_IDS.BUFFER && isArealApplied) {
+      return;
+    }
+
     if (moduleId === MODULE_IDS.AREAL) {
       // Из меню «Радиус» открывается отдельно — панель точки не остаётся в стеке.
       setArealDockedWithFeature(false);
@@ -280,17 +293,27 @@ export default function MapView() {
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature(false);
     setActiveModule((current) => (current === moduleId ? null : moduleId));
-  }, []);
+  }, [isArealApplied, isBufferApplied]);
 
   const handleOpenArealFromFeature = useCallback(() => {
+    if (isBufferApplied) {
+      return;
+    }
+
     setActiveModule(MODULE_IDS.FEATURE);
+    setBufferDockedWithFeature(false);
     setArealDockedWithFeature((open) => !open);
-  }, []);
+  }, [isBufferApplied]);
 
   const handleOpenBufferFromFeature = useCallback(() => {
+    if (isArealApplied) {
+      return;
+    }
+
     setActiveModule(MODULE_IDS.FEATURE);
+    setArealDockedWithFeature(false);
     setBufferDockedWithFeature((open) => !open);
-  }, []);
+  }, [isArealApplied]);
 
   const handleYearRangeChange = useCallback((nextRange) => {
     setYearRange((prev) =>
@@ -1310,6 +1333,12 @@ export default function MapView() {
     });
   }, []);
 
+  const handleArealReset = useCallback(() => {
+    setArealEnabled(false);
+    setArealAllMarkers(false);
+    setArealRadius(DEFAULT_AREAL_RADIUS_KM);
+  }, []);
+
   const handleBufferReset = useCallback(() => {
     setBufferEnabled(false);
     setBufferRadii(DEFAULT_BUFFER_RADII_KM);
@@ -1318,10 +1347,46 @@ export default function MapView() {
   }, []);
 
   const handleBufferEnabledChange = useCallback((enabled) => {
+    if (enabled && isArealApplied) {
+      return;
+    }
+
+    if (enabled) {
+      setArealDockedWithFeature(false);
+    }
+
     setBufferEnabled(enabled);
-  }, []);
+  }, [isArealApplied]);
+
+  const handleArealEnabledChange = useCallback((enabled) => {
+    if (enabled && isBufferApplied) {
+      return;
+    }
+
+    if (enabled) {
+      setBufferDockedWithFeature(false);
+    }
+
+    setArealEnabled(enabled);
+  }, [isBufferApplied]);
+
+  const handleArealAllMarkersChange = useCallback((enabled) => {
+    if (enabled && isBufferApplied) {
+      return;
+    }
+
+    if (enabled) {
+      setBufferDockedWithFeature(false);
+    }
+
+    setArealAllMarkers(enabled);
+  }, [isBufferApplied]);
 
   const handleBufferSelectionModeChange = useCallback(() => {
+    if (isArealApplied) {
+      return;
+    }
+
     setBufferSelectionMode((prev) => {
       const next = !prev;
 
@@ -1342,7 +1407,7 @@ export default function MapView() {
 
       return next;
     });
-  }, [popupData]);
+  }, [popupData, isArealApplied]);
 
   const handleArealPointSelect = useCallback((feature) => {
     const mapInstance = map.current;
@@ -1604,6 +1669,8 @@ export default function MapView() {
         activeModule={activeModule}
         onModuleSelect={handleModuleSelect}
         pointSelected={Boolean(popupData)}
+        arealBlocked={isBufferApplied}
+        bufferBlocked={isArealApplied}
         hoverTooltipsDisabled={hoverTooltipsDisabled}
         onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
         osmBasemapEnabled={osmBasemapEnabled}
@@ -1626,8 +1693,12 @@ export default function MapView() {
               onFiltersReset={handleFeatureFiltersReset}
               onOpenAreal={handleOpenArealFromFeature}
               arealDockedOpen={arealDockedWithFeature}
+              arealDisabled={isBufferApplied}
+              arealDisabledTitle={AREAL_BLOCKED_BY_BUFFER_TITLE}
               onOpenBuffer={handleOpenBufferFromFeature}
               bufferDockedOpen={bufferDockedWithFeature}
+              bufferDisabled={isArealApplied}
+              bufferDisabledTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
             />
           )}
           {(activeModule === MODULE_IDS.AREAL ||
@@ -1638,9 +1709,12 @@ export default function MapView() {
               radius={arealRadius}
               containedPoints={arealContainedPoints}
               onPointSelect={handleArealPointSelect}
-              onEnabledChange={setArealEnabled}
-              onAllMarkersChange={setArealAllMarkers}
+              onEnabledChange={handleArealEnabledChange}
+              onAllMarkersChange={handleArealAllMarkersChange}
+              toolBlocked={isBufferApplied}
+              toolBlockedTitle={AREAL_BLOCKED_BY_BUFFER_TITLE}
               onRadiusChange={setArealRadius}
+              onReset={handleArealReset}
               collapsed={isPanelCollapsed(PANEL_IDS.AREAL)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.AREAL)}
             />
@@ -1724,6 +1798,8 @@ export default function MapView() {
               onSelectionModeChange={handleBufferSelectionModeChange}
               onRadiusChange={handleBufferRadiusChange}
               onReset={handleBufferReset}
+              toolBlocked={isArealApplied}
+              toolBlockedTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
               collapsed={isPanelCollapsed(PANEL_IDS.BUFFER)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.BUFFER)}
             />
