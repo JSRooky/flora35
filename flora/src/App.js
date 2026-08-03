@@ -363,6 +363,23 @@ export default function MapView() {
     activeModule
   };
 
+  const pointSelectionStateRef = useRef({});
+  pointSelectionStateRef.current = {
+    popupData,
+    propertyFilters,
+    arealEnabled,
+    arealAllMarkers,
+    speciesPolygons,
+    activePolygonId,
+    bufferEnabled,
+    bufferSelectedPoints,
+    bufferSelectionMode,
+    polygonAddMode,
+    arealDockedWithFeature,
+    bufferDockedWithFeature,
+    activeModule
+  };
+
   const submissionStateRef = useRef({});
   submissionStateRef.current = {
     active: activeModule === MODULE_IDS.SUBMIT,
@@ -1344,6 +1361,27 @@ export default function MapView() {
   }, []);
 
   const clearPointSelection = useCallback(() => {
+    const state = pointSelectionStateRef.current;
+
+    if (
+      !state.popupData &&
+      Object.keys(state.propertyFilters).length === 0 &&
+      !state.arealEnabled &&
+      !state.arealAllMarkers &&
+      state.speciesPolygons.length === 0 &&
+      !state.activePolygonId &&
+      !state.bufferEnabled &&
+      state.bufferSelectedPoints.length === 0 &&
+      !state.bufferSelectionMode &&
+      !state.polygonAddMode &&
+      !state.arealDockedWithFeature &&
+      !state.bufferDockedWithFeature &&
+      state.activeModule !== MODULE_IDS.FEATURE &&
+      (!state.activeModule || state.activeModule === MODULE_IDS.POLYGON)
+    ) {
+      return;
+    }
+
     if (map.current) {
       hideArealPointHint();
       clearArealLayer(map.current);
@@ -1352,14 +1390,14 @@ export default function MapView() {
     }
 
     setPopupData(null);
-    setPropertyFilters({});
+    setPropertyFilters((prev) => (Object.keys(prev).length === 0 ? prev : {}));
     setArealEnabled(false);
     setArealAllMarkers(false);
-    setSpeciesPolygons([]);
+    setSpeciesPolygons((prev) => (prev.length === 0 ? prev : []));
     setActivePolygonId(null);
     setBufferRadii(DEFAULT_BUFFER_RADII_KM);
     setBufferEnabled(false);
-    setBufferSelectedPoints([]);
+    setBufferSelectedPoints((prev) => (prev.length === 0 ? prev : []));
     setBufferSelectionMode(false);
     setPolygonAddMode(false);
     setActiveModule((current) => (current === MODULE_IDS.POLYGON ? current : null));

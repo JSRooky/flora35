@@ -1144,6 +1144,17 @@ function filterValueEqual(a, b) {
   return false;
 }
 
+function filtersEqual(a, b) {
+  const keysA = Object.keys(a).sort();
+  const keysB = Object.keys(b).sort();
+
+  if (keysA.join("|") !== keysB.join("|")) {
+    return false;
+  }
+
+  return keysA.every((key) => filterValueEqual(a[key], b[key]));
+}
+
 /** Изменился только верхний предел found_year (типичное движение слайдера таймлайна). */
 function isTimelineYearMaxOnlyChange(prevFilters, nextFilters) {
   const prevYear = prevFilters.found_year;
@@ -1484,6 +1495,10 @@ export function applyLocationsFilter(map, filters = {}) {
     isTimelineYearMaxOnlyChange(currentFilters, filters)
   ) {
     applyTimelineYearChange(map, currentFilters, filters);
+    return;
+  }
+
+  if (map && locationsSourcesExist(map) && filtersEqual(currentFilters, filters)) {
     return;
   }
 
