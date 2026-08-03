@@ -3,6 +3,9 @@ const { join } = require("node:path");
 
 const USERPOINTS_PATH = join(__dirname, "../src/locations/userpoints.json");
 
+// Должен совпадать с DEFAULT_SPECIES_DESCRIPTION_MD в defaultSpeciesDescription.js
+const DEFAULT_SPECIES_DESCRIPTION_MD = "species/primula_veris.md";
+
 const EMPTY_COLLECTION = {
   type: "SpeciesCollection",
   species: []
@@ -81,10 +84,13 @@ function appendUserFinding(payload) {
       family: family.trim(),
       name_ru: nameRu.trim(),
       name_latin: nameLatin.trim(),
+      description_md: DEFAULT_SPECIES_DESCRIPTION_MD,
       findings: []
     };
 
     collection.species.push(species);
+  } else if (!species.description_md) {
+    species.description_md = DEFAULT_SPECIES_DESCRIPTION_MD;
   }
 
   const findingNumber = species.findings.length + 1;

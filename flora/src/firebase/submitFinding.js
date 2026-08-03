@@ -1,4 +1,5 @@
 import { getFirebaseApp } from "./config";
+import { DEFAULT_SPECIES_DESCRIPTION_MD } from "../locations/defaultSpeciesDescription";
 import {
   SUBMISSIONS_COLLECTION,
   LOCATION_DATASETS,
@@ -12,7 +13,7 @@ import {
  * ID документа: userpoints__{finding_id}.
  */
 export async function submitUserFinding(payload) {
-  const [{ getFirestore, doc, collection, setDoc, serverTimestamp }, app] =
+  const [{ getFirestore, doc, setDoc, serverTimestamp }, app] =
     await Promise.all([import("firebase/firestore"), getFirebaseApp()]);
 
   const db = getFirestore(app);
@@ -24,6 +25,7 @@ export async function submitUserFinding(payload) {
     ...payload,
     finding_id: findingId,
     species_id: speciesId,
+    description_md: DEFAULT_SPECIES_DESCRIPTION_MD,
     source: "flora35-test",
     submittedAt: serverTimestamp()
   });

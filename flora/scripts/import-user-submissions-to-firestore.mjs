@@ -9,6 +9,7 @@ import {
   LOCATION_DATASETS,
   buildFirestoreDocId
 } from "../src/firebase/speciesCollectionFirestore.js";
+import { DEFAULT_SPECIES_DESCRIPTION_MD } from "../src/locations/defaultSpeciesDescription.js";
 const dryRun = process.argv.includes("--dry-run");
 const useAdmin = process.argv.includes("--admin");
 const defaultProjectId = "redbook35-fa3f7";
@@ -114,6 +115,7 @@ function userpointsToSubmissionDocs(collection) {
           coordinates: finding.coordinates,
           finding_id: findingId,
           species_id: species.id,
+          description_md: species.description_md ?? DEFAULT_SPECIES_DESCRIPTION_MD,
           source: "userpoints-json"
         }
       });

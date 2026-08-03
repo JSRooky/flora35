@@ -3,6 +3,7 @@ import userpoints from "./userpoints.json";
 import { isFirebaseConfigured } from "../firebase/config";
 import { loadLocationsFromFirestore } from "../firebase/loadLocationsFromFirestore";
 import { slugifySpeciesId } from "../firebase/speciesCollectionFirestore";
+import { DEFAULT_SPECIES_DESCRIPTION_MD } from "./defaultSpeciesDescription";
 import { expandFindingsToFeatures } from "./expandFindings";
 import { mergeSpeciesCollections } from "./mergeSpeciesCollections";
 
@@ -69,7 +70,11 @@ export function appendUserSubmission(payload, findingId) {
       type: "SpeciesCollection",
       species: userpointsCollection.species.map((species) =>
         species.id === speciesId
-          ? { ...species, findings: [...species.findings, finding] }
+          ? {
+              ...species,
+              description_md: species.description_md ?? DEFAULT_SPECIES_DESCRIPTION_MD,
+              findings: [...species.findings, finding]
+            }
           : species
       )
     };
@@ -85,6 +90,7 @@ export function appendUserSubmission(payload, findingId) {
           family: payload.family,
           name_ru: payload.name_ru,
           name_latin: payload.name_latin,
+          description_md: DEFAULT_SPECIES_DESCRIPTION_MD,
           findings: [finding]
         }
       ]

@@ -1,3 +1,5 @@
+import { DEFAULT_SPECIES_DESCRIPTION_MD } from "../locations/defaultSpeciesDescription";
+
 /** Коллекция Firestore для проверенных точек карты (из points.json). */
 export const FINDINGS_COLLECTION = "findings";
 
@@ -164,6 +166,7 @@ export function submissionDocsToSpeciesCollection(docs) {
         family: record.family ?? "",
         name_ru: record.name_ru ?? "",
         name_latin: record.name_latin ?? "",
+        description_md: record.description_md ?? DEFAULT_SPECIES_DESCRIPTION_MD,
         findings: []
       });
     }
