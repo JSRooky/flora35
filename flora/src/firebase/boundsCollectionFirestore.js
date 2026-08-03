@@ -10,19 +10,13 @@ export const BOUNDS_LAYER_DEFINITIONS = [
   {
     id: "nature_reserve_polygon",
     sourceFile: "nature_reserve-polygon.geojson",
-    label: "Заповедники (OSM)",
+    label: "Заповедники",
     kind: BOUNDS_LAYER_KINDS.POLYGON
   },
   {
     id: "oopt_pol",
     sourceFile: "oopt_pol.geojson",
     label: "ООПТ полигоны",
-    kind: BOUNDS_LAYER_KINDS.POLYGON
-  },
-  {
-    id: "oopt_oz_pol",
-    sourceFile: "oopt_oz_pol.geojson",
-    label: "ООПТ особо охраняемые",
     kind: BOUNDS_LAYER_KINDS.POLYGON
   }
 ];

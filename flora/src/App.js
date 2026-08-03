@@ -36,9 +36,11 @@ import {
 import {
   addBoundsLayers,
   clearBoundsLayerCache,
+  getBoundsFeatureAtClick,
   syncBoundsLayersVisibility
 } from "./components/addBoundsLayers";
-import BoundsTestPanel, { createInitialBoundsVisibility } from "./components/BoundsTestPanel";
+import OoptPanel, { createInitialBoundsVisibility } from "./components/OoptPanel";
+import OoptFeaturePanel from "./components/OoptFeaturePanel";
 import { isFirebaseConfigured } from "./firebase/config";
 import {
   setDataSourceFilter,
@@ -127,6 +129,8 @@ const PANEL_IDS = {
   POLYGON: "polygon",
   BUFFER: "buffer",
   AREA: "area",
+  OOPT: "oopt",
+  OOPT_FEATURE: "oopt-feature",
   SUBMIT: "submit"
 };
 
@@ -151,6 +155,7 @@ export default function MapView() {
   const [boundsLayerVisibility, setBoundsLayerVisibility] = useState(createInitialBoundsVisibility);
   const [boundsLayerLoading, setBoundsLayerLoading] = useState({});
   const [boundsLayerErrors, setBoundsLayerErrors] = useState({});
+  const [selectedBoundsFeature, setSelectedBoundsFeature] = useState(null);
   const [activeModule, setActiveModule] = useState(null);
   // Радиус, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
   const [arealDockedWithFeature, setArealDockedWithFeature] = useState(false);
@@ -251,6 +256,9 @@ export default function MapView() {
         break;
       case MODULE_IDS.AREA:
         expandPanel(PANEL_IDS.AREA);
+        break;
+      case MODULE_IDS.OOPT:
+        expandPanel(PANEL_IDS.OOPT);
         break;
       case MODULE_IDS.SUBMIT:
         expandPanel(PANEL_IDS.SUBMIT);
@@ -455,6 +463,8 @@ export default function MapView() {
   };
 
   const expandedLeavesRef = useRef(null);
+  const activeModuleRef = useRef(activeModule);
+  activeModuleRef.current = activeModule;
 
   const refreshAreal = useCallback(() => {
     const mapInstance = map.current;
@@ -1155,6 +1165,18 @@ export default function MapView() {
   }, [boundsLayerVisibility, mapReady]);
 
   useEffect(() => {
+    if (activeModule !== MODULE_IDS.OOPT) {
+      setSelectedBoundsFeature(null);
+    }
+  }, [activeModule]);
+
+  useEffect(() => {
+    if (selectedBoundsFeature) {
+      expandPanel(PANEL_IDS.OOPT_FEATURE);
+    }
+  }, [selectedBoundsFeature, expandPanel]);
+
+  useEffect(() => {
     refreshAreal();
   }, [popupData, arealEnabled, arealAllMarkers, arealRadius, propertyFilters, statusFilters, yearFilterEnabled, yearRange, activeModule, timelineYear, refreshAreal]);
 
@@ -1677,6 +1699,7 @@ export default function MapView() {
 
             dismissArealPointHintOnPointClick(feature);
             clearSharedPointPin(map.current);
+            setSelectedBoundsFeature(null);
             setPopupData(feature);
             updateSelectedPointHighlight(map.current, feature);
             // Если какая-то панель уже открыта, оставляем её открытой — просто обновляем
@@ -1746,6 +1769,14 @@ export default function MapView() {
             }
 
             clearSharedPointPin(map.current);
+            setSelectedBoundsFeature(null);
+
+            const boundsHit = getBoundsFeatureAtClick(map.current, event);
+            if (boundsHit && activeModuleRef.current === MODULE_IDS.OOPT) {
+              setSelectedBoundsFeature(boundsHit);
+              return;
+            }
+
             clearPointSelection();
           },
           clusteringEnabled: DEFAULT_CLUSTERING_ENABLED,
@@ -1932,6 +1963,27 @@ export default function MapView() {
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.AREA)}
             />
           )}
+          {activeModule === MODULE_IDS.OOPT && (
+            <>
+              <OoptPanel
+                visibility={boundsLayerVisibility}
+                onVisibilityChange={setBoundsLayerVisibility}
+                loadingById={boundsLayerLoading}
+                errorsById={boundsLayerErrors}
+                firebaseConfigured={isFirebaseConfigured()}
+                collapsed={isPanelCollapsed(PANEL_IDS.OOPT)}
+                onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.OOPT)}
+              />
+              {selectedBoundsFeature ? (
+                <OoptFeaturePanel
+                  layerDefinition={selectedBoundsFeature.definition}
+                  feature={selectedBoundsFeature.feature}
+                  collapsed={isPanelCollapsed(PANEL_IDS.OOPT_FEATURE)}
+                  onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.OOPT_FEATURE)}
+                />
+              ) : null}
+            </>
+          )}
           {activeModule === MODULE_IDS.SUBMIT && (
             <Suspense fallback={null}>
               <UserSubmissionPanel
@@ -1974,13 +2026,6 @@ export default function MapView() {
         />
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
-      <BoundsTestPanel
-        visibility={boundsLayerVisibility}
-        onVisibilityChange={setBoundsLayerVisibility}
-        loadingById={boundsLayerLoading}
-        errorsById={boundsLayerErrors}
-        firebaseConfigured={isFirebaseConfigured()}
-      />
       <FeedbackWidget />
     </>
   );

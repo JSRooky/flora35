@@ -1,20 +1,35 @@
 import React, { useState } from "react";
 import { BOUNDS_LAYER_DEFINITIONS } from "../firebase/boundsCollectionFirestore";
-import "../styles/BoundsTestPanel.css";
+import "../styles/OoptPanel.css";
 
 export function createInitialBoundsVisibility() {
   return Object.fromEntries(BOUNDS_LAYER_DEFINITIONS.map(({ id }) => [id, false]));
 }
 
-export default function BoundsTestPanel({
+function getCollapsedSummary(visibility) {
+  const enabledCount = BOUNDS_LAYER_DEFINITIONS.filter(({ id }) => visibility[id]).length;
+
+  if (!enabledCount) {
+    return "Все слои выключены";
+  }
+
+  return `Включено слоёв: ${enabledCount}`;
+}
+
+export default function OoptPanel({
   visibility,
   onVisibilityChange,
   loadingById = {},
   errorsById = {},
-  firebaseConfigured = false
+  firebaseConfigured = false,
+  collapsed: collapsedProp,
+  onCollapsedChange
 }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const enabledCount = BOUNDS_LAYER_DEFINITIONS.filter(({ id }) => visibility[id]).length;
+  const [collapsedInternal, setCollapsedInternal] = useState(false);
+  const isControlled = collapsedProp !== undefined;
+  const collapsed = isControlled ? collapsedProp : collapsedInternal;
+  const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
+  const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
 
   const handleToggle = (layerId, checked) => {
     onVisibilityChange?.({
@@ -24,37 +39,32 @@ export default function BoundsTestPanel({
   };
 
   return (
-    <aside
-      className={`bounds-test-panel${collapsed ? " bounds-test-panel--collapsed" : ""}`}
-      aria-label="Слои границ из Firestore"
-    >
-      <div className="bounds-test-panel-header">
-        <h3 className="bounds-test-panel-title">Границы (Firestore)</h3>
+    <aside className={`oopt-panel ${collapsed ? "oopt-panel--collapsed" : ""}`} aria-label="ООПТ">
+      <div className="oopt-panel-header">
+        <h3 className="oopt-panel-title">ООПТ</h3>
         <button
           type="button"
-          className="bounds-test-panel-toggle"
-          onClick={() => setCollapsed((value) => !value)}
+          className="oopt-panel-toggle"
+          onClick={() => setCollapsed(!collapsed)}
           aria-expanded={!collapsed}
-          aria-label={collapsed ? "Развернуть" : "Свернуть"}
-          title={collapsed ? "Развернуть" : "Свернуть"}
+          aria-label={toggleLabel}
+          title={toggleLabel}
         >
           {collapsed ? "▾" : "▴"}
         </button>
       </div>
 
       {collapsed ? (
-        <p className="bounds-test-panel-summary">
-          {enabledCount ? `Включено: ${enabledCount}` : "Все слои выключены"}
-        </p>
+        <p className="oopt-panel-summary">{getCollapsedSummary(visibility)}</p>
       ) : (
-        <>
+        <div className="oopt-panel-content">
           {!firebaseConfigured && (
-            <p className="bounds-test-panel-note bounds-test-panel-note--warning">
+            <p className="oopt-panel-note oopt-panel-note--warning">
               Firebase не настроен. Добавьте переменные REACT_APP_FIREBASE_* в `.env.local`.
             </p>
           )}
 
-          <ul className="bounds-test-panel-list">
+          <ul className="oopt-panel-list">
             {BOUNDS_LAYER_DEFINITIONS.map(({ id, label }) => {
               const loading = Boolean(loadingById[id]);
               const error = errorsById[id];
@@ -63,7 +73,7 @@ export default function BoundsTestPanel({
               return (
                 <li key={id}>
                   <label
-                    className={`bounds-test-panel-switch${disabled ? " bounds-test-panel-switch--disabled" : ""}`}
+                    className={`oopt-panel-switch${disabled ? " oopt-panel-switch--disabled" : ""}`}
                     title={label}
                   >
                     <input
@@ -72,18 +82,18 @@ export default function BoundsTestPanel({
                       disabled={disabled}
                       onChange={(event) => handleToggle(id, event.target.checked)}
                     />
-                    <span className="bounds-test-panel-switch-slider" aria-hidden="true" />
-                    <span className="bounds-test-panel-switch-label">
+                    <span className="oopt-panel-switch-slider" aria-hidden="true" />
+                    <span className="oopt-panel-switch-label">
                       {label}
                       {loading ? " …" : ""}
                     </span>
                   </label>
-                  {error ? <p className="bounds-test-panel-error">{error}</p> : null}
+                  {error ? <p className="oopt-panel-error">{error}</p> : null}
                 </li>
               );
             })}
           </ul>
-        </>
+        </div>
       )}
     </aside>
   );

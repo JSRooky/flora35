@@ -11,6 +11,45 @@ const EMPTY_COLLECTION = {
 };
 
 const dataCache = new Map();
+const mapsWithCursorHandlers = new WeakSet();
+
+function getInteractiveBoundsLayerIds(map) {
+  return BOUNDS_LAYER_DEFINITIONS.filter(
+    (definition) => definition.kind === BOUNDS_LAYER_KINDS.POLYGON
+  )
+    .flatMap((definition) => [getFillLayerId(definition.id), getOutlineLayerId(definition.id)])
+    .filter(
+      (layerId) =>
+        map.getLayer(layerId) && map.getLayoutProperty(layerId, "visibility") !== "none"
+    );
+}
+
+function getBoundsLayerDefinitionForFeatureLayerId(layerId) {
+  return BOUNDS_LAYER_DEFINITIONS.find(
+    (definition) =>
+      layerId === getFillLayerId(definition.id) || layerId === getOutlineLayerId(definition.id)
+  );
+}
+
+function findBoundsFeatureAtPoint(map, point) {
+  const layerIds = getInteractiveBoundsLayerIds(map);
+  if (!layerIds.length) {
+    return null;
+  }
+
+  const features = map.queryRenderedFeatures(point, { layers: layerIds });
+  if (!features.length) {
+    return null;
+  }
+
+  const feature = features[0];
+  const definition = getBoundsLayerDefinitionForFeatureLayerId(feature.layer.id);
+  if (!definition) {
+    return null;
+  }
+
+  return { definition, feature };
+}
 
 const PAINT_BY_LAYER = {
   nature_reserve_polygon: {
@@ -18,35 +57,30 @@ const PAINT_BY_LAYER = {
       "match",
       ["get", "BOUNDARY"],
       "national_park",
-      "#2d7a4f",
+      "#52966a",
       "protected_area",
-      "#3d9970",
+      "#5fa67a",
       "boundary",
-      "#6aab82",
-      "#4caf50"
+      "#78b088",
+      "#68a878"
     ],
     outlineColor: [
       "match",
       ["get", "BOUNDARY"],
       "national_park",
-      "#1e5631",
+      "#3d7352",
       "protected_area",
-      "#2d7a4f",
+      "#4a8260",
       "boundary",
-      "#4d8a66",
-      "#388e3c"
+      "#5f9470",
+      "#508a62"
     ],
-    fillOpacity: 0.28
+    fillOpacity: 0.22
   },
   oopt_pol: {
-    fillColor: "#3b82f6",
-    outlineColor: "#1d4ed8",
-    fillOpacity: 0.28
-  },
-  oopt_oz_pol: {
-    fillColor: "#8b5cf6",
-    outlineColor: "#6d28d9",
-    fillOpacity: 0.28
+    fillColor: "#6b94c4",
+    outlineColor: "#4a72a8",
+    fillOpacity: 0.22
   }
 };
 
@@ -72,6 +106,50 @@ function getMapLayerIds(definition) {
   }
 
   return [getFillLayerId(definition.id), getOutlineLayerId(definition.id)];
+}
+
+/** Возвращает полигон границ в точке клика или null. */
+export function getBoundsFeatureAtClick(map, event) {
+  if (!map || !event?.point) {
+    return null;
+  }
+
+  const hit = findBoundsFeatureAtPoint(map, event.point);
+  if (!hit) {
+    return null;
+  }
+
+  return hit;
+}
+
+/** Проверяет, попадает ли точка клика в видимый полигон границ. */
+export function isBoundsFeatureAtPoint(map, point) {
+  return Boolean(map && point && findBoundsFeatureAtPoint(map, point));
+}
+
+function attachBoundsCursorHandlers(map, definition) {
+  if (definition.kind !== BOUNDS_LAYER_KINDS.POLYGON) {
+    return;
+  }
+
+  [getFillLayerId(definition.id), getOutlineLayerId(definition.id)].forEach((layerId) => {
+    map.on("mouseenter", layerId, () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+
+    map.on("mouseleave", layerId, () => {
+      map.getCanvas().style.cursor = "";
+    });
+  });
+}
+
+function attachBoundsInteractions(map) {
+  if (mapsWithCursorHandlers.has(map)) {
+    return;
+  }
+
+  mapsWithCursorHandlers.add(map);
+  BOUNDS_LAYER_DEFINITIONS.forEach((definition) => attachBoundsCursorHandlers(map, definition));
 }
 
 function setLayersVisibility(map, definition, visible) {
@@ -128,14 +206,15 @@ function ensureBoundsLayer(map, definition) {
           },
           paint: {
             "line-color": paint.outlineColor,
-            "line-width": 1.5,
-            "line-opacity": 0.75
+            "line-width": 1.25,
+            "line-opacity": 0.55
           }
         },
         beforeId
       );
     }
 
+    attachBoundsInteractions(map);
     return;
   }
 

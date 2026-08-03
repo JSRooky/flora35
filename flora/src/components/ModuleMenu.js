@@ -18,6 +18,7 @@ export const MODULE_IDS = {
   BUFFER: "buffer",
   // Совпадает с заголовком ## area в docs/moduleHelp.md.
   AREA: "area",
+  OOPT: "oopt",
   // Модуль ввода пользовательских данных в Firestore.
   SUBMIT: "submit",
   ABOUT: "about"
@@ -38,7 +39,8 @@ const MAP_MODULE_ITEMS = [
   { id: MODULE_IDS.AREAL, label: "Радиус", mapToolAccent: true },
   { id: MODULE_IDS.BUFFER, label: "Буфер", mapToolAccent: true },
   { id: MODULE_IDS.POLYGON, label: "Полигон", mapToolAccent: true },
-  { id: MODULE_IDS.AREA, label: "Область", mapToolAccent: true }
+  { id: MODULE_IDS.AREA, label: "Область", mapToolAccent: true },
+  { id: MODULE_IDS.OOPT, label: "ООПТ", mapToolAccent: true }
 ];
 
 const TEST_MODULE_ITEMS = [
