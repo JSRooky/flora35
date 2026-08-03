@@ -18,7 +18,7 @@ export const MODULE_IDS = {
   BUFFER: "buffer",
   // Совпадает с заголовком ## area в docs/moduleHelp.md.
   AREA: "area",
-  // Экспериментальный модуль ввода пользовательских данных через Firebase.
+  // Модуль ввода пользовательских данных в Firestore.
   SUBMIT: "submit",
   ABOUT: "about"
 };

@@ -34,7 +34,6 @@ import {
   updateHeatmapData
 } from "./components/addHeatmapLayer";
 import {
-  setUserPointsCollection,
   setDataSourceFilter,
   DATA_SOURCE_MODES,
   findFeatureByFindingId,
@@ -528,19 +527,15 @@ export default function MapView() {
     arealDynamicsFeature
   ]);
 
-  const handleUserFindingSaved = useCallback(
-    (userpointsCollection) => {
-      const mapInstance = map.current;
-      if (!mapInstance || !mapReady) {
-        return;
-      }
+  const handleUserFindingSaved = useCallback(() => {
+    const mapInstance = map.current;
+    if (!mapInstance || !mapReady) {
+      return;
+    }
 
-      setUserPointsCollection(userpointsCollection);
-      reloadLocationsData(mapInstance);
-      updateHeatmapData(mapInstance, buildLocationFilters());
-    },
-    [buildLocationFilters, mapReady]
-  );
+    reloadLocationsData(mapInstance);
+    updateHeatmapData(mapInstance, buildLocationFilters());
+  }, [buildLocationFilters, mapReady]);
 
   const areaContainedPoints = useMemo(() => {
     if (!areaGeometry || !mapReady) {

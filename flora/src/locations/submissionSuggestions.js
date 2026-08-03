@@ -25,7 +25,7 @@ function uniqueSorted(values) {
   );
 }
 
-/** Собирает варианты подсказок из points.json и userpoints.json. */
+/** Собирает варианты подсказок из данных Firestore, загруженных в память. */
 export function buildSubmissionSuggestionData() {
   const collection = getAllSpeciesCollection();
   const speciesList = [];

@@ -1,5 +1,5 @@
 import { getFirebaseApp } from "./config";
-import { DEFAULT_SPECIES_DESCRIPTION_MD } from "../locations/defaultSpeciesDescription";
+import { DEFAULT_SPECIES_DESCRIPTION_MD } from "../locations/defaultSpeciesDescription.js";
 import {
   SUBMISSIONS_COLLECTION,
   LOCATION_DATASETS,

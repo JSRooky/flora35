@@ -1,4 +1,4 @@
-import { DEFAULT_SPECIES_DESCRIPTION_MD } from "../locations/defaultSpeciesDescription";
+import { DEFAULT_SPECIES_DESCRIPTION_MD } from "../locations/defaultSpeciesDescription.js";
 
 /** Коллекция Firestore для проверенных точек карты (из points.json). */
 export const FINDINGS_COLLECTION = "findings";
@@ -78,7 +78,7 @@ export function speciesCollectionToFindingDocs(collection, dataset) {
           family: species.family ?? "",
           name_ru: species.name_ru ?? "",
           name_latin: species.name_latin ?? "",
-          ...(species.description_md ? { description_md: species.description_md } : {}),
+          description_md: species.description_md ?? DEFAULT_SPECIES_DESCRIPTION_MD,
           coordinates: finding.coordinates,
           found_by: finding.found_by ?? "",
           identified_by: finding.identified_by ?? "",
@@ -117,7 +117,7 @@ export function findingDocsToSpeciesCollection(docs, dataset = null) {
         family: record.family,
         name_ru: record.name_ru,
         name_latin: record.name_latin,
-        ...(record.description_md ? { description_md: record.description_md } : {}),
+        description_md: record.description_md ?? DEFAULT_SPECIES_DESCRIPTION_MD,
         findings: []
       });
     }

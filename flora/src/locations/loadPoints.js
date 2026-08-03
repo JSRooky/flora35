@@ -1,9 +1,5 @@
-import points from "./points.json";
-import userpoints from "./userpoints.json";
 import { isFirebaseConfigured } from "../firebase/config";
 import { loadLocationsFromFirestore } from "../firebase/loadLocationsFromFirestore";
-import { slugifySpeciesId } from "../firebase/speciesCollectionFirestore";
-import { DEFAULT_SPECIES_DESCRIPTION_MD } from "./defaultSpeciesDescription";
 import { expandFindingsToFeatures } from "./expandFindings";
 import { mergeSpeciesCollections } from "./mergeSpeciesCollections";
 
@@ -31,83 +27,19 @@ export const DATA_SOURCE_OPTIONS = [
   }
 ];
 
-let pointsCollection = points;
-let userpointsCollection = userpoints;
+const EMPTY_SPECIES_COLLECTION = {
+  type: "SpeciesCollection",
+  species: []
+};
+
+let pointsCollection = EMPTY_SPECIES_COLLECTION;
+let userpointsCollection = EMPTY_SPECIES_COLLECTION;
 let dataSourceFilter = DATA_SOURCE_MODES.ALL;
 let locationsInitPromise = null;
-let locationsLoadedFromFirestore = false;
-
-function shouldLoadFirestoreLocations() {
-  return (
-    isFirebaseConfigured() && process.env.REACT_APP_USE_FIRESTORE_LOCATIONS === "true"
-  );
-}
 
 function applyFirestoreCollections({ points, userpoints }) {
   pointsCollection = points;
   userpointsCollection = userpoints;
-  locationsLoadedFromFirestore = true;
-}
-
-/**
- * Добавляет пользовательскую находку в in-memory коллекцию userpoints.
- * @returns {object} обновлённая SpeciesCollection
- */
-export function appendUserSubmission(payload, findingId) {
-  const speciesId = slugifySpeciesId(payload.name_latin);
-  const finding = {
-    id: findingId,
-    coordinates: payload.coordinates,
-    found_by: payload.found_by,
-    identified_by: payload.identified_by ?? "",
-    found_year: payload.found_year
-  };
-
-  const existingSpecies = userpointsCollection.species.find((species) => species.id === speciesId);
-
-  if (existingSpecies) {
-    userpointsCollection = {
-      type: "SpeciesCollection",
-      species: userpointsCollection.species.map((species) =>
-        species.id === speciesId
-          ? {
-              ...species,
-              description_md: species.description_md ?? DEFAULT_SPECIES_DESCRIPTION_MD,
-              findings: [...species.findings, finding]
-            }
-          : species
-      )
-    };
-  } else {
-    userpointsCollection = {
-      type: "SpeciesCollection",
-      species: [
-        ...userpointsCollection.species,
-        {
-          id: speciesId,
-          regnum: payload.regnum,
-          status: payload.status,
-          family: payload.family,
-          name_ru: payload.name_ru,
-          name_latin: payload.name_latin,
-          description_md: DEFAULT_SPECIES_DESCRIPTION_MD,
-          findings: [finding]
-        }
-      ]
-    };
-  }
-
-  return userpointsCollection;
-}
-
-/** Подменяет данные userpoints в памяти (после сохранения через API или Firebase). */
-export function setUserPointsCollection(collection) {
-  userpointsCollection = collection;
-}
-
-/** Подменяет проверенные данные points в памяти. */
-export function setPointsCollection(collection) {
-  pointsCollection = collection;
 }
 
 /** Задаёт, какие источники данных показывать на карте. */
@@ -119,17 +51,13 @@ export function getDataSourceFilter() {
   return dataSourceFilter;
 }
 
-export function isLocationsLoadedFromFirestore() {
-  return locationsLoadedFromFirestore;
-}
-
 /**
- * Загружает проверенные точки (findings) и пользовательские (user_submissions) из Firestore,
- * если включено REACT_APP_USE_FIRESTORE_LOCATIONS.
+ * Загружает проверенные точки (findings) и пользовательские (user_submissions) из Firestore.
  * @returns {Promise<boolean>}
  */
 export function initLocationsFromFirestore() {
-  if (!shouldLoadFirestoreLocations()) {
+  if (!isFirebaseConfigured()) {
+    console.warn("Firebase is not configured — location data will be empty.");
     return Promise.resolve(false);
   }
 
@@ -151,7 +79,7 @@ export function initLocationsFromFirestore() {
 
 /** Повторно загружает коллекции из Firestore (например, после новой отправки). */
 export function refreshLocationsFromFirestore() {
-  if (!shouldLoadFirestoreLocations()) {
+  if (!isFirebaseConfigured()) {
     return Promise.resolve(false);
   }
 

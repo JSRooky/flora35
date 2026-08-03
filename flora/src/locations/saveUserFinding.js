@@ -1,34 +1,16 @@
 import { isFirebaseConfigured } from "../firebase/config";
 import { submitUserFinding } from "../firebase/submitFinding";
-import { appendUserSubmission } from "./loadPoints";
-
-const API_PATH = `${process.env.PUBLIC_URL || ""}/api/userpoints`;
+import { refreshLocationsFromFirestore } from "./loadPoints";
 
 /**
- * Сохраняет пользовательскую находку.
- * При настроенном Firebase — в Firestore (коллекция user_submissions).
- * Иначе — в src/locations/userpoints.json (только npm start).
- * @returns {Promise<{ type: string, species: object[] }>}
+ * Сохраняет пользовательскую находку в Firestore (коллекция user_submissions)
+ * и обновляет данные на карте из базы.
  */
 export async function saveUserFinding(payload) {
-  if (isFirebaseConfigured()) {
-    const { finding_id: findingId } = await submitUserFinding(payload);
-    return appendUserSubmission(payload, findingId);
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase не настроен. Добавьте переменные окружения Firebase.");
   }
 
-  const response = await fetch(API_PATH, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const data = await response.json();
-
-  if (!response.ok || !data.ok) {
-    throw new Error(data.error || "Не удалось сохранить данные.");
-  }
-
-  return data.collection;
+  await submitUserFinding(payload);
+  await refreshLocationsFromFirestore();
 }

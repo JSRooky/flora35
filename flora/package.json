@@ -28,7 +28,11 @@
     "import:firestore-locations": "node scripts/import-locations-to-firestore.mjs",
     "import:firestore-locations:dry-run": "node scripts/import-locations-to-firestore.mjs --dry-run",
     "import:firestore-submissions": "node scripts/import-user-submissions-to-firestore.mjs",
-    "import:firestore-submissions:dry-run": "node scripts/import-user-submissions-to-firestore.mjs --dry-run"
+    "import:firestore-submissions:dry-run": "node scripts/import-user-submissions-to-firestore.mjs --dry-run",
+    "audit:locations": "node scripts/audit-firestore-locations.mjs --dry-run",
+    "audit:locations:fix-local": "node scripts/audit-firestore-locations.mjs --fix-local",
+    "audit:locations:fix-firestore": "node scripts/audit-firestore-locations.mjs --fix-firestore",
+    "audit:locations:fix-all": "node scripts/audit-firestore-locations.mjs --fix-local --fix-firestore"
   },
   "eslintConfig": {
     "extends": [

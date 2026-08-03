@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { saveUserFinding } from "../locations/saveUserFinding";
-import { isFirebaseConfigured } from "../firebase/config";
 import {
   buildSubmissionSuggestionData,
   filterSpeciesByNameLatin,
@@ -152,7 +151,7 @@ export default function UserSubmissionPanel({
       setMessage(null);
 
       try {
-        const collection = await saveUserFinding({
+        await saveUserFinding({
           name_ru: form.name_ru.trim(),
           name_latin: form.name_latin.trim(),
           regnum: form.regnum,
@@ -165,12 +164,10 @@ export default function UserSubmissionPanel({
         });
 
         setForm(EMPTY_FORM);
-        onSaved?.(collection);
+        onSaved?.();
         setMessage({
           type: "success",
-          text: isFirebaseConfigured()
-            ? "Данные отправлены в Firebase и добавлены на карту."
-            : "Данные сохранены в src/locations/userpoints.json и добавлены на карту."
+          text: "Данные сохранены в базе и добавлены на карту."
         });
       } catch (error) {
         setMessage({
