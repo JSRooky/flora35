@@ -1,5 +1,7 @@
 import React, { useState } from "react";
+import { POLYGON_BUILD_MODES } from "./addSpeciesPolygonLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
+import PolygonModeIcon from "./PolygonModeIcon";
 import "../styles/ArealDynamicsPanel.css";
 
 function formatAreaKm2(value) {
@@ -84,11 +86,15 @@ export default function ArealDynamicsPanel({
   onReset,
   hideOthers = false,
   onHideOthersChange,
-  computing = false
+  computing = false,
+  buildMode = POLYGON_BUILD_MODES.CONVEX,
+  onBuildModeToggle,
+  canToggleAllPoints = false
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const visibleSlices = slices.filter((slice) => slice.year <= timelineYear);
   const hasSpecies = Boolean(speciesLatin);
+  const isAllPointsMode = buildMode === POLYGON_BUILD_MODES.ALL_POINTS;
 
   return (
     <div
@@ -164,6 +170,20 @@ export default function ArealDynamicsPanel({
       </div>
 
       <div className="areal-dynamics-panel-actions">
+        {enabled && hasSpecies ? (
+          <button
+            type="button"
+            className={`areal-dynamics-mode-btn${
+              isAllPointsMode ? " areal-dynamics-mode-btn--active" : ""
+            }`}
+            onClick={onBuildModeToggle}
+            disabled={!canToggleAllPoints && !isAllPointsMode}
+            aria-label={isAllPointsMode ? "Оболочка" : "Все точки"}
+            title={isAllPointsMode ? "Оболочка" : "Все точки"}
+          >
+            <PolygonModeIcon allPoints={isAllPointsMode} className="areal-dynamics-mode-icon" />
+          </button>
+        ) : null}
         {enabled && hasSpecies ? (
           <button
             type="button"

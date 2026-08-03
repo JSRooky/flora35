@@ -1,12 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { getYearBounds } from "./yearBounds";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/YearFilterPanel.css";
-
-const YEAR_BOUNDS = getYearBounds();
-const minYear = YEAR_BOUNDS.min;
-const maxYear = YEAR_BOUNDS.max;
 
 function getRangeProgress(value, min, max) {
   return ((value - min) / (max - min)) * 100;
@@ -27,7 +22,8 @@ function getCollapsedSummary(enabled, range, lockedByPropertyFilter) {
 export default function YearFilterPanel({
   enabled = false,
   onEnabledChange,
-  range = YEAR_BOUNDS,
+  yearBounds,
+  range,
   onRangeChange,
   lockedByPropertyFilter = false,
   collapsed: collapsedProp,
@@ -43,6 +39,7 @@ export default function YearFilterPanel({
   const isDraggingRef = useRef(false);
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## year в docs/moduleHelp.md
+  const { min: minYear, max: maxYear } = yearBounds;
 
   useEffect(() => {
     if (isDraggingRef.current) {

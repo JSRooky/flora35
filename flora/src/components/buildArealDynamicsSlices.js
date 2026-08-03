@@ -7,8 +7,11 @@ import {
 import { getYearBounds } from "./yearBounds";
 import { getTimelineColorHex, getYearColorRatio } from "./timelineColors";
 
-const YEAR_BOUNDS = getYearBounds();
 const SLICE_CACHE = new Map();
+
+function getSliceCacheKey(nameLatin, mode) {
+  return `${nameLatin}::${mode}`;
+}
 
 function getSpeciesPoints(nameLatin) {
   if (!nameLatin) {
@@ -48,16 +51,20 @@ function hasGeometry(feature) {
 
 /**
  * Строит послойные срезы расширения ареала вида по годам.
- * Каждый срез — прирост полигона (convex hull) относительно предыдущего года с находками.
+ * Каждый срез — прирост полигона относительно предыдущего года с находками.
  */
-export function buildArealDynamicsSlices(feature) {
+export function buildArealDynamicsSlices(
+  feature,
+  mode = POLYGON_BUILD_MODES.CONVEX
+) {
   const nameLatin = feature?.properties?.name_latin ?? "";
 
   if (!nameLatin) {
     return [];
   }
 
-  const cached = SLICE_CACHE.get(nameLatin);
+  const cacheKey = getSliceCacheKey(nameLatin, mode);
+  const cached = SLICE_CACHE.get(cacheKey);
   if (cached) {
     return cached;
   }
@@ -93,10 +100,7 @@ export function buildArealDynamicsSlices(feature) {
   years.forEach((year) => {
     cumulativeCoordinates.push(...pointsByYear.get(year));
 
-    const currentHull = buildPolygonFromCoordinates(
-      cumulativeCoordinates,
-      POLYGON_BUILD_MODES.CONVEX
-    );
+    const currentHull = buildPolygonFromCoordinates(cumulativeCoordinates, mode);
 
     if (!currentHull) {
       return;
@@ -109,7 +113,7 @@ export function buildArealDynamicsSlices(feature) {
       return;
     }
 
-    const colorRatio = getYearColorRatio(year, YEAR_BOUNDS.min, YEAR_BOUNDS.max);
+    const colorRatio = getYearColorRatio(year, getYearBounds().min, getYearBounds().max);
     const newPointCount = pointsByYear.get(year).length;
     const fillColor = getTimelineColorHex(colorRatio);
 
@@ -133,7 +137,7 @@ export function buildArealDynamicsSlices(feature) {
   });
 
   if (slices.length > 0) {
-    SLICE_CACHE.set(nameLatin, slices);
+    SLICE_CACHE.set(cacheKey, slices);
   }
 
   return slices;
@@ -141,7 +145,11 @@ export function buildArealDynamicsSlices(feature) {
 
 export function clearArealDynamicsSliceCache(nameLatin) {
   if (nameLatin) {
-    SLICE_CACHE.delete(nameLatin);
+    [...SLICE_CACHE.keys()].forEach((key) => {
+      if (key === nameLatin || key.startsWith(`${nameLatin}::`)) {
+        SLICE_CACHE.delete(key);
+      }
+    });
     return;
   }
 

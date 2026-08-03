@@ -208,46 +208,7 @@ function TrashIcon() {
   );
 }
 
-/** Иконка режима: выпуклая оболочка (пятиугольник) или все точки (звезда). */
-function PolygonModeIcon({ allPoints = false }) {
-  if (allPoints) {
-    return (
-      <svg
-        className="species-polygon-icon-svg"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-        focusable="false"
-      >
-        <polygon
-          points="12,2 15,9 22,9 17,14 19,21 12,17 5,21 7,14 2,9 9,9"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-
-  return (
-    <svg
-      className="species-polygon-icon-svg"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <polygon
-        points="12,4 20,9 17,19 7,19 4,9"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-/** Краткая подпись для свёрнутой панели. */
+import PolygonModeIcon from "./PolygonModeIcon";
 function getCollapsedSummary(polygons, containedSpecies, intersectionResult, builtPolygons) {
   if (intersectionResult?.hasIntersection && intersectionResult.speciesA && intersectionResult.speciesB) {
     const labelA = getSpeciesOptionLabel(intersectionResult.speciesA, builtPolygons);
@@ -425,7 +386,7 @@ export default function SpeciesPolygonPopup({
                 aria-label={isAllPointsMode ? "Оболочка" : "Все точки"}
                 title={isAllPointsMode ? "Оболочка" : "Все точки"}
               >
-                <PolygonModeIcon allPoints={isAllPointsMode} />
+                <PolygonModeIcon allPoints={isAllPointsMode} className="species-polygon-icon-svg" />
               </button>
               {builtPolygons.length > 0 && (
                 <button
@@ -484,7 +445,7 @@ export default function SpeciesPolygonPopup({
                             aria-label={modeTooltip}
                             title={modeTooltip}
                           >
-                            <PolygonModeIcon allPoints={isAllPointsMode} />
+                            <PolygonModeIcon allPoints={isAllPointsMode} className="species-polygon-icon-svg" />
                           </button>
                           <button
                             type="button"

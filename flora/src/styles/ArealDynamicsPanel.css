@@ -14,7 +14,7 @@
 }
 
 .areal-dynamics-panel--has-reset {
-  padding-right: 72px;
+  padding-right: 108px;
 }
 
 .areal-dynamics-row {
@@ -53,6 +53,52 @@
 .areal-dynamics-reset-btn:hover {
   background: rgba(220, 53, 69, 0.1);
   color: #c82333;
+}
+
+.areal-dynamics-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #555;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.areal-dynamics-mode-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #333;
+}
+
+.areal-dynamics-mode-btn--active {
+  background: rgba(43, 158, 8, 0.15);
+  color: var(--areal-dynamics-accent);
+}
+
+.areal-dynamics-mode-btn--active:hover {
+  background: rgba(43, 158, 8, 0.22);
+  color: var(--areal-dynamics-accent);
+}
+
+.areal-dynamics-mode-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.areal-dynamics-mode-btn:disabled:hover {
+  background: transparent;
+  color: #555;
+}
+
+.areal-dynamics-mode-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 
 .areal-dynamics-reset-icon {

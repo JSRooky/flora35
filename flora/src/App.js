@@ -55,6 +55,7 @@ import {
   toggleSpeciesPolygonBuildMode,
   updateSpeciesPolygonIntersectionLayer,
   upsertSpeciesPolygon,
+  getPointsForSpecies,
   POLYGON_BUILD_MODES
 } from "./components/addSpeciesPolygonLayer";
 import {
@@ -125,7 +126,6 @@ const DEFAULT_CLUSTERING_ENABLED = true;
 const DEFAULT_CLUSTER_BY_REGNUM = true;
 const DEFAULT_CLUSTER_PIE_CHARTS = false;
 const DEFAULT_MARKERS_VISIBLE = true;
-const YEAR_BOUNDS = getYearBounds();
 
 export default function MapView() {
   const ref = useRef(null);
@@ -150,13 +150,15 @@ export default function MapView() {
   const [arealAllMarkers, setArealAllMarkers] = useState(false);
   const [arealRadius, setArealRadius] = useState(DEFAULT_AREAL_RADIUS_KM);
   const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
-  const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
-  const [timelineYear, setTimelineYear] = useState(YEAR_BOUNDS.max);
+  const [yearBounds, setYearBounds] = useState(() => getYearBounds());
+  const [yearRange, setYearRange] = useState(() => getYearBounds());
+  const [timelineYear, setTimelineYear] = useState(() => getYearBounds().max);
   const [arealDynamicsEnabled, setArealDynamicsEnabled] = useState(false);
   const [arealDynamicsFeature, setArealDynamicsFeature] = useState(null);
   const [arealDynamicsSlices, setArealDynamicsSlices] = useState([]);
   const [arealDynamicsComputing, setArealDynamicsComputing] = useState(false);
   const [arealDynamicsHideOthers, setArealDynamicsHideOthers] = useState(false);
+  const [arealDynamicsBuildMode, setArealDynamicsBuildMode] = useState(POLYGON_BUILD_MODES.CONVEX);
   // Построенные полигоны видов (один на name_latin); activePolygonId — выбранный в списке.
   const [speciesPolygons, setSpeciesPolygons] = useState([]);
   const [activePolygonId, setActivePolygonId] = useState(null);
@@ -327,6 +329,13 @@ export default function MapView() {
     );
   }, []);
 
+  const syncYearBounds = useCallback(() => {
+    const bounds = getYearBounds();
+    setYearBounds(bounds);
+    setYearRange(bounds);
+    setTimelineYear(bounds.max);
+  }, []);
+
   const hasFoundYearPropertyFilter = Object.prototype.hasOwnProperty.call(
     propertyFilters,
     "found_year"
@@ -379,7 +388,8 @@ export default function MapView() {
     yearFilterEnabled,
     yearRange,
     activeModule,
-    timelineYear
+    timelineYear,
+    yearBounds
   };
 
   const bufferStateRef = useRef({});
@@ -439,7 +449,8 @@ export default function MapView() {
       yearFilterEnabled: yearEnabled,
       yearRange: selectedYearRange,
       activeModule: currentModule,
-      timelineYear: selectedTimelineYear
+      timelineYear: selectedTimelineYear,
+      yearBounds: selectedYearBounds
     } = arealStateRef.current;
 
     if (!mapInstance) {
@@ -452,7 +463,7 @@ export default function MapView() {
     }
     if (!Object.prototype.hasOwnProperty.call(filters, "found_year")) {
       if (currentModule === MODULE_IDS.TIMELINE) {
-        combinedFilters.found_year = { min: YEAR_BOUNDS.min, max: selectedTimelineYear };
+        combinedFilters.found_year = { min: selectedYearBounds.min, max: selectedTimelineYear };
       } else if (yearEnabled) {
         combinedFilters.found_year = selectedYearRange;
       }
@@ -499,7 +510,7 @@ export default function MapView() {
 
     if (!Object.prototype.hasOwnProperty.call(propertyFilters, "found_year")) {
       if (activeModule === MODULE_IDS.TIMELINE) {
-        filters.found_year = { min: YEAR_BOUNDS.min, max: timelineYear };
+        filters.found_year = { min: yearBounds.min, max: timelineYear };
       } else if (yearFilterEnabled) {
         filters.found_year = yearRange;
       }
@@ -524,7 +535,8 @@ export default function MapView() {
     timelineYear,
     arealDynamicsEnabled,
     arealDynamicsHideOthers,
-    arealDynamicsFeature
+    arealDynamicsFeature,
+    yearBounds
   ]);
 
   const handleUserFindingSaved = useCallback(() => {
@@ -533,9 +545,10 @@ export default function MapView() {
       return;
     }
 
+    syncYearBounds();
     reloadLocationsData(mapInstance);
     updateHeatmapData(mapInstance, buildLocationFilters());
-  }, [buildLocationFilters, mapReady]);
+  }, [buildLocationFilters, mapReady, syncYearBounds]);
 
   const areaContainedPoints = useMemo(() => {
     if (!areaGeometry || !mapReady) {
@@ -660,6 +673,7 @@ export default function MapView() {
       setArealDynamicsSlices([]);
       setArealDynamicsComputing(false);
       setArealDynamicsHideOthers(false);
+      setArealDynamicsBuildMode(POLYGON_BUILD_MODES.CONVEX);
     }
   }, [activeModule]);
 
@@ -680,12 +694,14 @@ export default function MapView() {
 
     setArealDynamicsComputing(true);
     const timer = window.setTimeout(() => {
-      setArealDynamicsSlices(buildArealDynamicsSlices(arealDynamicsFeature));
+      setArealDynamicsSlices(
+        buildArealDynamicsSlices(arealDynamicsFeature, arealDynamicsBuildMode)
+      );
       setArealDynamicsComputing(false);
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [arealDynamicsEnabled, arealDynamicsFeature]);
+  }, [arealDynamicsEnabled, arealDynamicsFeature, arealDynamicsBuildMode]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -1199,6 +1215,7 @@ export default function MapView() {
       setArealDynamicsFeature(null);
       setArealDynamicsSlices([]);
       setArealDynamicsHideOthers(false);
+      setArealDynamicsBuildMode(POLYGON_BUILD_MODES.CONVEX);
     }
   }, [popupData]);
 
@@ -1211,11 +1228,28 @@ export default function MapView() {
     setArealDynamicsFeature(null);
     setArealDynamicsSlices([]);
     setArealDynamicsHideOthers(false);
+    setArealDynamicsBuildMode(POLYGON_BUILD_MODES.CONVEX);
 
     if (map.current) {
       clearArealDynamicsLayer(map.current);
     }
   }, []);
+
+  const handleArealDynamicsBuildModeToggle = useCallback(() => {
+    setArealDynamicsBuildMode((mode) =>
+      mode === POLYGON_BUILD_MODES.ALL_POINTS
+        ? POLYGON_BUILD_MODES.CONVEX
+        : POLYGON_BUILD_MODES.ALL_POINTS
+    );
+  }, []);
+
+  const arealDynamicsPointCount = useMemo(() => {
+    if (!arealDynamicsFeature) {
+      return 0;
+    }
+
+    return getPointsForSpecies(arealDynamicsFeature).length;
+  }, [arealDynamicsFeature]);
 
   const handleArealDynamicsYearSelect = useCallback((year) => {
     setTimelineYear(year);
@@ -1542,6 +1576,7 @@ export default function MapView() {
 
       map.current.on("load", async () => {
         await initLocationsFromFirestore();
+        syncYearBounds();
 
         addOsmBasemapLayer(map.current);
         addLocationsLayer(map.current, {
@@ -1665,7 +1700,7 @@ export default function MapView() {
         map.current = null;
       }
     };
-  }, [clearPointSelection]);
+  }, [clearPointSelection, syncYearBounds]);
 
   return (
     <>
@@ -1751,6 +1786,7 @@ export default function MapView() {
             <YearFilterPanel
               enabled={yearFilterEnabled}
               onEnabledChange={setYearFilterEnabled}
+              yearBounds={yearBounds}
               range={yearRange}
               onRangeChange={handleYearRangeChange}
               lockedByPropertyFilter={hasFoundYearPropertyFilter}
@@ -1845,6 +1881,7 @@ export default function MapView() {
         visible={activeModule === MODULE_IDS.TIMELINE}
         year={timelineYear}
         onYearChange={setTimelineYear}
+        yearBounds={yearBounds}
       >
         <ArealDynamicsPanel
           enabled={arealDynamicsEnabled}
@@ -1858,6 +1895,9 @@ export default function MapView() {
           hideOthers={arealDynamicsHideOthers}
           onHideOthersChange={handleArealDynamicsHideOthersChange}
           computing={arealDynamicsComputing}
+          buildMode={arealDynamicsBuildMode}
+          onBuildModeToggle={handleArealDynamicsBuildModeToggle}
+          canToggleAllPoints={arealDynamicsPointCount >= 3}
         />
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />

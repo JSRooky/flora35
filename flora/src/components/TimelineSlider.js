@@ -1,9 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
-import { getYearBounds } from "./yearBounds";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getTimelineColors, TIMELINE_GRADIENT_LIGHT } from "./timelineColors";
 import "../styles/TimelineSlider.css";
 
-const YEAR_BOUNDS = getYearBounds();
 const ANIMATION_MS = 450;
 
 function getRangeProgress(value, min, max) {
@@ -21,17 +19,25 @@ function buildYearTicks(minYear, maxYear) {
     ticks.push({
       year: tickYear,
       major: tickYear % 10 === 0,
-      ratio: (tickYear - minYear) / (maxYear - minYear || 1),
+      ratio: (tickYear - minYear) / (maxYear - minYear || 1)
     });
   }
 
   return ticks;
 }
 
-const YEAR_TICKS = buildYearTicks(YEAR_BOUNDS.min, YEAR_BOUNDS.max);
-
-export default function TimelineSlider({ visible, year, onYearChange, children = null }) {
-  const { min: minYear, max: maxYear } = YEAR_BOUNDS;
+export default function TimelineSlider({
+  visible,
+  year,
+  onYearChange,
+  yearBounds,
+  children = null
+}) {
+  const { min: minYear, max: maxYear } = yearBounds;
+  const yearTicks = useMemo(
+    () => buildYearTicks(minYear, maxYear),
+    [minYear, maxYear]
+  );
   const wasVisibleRef = useRef(false);
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -77,7 +83,7 @@ export default function TimelineSlider({ visible, year, onYearChange, children =
         className="timeline-slider-wrap"
         style={{
           "--timeline-accent": timelineColors.accent,
-          "--timeline-accent-soft": timelineColors.accentSoft,
+          "--timeline-accent-soft": timelineColors.accentSoft
         }}
       >
         {children ? <div className="timeline-slider-dynamics">{children}</div> : null}
@@ -91,7 +97,7 @@ export default function TimelineSlider({ visible, year, onYearChange, children =
                 "--range-ratio": Math.max(filledRatio, 0.001),
                 "--timeline-gradient-start": TIMELINE_GRADIENT_LIGHT.start,
                 "--timeline-gradient-middle": TIMELINE_GRADIENT_LIGHT.middle,
-                "--timeline-gradient-end": TIMELINE_GRADIENT_LIGHT.end,
+                "--timeline-gradient-end": TIMELINE_GRADIENT_LIGHT.end
               }}
             >
               <span className="timeline-slider-year-wrap" aria-hidden="true">
@@ -99,7 +105,7 @@ export default function TimelineSlider({ visible, year, onYearChange, children =
               </span>
               <div className="timeline-slider-track">
                 <div className="timeline-slider-ticks" aria-hidden="true">
-                  {YEAR_TICKS.map(({ year: tickYear, major, ratio }) => {
+                  {yearTicks.map(({ year: tickYear, major, ratio }) => {
                     const isFilled = ratio <= filledRatio;
                     const tickColors = getTimelineColors(ratio);
 
@@ -114,9 +120,9 @@ export default function TimelineSlider({ visible, year, onYearChange, children =
                           ...(isFilled
                             ? {
                                 "--tick-accent": tickColors.accent,
-                                "--tick-filled-dot": tickColors.filledDot,
+                                "--tick-filled-dot": tickColors.filledDot
                               }
-                            : {}),
+                            : {})
                         }}
                       />
                     );
