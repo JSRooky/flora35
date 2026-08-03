@@ -1,6 +1,9 @@
 import React from "react";
+import { ReactComponent as MainLogo } from "../images/main_logo.svg";
 import { DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
 import "../styles/ModuleMenu.css";
+
+const HOME_URL = `${process.env.PUBLIC_URL || ""}/`;
 
 export const MODULE_IDS = {
   STATUS: "status",
@@ -32,7 +35,7 @@ const TIME_MODULE_ITEMS = [
 
 const MAP_MODULE_ITEMS = [
   { id: MODULE_IDS.MAP, label: "Группы точек", mapToolAccent: true },
-  { id: MODULE_IDS.AREAL, label: "Ареал", mapToolAccent: true },
+  { id: MODULE_IDS.AREAL, label: "Радиус", mapToolAccent: true },
   { id: MODULE_IDS.BUFFER, label: "Буфер", mapToolAccent: true },
   { id: MODULE_IDS.POLYGON, label: "Полигон", mapToolAccent: true },
   { id: MODULE_IDS.AREA, label: "Область", mapToolAccent: true }
@@ -49,6 +52,8 @@ function isPointRequiredModule(id) {
 }
 
 const DISABLED_POINT_REQUIRED_TITLE = "Выберите точку";
+const DISABLED_AREAL_BY_BUFFER_TITLE = 'Сначала сбросьте инструмент «Буфер»';
+const DISABLED_BUFFER_BY_AREAL_TITLE = 'Сначала сбросьте инструмент «Радиус»';
 
 function ModuleMenuButton({
   id,
@@ -58,8 +63,9 @@ function ModuleMenuButton({
   className = "",
   timeAccent = false,
   mapToolAccent = false,
-  // Некоторые модули (например, «Ареал») требуют предварительного выбора точки.
-  disabled = false
+  // Некоторые модули (например, «Радиус») требуют предварительного выбора точки.
+  disabled = false,
+  disabledTitle = DISABLED_POINT_REQUIRED_TITLE
 }) {
   const button = (
     <button
@@ -76,7 +82,7 @@ function ModuleMenuButton({
   // У disabled-кнопок не срабатывает title, поэтому оборачиваем в span.
   if (disabled) {
     return (
-      <span className="module-menu-btn-wrap" title={DISABLED_POINT_REQUIRED_TITLE}>
+      <span className="module-menu-btn-wrap" title={disabledTitle}>
         {button}
       </span>
     );
@@ -89,6 +95,8 @@ export default function ModuleMenu({
   activeModule,
   onModuleSelect,
   pointSelected = false,
+  arealBlocked = false,
+  bufferBlocked = false,
   hoverTooltipsDisabled = false,
   onHoverTooltipsDisabledChange,
   osmBasemapEnabled = false,
@@ -96,23 +104,44 @@ export default function ModuleMenu({
   dataSourceMode,
   onDataSourceModeChange
 }) {
-  const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => (
-    <li key={id}>
-      <ModuleMenuButton
-        id={id}
-        label={label}
-        activeModule={activeModule}
-        onModuleSelect={onModuleSelect}
-        timeAccent={timeAccent}
-        mapToolAccent={mapToolAccent}
-        disabled={isPointRequiredModule(id) && !pointSelected}
-      />
-    </li>
-  );
+  const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => {
+    const pointRequired = isPointRequiredModule(id) && !pointSelected;
+    const blockedByOtherTool =
+      (id === MODULE_IDS.AREAL && arealBlocked) || (id === MODULE_IDS.BUFFER && bufferBlocked);
+    const disabled = pointRequired || blockedByOtherTool;
+    const disabledTitle = pointRequired
+      ? DISABLED_POINT_REQUIRED_TITLE
+      : id === MODULE_IDS.AREAL
+        ? DISABLED_AREAL_BY_BUFFER_TITLE
+        : DISABLED_BUFFER_BY_AREAL_TITLE;
+
+    return (
+      <li key={id}>
+        <ModuleMenuButton
+          id={id}
+          label={label}
+          activeModule={activeModule}
+          onModuleSelect={onModuleSelect}
+          timeAccent={timeAccent}
+          mapToolAccent={mapToolAccent}
+          disabled={disabled}
+          disabledTitle={disabledTitle}
+        />
+      </li>
+    );
+  };
 
   return (
     <nav className="module-menu" aria-label="Модули приложения">
       <div className="module-menu-dock">
+        <a
+          href={HOME_URL}
+          className="module-menu-logo-link"
+          aria-label="На главную страницу"
+          title="На главную страницу"
+        >
+          <MainLogo className="module-menu-logo" aria-hidden="true" focusable="false" />
+        </a>
         <ul className="module-menu-list">
           {POINT_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator" aria-hidden="true" />

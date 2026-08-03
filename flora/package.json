@@ -20,7 +20,7 @@
     "copy-help-docs": "node scripts/copy-help-docs.js",
     "prestart": "npm run copy-help-docs",
     "prebuild": "npm run copy-help-docs",
-    "start": "cross-env GENERATE_SOURCEMAP=false react-scripts start",
+    "start": "node scripts/start-dev.js",
     "build": "cross-env GENERATE_SOURCEMAP=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

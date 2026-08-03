@@ -108,6 +108,22 @@
   margin: 4px 0;
 }
 
+.about-project-help-link-wrap {
+  margin: 8px 0 0;
+}
+
+.about-project-help-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a90e2;
+  text-decoration: none;
+}
+
+.about-project-help-link:hover {
+  color: #3a78c2;
+  text-decoration: underline;
+}
+
 @media (max-width: 768px) {
   .about-project-dialog {
     width: min(360px, 100%);

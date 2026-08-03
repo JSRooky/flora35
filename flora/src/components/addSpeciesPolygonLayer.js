@@ -132,7 +132,7 @@ function buildAllPointsPolygon(coordinates) {
   return polygon([ring]);
 }
 
-function buildPolygonFromCoordinates(coordinates, mode = POLYGON_BUILD_MODES.CONVEX) {
+export function buildPolygonFromCoordinates(coordinates, mode = POLYGON_BUILD_MODES.CONVEX) {
   if (mode === POLYGON_BUILD_MODES.ALL_POINTS) {
     return buildAllPointsPolygon(coordinates);
   }
@@ -664,12 +664,23 @@ export function getPointsWithinPolygonFeature(polygonFeature, filters = {}) {
 }
 
 /** Сводка по точкам внутри полигона пересечения. */
-export function getPolygonIntersectionContainedSummary(polygonFeature, filters = {}) {
-  const points = getPointsWithinPolygonFeature(polygonFeature, filters).sort((a, b) => {
-    const nameA = a.properties?.name_ru ?? "";
-    const nameB = b.properties?.name_ru ?? "";
-    return nameA.localeCompare(nameB, "ru");
-  });
+export function getPolygonIntersectionContainedSummary(
+  polygonFeature,
+  filters = {},
+  excludeSpeciesLatins = []
+) {
+  const excludedSpecies = new Set(excludeSpeciesLatins.filter(Boolean));
+
+  const points = getPointsWithinPolygonFeature(polygonFeature, filters)
+    .filter((feature) => {
+      const nameLatin = feature.properties?.name_latin;
+      return !nameLatin || !excludedSpecies.has(nameLatin);
+    })
+    .sort((a, b) => {
+      const nameA = a.properties?.name_ru ?? "";
+      const nameB = b.properties?.name_ru ?? "";
+      return nameA.localeCompare(nameB, "ru");
+    });
 
   return {
     count: points.length,

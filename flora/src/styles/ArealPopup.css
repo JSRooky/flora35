@@ -58,6 +58,17 @@
   line-height: 1.4;
 }
 
+.areal-popup-status {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+  line-height: 1.35;
+}
+
+.areal-popup-status--blocked {
+  color: var(--map-tool-accent-dark);
+}
+
 .areal-switch {
   display: flex;
   align-items: center;
@@ -234,6 +245,36 @@
 
 .areal-contained-points-item:hover {
   color: var(--map-tool-accent);
+}
+
+.areal-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.areal-reset-btn {
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.areal-reset-btn:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
+.areal-reset-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .areal-contained-points-list li + li {

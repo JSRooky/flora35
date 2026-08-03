@@ -1,6 +1,6 @@
 const HELP_SECTION_LABELS = {
   feature: "Сведения о точке",
-  areal: "Ареал",
+  areal: "Радиус",
   polygon: "Полигон",
   buffer: "Буфер",
   area: "Область",
@@ -13,6 +13,9 @@ const HELP_SECTION_LABELS = {
 const HELP_SECTION_IDS = Object.keys(HELP_SECTION_LABELS);
 
 const LIST_LINE_PATTERN = /^([*\-+])\s+(.*)$/;
+const IMAGE_LINE_PATTERN = /^!\[([^\]]*)\]\(([^)]+)\)$/;
+
+let markdownBaseUrl = null;
 
 function getRequestedSection() {
   const params = new URLSearchParams(window.location.search);
@@ -79,10 +82,40 @@ function getListItemText(line) {
   return match ? match[2].trim() : line.trim();
 }
 
+function resolveImageSrc(src) {
+  if (!markdownBaseUrl || /^([a-z][a-z0-9+.-]*:|\/\/|\/)/i.test(src)) {
+    return src;
+  }
+
+  return new URL(src, markdownBaseUrl).href;
+}
+
+function renderImageBlock(firstLine) {
+  const match = firstLine.trim().match(IMAGE_LINE_PATTERN);
+
+  if (!match) {
+    return null;
+  }
+
+  const figure = document.createElement("figure");
+  figure.className = "help-image";
+  const img = document.createElement("img");
+  img.src = resolveImageSrc(match[2].trim());
+  img.alt = match[1];
+  figure.appendChild(img);
+  return figure;
+}
+
 function renderBlock(block) {
   const lines = block.split("\n");
   const firstLine = lines[0];
   const fragment = document.createDocumentFragment();
+  const imageBlock = renderImageBlock(firstLine);
+
+  if (imageBlock) {
+    fragment.appendChild(imageBlock);
+    return fragment;
+  }
 
   if (firstLine.startsWith("### ")) {
     const heading = document.createElement("h3");
@@ -193,7 +226,7 @@ function buildNav(sections, activeSection) {
 
 function showSection(sectionId, markdown, sections) {
   const label = HELP_SECTION_LABELS[sectionId] || sectionId;
-  document.title = `${label} — Flora`;
+  document.title = `${label} — Как это работает`;
 
   const body = extractMarkdownSection(markdown, sectionId);
   const content = document.getElementById("help-content");
@@ -223,9 +256,10 @@ async function initHelpPage() {
 
   const sectionId = getRequestedSection();
   const markdownUrl = new URL("../docs/moduleHelp-full.md", window.location.href);
+  markdownBaseUrl = new URL("../docs/", window.location.href);
 
   try {
-    const response = await fetch(markdownUrl);
+    const response = await fetch(markdownUrl, { cache: "no-store" });
 
     if (!response.ok) {
       throw new Error("Failed to load help markdown");
