@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { getArealPointKey } from "./addArealLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
-import ContainedPointsFilterRow from "./ContainedPointsFilterRow";
 import "../styles/ArealPopup.css";
 const RADIUS_MIN = 0.5;
 const RADIUS_MAX = 15;
@@ -59,11 +58,9 @@ export default function ArealPopup({
   allMarkers,
   radius,
   containedPoints = null,
-  pointsFilterEnabled = false,
-  onPointsFilterToggle,
-  pointsFilterAvailable = false,
   onPointSelect,
-  onEnabledChange,  onAllMarkersChange,
+  onEnabledChange,
+  onAllMarkersChange,
   onRadiusChange,
   onReset,
   toolBlocked = false,
@@ -149,37 +146,28 @@ export default function ArealPopup({
           />
         </div>
 
-        {(hasContainedPoints || pointsFilterAvailable) && (
+        {hasContainedPoints ? (
           <div className="areal-contained-points">
-            <ContainedPointsFilterRow
-              summary={
-                <>
-                  {pointsFilterEnabled ? "В выбранной ООПТ" : "В радиусе"}:{" "}
-                  <strong>{formatContainedPointsCount(containedPoints?.count ?? 0)}</strong>
-                </>
-              }
-              pointsFilterEnabled={pointsFilterEnabled}
-              onPointsFilterToggle={onPointsFilterToggle}
-              pointsFilterAvailable={pointsFilterAvailable}
-            />
+            <p className="areal-contained-points-title">
+              В радиусе:{" "}
+              <strong>{formatContainedPointsCount(containedPoints.count)}</strong>
+            </p>
 
-            {hasContainedPoints ? (
-              <ul className="areal-contained-points-list">
-                {containedPoints.points.map((feature) => (
-                  <li key={getArealPointKey(feature)}>
-                    <button
-                      type="button"
-                      className="areal-contained-points-item"
-                      onClick={() => onPointSelect?.(feature)}
-                    >
-                      {getPointLabel(feature, containedPoints.points)}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+            <ul className="areal-contained-points-list">
+              {containedPoints.points.map((feature) => (
+                <li key={getArealPointKey(feature)}>
+                  <button
+                    type="button"
+                    className="areal-contained-points-item"
+                    onClick={() => onPointSelect?.(feature)}
+                  >
+                    {getPointLabel(feature, containedPoints.points)}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
-        )}
+        ) : null}
 
         <div className="areal-actions">
           <button

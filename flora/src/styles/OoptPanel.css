@@ -144,18 +144,9 @@
   color: #666;
 }
 
-.oopt-panel-group-action {
-  border: none;
-  background: transparent;
-  color: var(--map-tool-accent, #2a9d8f);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 2px 4px;
+.oopt-panel-group-switch {
   flex-shrink: 0;
-}
-
-.oopt-panel-group-action:hover {
-  text-decoration: underline;
+  gap: 0;
 }
 
 .oopt-panel-group-body {
@@ -231,6 +222,14 @@
 
 .oopt-panel-switch input:checked + .oopt-panel-switch-slider::after {
   transform: translateX(16px);
+}
+
+.oopt-panel-switch input:indeterminate + .oopt-panel-switch-slider {
+  background: rgba(42, 157, 143, 0.45);
+}
+
+.oopt-panel-switch input:indeterminate + .oopt-panel-switch-slider::after {
+  transform: translateX(8px);
 }
 
 .oopt-panel-switch--disabled {

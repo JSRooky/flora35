@@ -35,7 +35,7 @@ function escapeHtml(text) {
     .replace(/"/g, "&quot;");
 }
 
-function buildBoundsFeaturePopupHtml(hit) {
+function buildBoundsFeaturePopupHtml(hit, { pointsCount = null, speciesCount = null } = {}) {
   const layerId = hit.definition.id;
   const properties = hit.feature.properties ?? {};
   const title = getBoundsFeatureTitle(properties) || "ООПТ";
@@ -70,6 +70,24 @@ function buildBoundsFeaturePopupHtml(hit) {
     );
   }
 
+  if (pointsCount != null) {
+    detailRows.push(
+      '<div class="shared-point-popup-row">',
+      '<span class="shared-point-popup-label">Точек:</span>',
+      `<span class="shared-point-popup-value">${escapeHtml(String(pointsCount))}</span>`,
+      "</div>"
+    );
+  }
+
+  if (speciesCount != null) {
+    detailRows.push(
+      '<div class="shared-point-popup-row">',
+      '<span class="shared-point-popup-label">Видов:</span>',
+      `<span class="shared-point-popup-value">${escapeHtml(String(speciesCount))}</span>`,
+      "</div>"
+    );
+  }
+
   const lines = [
     '<div class="bounds-feature-popup-heading">',
     `<span class="bounds-feature-popup-dot" style="background-color:${escapeHtml(accentColor)}"></span>`,
@@ -99,12 +117,15 @@ function getBoundsFeaturePopupCoordinates(feature, lngLat) {
 }
 
 /** Показывает всплывающее окно со сведениями о полигоне bounds. */
-export function showBoundsFeaturePopup(map, hit, lngLat, { onOpenDetails } = {}) {
+export function showBoundsFeaturePopup(map, hit, lngLat, { onOpenDetails, filters = {} } = {}) {
   if (!map || !hit?.definition || !hit?.feature) {
     return;
   }
 
   hideBoundsFeaturePopup();
+
+  const pointsSummary = getBoundsContainedPointsSummary(hit.feature, filters);
+  const speciesSummary = getBoundsContainedSpeciesSummary(hit.feature, filters);
 
   const popup = new mapboxgl.Popup({
     closeButton: true,
@@ -117,7 +138,12 @@ export function showBoundsFeaturePopup(map, hit, lngLat, { onOpenDetails } = {})
 
   popup
     .setLngLat(getBoundsFeaturePopupCoordinates(hit.feature, lngLat))
-    .setHTML(buildBoundsFeaturePopupHtml(hit));
+    .setHTML(
+      buildBoundsFeaturePopupHtml(hit, {
+        pointsCount: pointsSummary.count,
+        speciesCount: speciesSummary.count
+      })
+    );
 
   popup.on("close", () => {
     if (boundsFeaturePopup !== popup) {
@@ -171,7 +197,7 @@ export function flyToBoundsFeature(map, feature, hit, options = {}) {
     return;
   }
 
-  const { padding = 48, maxZoom = 11, duration = 800, onOpenDetails } = options;
+  const { padding = 48, maxZoom = 11, duration = 800, onOpenDetails, filters = {} } = options;
   const bounds = bbox(feature);
   let popupShown = false;
 
@@ -181,7 +207,7 @@ export function flyToBoundsFeature(map, feature, hit, options = {}) {
     }
 
     popupShown = true;
-    showBoundsFeaturePopup(map, hit, null, { onOpenDetails });
+    showBoundsFeaturePopup(map, hit, null, { onOpenDetails, filters });
   };
 
   map.once("moveend", showPopupOnce);

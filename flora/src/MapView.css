@@ -214,6 +214,28 @@
   padding-right: 16px;
 }
 
+.bounds-feature-popup .shared-point-popup-details {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 4px;
+}
+
+.bounds-feature-popup .shared-point-popup-row {
+  display: contents;
+}
+
+.bounds-feature-popup .shared-point-popup-label {
+  color: #666;
+  white-space: nowrap;
+}
+
+.bounds-feature-popup .shared-point-popup-value {
+  color: #333;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .bounds-feature-popup .feature-popup-action-btn {
   border: none;
   outline: none;

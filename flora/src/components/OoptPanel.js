@@ -51,18 +51,6 @@ function getCollapsedSummary(catalogByLayerId, featureVisibility, markersVisible
   return parts.join(", ");
 }
 
-function getGroupToggleLabel(allVisible, someVisible) {
-  if (allVisible) {
-    return "Снять";
-  }
-
-  if (someVisible) {
-    return "Все";
-  }
-
-  return "Все";
-}
-
 function BoundsGroupSection({
   definition,
   catalog = [],
@@ -84,11 +72,11 @@ function BoundsGroupSection({
   const allVisible = filteredEntries.length > 0 && visibleInGroup === filteredEntries.length;
   const someVisible = visibleInGroup > 0 && !allVisible;
 
-  const handleGroupToggle = () => {
+  const handleGroupToggle = (event) => {
     onGroupVisibilityChange?.(
       definition.id,
       filteredEntries.map((entry) => entry.key),
-      !allVisible
+      event.target.checked
     );
   };
 
@@ -111,14 +99,25 @@ function BoundsGroupSection({
         </button>
 
         {filteredEntries.length > 0 ? (
-          <button
-            type="button"
-            className="oopt-panel-group-action"
-            onClick={handleGroupToggle}
+          <label
+            className="oopt-panel-switch oopt-panel-group-switch"
             title={allVisible ? "Скрыть все в группе" : "Показать все в группе"}
           >
-            {getGroupToggleLabel(allVisible, someVisible)}
-          </button>
+            <input
+              type="checkbox"
+              checked={allVisible}
+              ref={(element) => {
+                if (element) {
+                  element.indeterminate = someVisible;
+                }
+              }}
+              onChange={handleGroupToggle}
+              aria-label={
+                allVisible ? "Скрыть все в группе" : "Показать все в группе"
+              }
+            />
+            <span className="oopt-panel-switch-slider" aria-hidden="true" />
+          </label>
         ) : null}
       </div>
 
@@ -185,7 +184,9 @@ export default function OoptPanel({
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [collapsedGroups, setCollapsedGroups] = useState({});
+  const [collapsedGroups, setCollapsedGroups] = useState(() =>
+    Object.fromEntries(BOUNDS_LAYER_DEFINITIONS.map(({ id }) => [id, true]))
+  );
   const [helpOpen, setHelpOpen] = useState(false);
   const isControlled = collapsedProp !== undefined;
   const collapsed = isControlled ? collapsedProp : collapsedInternal;
