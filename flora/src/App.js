@@ -1171,6 +1171,14 @@ export default function MapView() {
   }, [activeModule]);
 
   useEffect(() => {
+    // Если пользователь выключил слой, к которому относится открытая панель
+    // «Сведения об ООПТ», сам объект на карте уже пропал — закрываем и панель.
+    if (selectedBoundsFeature && !boundsLayerVisibility[selectedBoundsFeature.definition?.id]) {
+      setSelectedBoundsFeature(null);
+    }
+  }, [boundsLayerVisibility, selectedBoundsFeature]);
+
+  useEffect(() => {
     if (selectedBoundsFeature) {
       expandPanel(PANEL_IDS.OOPT_FEATURE);
     }
@@ -1974,6 +1982,8 @@ export default function MapView() {
                 loadingById={boundsLayerLoading}
                 errorsById={boundsLayerErrors}
                 firebaseConfigured={isFirebaseConfigured()}
+                markersVisible={markersVisible}
+                onMarkersVisibleChange={setMarkersVisibleState}
                 collapsed={isPanelCollapsed(PANEL_IDS.OOPT)}
                 onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.OOPT)}
               />

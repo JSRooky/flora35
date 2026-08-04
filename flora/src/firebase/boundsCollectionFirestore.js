@@ -113,7 +113,14 @@ export function parseBoundsGeometry(record) {
   }
 
   if (typeof record.geometry_json === "string" && record.geometry_json) {
-    return JSON.parse(record.geometry_json);
+    try {
+      return JSON.parse(record.geometry_json);
+    } catch (error) {
+      // Один повреждённый документ не должен ронять загрузку всего слоя —
+      // пропускаем его (boundsFeatureDocsToGeoJSON отфильтрует null).
+      console.warn("Не удалось разобрать geometry_json объекта bounds:", error);
+      return null;
+    }
   }
 
   // Обратная совместимость, если geometry когда-либо сохраняли объектом.

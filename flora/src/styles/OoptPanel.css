@@ -69,6 +69,12 @@
   margin-top: 12px;
 }
 
+.oopt-panel-divider {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid #ddd;
+}
+
 .oopt-panel-list {
   list-style: none;
   margin: 0;

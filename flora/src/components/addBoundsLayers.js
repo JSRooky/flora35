@@ -3,7 +3,7 @@ import {
   BOUNDS_LAYER_KINDS
 } from "../firebase/boundsCollectionFirestore";
 import { loadBoundsLayerGeoJSONFromFirestore } from "../firebase/loadBoundsFromFirestore";
-import { getFirstLocationsLayerId } from "./addLocationsLayer";
+import { applyMapCursor, getFirstLocationsLayerId } from "./addLocationsLayer";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -11,6 +11,12 @@ const EMPTY_COLLECTION = {
 };
 
 const dataCache = new Map();
+// Промисы в процессе загрузки — чтобы два быстрых переключения одного слоя
+// не запускали два параллельных запроса в Firestore.
+const pendingLoads = new Map();
+// Последнее запрошенное состояние видимости — чтобы не включить слой после
+// await, если пользователь уже успел выключить его обратно во время загрузки.
+const desiredVisibility = new Map();
 const mapsWithCursorHandlers = new WeakSet();
 
 function getInteractiveBoundsLayerIds(map) {
@@ -31,6 +37,31 @@ function getBoundsLayerDefinitionForFeatureLayerId(layerId) {
   );
 }
 
+function getFeatureIdentityKey(properties = {}) {
+  const rawKey = properties.nid ?? properties.OSM_ID ?? properties.id;
+  return rawKey != null ? String(rawKey) : null;
+}
+
+/**
+ * mapboxgl.queryRenderedFeatures возвращает геометрию, обрезанную по тайлу —
+ * для больших полигонов (например, заповедников) это делает площадь и форму
+ * некорректными. Подменяем на полную геометрию из уже загруженного GeoJSON.
+ */
+function resolveFullBoundsFeature(definition, feature) {
+  const cached = dataCache.get(definition.id);
+  const targetKey = getFeatureIdentityKey(feature.properties);
+
+  if (!cached || targetKey == null) {
+    return feature;
+  }
+
+  const fullFeature = cached.features.find(
+    (candidate) => getFeatureIdentityKey(candidate.properties) === targetKey
+  );
+
+  return fullFeature ?? feature;
+}
+
 function findBoundsFeatureAtPoint(map, point) {
   const layerIds = getInteractiveBoundsLayerIds(map);
   if (!layerIds.length) {
@@ -48,7 +79,7 @@ function findBoundsFeatureAtPoint(map, point) {
     return null;
   }
 
-  return { definition, feature };
+  return { definition, feature: resolveFullBoundsFeature(definition, feature) };
 }
 
 const PAINT_BY_LAYER = {
@@ -133,12 +164,14 @@ function attachBoundsCursorHandlers(map, definition) {
   }
 
   [getFillLayerId(definition.id), getOutlineLayerId(definition.id)].forEach((layerId) => {
+    // applyMapCursor уважает setMapCursorOverride (например, crosshair при
+    // указании места находки) — прямая запись в style.cursor его перебивала бы.
     map.on("mouseenter", layerId, () => {
-      map.getCanvas().style.cursor = "pointer";
+      applyMapCursor(map, "pointer");
     });
 
     map.on("mouseleave", layerId, () => {
-      map.getCanvas().style.cursor = "";
+      applyMapCursor(map, "");
     });
   });
 }
@@ -250,6 +283,8 @@ export function addBoundsLayers(map) {
 /** Сбрасывает кэш GeoJSON, загруженный из Firestore. */
 export function clearBoundsLayerCache() {
   dataCache.clear();
+  pendingLoads.clear();
+  desiredVisibility.clear();
 }
 
 /** Показывает или скрывает слой границ, при необходимости загружая данные из Firestore. */
@@ -260,6 +295,7 @@ export async function setBoundsLayerVisible(map, layerId, visible) {
   }
 
   ensureBoundsLayer(map, definition);
+  desiredVisibility.set(layerId, visible);
 
   if (!visible) {
     setLayersVisibility(map, definition, false);
@@ -267,7 +303,16 @@ export async function setBoundsLayerVisible(map, layerId, visible) {
   }
 
   if (!dataCache.has(layerId)) {
-    const geojson = await loadBoundsLayerGeoJSONFromFirestore(layerId);
+    let loadPromise = pendingLoads.get(layerId);
+
+    if (!loadPromise) {
+      loadPromise = loadBoundsLayerGeoJSONFromFirestore(layerId).finally(() => {
+        pendingLoads.delete(layerId);
+      });
+      pendingLoads.set(layerId, loadPromise);
+    }
+
+    const geojson = await loadPromise;
 
     if (!geojson.features.length) {
       throw new Error(
@@ -277,6 +322,12 @@ export async function setBoundsLayerVisible(map, layerId, visible) {
 
     dataCache.set(layerId, geojson);
     map.getSource(getSourceId(layerId)).setData(geojson);
+  }
+
+  // Пока шла загрузка, видимость могли переключить обратно — не включаем слой,
+  // который пользователь уже успел снова выключить.
+  if (desiredVisibility.get(layerId) !== true) {
+    return;
   }
 
   setLayersVisibility(map, definition, true);

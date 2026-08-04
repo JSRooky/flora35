@@ -6,14 +6,21 @@ export function createInitialBoundsVisibility() {
   return Object.fromEntries(BOUNDS_LAYER_DEFINITIONS.map(({ id }) => [id, false]));
 }
 
-function getCollapsedSummary(visibility) {
+function getCollapsedSummary(visibility, markersVisible) {
+  const parts = [];
   const enabledCount = BOUNDS_LAYER_DEFINITIONS.filter(({ id }) => visibility[id]).length;
 
   if (!enabledCount) {
-    return "Все слои выключены";
+    parts.push("все слои выключены");
+  } else {
+    parts.push(`слои: ${enabledCount}`);
   }
 
-  return `Включено слоёв: ${enabledCount}`;
+  if (!markersVisible) {
+    parts.push("маркеры скрыты");
+  }
+
+  return parts.join(", ");
 }
 
 export default function OoptPanel({
@@ -22,6 +29,8 @@ export default function OoptPanel({
   loadingById = {},
   errorsById = {},
   firebaseConfigured = false,
+  markersVisible = true,
+  onMarkersVisibleChange,
   collapsed: collapsedProp,
   onCollapsedChange
 }) {
@@ -55,7 +64,7 @@ export default function OoptPanel({
       </div>
 
       {collapsed ? (
-        <p className="oopt-panel-summary">{getCollapsedSummary(visibility)}</p>
+        <p className="oopt-panel-summary">{getCollapsedSummary(visibility, markersVisible)}</p>
       ) : (
         <div className="oopt-panel-content">
           {!firebaseConfigured && (
@@ -93,6 +102,18 @@ export default function OoptPanel({
               );
             })}
           </ul>
+
+          <hr className="oopt-panel-divider" />
+
+          <label className="oopt-panel-switch" title="Показывать точки находок на карте">
+            <input
+              type="checkbox"
+              checked={markersVisible}
+              onChange={(event) => onMarkersVisibleChange?.(event.target.checked)}
+            />
+            <span className="oopt-panel-switch-slider" aria-hidden="true" />
+            <span className="oopt-panel-switch-label">Маркеры</span>
+          </label>
         </div>
       )}
     </aside>

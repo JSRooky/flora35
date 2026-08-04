@@ -100,7 +100,8 @@ let sharedPointPopupDetailsHandler = null;
 const SHARED_POINT_POPUP_FIELDS = ["regnum", "family", "found_year", "status"];
 let mapPinSvgTemplatePromise = null;
 
-function applyMapCursor(map, cursor) {
+/** Применяет курсор карты с учётом принудительного override (см. setMapCursorOverride). */
+export function applyMapCursor(map, cursor) {
   map.getCanvas().style.cursor = mapCursorOverride ?? cursor;
 }
 
