@@ -43,16 +43,6 @@
   padding-bottom: 0;
 }
 
-.oopt-panel-toggle {
-  border: none;
-  background: transparent;
-  color: #666;
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-  padding: 2px 4px;
-}
-
 .oopt-panel-summary,
 .oopt-panel-note {
   margin: 8px 0 0;

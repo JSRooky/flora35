@@ -210,7 +210,7 @@ export default function OoptPanel({
           />
           <button
             type="button"
-            className="oopt-panel-toggle"
+            className="popup-panel-toggle"
             onClick={() => setCollapsed(!collapsed)}
             aria-expanded={!collapsed}
             aria-label={toggleLabel}
