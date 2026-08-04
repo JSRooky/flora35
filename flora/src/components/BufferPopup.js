@@ -7,6 +7,7 @@ import {
 } from "./addBufferLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import ContainedPointsFilterRow from "./ContainedPointsFilterRow";
 import "../styles/BufferPopup.css";
 
 /** Процент заполнения слайдера для CSS-переменной --range-progress. */
@@ -65,6 +66,10 @@ export default function BufferPopup({
   radiiKm = DEFAULT_BUFFER_RADII_KM,
   selectionMode = false,
   selectedCount = 0,
+  containedPoints = null,
+  pointsFilterEnabled = false,
+  onPointsFilterToggle,
+  pointsFilterAvailable = false,
   onEnabledChange,
   onSelectionModeChange,
   onRadiusChange,
@@ -190,6 +195,22 @@ export default function BufferPopup({
               ))}
             </ul>
           </div>
+
+          {pointsFilterAvailable ? (
+            <div className="areal-contained-points">
+              <ContainedPointsFilterRow
+                summary={
+                  <>
+                    {pointsFilterEnabled ? "В выбранной ООПТ" : "В буфере"}:{" "}
+                    <strong>{formatSelectedPointsCount(containedPoints?.count ?? 0)}</strong>
+                  </>
+                }
+                pointsFilterEnabled={pointsFilterEnabled}
+                onPointsFilterToggle={onPointsFilterToggle}
+                pointsFilterAvailable={pointsFilterAvailable}
+              />
+            </div>
+          ) : null}
 
           <div className="buffer-actions">
             <button

@@ -1,8 +1,5 @@
 .feedback-widget {
-  position: fixed;
-  left: 20px;
-  bottom: 16px;
-  z-index: 1000;
+  position: static;
   pointer-events: none;
 }
 
@@ -71,11 +68,6 @@
 }
 
 @media (max-width: 768px) {
-  .feedback-widget {
-    left: 10px;
-    bottom: 12px;
-  }
-
   .feedback-widget-bar {
     padding: 3px 5px;
   }

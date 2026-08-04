@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Production-правила для модуля «Ввод данных» (не задеплоены по умолчанию).
+// Production-правила для модулей «Ввод данных» и «ООПТ» (не задеплоены по умолчанию).
 service cloud.firestore {
   match /databases/{database}/documents {
     match /findings/{findingId} {
@@ -23,6 +23,17 @@ service cloud.firestore {
         && request.resource.data.coordinates is list
         && request.resource.data.coordinates.size() == 2;
       allow update, delete: if false;
+    }
+
+    // Границы ООПТ/заповедников (модуль «ООПТ») — по одной коллекции на слой
+    // с именем "bounds_<layer_id>", см. BOUNDS_LAYER_DEFINITIONS
+    // в src/firebase/boundsCollectionFirestore.js. Firestore не поддерживает
+    // wildcard по префиксу имени коллекции, поэтому сверяем префикс через matches().
+    // Данные только читаются на клиенте; импорт выполняется отдельным скриптом
+    // (scripts/import-bounds-to-firestore.mjs) с сервисным аккаунтом.
+    match /{collectionId}/{documentId} {
+      allow read: if collectionId.matches('^bounds_.*');
+      allow write: if false;
     }
   }
 }

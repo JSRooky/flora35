@@ -1,5 +1,5 @@
 import mapboxgl from "mapbox-gl";
-import { bbox, center } from "@turf/turf";
+import { bbox, booleanPointInPolygon, center, point } from "@turf/turf";
 import {
   BOUNDS_LAYER_DEFINITIONS,
   BOUNDS_LAYER_KINDS,
@@ -13,7 +13,7 @@ import {
   getBoundsFeatureFillColor
 } from "./boundsPropertyLabels";
 import { loadBoundsLayerGeoJSONFromFirestore } from "../firebase/loadBoundsFromFirestore";
-import { getFirstLocationsLayerId } from "./addLocationsLayer";
+import { applyMapCursor, getFilteredFeatures, getFirstLocationsLayerId } from "./addLocationsLayer";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -214,6 +214,31 @@ function getBoundsLayerDefinitionForFeatureLayerId(layerId) {
   );
 }
 
+function getFeatureIdentityKey(properties = {}) {
+  const rawKey = properties.nid ?? properties.OSM_ID ?? properties.id;
+  return rawKey != null ? String(rawKey) : null;
+}
+
+/**
+ * mapboxgl.queryRenderedFeatures возвращает геометрию, обрезанную по тайлу —
+ * для больших полигонов (например, заповедников) это делает площадь и форму
+ * некорректными. Подменяем на полную геометрию из уже загруженного GeoJSON.
+ */
+function resolveFullBoundsFeature(definition, feature) {
+  const cached = dataCache.get(definition.id);
+  const targetKey = getFeatureIdentityKey(feature.properties);
+
+  if (!cached || targetKey == null) {
+    return feature;
+  }
+
+  const fullFeature = cached.features.find(
+    (candidate) => getFeatureIdentityKey(candidate.properties) === targetKey
+  );
+
+  return fullFeature ?? feature;
+}
+
 function findBoundsFeatureAtPoint(map, point) {
   const layerIds = getInteractiveBoundsLayerIds(map);
   if (!layerIds.length) {
@@ -231,7 +256,7 @@ function findBoundsFeatureAtPoint(map, point) {
     return null;
   }
 
-  return { definition, feature };
+  return { definition, feature: resolveFullBoundsFeature(definition, feature) };
 }
 
 const PAINT_BY_LAYER = {
@@ -338,12 +363,14 @@ function attachBoundsCursorHandlers(map, definition) {
   }
 
   [getFillLayerId(definition.id), getOutlineLayerId(definition.id)].forEach((layerId) => {
+    // applyMapCursor уважает setMapCursorOverride (например, crosshair при
+    // указании места находки) — прямая запись в style.cursor его перебивала бы.
     map.on("mouseenter", layerId, () => {
-      map.getCanvas().style.cursor = "pointer";
+      applyMapCursor(map, "pointer");
     });
 
     map.on("mouseleave", layerId, () => {
-      map.getCanvas().style.cursor = "";
+      applyMapCursor(map, "");
     });
   });
 }
@@ -530,4 +557,77 @@ export async function syncBoundsFeaturesVisibility(map, featureVisibility = {}) 
   });
 
   return errors;
+}
+
+/**
+ * Считает уникальные виды (по name_latin, иначе name_ru) среди точек находок
+ * из текущей выборки, попавших внутрь полигона ООПТ или заповедника.
+ */
+export function getBoundsContainedSpeciesSummary(boundsFeature, filters = {}) {
+  if (!boundsFeature?.geometry) {
+    return { count: 0, species: [] };
+  }
+
+  const speciesByKey = new Map();
+
+  getFilteredFeatures(filters).forEach((feature) => {
+    const coordinates = feature.geometry?.coordinates;
+    if (!coordinates) {
+      return;
+    }
+
+    if (!booleanPointInPolygon(point(coordinates), boundsFeature)) {
+      return;
+    }
+
+    const nameLatin = feature.properties?.name_latin;
+    const speciesKey = nameLatin || feature.properties?.name_ru;
+    if (!speciesKey || speciesByKey.has(speciesKey)) {
+      return;
+    }
+
+    speciesByKey.set(speciesKey, {
+      nameRu: feature.properties?.name_ru || "Без названия",
+      nameLatin: nameLatin || "",
+      regnum: feature.properties?.regnum || "",
+      family: feature.properties?.family || "",
+      point: feature
+    });
+  });
+
+  const species = [...speciesByKey.values()].sort((left, right) =>
+    left.nameRu.localeCompare(right.nameRu, "ru")
+  );
+
+  return {
+    count: species.length,
+    species
+  };
+}
+
+/** Считает точки находок из текущей выборки, попавшие внутрь полигона ООПТ или заповедника. */
+export function getBoundsContainedPointsSummary(boundsFeature, filters = {}) {
+  if (!boundsFeature?.geometry) {
+    return { count: 0, points: [] };
+  }
+
+  const points = getFilteredFeatures(filters)
+    .filter((feature) => {
+      const coordinates = feature.geometry?.coordinates;
+      if (!coordinates) {
+        return false;
+      }
+
+      return booleanPointInPolygon(point(coordinates), boundsFeature);
+    })
+    .sort((left, right) => {
+      const nameA = left.properties?.name_ru ?? "";
+      const nameB = right.properties?.name_ru ?? "";
+      return nameA.localeCompare(nameB, "ru");
+    });
+
+  return {
+    count: points.length,
+    points
+  };
 }

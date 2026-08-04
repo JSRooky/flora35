@@ -1,0 +1,152 @@
+.bounds-species-list-popup-stack {
+  position: fixed;
+  top: 68px;
+  right: 20px;
+  z-index: 1000;
+  max-height: calc(100vh - 88px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.bounds-species-list-popup .feature-popup-title {
+  border-bottom-color: var(--map-tool-accent);
+}
+
+.bounds-species-list-popup-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bounds-species-list-popup-subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #666;
+}
+
+.bounds-species-list-popup-subtitle-title {
+  font-weight: 600;
+  color: #333;
+}
+
+.bounds-species-list-popup-section {
+  border-top: none;
+  padding-top: 0;
+}
+
+.bounds-species-list-popup-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bounds-species-list-popup-toolbar .areal-contained-points-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.bounds-species-list-popup-group-switch {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--map-tool-accent-text);
+  white-space: nowrap;
+}
+
+.bounds-species-list-popup-group-switch.property-switch input:checked + .property-switch-slider {
+  background: var(--map-tool-accent);
+}
+
+.bounds-species-list-popup-group-switch-label {
+  margin-left: 6px;
+  color: var(--map-tool-accent-text-muted);
+  user-select: none;
+}
+
+.bounds-species-list-popup-tree {
+  max-height: min(48vh, 420px);
+  overflow-y: auto;
+}
+
+.bounds-species-tree {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bounds-species-tree-children {
+  margin: 0;
+  padding: 0 0 0 14px;
+  list-style: none;
+}
+
+.bounds-species-tree > .bounds-species-tree-node + .bounds-species-tree-node {
+  margin-top: 4px;
+}
+
+.bounds-species-tree-children > .bounds-species-tree-node + .bounds-species-tree-node {
+  margin-top: 2px;
+}
+
+.bounds-species-tree-toggle {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  margin: 0;
+  padding: 3px 0;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: #444;
+}
+
+.bounds-species-tree-toggle--regnum {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.bounds-species-tree-toggle--family {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+}
+
+.bounds-species-tree-chevron {
+  flex-shrink: 0;
+  width: 12px;
+  font-size: 11px;
+  line-height: 1;
+  color: #888;
+}
+
+.bounds-species-tree-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.bounds-species-tree-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: #888;
+}
+
+.bounds-species-tree-species-list {
+  margin-top: 2px;
+}
+
+.bounds-species-tree-species-item {
+  padding-left: 18px;
+}
+
+.bounds-species-list-popup-list {
+  max-height: min(48vh, 420px);
+  overflow-y: auto;
+}

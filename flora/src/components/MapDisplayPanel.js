@@ -1,7 +1,23 @@
 import React, { useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import ContainedPointsFilterRow from "./ContainedPointsFilterRow";
 import "../styles/MapDisplayPanel.css";
+
+function formatContainedPointsCount(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${count} точка`;
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${count} точки`;
+  }
+
+  return `${count} точек`;
+}
 
 /** Краткое описание текущих настроек карты для свёрнутой панели. */
 function getCollapsedSummary(
@@ -9,12 +25,17 @@ function getCollapsedSummary(
   heatmapEnabled,
   clusteringEnabled,
   clusterByRegnum,
-  clusterPieCharts
+  clusterPieCharts,
+  pointsFilterEnabled
 ) {
   const parts = [];
 
-  if (!markersVisible) {
+  if (!markersVisible && !pointsFilterEnabled) {
     parts.push("маркеры скрыты");
+  }
+
+  if (pointsFilterEnabled) {
+    parts.push("фильтр ООПТ");
   }
 
   if (clusteringEnabled && markersVisible) {
@@ -45,6 +66,10 @@ export default function MapDisplayPanel({
   onClusterByRegnumChange,
   clusterPieCharts = false,
   onClusterPieChartsChange,
+  containedPoints = null,
+  pointsFilterEnabled = false,
+  onPointsFilterToggle,
+  pointsFilterAvailable = false,
   collapsed: collapsedProp,
   onCollapsedChange
 }) {
@@ -86,7 +111,8 @@ export default function MapDisplayPanel({
             heatmapEnabled,
             clusteringEnabled,
             clusterByRegnum,
-            clusterPieCharts
+            clusterPieCharts,
+            pointsFilterEnabled
           )}
         </p>
       ) : (
@@ -178,6 +204,20 @@ export default function MapDisplayPanel({
             <span className="map-display-switch-slider" />
             <span className="map-display-switch-label">Тепловая карта</span>
           </label>
+
+          <hr />
+
+          <ContainedPointsFilterRow
+            summary={
+              <>
+                {pointsFilterEnabled ? "В выбранной ООПТ" : "Точек в ООПТ"}:{" "}
+                <strong>{formatContainedPointsCount(containedPoints?.count ?? 0)}</strong>
+              </>
+            }
+            pointsFilterEnabled={pointsFilterEnabled}
+            onPointsFilterToggle={onPointsFilterToggle}
+            pointsFilterAvailable={pointsFilterAvailable}
+          />
         </div>
       )}
       <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.MAP} open={helpOpen} />

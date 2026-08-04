@@ -4,6 +4,7 @@ import { getPointsForSpecies, POLYGON_BUILD_MODES } from "./addSpeciesPolygonLay
 import { formatPointCount } from "./featurePropertyLabels";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import ContainedPointsFilterRow from "./ContainedPointsFilterRow";
 import PolygonModeIcon from "./PolygonModeIcon";
 import "../styles/SpeciesPolygonPopup.css";
 import "../styles/ArealPopup.css";
@@ -258,6 +259,10 @@ export default function SpeciesPolygonPopup({
   intersectionContainedPoints = null,
   intersectionOnlyMode = false,
   intersectionActionsLocked = false,
+  pointsFilterEnabled = false,
+  onPointsFilterToggle,
+  pointsFilterAvailable = false,
+  filterContainedPoints = null,
   onIntersectionSpeciesAChange,
   onIntersectionSpeciesBChange,
   onIntersectionCompute,
@@ -649,6 +654,22 @@ export default function SpeciesPolygonPopup({
               </div>
             )}
           </div>
+
+          {pointsFilterAvailable ? (
+            <div className="areal-contained-points">
+              <ContainedPointsFilterRow
+                summary={
+                  <>
+                    {pointsFilterEnabled ? "В выбранной ООПТ" : "В выделении"}:{" "}
+                    <strong>{formatContainedPointsCount(filterContainedPoints?.count ?? 0)}</strong>
+                  </>
+                }
+                pointsFilterEnabled={pointsFilterEnabled}
+                onPointsFilterToggle={onPointsFilterToggle}
+                pointsFilterAvailable={pointsFilterAvailable}
+              />
+            </div>
+          ) : null}
 
           <div className="species-polygon-add-section">
             <button

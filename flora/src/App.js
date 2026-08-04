@@ -17,6 +17,7 @@ import {
   clearSharedPointPin,
   featureMatchesFilters,
   isFeatureUnclusteredOnMap,
+  getContainedPointsSummaryForWithinFeature,
   reloadLocationsData,
   setClusterByRegnum,
   setClusteringEnabled,
@@ -26,7 +27,8 @@ import {
   setMapCursorOverride,
   showSharedPointPin,
   showSharedPointPopup,
-  updateSelectedPointHighlight
+  updateSelectedPointHighlight,
+  WITHIN_FEATURE_FILTER_KEY
 } from "./components/addLocationsLayer";
 import {
   addHeatmapLayer,
@@ -38,6 +40,8 @@ import {
   clearBoundsLayerCache,
   ensureBoundsLayerGeoJSON,
   flyToBoundsFeature,
+  getBoundsContainedPointsSummary,
+  getBoundsContainedSpeciesSummary,
   getBoundsFeatureAtClick,
   getCachedBoundsLayerGeoJSON,
   hideBoundsFeaturePopup,
@@ -46,6 +50,8 @@ import {
 } from "./components/addBoundsLayers";
 import OoptPanel from "./components/OoptPanel";
 import OoptFeaturePanel from "./components/OoptFeaturePanel";
+import BoundsSpeciesListPopup from "./components/BoundsSpeciesListPopup";
+import { getBoundsFeatureHeadingParts } from "./components/boundsPropertyLabels";
 import { isFirebaseConfigured } from "./firebase/config";
 import {
   BOUNDS_LAYER_DEFINITIONS,
@@ -91,8 +97,19 @@ import {
   addBufferLayer,
   clearBufferLayer,
   updateBufferLayer,
-  DEFAULT_BUFFER_RADII_KM
+  DEFAULT_BUFFER_RADII_KM,
+  getBufferOuterFeature
 } from "./components/addBufferLayer";
+import {
+  getToolWithinFeature,
+  getOoptWithinFeature,
+  isOoptPointsFilterActive,
+  resolveToolPointsFilterModule
+} from "./components/getToolWithinFeature";
+import {
+  loadToolPointsFilterState,
+  saveToolPointsFilterState
+} from "./toolPointsFilterStorage";
 import {
   addAreaSelectionLayer,
   applyAreaGeometryOperation,
@@ -121,7 +138,7 @@ import YearFilterPanel from "./components/YearFilterPanel";
 import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
-import FeedbackWidget from "./components/FeedbackWidget";
+import MapCornerControls from "./components/MapCornerControls";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
@@ -167,6 +184,10 @@ export default function MapView() {
   const [boundsLayerLoading, setBoundsLayerLoading] = useState({});
   const [boundsLayerErrors, setBoundsLayerErrors] = useState({});
   const [selectedBoundsFeature, setSelectedBoundsFeature] = useState(null);
+  const [ooptFilterBoundsFeature, setOoptFilterBoundsFeature] = useState(null);
+  const [toolPointsFilterEnabled, setToolPointsFilterEnabled] = useState(loadToolPointsFilterState);
+  const [mapViewportFilterVersion, setMapViewportFilterVersion] = useState(0);
+  const [boundsSpeciesListOpen, setBoundsSpeciesListOpen] = useState(false);
   const [activeModule, setActiveModule] = useState(null);
   // Радиус, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
   const [arealDockedWithFeature, setArealDockedWithFeature] = useState(false);
@@ -604,7 +625,7 @@ export default function MapView() {
     });
   }, []);
 
-  const buildLocationFilters = useCallback(() => {
+  const buildBaseLocationFilters = useCallback(() => {
     const filters = { ...propertyFilters };
 
     if (statusFilters.length > 0) {
@@ -642,25 +663,22 @@ export default function MapView() {
     yearBounds
   ]);
 
-  const handleUserFindingSaved = useCallback(() => {
-    const mapInstance = map.current;
-    if (!mapInstance || !mapReady) {
-      return;
+  const activeToolFilterModule = useMemo(
+    () =>
+      resolveToolPointsFilterModule(activeModule, {
+        arealDockedWithFeature,
+        bufferDockedWithFeature
+      }),
+    [activeModule, arealDockedWithFeature, bufferDockedWithFeature]
+  );
+
+  const bufferFilterFeatures = useMemo(() => {
+    if (bufferSelectedPoints.length > 0) {
+      return bufferSelectedPoints;
     }
 
-    syncYearBounds();
-    reloadLocationsData(mapInstance);
-    updateHeatmapData(mapInstance, buildLocationFilters());
-    clearArealDynamicsSliceCache();
-  }, [buildLocationFilters, mapReady, syncYearBounds]);
-
-  const areaContainedPoints = useMemo(() => {
-    if (!areaGeometry || !mapReady) {
-      return null;
-    }
-
-    return getAreaContainedPointsSummary(areaGeometry, buildLocationFilters());
-  }, [areaGeometry, buildLocationFilters, mapReady]);
+    return popupData ? [popupData] : [];
+  }, [bufferSelectedPoints, popupData]);
 
   const visibleBuiltPolygons = useMemo(
     () => speciesPolygons.filter((entry) => entry.built && !entry.hidden),
@@ -682,6 +700,153 @@ export default function MapView() {
 
     return visibleBuiltPolygons[0] ?? null;
   }, [speciesPolygons, activePolygonId, visibleBuiltPolygons]);
+
+  const activeToolWithinFeature = useMemo(() => {
+    return getToolWithinFeature({
+      moduleId: activeToolFilterModule,
+      map: map.current,
+      baseFilters: buildBaseLocationFilters(),
+      arealEnabled,
+      arealAllMarkers,
+      arealRadius,
+      arealCenterFeature: popupData,
+      bufferEnabled,
+      bufferFeatures: bufferFilterFeatures,
+      bufferRadiiKm: bufferRadii,
+      visibleBuiltPolygons,
+      activePolygon,
+      intersectionResult,
+      areaGeometry,
+      selectedBoundsFeature
+    });
+  }, [
+    activeToolFilterModule,
+    buildBaseLocationFilters,
+    arealEnabled,
+    arealAllMarkers,
+    arealRadius,
+    popupData,
+    bufferEnabled,
+    bufferFilterFeatures,
+    bufferRadii,
+    visibleBuiltPolygons,
+    activePolygon,
+    intersectionResult,
+    areaGeometry,
+    selectedBoundsFeature,
+    mapReady,
+    mapViewportFilterVersion
+  ]);
+
+  const ooptFilterTarget = useMemo(() => {
+    if (!toolPointsFilterEnabled[MODULE_IDS.OOPT]) {
+      return selectedBoundsFeature;
+    }
+
+    return ooptFilterBoundsFeature ?? selectedBoundsFeature;
+  }, [toolPointsFilterEnabled, ooptFilterBoundsFeature, selectedBoundsFeature]);
+
+  const ooptWithinFeature = useMemo(
+    () => getOoptWithinFeature(ooptFilterTarget),
+    [ooptFilterTarget]
+  );
+
+  const ooptPointsFilterActive = useMemo(
+    () => isOoptPointsFilterActive(toolPointsFilterEnabled, ooptFilterTarget),
+    [toolPointsFilterEnabled, ooptFilterTarget]
+  );
+
+  const effectiveWithinFeature = useMemo(() => {
+    if (ooptPointsFilterActive && ooptWithinFeature) {
+      return ooptWithinFeature;
+    }
+
+    return null;
+  }, [ooptPointsFilterActive, ooptWithinFeature]);
+
+  const buildLocationFilters = useCallback(() => {
+    const filters = buildBaseLocationFilters();
+
+    if (effectiveWithinFeature) {
+      filters[WITHIN_FEATURE_FILTER_KEY] = effectiveWithinFeature;
+    }
+
+    return filters;
+  }, [buildBaseLocationFilters, effectiveWithinFeature]);
+
+  const handleUserFindingSaved = useCallback(() => {
+    const mapInstance = map.current;
+    if (!mapInstance || !mapReady) {
+      return;
+    }
+
+    syncYearBounds();
+    reloadLocationsData(mapInstance);
+    updateHeatmapData(mapInstance, buildLocationFilters());
+    clearArealDynamicsSliceCache();
+  }, [buildLocationFilters, mapReady, syncYearBounds]);
+
+  const areaContainedPoints = useMemo(() => {
+    if (!areaGeometry || !mapReady) {
+      return null;
+    }
+
+    return getAreaContainedPointsSummary(areaGeometry, buildLocationFilters());
+  }, [areaGeometry, buildLocationFilters, mapReady]);
+
+  const boundsFilterBase = useCallback(() => {
+    const filters = buildLocationFilters();
+    delete filters[WITHIN_FEATURE_FILTER_KEY];
+    return filters;
+  }, [buildLocationFilters]);
+
+  const boundsContainedSpecies = useMemo(() => {
+    if (!selectedBoundsFeature?.feature || !mapReady) {
+      return null;
+    }
+
+    return getBoundsContainedSpeciesSummary(
+      selectedBoundsFeature.feature,
+      boundsFilterBase()
+    );
+  }, [selectedBoundsFeature, boundsFilterBase, mapReady]);
+
+  const boundsContainedPoints = useMemo(() => {
+    if (!selectedBoundsFeature?.feature || !mapReady) {
+      return null;
+    }
+
+    return getBoundsContainedPointsSummary(
+      selectedBoundsFeature.feature,
+      boundsFilterBase()
+    );
+  }, [selectedBoundsFeature, boundsFilterBase, mapReady]);
+
+  const toolPointsFilterActive = Boolean(effectiveWithinFeature);
+
+  const mapMarkersVisible = markersVisible || toolPointsFilterActive;
+
+  const ooptFilterPointsSummary = useMemo(() => {
+    if (!ooptWithinFeature || !mapReady) {
+      return null;
+    }
+
+    return getContainedPointsSummaryForWithinFeature(
+      ooptWithinFeature,
+      buildBaseLocationFilters()
+    );
+  }, [ooptWithinFeature, buildBaseLocationFilters, mapReady]);
+
+  const activeToolFilterPointsSummary = useMemo(() => {
+    if (!activeToolWithinFeature || !mapReady) {
+      return null;
+    }
+
+    return getContainedPointsSummaryForWithinFeature(
+      activeToolWithinFeature,
+      buildBaseLocationFilters()
+    );
+  }, [activeToolWithinFeature, buildBaseLocationFilters, mapReady]);
 
   const speciesPolygonContainedSpecies = useMemo(() => {
     if (
@@ -1169,8 +1334,8 @@ export default function MapView() {
       return;
     }
 
-    setMarkersVisible(map.current, markersVisible);
-  }, [markersVisible, mapReady]);
+    setMarkersVisible(map.current, mapMarkersVisible);
+  }, [mapMarkersVisible, mapReady]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -1309,10 +1474,59 @@ export default function MapView() {
   }, [activeModule, mapReady]);
 
   useEffect(() => {
+    if (toolPointsFilterEnabled[MODULE_IDS.OOPT] && selectedBoundsFeature) {
+      setOoptFilterBoundsFeature(selectedBoundsFeature);
+    }
+  }, [selectedBoundsFeature, toolPointsFilterEnabled]);
+
+  useEffect(() => {
     if (activeModule !== MODULE_IDS.OOPT) {
+      setBoundsSpeciesListOpen(false);
+
+      if (!toolPointsFilterEnabled[MODULE_IDS.OOPT]) {
+        setSelectedBoundsFeature(null);
+      }
+    }
+  }, [activeModule, toolPointsFilterEnabled]);
+
+  useEffect(() => {
+    saveToolPointsFilterState(toolPointsFilterEnabled);
+  }, [toolPointsFilterEnabled]);
+
+  useEffect(() => {
+    const mapInstance = map.current;
+
+    if (
+      !mapInstance ||
+      !mapReady ||
+      ooptPointsFilterActive ||
+      !toolPointsFilterEnabled[MODULE_IDS.MAP] ||
+      activeToolFilterModule !== MODULE_IDS.MAP
+    ) {
+      return undefined;
+    }
+
+    const handleMoveEnd = () => {
+      setMapViewportFilterVersion((version) => version + 1);
+    };
+
+    mapInstance.on("moveend", handleMoveEnd);
+    return () => {
+      mapInstance.off("moveend", handleMoveEnd);
+    };
+  }, [activeToolFilterModule, mapReady, ooptPointsFilterActive, toolPointsFilterEnabled]);
+
+  useEffect(() => {
+    // Если пользователь выключил слой, к которому относится открытая панель
+    // «Сведения об ООПТ», сам объект на карте уже пропал — закрываем и панель.
+    if (
+      selectedBoundsFeature &&
+      !boundsLayerVisibility[selectedBoundsFeature.definition?.id] &&
+      !toolPointsFilterEnabled[MODULE_IDS.OOPT]
+    ) {
       setSelectedBoundsFeature(null);
     }
-  }, [activeModule]);
+  }, [boundsLayerVisibility, selectedBoundsFeature, toolPointsFilterEnabled]);
 
   useEffect(() => {
     if (!selectedBoundsFeature) {
@@ -1707,6 +1921,82 @@ export default function MapView() {
     panToArealPoint(mapInstance, feature);
   }, []);
 
+  const bufferContainedPoints = useMemo(() => {
+    if (!bufferEnabled || !mapReady) {
+      return null;
+    }
+
+    const withinFeature = getBufferOuterFeature(bufferFilterFeatures, bufferRadii);
+    if (!withinFeature) {
+      return null;
+    }
+
+    return getContainedPointsSummaryForWithinFeature(withinFeature, buildBaseLocationFilters());
+  }, [
+    bufferEnabled,
+    bufferFilterFeatures,
+    bufferRadii,
+    buildBaseLocationFilters,
+    mapReady
+  ]);
+
+  const mapContainedPoints = useMemo(() => {
+    if (!mapReady || activeToolFilterModule !== MODULE_IDS.MAP) {
+      return null;
+    }
+
+    const withinFeature = getToolWithinFeature({
+      moduleId: MODULE_IDS.MAP,
+      map: map.current
+    });
+
+    if (!withinFeature) {
+      return null;
+    }
+
+    return getContainedPointsSummaryForWithinFeature(withinFeature, buildBaseLocationFilters());
+  }, [
+    activeToolFilterModule,
+    buildBaseLocationFilters,
+    mapReady,
+    mapViewportFilterVersion
+  ]);
+
+  const handleToolPointsFilterToggle = useCallback(() => {
+    setToolPointsFilterEnabled((current) => {
+      const nextEnabled = !current[MODULE_IDS.OOPT];
+
+      if (nextEnabled && selectedBoundsFeature) {
+        setOoptFilterBoundsFeature(selectedBoundsFeature);
+      } else if (!nextEnabled) {
+        setOoptFilterBoundsFeature(null);
+      }
+
+      return {
+        ...current,
+        [MODULE_IDS.OOPT]: nextEnabled
+      };
+    });
+  }, [selectedBoundsFeature]);
+
+  const handleBoundsSpeciesListToggle = useCallback(() => {
+    setBoundsSpeciesListOpen((open) => !open);
+  }, []);
+
+  const handleBoundsSpeciesListClose = useCallback(() => {
+    setBoundsSpeciesListOpen(false);
+  }, []);
+
+  const handleBoundsSpeciesSelect = useCallback((feature) => {
+    const mapInstance = map.current;
+
+    if (!mapInstance) {
+      return;
+    }
+
+    panToArealPoint(mapInstance, feature);
+  }, []);
+
   const clearPointSelection = useCallback(() => {
     const state = pointSelectionStateRef.current;
 
@@ -1962,6 +2252,36 @@ export default function MapView() {
     };
   }, [clearPointSelection, syncYearBounds]);
 
+  const arealDisplayedContainedPoints = arealContainedPoints ?? activeToolFilterPointsSummary;
+
+  const ooptGlobalFilterTooltip = useMemo(() => {
+    if (!ooptFilterTarget) {
+      return "Только точки в выбранной ООПТ";
+    }
+
+    const heading = getBoundsFeatureHeadingParts(
+      ooptFilterTarget.definition?.id,
+      ooptFilterTarget.feature?.properties ?? {}
+    );
+    const title = [heading?.category, heading?.title].filter(Boolean).join(" — ");
+
+    if (!title) {
+      return "Только точки в выбранной ООПТ";
+    }
+
+    const count = ooptFilterPointsSummary?.count;
+    return count != null ? `${title} (${count} точ.)` : title;
+  }, [ooptFilterTarget, ooptFilterPointsSummary]);
+
+  const getGlobalPointsFilterProps = () => ({
+    pointsFilterEnabled: ooptPointsFilterActive,
+    pointsFilterAvailable: Boolean(ooptWithinFeature),
+    onPointsFilterToggle: handleToolPointsFilterToggle
+  });
+
+  const getPanelFilterPointsSummary = (moduleSummary) =>
+    ooptPointsFilterActive ? ooptFilterPointsSummary : moduleSummary;
+
   return (
     <>
       <ModuleMenu
@@ -2006,7 +2326,8 @@ export default function MapView() {
               enabled={arealEnabled}
               allMarkers={arealAllMarkers}
               radius={arealRadius}
-              containedPoints={arealContainedPoints}
+              containedPoints={getPanelFilterPointsSummary(arealDisplayedContainedPoints)}
+              {...getGlobalPointsFilterProps()}
               onPointSelect={handleArealPointSelect}
               onEnabledChange={handleArealEnabledChange}
               onAllMarkersChange={handleArealAllMarkersChange}
@@ -2038,6 +2359,8 @@ export default function MapView() {
               onClusterByRegnumChange={handleClusterByRegnumChange}
               clusterPieCharts={clusterPieCharts}
               onClusterPieChartsChange={handleClusterPieChartsChange}
+              containedPoints={ooptWithinFeature ? ooptFilterPointsSummary : mapContainedPoints}
+              {...getGlobalPointsFilterProps()}
               collapsed={isPanelCollapsed(PANEL_IDS.MAP)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.MAP)}
             />
@@ -2076,6 +2399,8 @@ export default function MapView() {
               intersectionContainedPoints={intersectionContainedPoints}
               intersectionOnlyMode={intersectionOnlyMode}
               intersectionActionsLocked={intersectionActionsLocked}
+              {...getGlobalPointsFilterProps()}
+              filterContainedPoints={getPanelFilterPointsSummary(activeToolFilterPointsSummary)}
               onIntersectionSpeciesAChange={handleIntersectionSpeciesAChange}
               onIntersectionSpeciesBChange={handleIntersectionSpeciesBChange}
               onIntersectionCompute={handleIntersectionCompute}
@@ -2094,6 +2419,8 @@ export default function MapView() {
               radiiKm={bufferRadii}
               selectionMode={bufferSelectionMode}
               selectedCount={bufferSelectedPoints.length}
+              containedPoints={getPanelFilterPointsSummary(bufferContainedPoints)}
+              {...getGlobalPointsFilterProps()}
               onEnabledChange={handleBufferEnabledChange}
               onSelectionModeChange={handleBufferSelectionModeChange}
               onRadiusChange={handleBufferRadiusChange}
@@ -2112,7 +2439,8 @@ export default function MapView() {
               onOperationModeChange={handleAreaOperationModeChange}
               drawingActive={areaDrawingActive}
               hasArea={Boolean(areaGeometry)}
-              containedPoints={areaContainedPoints}
+              containedPoints={getPanelFilterPointsSummary(areaContainedPoints)}
+              {...getGlobalPointsFilterProps()}
               onPointSelect={handleAreaPointSelect}
               onReset={handleAreaReset}
               collapsed={isPanelCollapsed(PANEL_IDS.AREA)}
@@ -2139,6 +2467,13 @@ export default function MapView() {
                 <OoptFeaturePanel
                   layerDefinition={selectedBoundsFeature.definition}
                   feature={selectedBoundsFeature.feature}
+                  containedSpeciesCount={boundsContainedSpecies?.count ?? null}
+                  containedPointsCount={boundsContainedPoints?.count ?? null}
+                  pointsFilterEnabled={ooptPointsFilterActive}
+                  onPointsFilterToggle={handleToolPointsFilterToggle}
+                  pointsFilterAvailable={Boolean(ooptWithinFeature)}
+                  onShowSpeciesList={handleBoundsSpeciesListToggle}
+                  speciesListOpen={boundsSpeciesListOpen}
                   collapsed={isPanelCollapsed(PANEL_IDS.OOPT_FEATURE)}
                   onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.OOPT_FEATURE)}
                 />
@@ -2187,7 +2522,30 @@ export default function MapView() {
         />
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
-      <FeedbackWidget />
+      <BoundsSpeciesListPopup
+        open={
+          boundsSpeciesListOpen &&
+          activeModule === MODULE_IDS.OOPT &&
+          Boolean(selectedBoundsFeature)
+        }
+        onClose={handleBoundsSpeciesListClose}
+        territoryHeading={
+          selectedBoundsFeature
+            ? getBoundsFeatureHeadingParts(
+                selectedBoundsFeature.definition?.id,
+                selectedBoundsFeature.feature?.properties ?? {}
+              )
+            : null
+        }
+        speciesSummary={boundsContainedSpecies}
+        onSpeciesSelect={handleBoundsSpeciesSelect}
+      />
+      <MapCornerControls
+        ooptFilterEnabled={ooptPointsFilterActive}
+        ooptFilterAvailable={Boolean(ooptWithinFeature)}
+        onOoptFilterToggle={handleToolPointsFilterToggle}
+        ooptFilterTooltip={ooptGlobalFilterTooltip}
+      />
     </>
   );
 }

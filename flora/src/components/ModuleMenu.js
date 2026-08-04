@@ -19,6 +19,8 @@ export const MODULE_IDS = {
   // Совпадает с заголовком ## area в docs/moduleHelp.md.
   AREA: "area",
   OOPT: "oopt",
+  // Совпадает с заголовком ## oopt-feature в docs/moduleHelp.md.
+  OOPT_FEATURE: "oopt-feature",
   // Модуль ввода пользовательских данных в Firestore.
   SUBMIT: "submit",
   ABOUT: "about"
