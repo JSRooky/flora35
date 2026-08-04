@@ -92,6 +92,12 @@
   font-style: italic;
 }
 
+.point-tooltip-count {
+  margin-top: 4px;
+  color: #666;
+  font-size: 11px;
+}
+
 .cluster-tooltip-title {
   color: #333;
   font-size: 12px;
@@ -157,6 +163,69 @@
   color: #333;
   font-size: 12px;
   font-weight: 600;
+}
+
+.bounds-feature-popup.mapboxgl-popup {
+  max-width: 320px;
+  z-index: 1002;
+}
+
+.bounds-feature-popup .mapboxgl-popup-content {
+  padding: 10px 12px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-family: Arial, sans-serif;
+  line-height: 1.35;
+}
+
+.bounds-feature-popup .mapboxgl-popup-tip {
+  border-top-color: rgba(255, 255, 255, 0.96);
+}
+
+.bounds-feature-popup .mapboxgl-popup-close-button {
+  font-size: 18px;
+  padding: 4px 8px;
+  color: #666;
+}
+
+.bounds-feature-popup-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.bounds-feature-popup-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.bounds-feature-popup-title {
+  color: #222;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  padding-right: 16px;
+}
+
+.bounds-feature-popup .feature-popup-action-btn {
+  border: none;
+  outline: none;
+  background: rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.bounds-feature-popup .feature-popup-action-btn:hover:not(:disabled),
+.bounds-feature-popup .feature-popup-action-btn:focus,
+.bounds-feature-popup .feature-popup-action-btn:focus-visible,
+.bounds-feature-popup .feature-popup-action-btn:active {
+  background: rgba(42, 157, 143, 0.14);
 }
 
 

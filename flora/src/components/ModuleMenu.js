@@ -44,7 +44,7 @@ const MAP_MODULE_ITEMS = [
 ];
 
 const TEST_MODULE_ITEMS = [
-  { id: MODULE_IDS.SUBMIT, label: "Ввод данных о находке" }
+  { id: MODULE_IDS.SUBMIT, label: "Новая находка" }
 ];
 
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
@@ -181,18 +181,18 @@ export default function ModuleMenu({
                 onChange={(event) => onOsmBasemapEnabledChange?.(event.target.checked)}
               />
               <span className="module-menu-switch-slider" aria-hidden="true" />
-              <span className="module-menu-switch-label">OpenStreetMap</span>
+              <span className="module-menu-switch-label">OSM</span>
             </label>
           </li>
           <li className="module-menu-toggle-item">
-            <label className="module-menu-switch" title="Отключить подсказки при наведении на точки и кластеры">
+            <label className="module-menu-switch" title="Показывать подсказки при наведении на точки и кластеры">
               <input
                 type="checkbox"
-                checked={hoverTooltipsDisabled}
-                onChange={(event) => onHoverTooltipsDisabledChange?.(event.target.checked)}
+                checked={!hoverTooltipsDisabled}
+                onChange={(event) => onHoverTooltipsDisabledChange?.(!event.target.checked)}
               />
               <span className="module-menu-switch-slider" aria-hidden="true" />
-              <span className="module-menu-switch-label">Отключить подсказки</span>
+              <span className="module-menu-switch-label">Подсказки</span>
             </label>
           </li>
           <li>

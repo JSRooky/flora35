@@ -16,7 +16,7 @@ export const BOUNDS_LAYER_DEFINITIONS = [
   {
     id: "oopt_pol",
     sourceFile: "oopt_pol.geojson",
-    label: "ООПТ полигоны",
+    label: "ООПТ",
     kind: BOUNDS_LAYER_KINDS.POLYGON
   }
 ];
@@ -71,16 +71,23 @@ export function normalizeBoundsProperties(properties = {}) {
 
 /** Читабельное название объекта для UI и поиска. */
 export function getBoundsFeatureTitle(properties = {}) {
-  return (
+  const nameCandidate =
     properties.title ??
     properties.NAME_RU ??
     properties.NAME ??
-    properties.name ??
-    properties.nid ??
-    properties.OSM_ID ??
-    properties.id ??
-    ""
-  );
+    properties.name;
+
+  if (nameCandidate != null && nameCandidate !== "") {
+    return String(nameCandidate);
+  }
+
+  const idCandidate = properties.nid ?? properties.OSM_ID ?? properties.id;
+
+  if (idCandidate != null && idCandidate !== "") {
+    return `Объект ${idCandidate}`;
+  }
+
+  return "";
 }
 
 function buildFeatureKey(properties = {}, featureIndex) {
@@ -96,6 +103,69 @@ function buildFeatureKey(properties = {}, featureIndex) {
 /** ID документа Firestore для одного GeoJSON feature внутри коллекции слоя. */
 export function buildBoundsFeatureDocId(properties, featureIndex) {
   return buildFeatureKey(properties, featureIndex);
+}
+
+/** Составной ключ объекта bounds для UI и состояния видимости. */
+export function getBoundsFeatureKey(layerId, properties, featureIndex = 0) {
+  return `${layerId}:${buildBoundsFeatureDocId(properties, featureIndex)}`;
+}
+
+export function parseBoundsFeatureKey(featureKey) {
+  const colonIndex = featureKey.indexOf(":");
+  if (colonIndex === -1) {
+    return null;
+  }
+
+  return {
+    layerId: featureKey.slice(0, colonIndex),
+    docId: featureKey.slice(colonIndex + 1)
+  };
+}
+
+function getBoundsFeatureSubtitle(layerId, properties = {}) {
+  if (layerId === "oopt_pol") {
+    return properties.category_t ?? properties.status_tit ?? null;
+  }
+
+  if (layerId === "nature_reserve_polygon") {
+    const boundaryLabels = {
+      national_park: "Национальный парк",
+      protected_area: "ООПТ",
+      boundary: "Граница"
+    };
+
+    return boundaryLabels[properties.BOUNDARY] ?? null;
+  }
+
+  return null;
+}
+
+/** Краткий каталог объектов слоя для списка в панели ООПТ. */
+export function buildBoundsCatalogFromGeoJSON(layerId, featureCollection) {
+  const features = Array.isArray(featureCollection?.features) ? featureCollection.features : [];
+
+  return features
+    .map((feature, featureIndex) => {
+      const properties = feature.properties ?? {};
+      const title = getBoundsFeatureTitle(properties);
+
+      return {
+        key: getBoundsFeatureKey(layerId, properties, featureIndex),
+        layerId,
+        featureIndex,
+        title: title || `Объект ${featureIndex + 1}`,
+        subtitle: getBoundsFeatureSubtitle(layerId, properties)
+      };
+    })
+    .sort((left, right) => left.title.localeCompare(right.title, "ru", { numeric: true }));
+}
+
+export function findBoundsCatalogEntry(catalog, featureKey) {
+  return catalog.find((entry) => entry.key === featureKey) ?? null;
+}
+
+export function countVisibleBoundsFeatures(featureVisibility = {}) {
+  return Object.values(featureVisibility).filter(Boolean).length;
 }
 
 /** Firestore не поддерживает вложенные массивы координат GeoJSON — храним geometry как JSON-строку. */

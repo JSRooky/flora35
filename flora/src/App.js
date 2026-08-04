@@ -36,12 +36,22 @@ import {
 import {
   addBoundsLayers,
   clearBoundsLayerCache,
+  ensureBoundsLayerGeoJSON,
+  flyToBoundsFeature,
   getBoundsFeatureAtClick,
-  syncBoundsLayersVisibility
+  getCachedBoundsLayerGeoJSON,
+  hideBoundsFeaturePopup,
+  showBoundsFeaturePopup,
+  syncBoundsFeaturesVisibility
 } from "./components/addBoundsLayers";
-import OoptPanel, { createInitialBoundsVisibility } from "./components/OoptPanel";
+import OoptPanel from "./components/OoptPanel";
 import OoptFeaturePanel from "./components/OoptFeaturePanel";
 import { isFirebaseConfigured } from "./firebase/config";
+import {
+  BOUNDS_LAYER_DEFINITIONS,
+  buildBoundsCatalogFromGeoJSON,
+  getBoundsLayerDefinition
+} from "./firebase/boundsCollectionFirestore";
 import {
   setDataSourceFilter,
   DATA_SOURCE_MODES,
@@ -152,7 +162,8 @@ export default function MapView() {
   const [markersVisible, setMarkersVisibleState] = useState(DEFAULT_MARKERS_VISIBLE);
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
-  const [boundsLayerVisibility, setBoundsLayerVisibility] = useState(createInitialBoundsVisibility);
+  const [boundsFeatureVisibility, setBoundsFeatureVisibility] = useState({});
+  const [boundsCatalogByLayerId, setBoundsCatalogByLayerId] = useState({});
   const [boundsLayerLoading, setBoundsLayerLoading] = useState({});
   const [boundsLayerErrors, setBoundsLayerErrors] = useState({});
   const [selectedBoundsFeature, setSelectedBoundsFeature] = useState(null);
@@ -281,6 +292,69 @@ export default function MapView() {
       expandPanel(PANEL_IDS.BUFFER);
     }
   }, [activeModule, arealDockedWithFeature, bufferDockedWithFeature, expandPanel]);
+
+  const handleOpenBoundsFeatureDetails = useCallback(() => {
+    expandPanel(PANEL_IDS.OOPT_FEATURE);
+  }, [expandPanel]);
+
+  const handleBoundsFeatureVisibilityChange = useCallback((featureKey, visible) => {
+    setBoundsFeatureVisibility((prev) => {
+      const next = { ...prev };
+
+      if (visible) {
+        next[featureKey] = true;
+      } else {
+        delete next[featureKey];
+      }
+
+      return next;
+    });
+  }, []);
+
+  const handleBoundsGroupVisibilityChange = useCallback((_layerId, featureKeys, visible) => {
+    setBoundsFeatureVisibility((prev) => {
+      const next = { ...prev };
+
+      featureKeys.forEach((featureKey) => {
+        if (visible) {
+          next[featureKey] = true;
+        } else {
+          delete next[featureKey];
+        }
+      });
+
+      return next;
+    });
+  }, []);
+
+  const handleBoundsFeatureSelect = useCallback((entry) => {
+    const geojson = getCachedBoundsLayerGeoJSON(entry.layerId);
+    const definition = getBoundsLayerDefinition(entry.layerId);
+
+    if (!geojson || !definition) {
+      return;
+    }
+
+    const feature = geojson.features[entry.featureIndex];
+
+    if (!feature) {
+      return;
+    }
+
+    setBoundsFeatureVisibility((prev) =>
+      prev[entry.key] ? prev : { ...prev, [entry.key]: true }
+    );
+    setPopupData(null);
+    updateSelectedPointHighlight(map.current, null);
+    setSelectedBoundsFeature({ definition, feature });
+    setActiveModule(MODULE_IDS.OOPT);
+
+    if (map.current) {
+      flyToBoundsFeature(map.current, feature, { definition, feature }, {
+        onOpenDetails: handleOpenBoundsFeatureDetails
+      });
+    }
+  }, [handleOpenBoundsFeatureDetails]);
 
   const handleModuleSelect = useCallback((moduleId) => {
     if (moduleId === MODULE_IDS.ABOUT) {
@@ -1136,13 +1210,18 @@ export default function MapView() {
     }
 
     let cancelled = false;
-    const loadingIds = Object.entries(boundsLayerVisibility)
+    const layerIdsWithVisibleFeatures = Object.entries(boundsFeatureVisibility)
       .filter(([, visible]) => visible)
-      .map(([layerId]) => layerId);
+      .map(([featureKey]) => featureKey.split(":")[0])
+      .filter((layerId, index, layerIds) => layerIds.indexOf(layerId) === index);
 
-    setBoundsLayerLoading(Object.fromEntries(loadingIds.map((layerId) => [layerId, true])));
+    if (layerIdsWithVisibleFeatures.length) {
+      setBoundsLayerLoading(
+        Object.fromEntries(layerIdsWithVisibleFeatures.map((layerId) => [layerId, true]))
+      );
+    }
 
-    syncBoundsLayersVisibility(map.current, boundsLayerVisibility)
+    syncBoundsFeaturesVisibility(map.current, boundsFeatureVisibility)
       .then((errors) => {
         if (!cancelled) {
           setBoundsLayerErrors(errors);
@@ -1162,13 +1241,84 @@ export default function MapView() {
     return () => {
       cancelled = true;
     };
-  }, [boundsLayerVisibility, mapReady]);
+  }, [boundsFeatureVisibility, mapReady]);
+
+  useEffect(() => {
+    if (activeModule !== MODULE_IDS.OOPT || !mapReady || !isFirebaseConfigured()) {
+      return;
+    }
+
+    let cancelled = false;
+    setBoundsLayerLoading((prev) => ({
+      ...prev,
+      ...Object.fromEntries(BOUNDS_LAYER_DEFINITIONS.map(({ id }) => [id, true]))
+    }));
+
+    Promise.all(
+      BOUNDS_LAYER_DEFINITIONS.map(async ({ id: layerId }) => {
+        try {
+          const geojson = await ensureBoundsLayerGeoJSON(layerId);
+          return {
+            layerId,
+            catalog: buildBoundsCatalogFromGeoJSON(layerId, geojson),
+            error: null
+          };
+        } catch (error) {
+          return {
+            layerId,
+            catalog: [],
+            error: error?.message || String(error)
+          };
+        }
+      })
+    )
+      .then((results) => {
+        if (cancelled) {
+          return;
+        }
+
+        setBoundsCatalogByLayerId(
+          Object.fromEntries(results.map(({ layerId, catalog }) => [layerId, catalog]))
+        );
+        setBoundsLayerErrors((prev) => {
+          const next = { ...prev };
+
+          results.forEach(({ layerId, error }) => {
+            if (error) {
+              next[layerId] = error;
+            } else {
+              delete next[layerId];
+            }
+          });
+
+          return next;
+        });
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBoundsLayerLoading((prev) => ({
+            ...prev,
+            ...Object.fromEntries(BOUNDS_LAYER_DEFINITIONS.map(({ id }) => [id, false]))
+          }));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeModule, mapReady]);
 
   useEffect(() => {
     if (activeModule !== MODULE_IDS.OOPT) {
       setSelectedBoundsFeature(null);
     }
   }, [activeModule]);
+
+  useEffect(() => {
+    if (!selectedBoundsFeature) {
+      hideBoundsFeaturePopup();
+    }
+  }, [selectedBoundsFeature]);
 
   useEffect(() => {
     if (selectedBoundsFeature) {
@@ -1776,6 +1926,9 @@ export default function MapView() {
               updateSelectedPointHighlight(map.current, null);
               setSelectedBoundsFeature(boundsHit);
               setActiveModule(MODULE_IDS.OOPT);
+              showBoundsFeaturePopup(map.current, boundsHit, event.lngLat, {
+                onOpenDetails: handleOpenBoundsFeatureDetails
+              });
               return;
             }
 
@@ -1969,11 +2122,16 @@ export default function MapView() {
           {activeModule === MODULE_IDS.OOPT && (
             <>
               <OoptPanel
-                visibility={boundsLayerVisibility}
-                onVisibilityChange={setBoundsLayerVisibility}
+                catalogByLayerId={boundsCatalogByLayerId}
+                featureVisibility={boundsFeatureVisibility}
+                onFeatureVisibilityChange={handleBoundsFeatureVisibilityChange}
+                onGroupVisibilityChange={handleBoundsGroupVisibilityChange}
+                onFeatureSelect={handleBoundsFeatureSelect}
                 loadingById={boundsLayerLoading}
                 errorsById={boundsLayerErrors}
                 firebaseConfigured={isFirebaseConfigured()}
+                markersVisible={markersVisible}
+                onMarkersVisibleChange={setMarkersVisibleState}
                 collapsed={isPanelCollapsed(PANEL_IDS.OOPT)}
                 onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.OOPT)}
               />

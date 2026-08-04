@@ -187,7 +187,7 @@ export default function UserSubmissionPanel({
       data-module-id={MODULE_IDS.SUBMIT}
     >
       <div className="user-submission-panel-header">
-        <h3 className="user-submission-panel-title">Ввод данных о находке</h3>
+        <h3 className="user-submission-panel-title">Новая находка</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
           <button

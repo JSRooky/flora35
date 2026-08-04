@@ -77,6 +77,7 @@ let clusterPieChartRenderHandler = null;
 let clusterPieChartMap = null;
 let currentFilters = {};
 let currentFilteredFeatures = [];
+let speciesPointCountsOnMap = new Map();
 let interactionHandlers = null;
 let onClusterExpandedCallback = null;
 let onPointClickCallback = null;
@@ -124,7 +125,7 @@ function escapeHtml(text) {
 }
 
 /** HTML-подсказка с русским и латинским названием вида. */
-function buildPointTooltipHtml(nameRu, nameLatin) {
+function buildPointTooltipHtml(nameRu, nameLatin, speciesPointCount) {
   const lines = [];
 
   if (nameRu) {
@@ -137,6 +138,12 @@ function buildPointTooltipHtml(nameRu, nameLatin) {
 
   if (lines.length === 0) {
     return '<div class="point-tooltip-name-ru">Точка данных</div>';
+  }
+
+  if (speciesPointCount > 0) {
+    lines.push(
+      `<div class="point-tooltip-count">${formatClusterPointsCount(speciesPointCount)} на карте</div>`
+    );
   }
 
   return lines.join("");
@@ -179,6 +186,37 @@ function buildSharedPointPopupHtml(feature) {
   );
 
   return lines.join("");
+}
+
+function getFeatureSpeciesKey(feature) {
+  const { name_latin: nameLatin, name_ru: nameRu } = feature?.properties ?? {};
+  return nameLatin || nameRu || "";
+}
+
+function rebuildSpeciesPointCountsOnMap() {
+  const counts = new Map();
+
+  currentFilteredFeatures.forEach((feature) => {
+    const key = getFeatureSpeciesKey(feature);
+
+    if (!key) {
+      return;
+    }
+
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  });
+
+  speciesPointCountsOnMap = counts;
+}
+
+function getSpeciesPointCountOnMap(nameRu, nameLatin) {
+  const key = nameLatin || nameRu || "";
+  return key ? (speciesPointCountsOnMap.get(key) ?? 0) : 0;
+}
+
+function setCurrentFilteredFeatures(features) {
+  currentFilteredFeatures = features;
+  rebuildSpeciesPointCountsOnMap();
 }
 
 function formatClusterPointsCount(count) {
@@ -1277,7 +1315,7 @@ function attachLocationsInteractions(map) {
     showPointHoverPopup(
       map,
       feature.geometry.coordinates,
-      buildPointTooltipHtml(nameRu, nameLatin)
+      buildPointTooltipHtml(nameRu, nameLatin, getSpeciesPointCountOnMap(nameRu, nameLatin))
     );
   };
 
@@ -1570,7 +1608,7 @@ function applyTimelineYearChange(map, prevFilters, nextFilters) {
     });
   }
 
-  currentFilteredFeatures = newFilteredFeatures;
+  setCurrentFilteredFeatures(newFilteredFeatures);
   currentFilters = nextFilters;
   updateLocationsSourceData(map, newFilteredFeatures);
   refreshSelectedPointHighlight(map);
@@ -1589,7 +1627,7 @@ function rebuildLocationsLayers(map) {
   removeLocationsFromMap(map);
 
   const filteredFeatures = filterFeatures(locationsData.features, currentFilters);
-  currentFilteredFeatures = filteredFeatures;
+  setCurrentFilteredFeatures(filteredFeatures);
 
   if (!clusteringEnabled) {
     map.addSource("locations", {

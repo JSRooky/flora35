@@ -1,7 +1,17 @@
+import mapboxgl from "mapbox-gl";
+import { bbox, center } from "@turf/turf";
 import {
   BOUNDS_LAYER_DEFINITIONS,
-  BOUNDS_LAYER_KINDS
+  BOUNDS_LAYER_KINDS,
+  buildBoundsFeatureDocId,
+  getBoundsFeatureTitle
 } from "../firebase/boundsCollectionFirestore";
+import {
+  BOUNDS_DISPLAY_FIELDS,
+  formatBoundsPropertyValue,
+  getBoundsFeatureAreaDisplay,
+  getBoundsFeatureFillColor
+} from "./boundsPropertyLabels";
 import { loadBoundsLayerGeoJSONFromFirestore } from "../firebase/loadBoundsFromFirestore";
 import { getFirstLocationsLayerId } from "./addLocationsLayer";
 
@@ -12,6 +22,179 @@ const EMPTY_COLLECTION = {
 
 const dataCache = new Map();
 const mapsWithCursorHandlers = new WeakSet();
+let boundsFeaturePopup = null;
+let boundsFeaturePopupDetailsHandler = null;
+
+const TITLE_PROPERTY_KEYS = new Set(["title", "NAME_RU", "NAME"]);
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildBoundsFeaturePopupHtml(hit) {
+  const layerId = hit.definition.id;
+  const properties = hit.feature.properties ?? {};
+  const title = getBoundsFeatureTitle(properties) || "ООПТ";
+  const accentColor = getBoundsFeatureFillColor(layerId, properties);
+  const fields = BOUNDS_DISPLAY_FIELDS[layerId] ?? [];
+  const detailRows = fields.flatMap((field) => {
+    if (TITLE_PROPERTY_KEYS.has(field.key)) {
+      return [];
+    }
+
+    const value = formatBoundsPropertyValue(field, properties);
+
+    if (value == null) {
+      return [];
+    }
+
+    return [
+      '<div class="shared-point-popup-row">',
+      `<span class="shared-point-popup-label">${escapeHtml(field.label)}:</span>`,
+      `<span class="shared-point-popup-value">${escapeHtml(value)}</span>`,
+      "</div>"
+    ];
+  });
+  const areaDisplay = getBoundsFeatureAreaDisplay(layerId, hit.feature);
+
+  if (areaDisplay) {
+    detailRows.push(
+      '<div class="shared-point-popup-row">',
+      '<span class="shared-point-popup-label">Площадь:</span>',
+      `<span class="shared-point-popup-value">${escapeHtml(areaDisplay)}</span>`,
+      "</div>"
+    );
+  }
+
+  const lines = [
+    '<div class="bounds-feature-popup-heading">',
+    `<span class="bounds-feature-popup-dot" style="background-color:${escapeHtml(accentColor)}"></span>`,
+    `<div class="bounds-feature-popup-title">${escapeHtml(title)}</div>`,
+    "</div>"
+  ];
+
+  if (detailRows.length > 0) {
+    lines.push(`<div class="shared-point-popup-details">${detailRows.join("")}</div>`);
+  }
+
+  lines.push(
+    '<div class="feature-popup-actions shared-point-popup-actions">',
+    '<button type="button" class="feature-popup-action-btn" data-bounds-feature-details>Подробнее</button>',
+    "</div>"
+  );
+
+  return lines.join("");
+}
+
+function getBoundsFeaturePopupCoordinates(feature, lngLat) {
+  if (lngLat && typeof lngLat.lng === "number" && typeof lngLat.lat === "number") {
+    return [lngLat.lng, lngLat.lat];
+  }
+
+  return center(feature).geometry.coordinates;
+}
+
+/** Показывает всплывающее окно со сведениями о полигоне bounds. */
+export function showBoundsFeaturePopup(map, hit, lngLat, { onOpenDetails } = {}) {
+  if (!map || !hit?.definition || !hit?.feature) {
+    return;
+  }
+
+  hideBoundsFeaturePopup();
+
+  const popup = new mapboxgl.Popup({
+    closeButton: true,
+    closeOnClick: false,
+    className: "bounds-feature-popup",
+    anchor: "bottom",
+    offset: 12,
+    maxWidth: "320px"
+  });
+
+  popup
+    .setLngLat(getBoundsFeaturePopupCoordinates(hit.feature, lngLat))
+    .setHTML(buildBoundsFeaturePopupHtml(hit));
+
+  popup.on("close", () => {
+    if (boundsFeaturePopup !== popup) {
+      return;
+    }
+
+    boundsFeaturePopup = null;
+    boundsFeaturePopupDetailsHandler = null;
+  });
+
+  boundsFeaturePopup = popup;
+  popup.addTo(map);
+
+  if (onOpenDetails) {
+    const detailsButton = popup.getElement()?.querySelector("[data-bounds-feature-details]");
+
+    if (detailsButton) {
+      boundsFeaturePopupDetailsHandler = (event) => {
+        event.preventDefault();
+        onOpenDetails(hit);
+      };
+      detailsButton.addEventListener("click", boundsFeaturePopupDetailsHandler);
+    }
+  }
+}
+
+export function hideBoundsFeaturePopup() {
+  if (boundsFeaturePopupDetailsHandler && boundsFeaturePopup) {
+    const detailsButton = boundsFeaturePopup
+      .getElement()
+      ?.querySelector("[data-bounds-feature-details]");
+
+    if (detailsButton) {
+      detailsButton.removeEventListener("click", boundsFeaturePopupDetailsHandler);
+    }
+  }
+
+  boundsFeaturePopupDetailsHandler = null;
+
+  if (!boundsFeaturePopup) {
+    return;
+  }
+
+  boundsFeaturePopup.remove();
+  boundsFeaturePopup = null;
+}
+
+/** Приближает карту к полигону и показывает popup после анимации. */
+export function flyToBoundsFeature(map, feature, hit, options = {}) {
+  if (!map || !feature?.geometry || !hit) {
+    return;
+  }
+
+  const { padding = 48, maxZoom = 11, duration = 800, onOpenDetails } = options;
+  const bounds = bbox(feature);
+  let popupShown = false;
+
+  const showPopupOnce = () => {
+    if (popupShown) {
+      return;
+    }
+
+    popupShown = true;
+    showBoundsFeaturePopup(map, hit, null, { onOpenDetails });
+  };
+
+  map.once("moveend", showPopupOnce);
+  map.fitBounds(
+    [
+      [bounds[0], bounds[1]],
+      [bounds[2], bounds[3]]
+    ],
+    { padding, maxZoom, duration }
+  );
+
+  setTimeout(showPopupOnce, duration + 100);
+}
 
 function getInteractiveBoundsLayerIds(map) {
   return BOUNDS_LAYER_DEFINITIONS.filter(
@@ -106,6 +289,28 @@ function getMapLayerIds(definition) {
   }
 
   return [getFillLayerId(definition.id), getOutlineLayerId(definition.id)];
+}
+
+function getVisibleDocIdsForLayer(layerId, featureVisibility = {}) {
+  const prefix = `${layerId}:`;
+
+  return new Set(
+    Object.entries(featureVisibility)
+      .filter(([featureKey, visible]) => visible && featureKey.startsWith(prefix))
+      .map(([featureKey]) => featureKey.slice(prefix.length))
+  );
+}
+
+function filterGeoJSONByDocIds(fullGeojson, visibleDocIds) {
+  const features = fullGeojson.features.filter((feature, featureIndex) => {
+    const docId = buildBoundsFeatureDocId(feature.properties ?? {}, featureIndex);
+    return visibleDocIds.has(docId);
+  });
+
+  return {
+    type: "FeatureCollection",
+    features
+  };
 }
 
 /** Возвращает полигон границ в точке клика или null. */
@@ -252,49 +457,77 @@ export function clearBoundsLayerCache() {
   dataCache.clear();
 }
 
-/** Показывает или скрывает слой границ, при необходимости загружая данные из Firestore. */
-export async function setBoundsLayerVisible(map, layerId, visible) {
-  const definition = BOUNDS_LAYER_DEFINITIONS.find((item) => item.id === layerId);
-  if (!definition) {
-    return;
+/** Загружает GeoJSON слоя из Firestore или возвращает кэш. */
+export async function ensureBoundsLayerGeoJSON(layerId) {
+  if (dataCache.has(layerId)) {
+    return dataCache.get(layerId);
   }
 
-  ensureBoundsLayer(map, definition);
+  const geojson = await loadBoundsLayerGeoJSONFromFirestore(layerId);
 
-  if (!visible) {
+  if (!geojson.features.length) {
+    throw new Error(
+      "В Firestore нет данных для этого слоя. Выполните npm run import:firestore-bounds"
+    );
+  }
+
+  dataCache.set(layerId, geojson);
+  return geojson;
+}
+
+export function getCachedBoundsLayerGeoJSON(layerId) {
+  return dataCache.get(layerId) ?? null;
+}
+
+function applyLayerFeatureVisibility(map, definition, featureVisibility = {}) {
+  const layerId = definition.id;
+  const source = map.getSource(getSourceId(layerId));
+  const visibleDocIds = getVisibleDocIdsForLayer(layerId, featureVisibility);
+
+  if (!visibleDocIds.size) {
+    if (source) {
+      source.setData(EMPTY_COLLECTION);
+    }
     setLayersVisibility(map, definition, false);
     return;
   }
 
-  if (!dataCache.has(layerId)) {
-    const geojson = await loadBoundsLayerGeoJSONFromFirestore(layerId);
-
-    if (!geojson.features.length) {
-      throw new Error(
-        "В Firestore нет данных для этого слоя. Выполните npm run import:firestore-bounds"
-      );
-    }
-
-    dataCache.set(layerId, geojson);
-    map.getSource(getSourceId(layerId)).setData(geojson);
+  const fullGeojson = dataCache.get(layerId);
+  if (!fullGeojson) {
+    return;
   }
 
+  source.setData(filterGeoJSONByDocIds(fullGeojson, visibleDocIds));
   setLayersVisibility(map, definition, true);
 }
 
-/** Синхронизирует видимость всех слоёв границ. Возвращает ошибки по layer_id. */
-export async function syncBoundsLayersVisibility(map, visibilityById = {}) {
+/** Синхронизирует видимость отдельных объектов bounds на карте. */
+export async function syncBoundsFeaturesVisibility(map, featureVisibility = {}) {
   const errors = {};
 
+  BOUNDS_LAYER_DEFINITIONS.forEach((definition) => ensureBoundsLayer(map, definition));
+
+  const layersNeedingData = BOUNDS_LAYER_DEFINITIONS.filter(({ id }) =>
+    getVisibleDocIdsForLayer(id, featureVisibility).size
+  );
+
   await Promise.all(
-    BOUNDS_LAYER_DEFINITIONS.map(async ({ id }) => {
+    layersNeedingData.map(async (definition) => {
       try {
-        await setBoundsLayerVisible(map, id, Boolean(visibilityById[id]));
+        await ensureBoundsLayerGeoJSON(definition.id);
       } catch (error) {
-        errors[id] = error?.message || String(error);
+        errors[definition.id] = error?.message || String(error);
       }
     })
   );
+
+  BOUNDS_LAYER_DEFINITIONS.forEach((definition) => {
+    try {
+      applyLayerFeatureVisibility(map, definition, featureVisibility);
+    } catch (error) {
+      errors[definition.id] = error?.message || String(error);
+    }
+  });
 
   return errors;
 }
