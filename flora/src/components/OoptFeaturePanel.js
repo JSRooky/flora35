@@ -147,18 +147,6 @@ export default function OoptFeaturePanel({
                     <button
                       type="button"
                       className={`oopt-feature-panel-icon-btn${
-                        speciesListOpen ? " oopt-feature-panel-icon-btn--active" : ""
-                      }`}
-                      onClick={onShowSpeciesList}
-                      aria-pressed={speciesListOpen}
-                      aria-label={speciesListOpen ? "Скрыть" : "Показать"}
-                      title={speciesListOpen ? "Скрыть" : "Показать"}
-                    >
-                      <ListIcon className="oopt-feature-panel-icon-btn-svg" />
-                    </button>
-                    <button
-                      type="button"
-                      className={`oopt-feature-panel-icon-btn${
                         pointsFilterEnabled ? " oopt-feature-panel-icon-btn--active" : ""
                       }`}
                       onClick={onPointsFilterToggle}
@@ -168,6 +156,18 @@ export default function OoptFeaturePanel({
                       title="Только эти"
                     >
                       <FilterIcon className="oopt-feature-panel-icon-btn-svg" />
+                    </button>
+                    <button
+                      type="button"
+                      className={`oopt-feature-panel-icon-btn${
+                        speciesListOpen ? " oopt-feature-panel-icon-btn--active" : ""
+                      }`}
+                      onClick={onShowSpeciesList}
+                      aria-pressed={speciesListOpen}
+                      aria-label={speciesListOpen ? "Скрыть" : "Показать"}
+                      title={speciesListOpen ? "Скрыть" : "Показать"}
+                    >
+                      <ListIcon className="oopt-feature-panel-icon-btn-svg" />
                     </button>
                   </div>
                 </div>

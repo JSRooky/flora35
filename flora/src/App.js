@@ -187,6 +187,7 @@ export default function MapView() {
   const [ooptFilterBoundsFeature, setOoptFilterBoundsFeature] = useState(null);
   const [toolPointsFilterEnabled, setToolPointsFilterEnabled] = useState(loadToolPointsFilterState);
   const [boundsSpeciesListOpen, setBoundsSpeciesListOpen] = useState(false);
+  const [boundsSpeciesRegnumFilter, setBoundsSpeciesRegnumFilter] = useState(null);
   const [activeModule, setActiveModule] = useState(null);
   // Радиус, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
   const [arealDockedWithFeature, setArealDockedWithFeature] = useState(false);
@@ -795,8 +796,22 @@ export default function MapView() {
       filters[WITHIN_FEATURE_FILTER_KEY] = effectiveWithinFeature;
     }
 
+    if (boundsSpeciesRegnumFilter !== null) {
+      const enabledRegnums = boundsSpeciesRegnumFilter;
+
+      if (enabledRegnums.length === 0) {
+        filters.regnum = ["__none__"];
+      } else if (filters.regnum != null) {
+        const existing = Array.isArray(filters.regnum) ? filters.regnum : [filters.regnum];
+        const intersected = enabledRegnums.filter((regnum) => existing.includes(regnum));
+        filters.regnum = intersected.length > 0 ? intersected : ["__none__"];
+      } else {
+        filters.regnum = enabledRegnums;
+      }
+    }
+
     return filters;
-  }, [buildBaseLocationFilters, effectiveWithinFeature]);
+  }, [buildBaseLocationFilters, boundsSpeciesRegnumFilter, effectiveWithinFeature]);
 
   const handleUserFindingSaved = useCallback(() => {
     const mapInstance = map.current;
@@ -818,11 +833,7 @@ export default function MapView() {
     return getAreaContainedPointsSummary(areaGeometry, buildLocationFilters());
   }, [areaGeometry, buildLocationFilters, mapReady]);
 
-  const boundsFilterBase = useCallback(() => {
-    const filters = buildLocationFilters();
-    delete filters[WITHIN_FEATURE_FILTER_KEY];
-    return filters;
-  }, [buildLocationFilters]);
+  const boundsFilterBase = useCallback(() => buildBaseLocationFilters(), [buildBaseLocationFilters]);
   boundsFilterBaseRef.current = boundsFilterBase;
 
   const boundsContainedSpecies = useMemo(() => {
@@ -1508,6 +1519,7 @@ export default function MapView() {
     if (activeModule !== MODULE_IDS.OOPT) {
       if (!toolPointsFilterEnabled[MODULE_IDS.OOPT]) {
         setBoundsSpeciesListOpen(false);
+        setBoundsSpeciesRegnumFilter(null);
         setSelectedBoundsFeature(null);
       }
     }
@@ -1950,11 +1962,22 @@ export default function MapView() {
   }, [selectedBoundsFeature]);
 
   const handleBoundsSpeciesListToggle = useCallback(() => {
-    setBoundsSpeciesListOpen((open) => !open);
+    setBoundsSpeciesListOpen((open) => {
+      if (open) {
+        setBoundsSpeciesRegnumFilter(null);
+      }
+
+      return !open;
+    });
   }, []);
 
   const handleBoundsSpeciesListClose = useCallback(() => {
     setBoundsSpeciesListOpen(false);
+    setBoundsSpeciesRegnumFilter(null);
+  }, []);
+
+  const handleBoundsSpeciesRegnumVisibilityChange = useCallback((enabledRegnums) => {
+    setBoundsSpeciesRegnumFilter(enabledRegnums);
   }, []);
 
   const handleBoundsSpeciesSelect = useCallback((feature) => {
@@ -2513,6 +2536,7 @@ export default function MapView() {
         }
         speciesSummary={boundsContainedSpecies}
         onSpeciesSelect={handleBoundsSpeciesSelect}
+        onRegnumVisibilityChange={handleBoundsSpeciesRegnumVisibilityChange}
       />
       <MapCornerControls
         ooptFilterEnabled={ooptPointsFilterActive}
