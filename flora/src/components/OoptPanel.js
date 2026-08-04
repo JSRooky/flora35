@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { BOUNDS_LAYER_DEFINITIONS } from "../firebase/boundsCollectionFirestore";
+import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
+import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/OoptPanel.css";
 
 export function createInitialBoundsVisibility() {
@@ -35,6 +37,7 @@ export default function OoptPanel({
   onCollapsedChange
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const isControlled = collapsedProp !== undefined;
   const collapsed = isControlled ? collapsedProp : collapsedInternal;
   const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
@@ -51,16 +54,23 @@ export default function OoptPanel({
     <aside className={`oopt-panel ${collapsed ? "oopt-panel--collapsed" : ""}`} aria-label="ООПТ">
       <div className="oopt-panel-header">
         <h3 className="oopt-panel-title">ООПТ</h3>
-        <button
-          type="button"
-          className="oopt-panel-toggle"
-          onClick={() => setCollapsed(!collapsed)}
-          aria-expanded={!collapsed}
-          aria-label={toggleLabel}
-          title={toggleLabel}
-        >
-          {collapsed ? "▾" : "▴"}
-        </button>
+        <div className="popup-panel-header-actions">
+          <ModuleHelpButton
+            mapToolAccent
+            open={helpOpen}
+            onClick={() => setHelpOpen((value) => !value)}
+          />
+          <button
+            type="button"
+            className="oopt-panel-toggle"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-expanded={!collapsed}
+            aria-label={toggleLabel}
+            title={toggleLabel}
+          >
+            {collapsed ? "▾" : "▴"}
+          </button>
+        </div>
       </div>
 
       {collapsed ? (
@@ -116,6 +126,8 @@ export default function OoptPanel({
           </label>
         </div>
       )}
+
+      <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.OOPT} open={helpOpen} />
     </aside>
   );
 }

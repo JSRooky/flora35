@@ -1,4 +1,5 @@
 import { area } from "@turf/turf";
+import { getBoundsFeatureTitle } from "../firebase/boundsCollectionFirestore";
 
 const BOUNDARY_LABELS = {
   national_park: "Национальный парк",
@@ -53,6 +54,23 @@ export function formatBoundsPropertyValue(field, properties) {
   }
 
   return String(rawValue);
+}
+
+/** Категория и название объекта bounds для заголовков в UI. */
+export function getBoundsFeatureHeadingParts(layerId, properties = {}) {
+  const title = getBoundsFeatureTitle(properties) || "";
+  let category = null;
+
+  if (layerId === "oopt_pol") {
+    category = formatBoundsPropertyValue({ key: "category_t" }, properties);
+  } else if (layerId === "nature_reserve_polygon") {
+    category = formatBoundsPropertyValue(
+      { key: "BOUNDARY", format: (value) => BOUNDARY_LABELS[value] ?? value },
+      properties
+    );
+  }
+
+  return { category, title };
 }
 
 function formatAreaKm2(areaKm2) {

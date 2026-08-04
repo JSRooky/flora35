@@ -1,4 +1,5 @@
 import mapboxgl from "mapbox-gl";
+import { booleanPointInPolygon, point } from "@turf/turf";
 import {
   formatPropertyValue,
   getPropertyLabel
@@ -19,6 +20,9 @@ const CLUSTER_OPTIONS = {
   clusterMaxZoom: 14,
   clusterRadius: 50
 };
+
+/** Ключ фильтра GeoJSON-полигона в объекте filters для applyLocationsFilter. */
+export const WITHIN_FEATURE_FILTER_KEY = "__withinFeature";
 
 const REGNUM_COLORS = {
   plantae: "#588f38",
@@ -1438,6 +1442,10 @@ function filterValueEqual(a, b) {
     return true;
   }
 
+  if (a?.type === "Feature" && b?.type === "Feature") {
+    return a === b;
+  }
+
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((value, index) => value === b[index]);
   }
@@ -1646,33 +1654,48 @@ function rebuildLocationsLayers(map) {
 
 /** Фильтрует GeoJSON-объекты по properties; массив значений — логика «любой из». */
 export function filterFeatures(features, filters = {}) {
-  const filterEntries = Object.entries(filters);
-  if (filterEntries.length === 0) {
-    return features;
+  const { [WITHIN_FEATURE_FILTER_KEY]: withinFeature, ...propertyFilters } = filters;
+  const filterEntries = Object.entries(propertyFilters);
+
+  let result = features;
+
+  if (filterEntries.length > 0) {
+    result = result.filter((feature) =>
+      filterEntries.every(([key, value]) => {
+        if (value && typeof value === "object" && !Array.isArray(value) && "min" in value && "max" in value) {
+          const prop = feature.properties[key];
+          if (prop == null) {
+            return false;
+          }
+
+          return prop >= value.min && prop <= value.max;
+        }
+
+        if (Array.isArray(value)) {
+          if (value.length === 0) {
+            return true;
+          }
+
+          return value.includes(feature.properties[key]);
+        }
+
+        return feature.properties[key] === value;
+      })
+    );
   }
 
-  return features.filter((feature) =>
-    filterEntries.every(([key, value]) => {
-      if (value && typeof value === "object" && !Array.isArray(value) && "min" in value && "max" in value) {
-        const prop = feature.properties[key];
-        if (prop == null) {
-          return false;
-        }
-
-        return prop >= value.min && prop <= value.max;
+  if (withinFeature?.geometry) {
+    result = result.filter((feature) => {
+      const coordinates = feature.geometry?.coordinates;
+      if (!coordinates) {
+        return false;
       }
 
-      if (Array.isArray(value)) {
-        if (value.length === 0) {
-          return true;
-        }
+      return booleanPointInPolygon(point(coordinates), withinFeature);
+    });
+  }
 
-        return value.includes(feature.properties[key]);
-      }
-
-      return feature.properties[key] === value;
-    })
-  );
+  return result;
 }
 
 export function getFilteredFeatureCenters(filters = {}) {

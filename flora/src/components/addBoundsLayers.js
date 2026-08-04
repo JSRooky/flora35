@@ -1,9 +1,10 @@
+import { booleanPointInPolygon, point } from "@turf/turf";
 import {
   BOUNDS_LAYER_DEFINITIONS,
   BOUNDS_LAYER_KINDS
 } from "../firebase/boundsCollectionFirestore";
 import { loadBoundsLayerGeoJSONFromFirestore } from "../firebase/loadBoundsFromFirestore";
-import { applyMapCursor, getFirstLocationsLayerId } from "./addLocationsLayer";
+import { applyMapCursor, getFilteredFeatures, getFirstLocationsLayerId } from "./addLocationsLayer";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -348,4 +349,77 @@ export async function syncBoundsLayersVisibility(map, visibilityById = {}) {
   );
 
   return errors;
+}
+
+/**
+ * Считает уникальные виды (по name_latin, иначе name_ru) среди точек находок
+ * из текущей выборки, попавших внутрь полигона ООПТ или заповедника.
+ */
+export function getBoundsContainedSpeciesSummary(boundsFeature, filters = {}) {
+  if (!boundsFeature?.geometry) {
+    return { count: 0, species: [] };
+  }
+
+  const speciesByKey = new Map();
+
+  getFilteredFeatures(filters).forEach((feature) => {
+    const coordinates = feature.geometry?.coordinates;
+    if (!coordinates) {
+      return;
+    }
+
+    if (!booleanPointInPolygon(point(coordinates), boundsFeature)) {
+      return;
+    }
+
+    const nameLatin = feature.properties?.name_latin;
+    const speciesKey = nameLatin || feature.properties?.name_ru;
+    if (!speciesKey || speciesByKey.has(speciesKey)) {
+      return;
+    }
+
+    speciesByKey.set(speciesKey, {
+      nameRu: feature.properties?.name_ru || "Без названия",
+      nameLatin: nameLatin || "",
+      regnum: feature.properties?.regnum || "",
+      family: feature.properties?.family || "",
+      point: feature
+    });
+  });
+
+  const species = [...speciesByKey.values()].sort((left, right) =>
+    left.nameRu.localeCompare(right.nameRu, "ru")
+  );
+
+  return {
+    count: species.length,
+    species
+  };
+}
+
+/** Считает точки находок из текущей выборки, попавшие внутрь полигона ООПТ или заповедника. */
+export function getBoundsContainedPointsSummary(boundsFeature, filters = {}) {
+  if (!boundsFeature?.geometry) {
+    return { count: 0, points: [] };
+  }
+
+  const points = getFilteredFeatures(filters)
+    .filter((feature) => {
+      const coordinates = feature.geometry?.coordinates;
+      if (!coordinates) {
+        return false;
+      }
+
+      return booleanPointInPolygon(point(coordinates), boundsFeature);
+    })
+    .sort((left, right) => {
+      const nameA = left.properties?.name_ru ?? "";
+      const nameB = right.properties?.name_ru ?? "";
+      return nameA.localeCompare(nameB, "ru");
+    });
+
+  return {
+    count: points.length,
+    points
+  };
 }

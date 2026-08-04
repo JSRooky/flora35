@@ -26,7 +26,8 @@ import {
   setMapCursorOverride,
   showSharedPointPin,
   showSharedPointPopup,
-  updateSelectedPointHighlight
+  updateSelectedPointHighlight,
+  WITHIN_FEATURE_FILTER_KEY
 } from "./components/addLocationsLayer";
 import {
   addHeatmapLayer,
@@ -36,11 +37,15 @@ import {
 import {
   addBoundsLayers,
   clearBoundsLayerCache,
+  getBoundsContainedPointsSummary,
+  getBoundsContainedSpeciesSummary,
   getBoundsFeatureAtClick,
   syncBoundsLayersVisibility
 } from "./components/addBoundsLayers";
 import OoptPanel, { createInitialBoundsVisibility } from "./components/OoptPanel";
 import OoptFeaturePanel from "./components/OoptFeaturePanel";
+import BoundsSpeciesListPopup from "./components/BoundsSpeciesListPopup";
+import { getBoundsFeatureHeadingParts } from "./components/boundsPropertyLabels";
 import { isFirebaseConfigured } from "./firebase/config";
 import {
   setDataSourceFilter,
@@ -156,6 +161,8 @@ export default function MapView() {
   const [boundsLayerLoading, setBoundsLayerLoading] = useState({});
   const [boundsLayerErrors, setBoundsLayerErrors] = useState({});
   const [selectedBoundsFeature, setSelectedBoundsFeature] = useState(null);
+  const [boundsPointsFilterEnabled, setBoundsPointsFilterEnabled] = useState(false);
+  const [boundsSpeciesListOpen, setBoundsSpeciesListOpen] = useState(false);
   const [activeModule, setActiveModule] = useState(null);
   // Радиус, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
   const [arealDockedWithFeature, setArealDockedWithFeature] = useState(false);
@@ -554,6 +561,14 @@ export default function MapView() {
       filters.name_latin = arealDynamicsFeature.properties.name_latin;
     }
 
+    if (
+      boundsPointsFilterEnabled &&
+      activeModule === MODULE_IDS.OOPT &&
+      selectedBoundsFeature?.feature
+    ) {
+      filters[WITHIN_FEATURE_FILTER_KEY] = selectedBoundsFeature.feature;
+    }
+
     return filters;
   }, [
     propertyFilters,
@@ -565,7 +580,9 @@ export default function MapView() {
     arealDynamicsEnabled,
     arealDynamicsHideOthers,
     arealDynamicsFeature,
-    yearBounds
+    yearBounds,
+    boundsPointsFilterEnabled,
+    selectedBoundsFeature
   ]);
 
   const handleUserFindingSaved = useCallback(() => {
@@ -587,6 +604,36 @@ export default function MapView() {
 
     return getAreaContainedPointsSummary(areaGeometry, buildLocationFilters());
   }, [areaGeometry, buildLocationFilters, mapReady]);
+
+  const boundsFilterBase = useCallback(() => {
+    const filters = buildLocationFilters();
+    delete filters[WITHIN_FEATURE_FILTER_KEY];
+    return filters;
+  }, [buildLocationFilters]);
+
+  const boundsContainedSpecies = useMemo(() => {
+    if (!selectedBoundsFeature?.feature || !mapReady) {
+      return null;
+    }
+
+    return getBoundsContainedSpeciesSummary(
+      selectedBoundsFeature.feature,
+      boundsFilterBase()
+    );
+  }, [selectedBoundsFeature, boundsFilterBase, mapReady]);
+
+  const boundsContainedPoints = useMemo(() => {
+    if (!selectedBoundsFeature?.feature || !mapReady) {
+      return null;
+    }
+
+    return getBoundsContainedPointsSummary(
+      selectedBoundsFeature.feature,
+      boundsFilterBase()
+    );
+  }, [selectedBoundsFeature, boundsFilterBase, mapReady]);
+
+  const mapMarkersVisible = markersVisible || boundsPointsFilterEnabled;
 
   const visibleBuiltPolygons = useMemo(
     () => speciesPolygons.filter((entry) => entry.built && !entry.hidden),
@@ -1095,8 +1142,8 @@ export default function MapView() {
       return;
     }
 
-    setMarkersVisible(map.current, markersVisible);
-  }, [markersVisible, mapReady]);
+    setMarkersVisible(map.current, mapMarkersVisible);
+  }, [mapMarkersVisible, mapReady]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -1167,8 +1214,16 @@ export default function MapView() {
   useEffect(() => {
     if (activeModule !== MODULE_IDS.OOPT) {
       setSelectedBoundsFeature(null);
+      setBoundsSpeciesListOpen(false);
+      setBoundsPointsFilterEnabled(false);
     }
   }, [activeModule]);
+
+  useEffect(() => {
+    if (!selectedBoundsFeature) {
+      setBoundsPointsFilterEnabled(false);
+    }
+  }, [selectedBoundsFeature]);
 
   useEffect(() => {
     // Если пользователь выключил слой, к которому относится открытая панель
@@ -1556,6 +1611,28 @@ export default function MapView() {
   }, []);
 
   const handleSpeciesPolygonSpeciesSelect = useCallback((feature) => {
+    const mapInstance = map.current;
+
+    if (!mapInstance) {
+      return;
+    }
+
+    panToArealPoint(mapInstance, feature);
+  }, []);
+
+  const handleBoundsPointsFilterToggle = useCallback(() => {
+    setBoundsPointsFilterEnabled((enabled) => !enabled);
+  }, []);
+
+  const handleBoundsSpeciesListToggle = useCallback(() => {
+    setBoundsSpeciesListOpen((open) => !open);
+  }, []);
+
+  const handleBoundsSpeciesListClose = useCallback(() => {
+    setBoundsSpeciesListOpen(false);
+  }, []);
+
+  const handleBoundsSpeciesSelect = useCallback((feature) => {
     const mapInstance = map.current;
 
     if (!mapInstance) {
@@ -1991,6 +2068,12 @@ export default function MapView() {
                 <OoptFeaturePanel
                   layerDefinition={selectedBoundsFeature.definition}
                   feature={selectedBoundsFeature.feature}
+                  containedSpeciesCount={boundsContainedSpecies?.count ?? null}
+                  containedPointsCount={boundsContainedPoints?.count ?? null}
+                  pointsFilterEnabled={boundsPointsFilterEnabled}
+                  onPointsFilterToggle={handleBoundsPointsFilterToggle}
+                  onShowSpeciesList={handleBoundsSpeciesListToggle}
+                  speciesListOpen={boundsSpeciesListOpen}
                   collapsed={isPanelCollapsed(PANEL_IDS.OOPT_FEATURE)}
                   onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.OOPT_FEATURE)}
                 />
@@ -2039,6 +2122,24 @@ export default function MapView() {
         />
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
+      <BoundsSpeciesListPopup
+        open={
+          boundsSpeciesListOpen &&
+          activeModule === MODULE_IDS.OOPT &&
+          Boolean(selectedBoundsFeature)
+        }
+        onClose={handleBoundsSpeciesListClose}
+        territoryHeading={
+          selectedBoundsFeature
+            ? getBoundsFeatureHeadingParts(
+                selectedBoundsFeature.definition?.id,
+                selectedBoundsFeature.feature?.properties ?? {}
+              )
+            : null
+        }
+        speciesSummary={boundsContainedSpecies}
+        onSpeciesSelect={handleBoundsSpeciesSelect}
+      />
       <FeedbackWidget />
     </>
   );

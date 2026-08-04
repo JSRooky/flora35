@@ -31,6 +31,8 @@
     "import:firestore-submissions:dry-run": "node scripts/import-user-submissions-to-firestore.mjs --dry-run",
     "import:firestore-bounds": "node scripts/import-bounds-to-firestore.mjs",
     "import:firestore-bounds:dry-run": "node scripts/import-bounds-to-firestore.mjs --dry-run",
+    "generate:oopt-findings": "node scripts/generate-oopt-findings.mjs --import",
+    "generate:oopt-findings:dry-run": "node scripts/generate-oopt-findings.mjs --dry-run",
     "audit:locations": "node scripts/audit-firestore-locations.mjs --dry-run",
     "audit:locations:fix-local": "node scripts/audit-firestore-locations.mjs --fix-local",
     "audit:locations:fix-firestore": "node scripts/audit-firestore-locations.mjs --fix-firestore",
