@@ -37,6 +37,7 @@ export default function OoptFeaturePanel({
   containedSpeciesCount = null,
   containedPointsCount = null,
   pointsFilterEnabled = false,
+  pointsFilterAvailable = true,
   speciesListOpen = false,
   onPointsFilterToggle,
   onShowSpeciesList,
@@ -161,6 +162,7 @@ export default function OoptFeaturePanel({
                         pointsFilterEnabled ? " oopt-feature-panel-icon-btn--active" : ""
                       }`}
                       onClick={onPointsFilterToggle}
+                      disabled={!pointsFilterAvailable}
                       aria-pressed={pointsFilterEnabled}
                       aria-label="Только эти"
                       title="Только эти"

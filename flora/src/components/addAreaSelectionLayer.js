@@ -61,7 +61,7 @@ function ringToPolygonFeature(ringCoordinates) {
   return polygon([ringCoordinates]);
 }
 
-function geometryToFeature(geometry) {
+export function geometryToFeature(geometry) {
   return {
     type: "Feature",
     geometry,

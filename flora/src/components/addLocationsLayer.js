@@ -1716,6 +1716,24 @@ export function getFilteredFeatures(filters = {}) {
   return filterFeatures(locationsData.features, filters);
 }
 
+/** Сводка по точкам внутри GeoJSON-объекта с учётом фильтров (без within-фильтра в base). */
+export function getContainedPointsSummaryForWithinFeature(withinFeature, filters = {}) {
+  const { [WITHIN_FEATURE_FILTER_KEY]: _ignored, ...baseFilters } = filters;
+  const points = filterFeatures(getFilteredFeatures(baseFilters), {
+    ...baseFilters,
+    [WITHIN_FEATURE_FILTER_KEY]: withinFeature
+  }).sort((a, b) => {
+    const nameA = a.properties?.name_ru ?? "";
+    const nameB = b.properties?.name_ru ?? "";
+    return nameA.localeCompare(nameB, "ru");
+  });
+
+  return {
+    count: points.length,
+    points
+  };
+}
+
 /** Убирает дубли координат (несколько объектов могут совпасть по lng/lat). */
 function dedupeFeaturesByCoordinates(features) {
   const seen = new Set();

@@ -1,0 +1,50 @@
+.contained-points-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.contained-points-filter-summary {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #444;
+}
+
+.points-filter-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 28px;
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid var(--map-tool-accent-border-soft, rgba(42, 157, 143, 0.45));
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--map-tool-accent-text, #1a6b62);
+  cursor: pointer;
+}
+
+.points-filter-btn:hover:not(:disabled) {
+  background: var(--map-tool-accent-soft, rgba(42, 157, 143, 0.12));
+}
+
+.points-filter-btn--active {
+  background: var(--map-tool-accent, #2a9d8f);
+  border-color: var(--map-tool-accent, #2a9d8f);
+  color: #fff;
+}
+
+.points-filter-btn--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.points-filter-btn-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}

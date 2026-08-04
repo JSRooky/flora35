@@ -56,7 +56,7 @@ export function addBufferLayer(map) {
 }
 
 /** Объединяет окружности одного радиуса вокруг нескольких центров. */
-function unionCircles(centers, radiusKm) {
+export function unionCircles(centers, radiusKm) {
   if (!centers.length) {
     return null;
   }
@@ -155,6 +155,24 @@ export function updateBufferLayer(map, features, radiiKm) {
     built: rings.length > 0,
     radiiKm: [...radiiKm]
   };
+}
+
+/** Возвращает внешнюю границу буфера (объединение окружностей максимального радиуса). */
+export function getBufferOuterFeature(features, radiiKm) {
+  const featureList = Array.isArray(features) ? features : features ? [features] : [];
+  const centers = featureList.map((feature) => feature?.geometry?.coordinates).filter(Boolean);
+
+  if (!centers.length) {
+    return null;
+  }
+
+  const outerRadiusKm = radiiKm?.[radiiKm.length - 1];
+  const radiusKm =
+    typeof outerRadiusKm === "number" && !Number.isNaN(outerRadiusKm)
+      ? outerRadiusKm
+      : BUFFER_MIN_RADIUS_KM;
+
+  return unionCircles(centers, radiusKm);
 }
 
 /** Очищает слой буфера на карте. */

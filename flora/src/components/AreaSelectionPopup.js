@@ -3,6 +3,7 @@ import { getArealPointKey } from "./addArealLayer";
 import { AREA_DRAW_MODES, AREA_OPERATION_MODES } from "./addAreaSelectionLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import ContainedPointsFilterRow from "./ContainedPointsFilterRow";
 import { ReactComponent as DrawFreeIcon } from "../images/draw-free.svg";
 import { ReactComponent as DrawRectIcon } from "../images/draw-rect.svg";
 import { ReactComponent as DrawPolyIcon } from "../images/draw-poly.svg";
@@ -118,6 +119,9 @@ export default function AreaSelectionPopup({
   drawingActive = false,
   hasArea = false,
   containedPoints = null,
+  pointsFilterEnabled = false,
+  onPointsFilterToggle,
+  pointsFilterAvailable = false,
   onPointSelect,
   onReset,
   collapsed = false,
@@ -220,12 +224,19 @@ export default function AreaSelectionPopup({
               </button>
             </div>
 
-            {hasArea && (
+            {hasArea || pointsFilterAvailable ? (
               <div className="area-selection-contained-points">
-                <p className="area-selection-contained-points-title">
-                  В области:{" "}
-                  <strong>{formatContainedPointsCount(containedPoints?.count ?? 0)}</strong>
-                </p>
+                <ContainedPointsFilterRow
+                  summary={
+                    <>
+                      {pointsFilterEnabled ? "В выбранной ООПТ" : "В области"}:{" "}
+                      <strong>{formatContainedPointsCount(containedPoints?.count ?? 0)}</strong>
+                    </>
+                  }
+                  pointsFilterEnabled={pointsFilterEnabled}
+                  onPointsFilterToggle={onPointsFilterToggle}
+                  pointsFilterAvailable={pointsFilterAvailable || hasArea}
+                />
 
                 {hasContainedPoints ? (
                   <ul className="area-selection-contained-points-list">
@@ -245,7 +256,7 @@ export default function AreaSelectionPopup({
                   <p className="area-selection-popup-status">Ни одна точка не попала в выделение.</p>
                 )}
               </div>
-            )}
+            ) : null}
           </div>
         )}
         <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.AREA} open={helpOpen} />
