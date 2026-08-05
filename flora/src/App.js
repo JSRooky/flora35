@@ -339,6 +339,8 @@ export default function MapView() {
     const isolation = boundsIsolationRef.current;
     return isolation.active && isolation.featureKey === featureKey;
   }, []);
+  const isBoundsFeatureIsolatedRef = useRef(isBoundsFeatureIsolated);
+  isBoundsFeatureIsolatedRef.current = isBoundsFeatureIsolated;
 
   const handleBoundsFeatureVisibilityChange = useCallback((featureKey, visible) => {
     clearBoundsIsolation();
@@ -2291,7 +2293,7 @@ export default function MapView() {
               showBoundsFeaturePopup(map.current, boundsHit, event.lngLat, {
                 onOpenDetails: () => openBoundsFeatureDetailsRef.current?.(),
                 onIsolate: (hit) => isolateBoundsFeatureRef.current?.(hit),
-                isIsolated: isBoundsFeatureIsolated(
+                isIsolated: isBoundsFeatureIsolatedRef.current?.(
                   getBoundsFeatureVisibilityKey(boundsHit)
                 ),
                 filters: boundsFilterBaseRef.current()
