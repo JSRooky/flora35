@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import SubmissionFieldLabel from "./SubmissionFieldLabel";
 
 export default function SubmissionAutocompleteField({
   label,
@@ -10,6 +11,7 @@ export default function SubmissionAutocompleteField({
   getSuggestionKey,
   placeholder,
   required = false,
+  filled = false,
   type = "text",
   min,
   max,
@@ -97,7 +99,9 @@ export default function SubmissionAutocompleteField({
 
   return (
     <label className="user-submission-field user-submission-autocomplete">
-      <span>{label}</span>
+      <SubmissionFieldLabel required={required} filled={filled}>
+        {label}
+      </SubmissionFieldLabel>
       <div className="user-submission-autocomplete-wrap" ref={containerRef}>
         <input
           type={type}

@@ -1,11 +1,16 @@
 .user-submission-panel {
+  --submit-accent: #007bff;
+  --submit-accent-dark: #0056b3;
+  --submit-accent-soft: rgba(0, 123, 255, 0.12);
+  --submit-accent-border: rgba(0, 123, 255, 0.35);
+
   box-sizing: border-box;
   width: 400px;
   max-width: calc(100vw - 40px);
   overflow-x: hidden;
   background-color: rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(20px);
-  border: 1px solid #ddd;
+  border: 1px solid var(--submit-accent-border);
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   padding: 12px 16px;
@@ -33,7 +38,7 @@
   margin: 0;
   font-size: 15px;
   color: #333;
-  border-bottom: 2px solid #6c757d;
+  border-bottom: 2px solid var(--submit-accent);
   padding-bottom: 6px;
   flex: 1;
 }
@@ -48,7 +53,7 @@
   gap: 12px;
   margin: 0;
   padding: 12px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--submit-accent-border);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.35);
 }
@@ -72,6 +77,27 @@
   gap: 4px;
   font-size: 13px;
   color: #333;
+}
+
+.user-submission-field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-submission-field-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.user-submission-field-marker--empty {
+  background: #dc3545;
+}
+
+.user-submission-field-marker--filled {
+  background: #1e7e34;
 }
 
 .user-submission-field input,
@@ -117,14 +143,14 @@
 
 .user-submission-suggestion:hover,
 .user-submission-suggestion--active {
-  background: rgba(108, 117, 125, 0.12);
+  background: var(--submit-accent-soft);
 }
 
 .user-submission-coordinates {
   flex: 1;
   min-width: 0;
   padding: 6px 10px;
-  border: 1px dashed #aaa;
+  border: 1px dashed var(--submit-accent-border);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.6);
   font-size: 13px;
@@ -139,6 +165,13 @@
   display: flex;
   align-items: stretch;
   gap: 8px;
+}
+
+.user-submission-location-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .user-submission-location-btn {
@@ -157,25 +190,27 @@
 
 .user-submission-location-btn:hover {
   background: #fff;
-  border-color: #999;
+  border-color: var(--submit-accent);
+  color: var(--submit-accent-dark);
 }
 
 .user-submission-location-btn--active {
-  border-color: #6c757d;
-  background: #6c757d;
+  border-color: var(--submit-accent);
+  background: var(--submit-accent);
   color: #fff;
 }
 
 .user-submission-location-btn--active:hover {
-  border-color: #5a6268;
-  background: #5a6268;
+  border-color: var(--submit-accent-dark);
+  background: var(--submit-accent-dark);
 }
 
 .user-submission-status-field {
   gap: 6px;
 }
 
-.user-submission-status-label {
+.user-submission-status-label,
+.user-submission-status-field .user-submission-field-label {
   font-size: 13px;
   color: #333;
 }
@@ -205,7 +240,7 @@
 }
 
 .user-submission-status-option:hover {
-  border-color: #999;
+  border-color: var(--submit-accent);
   background: rgba(255, 255, 255, 0.95);
 }
 
@@ -218,14 +253,14 @@
 }
 
 .user-submission-status-option:has(input:checked) {
-  border-color: #6c757d;
-  background: #6c757d;
+  border-color: var(--submit-accent);
+  background: var(--submit-accent);
   color: #fff;
 }
 
 .user-submission-status-option:has(input:checked):hover {
-  border-color: #5a6268;
-  background: #5a6268;
+  border-color: var(--submit-accent-dark);
+  background: var(--submit-accent-dark);
 }
 
 .user-submission-status-code {
@@ -253,11 +288,23 @@
   gap: 8px;
 }
 
+.user-submission-submit-wrap {
+  display: inline-flex;
+}
+
+.user-submission-submit-wrap:has(.user-submission-submit:disabled) {
+  cursor: default;
+}
+
+.user-submission-submit-wrap .user-submission-submit:disabled {
+  pointer-events: none;
+}
+
 .user-submission-submit {
   padding: 8px 14px;
   border: none;
   border-radius: 6px;
-  background: #6c757d;
+  background: var(--submit-accent);
   color: #fff;
   font-size: 13px;
   cursor: pointer;
@@ -265,12 +312,12 @@
 }
 
 .user-submission-submit:hover:not(:disabled) {
-  background: #5a6268;
+  background: var(--submit-accent-dark);
 }
 
 .user-submission-submit:disabled {
   opacity: 0.65;
-  cursor: wait;
+  cursor: default;
 }
 
 .user-submission-reset {
@@ -285,11 +332,12 @@
 }
 
 .user-submission-reset:hover:not(:disabled) {
-  background: #f5f5f5;
-  border-color: #999;
+  background: var(--submit-accent-soft);
+  border-color: var(--submit-accent);
+  color: var(--submit-accent-dark);
 }
 
 .user-submission-reset:disabled {
   opacity: 0.65;
-  cursor: wait;
+  cursor: default;
 }

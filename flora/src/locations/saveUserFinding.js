@@ -6,19 +6,40 @@ import { refreshLocationsFromFirestore } from "./loadPoints";
  * Сохраняет пользовательскую находку в Firestore (коллекция user_submissions)
  * и обновляет данные на карте из базы.
  */
+async function refreshMapAfterSave({ count = 1 } = {}) {
+  const refreshed = await refreshLocationsFromFirestore();
+  if (!refreshed) {
+    const pointLabel = count === 1 ? "точку" : "точки";
+    const savedLabel =
+      count === 1
+        ? "Находка сохранена, но не удалось обновить карту."
+        : "Находки сохранены, но не удалось обновить карту.";
+
+    throw new Error(
+      `${savedLabel} Обновите страницу, чтобы увидеть ${pointLabel}.`
+    );
+  }
+}
+
 export async function saveUserFinding(payload) {
   if (!isFirebaseConfigured()) {
     throw new Error("Firebase не настроен. Добавьте переменные окружения Firebase.");
   }
 
   await submitUserFinding(payload);
+  await refreshMapAfterSave();
+}
 
-  const refreshed = await refreshLocationsFromFirestore();
-  if (!refreshed) {
-    // Запись в Firestore прошла успешно, но перечитать коллекции не удалось —
-    // сообщаем об этом явно, иначе UI покажет «Сохранено», а точка не появится на карте.
-    throw new Error(
-      "Находка сохранена, но не удалось обновить карту. Обновите страницу, чтобы увидеть точку."
-    );
+/** Сохраняет несколько находок одного вида и один раз обновляет карту. */
+export async function saveUserFindings(payloads) {
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase не настроен. Добавьте переменные окружения Firebase.");
   }
+
+  if (payloads.length === 0) {
+    throw new Error("Нет координат для сохранения.");
+  }
+
+  await Promise.all(payloads.map((payload) => submitUserFinding(payload)));
+  await refreshMapAfterSave({ count: payloads.length });
 }

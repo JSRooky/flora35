@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
+import { formatPointsCount } from "../locations/parseCoordinatesList";
 import { saveUserFinding } from "../locations/saveUserFinding";
 import {
   buildSubmissionSuggestionData,
@@ -6,8 +7,10 @@ import {
   filterSpeciesByNameRu,
   filterTextSuggestions
 } from "../locations/submissionSuggestions";
+import CoordinatesListPopup from "./CoordinatesListPopup";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import SubmissionAutocompleteField from "./SubmissionAutocompleteField";
+import SubmissionFieldLabel from "./SubmissionFieldLabel";
 import { STATUS_OPTIONS } from "./StatusFilterPanel";
 import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/UserSubmissionPanel.css";
@@ -48,6 +51,24 @@ function applySpeciesToForm(species) {
   };
 }
 
+function isSubmissionFormComplete(form, coordinates) {
+  if (!coordinates) {
+    return false;
+  }
+
+  if (
+    !form.family.trim() ||
+    !form.name_ru.trim() ||
+    !form.name_latin.trim() ||
+    !form.found_by.trim()
+  ) {
+    return false;
+  }
+
+  const foundYear = Number(form.found_year);
+  return Number.isInteger(foundYear) && foundYear >= 1500 && foundYear <= 2100;
+}
+
 export default function UserSubmissionPanel({
   coordinates,
   locationPickingActive = false,
@@ -67,6 +88,7 @@ export default function UserSubmissionPanel({
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## submit в docs/moduleHelp.md
+  const [listInputOpen, setListInputOpen] = useState(false);
 
   const suggestionData = buildSubmissionSuggestionData();
 
@@ -100,6 +122,26 @@ export default function UserSubmissionPanel({
     [form.found_year, suggestionData.foundYears]
   );
 
+  const canSave = useMemo(
+    () => isSubmissionFormComplete(form, coordinates),
+    [coordinates, form]
+  );
+
+  const fieldCompletion = useMemo(() => {
+    const foundYear = Number(form.found_year);
+
+    return {
+      regnum: Boolean(form.regnum),
+      family: Boolean(form.family.trim()),
+      name_ru: Boolean(form.name_ru.trim()),
+      name_latin: Boolean(form.name_latin.trim()),
+      status: Boolean(form.status),
+      coordinates: Boolean(coordinates),
+      found_year: Number.isInteger(foundYear) && foundYear >= 1500 && foundYear <= 2100,
+      found_by: Boolean(form.found_by.trim())
+    };
+  }, [coordinates, form]);
+
   const handleFieldChange = useCallback((field) => (value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setMessage(null);
@@ -116,8 +158,33 @@ export default function UserSubmissionPanel({
   const handleReset = useCallback(() => {
     setForm(EMPTY_FORM);
     setMessage(null);
+    setListInputOpen(false);
     onReset?.();
   }, [onReset]);
+
+  const handleLocationPickingToggle = useCallback(() => {
+    onLocationPickingChange?.(!locationPickingActive);
+  }, [locationPickingActive, onLocationPickingChange]);
+
+  const handleListInputOpen = useCallback(() => {
+    onLocationPickingChange?.(false);
+    setListInputOpen(true);
+    setMessage(null);
+  }, [onLocationPickingChange]);
+
+  const handleListInputSaved = useCallback(
+    (savedCount) => {
+      onSaved?.();
+      setMessage({
+        type: "success",
+        text:
+          savedCount === 1
+            ? "Координаты записаны в базу и добавлены на карту."
+            : `Записано ${formatPointsCount(savedCount)} в базу и добавлено на карту.`
+      });
+    },
+    [onSaved]
+  );
 
   const handleSubmit = useCallback(
     async (event) => {
@@ -182,184 +249,218 @@ export default function UserSubmissionPanel({
   );
 
   return (
-    <aside
-      className={`user-submission-panel${collapsed ? " user-submission-panel--collapsed" : ""}`}
-      data-module-id={MODULE_IDS.SUBMIT}
-    >
-      <div className="user-submission-panel-header">
-        <h3 className="user-submission-panel-title">Новая находка</h3>
-        <div className="popup-panel-header-actions">
-          <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
-          <button
-            type="button"
-            className="user-submission-panel-toggle"
-            onClick={() => setCollapsed(!collapsed)}
-            aria-expanded={!collapsed}
-            aria-label={toggleLabel}
-            title={toggleLabel}
-          >
-            {collapsed ? "▾" : "▴"}
-          </button>
+    <>
+      <aside
+        className={`user-submission-panel${collapsed ? " user-submission-panel--collapsed" : ""}`}
+        data-module-id={MODULE_IDS.SUBMIT}
+      >
+        <div className="user-submission-panel-header">
+          <h3 className="user-submission-panel-title">Новая находка</h3>
+          <div className="popup-panel-header-actions">
+            <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+            <button
+              type="button"
+              className="user-submission-panel-toggle"
+              onClick={() => setCollapsed(!collapsed)}
+              aria-expanded={!collapsed}
+              aria-label={toggleLabel}
+              title={toggleLabel}
+            >
+              {collapsed ? "▾" : "▴"}
+            </button>
+          </div>
         </div>
-      </div>
 
-      {!collapsed && (
-        <div className="user-submission-panel-content">
-          <form className="user-submission-form" onSubmit={handleSubmit}>
-            <fieldset className="user-submission-fieldset">
-              <label className="user-submission-field">
-                <span>Царство *</span>
-                <select value={form.regnum} onChange={(event) => handleFieldChange("regnum")(event.target.value)}>
-                  {REGNUM_OPTIONS.map(({ value, label }) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+        {!collapsed && (
+          <div className="user-submission-panel-content">
+            <form className="user-submission-form" onSubmit={handleSubmit}>
+              <fieldset className="user-submission-fieldset">
+                <label className="user-submission-field">
+                  <SubmissionFieldLabel required filled={fieldCompletion.regnum}>
+                    Царство
+                  </SubmissionFieldLabel>
+                  <select value={form.regnum} onChange={(event) => handleFieldChange("regnum")(event.target.value)}>
+                    {REGNUM_OPTIONS.map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <SubmissionAutocompleteField
-                label="Семейство *"
-                value={form.family}
-                onChange={handleFieldChange("family")}
-                suggestions={familySuggestions}
-                placeholder="Ericaceae"
-                required
-              />
+                <SubmissionAutocompleteField
+                  label="Семейство"
+                  value={form.family}
+                  onChange={handleFieldChange("family")}
+                  suggestions={familySuggestions}
+                  placeholder="Ericaceae"
+                  required
+                  filled={fieldCompletion.family}
+                />
 
-              <SubmissionAutocompleteField
-                label="Название (рус.) *"
-                value={form.name_ru}
-                onChange={handleFieldChange("name_ru")}
-                onSuggestionSelect={handleSpeciesSuggestion}
-                suggestions={nameRuSuggestions}
-                getSuggestionLabel={(species) => species.name_ru}
-                getSuggestionKey={(species) => species.name_ru}
-                required
-              />
+                <SubmissionAutocompleteField
+                  label="Название (рус.)"
+                  value={form.name_ru}
+                  onChange={handleFieldChange("name_ru")}
+                  onSuggestionSelect={handleSpeciesSuggestion}
+                  suggestions={nameRuSuggestions}
+                  getSuggestionLabel={(species) => species.name_ru}
+                  getSuggestionKey={(species) => species.name_ru}
+                  required
+                  filled={fieldCompletion.name_ru}
+                />
 
-              <SubmissionAutocompleteField
-                label="Название (лат.) *"
-                value={form.name_latin}
-                onChange={handleFieldChange("name_latin")}
-                onSuggestionSelect={handleSpeciesSuggestion}
-                suggestions={nameLatinSuggestions}
-                getSuggestionLabel={(species) => species.name_latin}
-                getSuggestionKey={(species) => species.name_latin}
-                required
-              />
+                <SubmissionAutocompleteField
+                  label="Название (лат.)"
+                  value={form.name_latin}
+                  onChange={handleFieldChange("name_latin")}
+                  onSuggestionSelect={handleSpeciesSuggestion}
+                  suggestions={nameLatinSuggestions}
+                  getSuggestionLabel={(species) => species.name_latin}
+                  getSuggestionKey={(species) => species.name_latin}
+                  required
+                  filled={fieldCompletion.name_latin}
+                />
 
-              <div className="user-submission-field user-submission-status-field">
-                <span className="user-submission-status-label">Статус МСОП *</span>
-                <div
-                  className="user-submission-status-options"
-                  role="radiogroup"
-                  aria-label="Статус МСОП"
-                >
-                  {STATUS_OPTIONS.map(({ code, label }) => (
-                    <label
-                      key={code}
-                      className="user-submission-status-option"
-                      title={label}
-                    >
-                      <input
-                        type="radio"
-                        name="status"
-                        value={code}
-                        checked={form.status === code}
-                        onChange={(event) => handleFieldChange("status")(event.target.value)}
-                      />
-                      <span className="user-submission-status-code">{code}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </fieldset>
-
-            <fieldset className="user-submission-fieldset">
-              <legend className="user-submission-legend">Находка</legend>
-
-              <div className="user-submission-field user-submission-location-field">
-                <span>Место находки *</span>
-                <div className="user-submission-location-row">
-                  <output className="user-submission-coordinates">
-                    {coordinates
-                      ? formatCoordinates(coordinates)
-                      : locationPickingActive
-                        ? "Кликните по карте"
-                        : "Не указано"}
-                  </output>
-                  <button
-                    type="button"
-                    className={`user-submission-location-btn${
-                      locationPickingActive ? " user-submission-location-btn--active" : ""
-                    }`}
-                    onClick={() => onLocationPickingChange?.(!locationPickingActive)}
-                    aria-pressed={locationPickingActive}
+                <div className="user-submission-field user-submission-status-field">
+                  <SubmissionFieldLabel required filled={fieldCompletion.status} className="user-submission-status-label">
+                    Статус МСОП
+                  </SubmissionFieldLabel>
+                  <div
+                    className="user-submission-status-options"
+                    role="radiogroup"
+                    aria-label="Статус МСОП"
                   >
-                    {locationPickingActive ? "Отмена" : "Указать место"}
-                  </button>
+                    {STATUS_OPTIONS.map(({ code, label }) => (
+                      <label
+                        key={code}
+                        className="user-submission-status-option"
+                        title={label}
+                      >
+                        <input
+                          type="radio"
+                          name="status"
+                          value={code}
+                          checked={form.status === code}
+                          onChange={(event) => handleFieldChange("status")(event.target.value)}
+                        />
+                        <span className="user-submission-status-code">{code}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
+              </fieldset>
+
+              <fieldset className="user-submission-fieldset">
+                <legend className="user-submission-legend">Находка</legend>
+
+                <div className="user-submission-field user-submission-location-field">
+                  <SubmissionFieldLabel required filled={fieldCompletion.coordinates}>
+                    Место находки
+                  </SubmissionFieldLabel>
+                  <div className="user-submission-location-row">
+                    <output className="user-submission-coordinates">
+                      {coordinates
+                        ? formatCoordinates(coordinates)
+                        : locationPickingActive
+                          ? "Кликните по карте"
+                          : "Не указано"}
+                    </output>
+                    <div className="user-submission-location-actions">
+                      <button
+                        type="button"
+                        className={`user-submission-location-btn${
+                          locationPickingActive ? " user-submission-location-btn--active" : ""
+                        }`}
+                        onClick={handleLocationPickingToggle}
+                        aria-pressed={locationPickingActive}
+                      >
+                        {locationPickingActive ? "Отмена" : "Указать место"}
+                      </button>
+                      <button
+                        type="button"
+                        className="user-submission-location-btn"
+                        onClick={handleListInputOpen}
+                      >
+                        Ввод списком
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <SubmissionAutocompleteField
+                  label="Год находки"
+                  value={form.found_year}
+                  onChange={handleFieldChange("found_year")}
+                  suggestions={foundYearSuggestions}
+                  type="number"
+                  min="1500"
+                  max="2100"
+                  step="1"
+                  required
+                  filled={fieldCompletion.found_year}
+                />
+
+                <SubmissionAutocompleteField
+                  label="Кем найдено"
+                  value={form.found_by}
+                  onChange={handleFieldChange("found_by")}
+                  suggestions={foundBySuggestions}
+                  required
+                  filled={fieldCompletion.found_by}
+                />
+
+                <SubmissionAutocompleteField
+                  label="Кем определено"
+                  value={form.identified_by}
+                  onChange={handleFieldChange("identified_by")}
+                  suggestions={identifiedBySuggestions}
+                />
+              </fieldset>
+
+              {message && (
+                <p
+                  className={`user-submission-message user-submission-message--${message.type}`}
+                  role="status"
+                >
+                  {message.text}
+                </p>
+              )}
+
+              <div className="user-submission-actions">
+                <span
+                  className="user-submission-submit-wrap"
+                  title={!submitting && !canSave ? "Заполните обязательные поля" : undefined}
+                >
+                  <button
+                    type="submit"
+                    className="user-submission-submit"
+                    disabled={submitting || !canSave}
+                  >
+                    {submitting ? "Сохранение…" : "Сохранить"}
+                  </button>
+                </span>
+                <button
+                  type="button"
+                  className="user-submission-reset"
+                  onClick={handleReset}
+                  disabled={submitting}
+                >
+                  Сброс
+                </button>
               </div>
+            </form>
+          </div>
+        )}
+        <ModuleHelpPanel sectionId={MODULE_IDS.SUBMIT} open={helpOpen} />
+      </aside>
 
-              <SubmissionAutocompleteField
-                label="Год находки *"
-                value={form.found_year}
-                onChange={handleFieldChange("found_year")}
-                suggestions={foundYearSuggestions}
-                type="number"
-                min="1500"
-                max="2100"
-                step="1"
-                required
-              />
-
-              <SubmissionAutocompleteField
-                label="Кем найдено *"
-                value={form.found_by}
-                onChange={handleFieldChange("found_by")}
-                suggestions={foundBySuggestions}
-                required
-              />
-
-              <SubmissionAutocompleteField
-                label="Кем определено"
-                value={form.identified_by}
-                onChange={handleFieldChange("identified_by")}
-                suggestions={identifiedBySuggestions}
-              />
-            </fieldset>
-
-            {message && (
-              <p
-                className={`user-submission-message user-submission-message--${message.type}`}
-                role="status"
-              >
-                {message.text}
-              </p>
-            )}
-
-            <div className="user-submission-actions">
-              <button
-                type="submit"
-                className="user-submission-submit"
-                disabled={submitting}
-              >
-                {submitting ? "Сохранение…" : "Сохранить"}
-              </button>
-              <button
-                type="button"
-                className="user-submission-reset"
-                onClick={handleReset}
-                disabled={submitting}
-              >
-                Сброс
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-      <ModuleHelpPanel sectionId={MODULE_IDS.SUBMIT} open={helpOpen} />
-    </aside>
+      <CoordinatesListPopup
+        open={listInputOpen}
+        onClose={() => setListInputOpen(false)}
+        form={form}
+        onSaved={handleListInputSaved}
+      />
+    </>
   );
 }
