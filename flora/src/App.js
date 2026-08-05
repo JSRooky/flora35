@@ -43,6 +43,7 @@ import {
   getBoundsContainedPointsSummary,
   getBoundsContainedSpeciesSummary,
   getBoundsFeatureAtClick,
+  getBoundsFeatureVisibilityKey,
   getCachedBoundsLayerGeoJSON,
   hideBoundsFeaturePopup,
   showBoundsFeaturePopup,
@@ -350,6 +351,20 @@ export default function MapView() {
     });
   }, []);
 
+  const handleIsolateBoundsFeature = useCallback((hit) => {
+    const featureKey = getBoundsFeatureVisibilityKey(hit);
+
+    if (!featureKey) {
+      return;
+    }
+
+    // Ключи, отсутствующие в объекте, уже считаются невидимыми (см. getVisibleDocIdsForLayer),
+    // поэтому достаточно оставить в состоянии только выбранный объект.
+    setBoundsFeatureVisibility({ [featureKey]: true });
+  }, []);
+  const isolateBoundsFeatureRef = useRef(handleIsolateBoundsFeature);
+  isolateBoundsFeatureRef.current = handleIsolateBoundsFeature;
+
   const handleBoundsFeatureSelect = useCallback((entry) => {
     const geojson = getCachedBoundsLayerGeoJSON(entry.layerId);
     const definition = getBoundsLayerDefinition(entry.layerId);
@@ -375,10 +390,11 @@ export default function MapView() {
     if (map.current) {
       flyToBoundsFeature(map.current, feature, { definition, feature }, {
         onOpenDetails: handleOpenBoundsFeatureDetails,
+        onIsolate: handleIsolateBoundsFeature,
         filters: boundsFilterBaseRef.current()
       });
     }
-  }, [handleOpenBoundsFeatureDetails]);
+  }, [handleOpenBoundsFeatureDetails, handleIsolateBoundsFeature]);
 
   const handleModuleSelect = useCallback((moduleId) => {
     if (moduleId === MODULE_IDS.ABOUT) {
@@ -2226,6 +2242,7 @@ export default function MapView() {
               setActiveModule(MODULE_IDS.OOPT);
               showBoundsFeaturePopup(map.current, boundsHit, event.lngLat, {
                 onOpenDetails: () => openBoundsFeatureDetailsRef.current?.(),
+                onIsolate: (hit) => isolateBoundsFeatureRef.current?.(hit),
                 filters: boundsFilterBaseRef.current()
               });
               return;

@@ -4,6 +4,7 @@ import {
   BOUNDS_LAYER_DEFINITIONS,
   BOUNDS_LAYER_KINDS,
   buildBoundsFeatureDocId,
+  getBoundsFeatureKey,
   getBoundsFeatureTitle
 } from "../firebase/boundsCollectionFirestore";
 import {
@@ -24,6 +25,7 @@ const dataCache = new Map();
 const mapsWithCursorHandlers = new WeakSet();
 let boundsFeaturePopup = null;
 let boundsFeaturePopupDetailsHandler = null;
+let boundsFeaturePopupIsolateHandler = null;
 
 const TITLE_PROPERTY_KEYS = new Set(["title", "NAME_RU", "NAME"]);
 
@@ -102,10 +104,30 @@ function buildBoundsFeaturePopupHtml(hit, { pointsCount = null, speciesCount = n
   lines.push(
     '<div class="feature-popup-actions shared-point-popup-actions">',
     '<button type="button" class="feature-popup-action-btn" data-bounds-feature-details>Подробнее</button>',
+    '<button type="button" class="feature-popup-action-btn" data-bounds-feature-isolate title="Скрыть остальные полигоны ООПТ и заповедников">Изолировать</button>',
     "</div>"
   );
 
   return lines.join("");
+}
+
+/**
+ * Ключ объекта bounds для featureVisibility — в том же формате, что и ключи
+ * каталога панели ООПТ (см. buildBoundsCatalogFromGeoJSON), чтобы включение
+ * видимости через popup совпадало с состоянием чекбоксов в панели.
+ */
+export function getBoundsFeatureVisibilityKey(hit) {
+  const layerId = hit?.definition?.id;
+  const feature = hit?.feature;
+
+  if (!layerId || !feature) {
+    return null;
+  }
+
+  const cached = dataCache.get(layerId);
+  const featureIndex = cached ? cached.features.indexOf(feature) : -1;
+
+  return getBoundsFeatureKey(layerId, feature.properties ?? {}, featureIndex >= 0 ? featureIndex : 0);
 }
 
 function getBoundsFeaturePopupCoordinates(feature, lngLat) {
@@ -117,7 +139,7 @@ function getBoundsFeaturePopupCoordinates(feature, lngLat) {
 }
 
 /** Показывает всплывающее окно со сведениями о полигоне bounds. */
-export function showBoundsFeaturePopup(map, hit, lngLat, { onOpenDetails, filters = {} } = {}) {
+export function showBoundsFeaturePopup(map, hit, lngLat, { onOpenDetails, onIsolate, filters = {} } = {}) {
   if (!map || !hit?.definition || !hit?.feature) {
     return;
   }
@@ -152,13 +174,16 @@ export function showBoundsFeaturePopup(map, hit, lngLat, { onOpenDetails, filter
 
     boundsFeaturePopup = null;
     boundsFeaturePopupDetailsHandler = null;
+    boundsFeaturePopupIsolateHandler = null;
   });
 
   boundsFeaturePopup = popup;
   popup.addTo(map);
 
+  const popupElement = popup.getElement();
+
   if (onOpenDetails) {
-    const detailsButton = popup.getElement()?.querySelector("[data-bounds-feature-details]");
+    const detailsButton = popupElement?.querySelector("[data-bounds-feature-details]");
 
     if (detailsButton) {
       boundsFeaturePopupDetailsHandler = (event) => {
@@ -168,20 +193,41 @@ export function showBoundsFeaturePopup(map, hit, lngLat, { onOpenDetails, filter
       detailsButton.addEventListener("click", boundsFeaturePopupDetailsHandler);
     }
   }
+
+  if (onIsolate) {
+    const isolateButton = popupElement?.querySelector("[data-bounds-feature-isolate]");
+
+    if (isolateButton) {
+      boundsFeaturePopupIsolateHandler = (event) => {
+        event.preventDefault();
+        onIsolate(hit);
+      };
+      isolateButton.addEventListener("click", boundsFeaturePopupIsolateHandler);
+    }
+  }
 }
 
 export function hideBoundsFeaturePopup() {
-  if (boundsFeaturePopupDetailsHandler && boundsFeaturePopup) {
-    const detailsButton = boundsFeaturePopup
-      .getElement()
-      ?.querySelector("[data-bounds-feature-details]");
+  const popupElement = boundsFeaturePopup?.getElement();
+
+  if (boundsFeaturePopupDetailsHandler && popupElement) {
+    const detailsButton = popupElement.querySelector("[data-bounds-feature-details]");
 
     if (detailsButton) {
       detailsButton.removeEventListener("click", boundsFeaturePopupDetailsHandler);
     }
   }
 
+  if (boundsFeaturePopupIsolateHandler && popupElement) {
+    const isolateButton = popupElement.querySelector("[data-bounds-feature-isolate]");
+
+    if (isolateButton) {
+      isolateButton.removeEventListener("click", boundsFeaturePopupIsolateHandler);
+    }
+  }
+
   boundsFeaturePopupDetailsHandler = null;
+  boundsFeaturePopupIsolateHandler = null;
 
   if (!boundsFeaturePopup) {
     return;
@@ -197,7 +243,7 @@ export function flyToBoundsFeature(map, feature, hit, options = {}) {
     return;
   }
 
-  const { padding = 48, maxZoom = 11, duration = 800, onOpenDetails, filters = {} } = options;
+  const { padding = 48, maxZoom = 11, duration = 800, onOpenDetails, onIsolate, filters = {} } = options;
   const bounds = bbox(feature);
   let popupShown = false;
 
@@ -207,7 +253,7 @@ export function flyToBoundsFeature(map, feature, hit, options = {}) {
     }
 
     popupShown = true;
-    showBoundsFeaturePopup(map, hit, null, { onOpenDetails, filters });
+    showBoundsFeaturePopup(map, hit, null, { onOpenDetails, onIsolate, filters });
   };
 
   map.once("moveend", showPopupOnce);
