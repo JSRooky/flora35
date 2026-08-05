@@ -1,6 +1,7 @@
 import React from "react";
 import { ReactComponent as MainLogo } from "../images/main_logo.svg";
 import { DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
+import UserAccountControl from "./UserAccountControl";
 import "../styles/ModuleMenu.css";
 
 const HOME_URL = `${process.env.PUBLIC_URL || ""}/`;
@@ -106,7 +107,9 @@ export default function ModuleMenu({
   osmBasemapEnabled = false,
   onOsmBasemapEnabledChange,
   dataSourceMode,
-  onDataSourceModeChange
+  onDataSourceModeChange,
+  accountUser = null,
+  onAccountClick
 }) {
   const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => {
     const pointRequired = isPointRequiredModule(id) && !pointSelected;
@@ -204,6 +207,10 @@ export default function ModuleMenu({
               activeModule={activeModule}
               onModuleSelect={onModuleSelect}
             />
+          </li>
+          <li className="module-menu-separator" aria-hidden="true" />
+          <li className="module-menu-account-item">
+            <UserAccountControl user={accountUser} onAccountClick={onAccountClick} />
           </li>
         </ul>
       </div>

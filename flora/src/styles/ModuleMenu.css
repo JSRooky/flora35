@@ -171,6 +171,13 @@
   flex-shrink: 0;
 }
 
+.module-menu-account-item {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+
 .module-menu-switch {
   display: flex;
   align-items: center;
