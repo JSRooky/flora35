@@ -1,5 +1,5 @@
 import { area, difference, featureCollection } from "@turf/turf";
-import { getFeatureCollection } from "../locations/loadPoints";
+import { getFeaturesByNameLatin } from "../locations/loadPoints";
 import {
   buildPolygonFromCoordinates,
   POLYGON_BUILD_MODES
@@ -14,13 +14,7 @@ function getSliceCacheKey(nameLatin, mode) {
 }
 
 function getSpeciesPoints(nameLatin) {
-  if (!nameLatin) {
-    return [];
-  }
-
-  return getFeatureCollection().features.filter(
-    (candidate) => candidate.properties?.name_latin === nameLatin
-  );
+  return getFeaturesByNameLatin(nameLatin);
 }
 
 function getSliceGeometry(currentHull, previousHull) {

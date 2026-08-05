@@ -18,6 +18,7 @@ import {
   truncate
 } from "@turf/turf";
 import { getFilteredFeatures, getPointColorForRegnum } from "./addLocationsLayer";
+import { getFeaturesByNameLatin } from "../locations/loadPoints";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -60,14 +61,7 @@ export function getSpeciesKey(feature) {
 
 /** Все точки набора данных, относящиеся к тому же виду. */
 export function getPointsForSpecies(feature) {
-  const speciesKey = getSpeciesKey(feature);
-  if (!speciesKey) {
-    return [];
-  }
-
-  return getFilteredFeatures().filter(
-    (candidate) => candidate.properties?.name_latin === speciesKey
-  );
+  return getFeaturesByNameLatin(getSpeciesKey(feature));
 }
 
 /**

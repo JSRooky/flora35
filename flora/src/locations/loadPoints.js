@@ -37,14 +37,62 @@ let userpointsCollection = EMPTY_SPECIES_COLLECTION;
 let dataSourceFilter = DATA_SOURCE_MODES.ALL;
 let locationsInitPromise = null;
 
+let cachedFeatureCollection = null;
+let cachedFeatureCollectionMode = null;
+let cachedFeaturesByNameLatin = null;
+let cachedAllFeatureCollection = null;
+let featureCacheVersion = 0;
+
+function buildFeaturesByNameLatin(features) {
+  const index = new Map();
+
+  for (const feature of features) {
+    const latin = feature.properties?.name_latin;
+    if (!latin) {
+      continue;
+    }
+
+    const speciesFeatures = index.get(latin);
+    if (speciesFeatures) {
+      speciesFeatures.push(feature);
+    } else {
+      index.set(latin, [feature]);
+    }
+  }
+
+  return index;
+}
+
+function invalidateFeatureCaches() {
+  cachedFeatureCollection = null;
+  cachedFeatureCollectionMode = null;
+  cachedFeaturesByNameLatin = null;
+  cachedAllFeatureCollection = null;
+  featureCacheVersion += 1;
+}
+
+/** Счётчик сброса кэша GeoJSON — для зависимых кэшей (годы и т.п.). */
+export function getFeatureCacheVersion() {
+  return featureCacheVersion;
+}
+
 function applyFirestoreCollections({ points, userpoints }) {
   pointsCollection = points;
   userpointsCollection = userpoints;
+  invalidateFeatureCaches();
 }
 
 /** Задаёт, какие источники данных показывать на карте. */
 export function setDataSourceFilter(mode) {
+  if (dataSourceFilter === mode) {
+    return;
+  }
+
   dataSourceFilter = mode;
+  cachedFeatureCollection = null;
+  cachedFeatureCollectionMode = null;
+  cachedFeaturesByNameLatin = null;
+  featureCacheVersion += 1;
 }
 
 export function getDataSourceFilter() {
@@ -113,7 +161,34 @@ export function getSpeciesCollection() {
 
 /** Разворачивает активную коллекцию в GeoJSON FeatureCollection для карты. */
 export function getFeatureCollection() {
-  return expandFindingsToFeatures(getSpeciesCollection());
+  if (cachedFeatureCollection && cachedFeatureCollectionMode === dataSourceFilter) {
+    return cachedFeatureCollection;
+  }
+
+  const collection = expandFindingsToFeatures(getSpeciesCollection());
+  cachedFeatureCollection = collection;
+  cachedFeatureCollectionMode = dataSourceFilter;
+  cachedFeaturesByNameLatin = buildFeaturesByNameLatin(collection.features);
+  return collection;
+}
+
+/** Точки одного вида по латинскому названию (O(1) lookup). */
+export function getFeaturesByNameLatin(nameLatin) {
+  if (!nameLatin) {
+    return [];
+  }
+
+  getFeatureCollection();
+  return cachedFeaturesByNameLatin?.get(nameLatin) ?? [];
+}
+
+function getAllFeatureCollection() {
+  if (cachedAllFeatureCollection) {
+    return cachedAllFeatureCollection;
+  }
+
+  cachedAllFeatureCollection = expandFindingsToFeatures(getAllSpeciesCollection());
+  return cachedAllFeatureCollection;
 }
 
 function featureMatchesFindingId(feature, findingId) {
@@ -131,7 +206,7 @@ export function findFeatureByFindingId(findingId) {
   }
 
   return (
-    expandFindingsToFeatures(getAllSpeciesCollection()).features.find((feature) =>
+    getAllFeatureCollection().features.find((feature) =>
       featureMatchesFindingId(feature, findingId)
     ) ?? null
   );

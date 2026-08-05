@@ -649,7 +649,7 @@ export default function MapView() {
     });
   }, []);
 
-  const buildBaseLocationFilters = useCallback(() => {
+  const baseLocationFilters = useMemo(() => {
     const filters = { ...propertyFilters };
 
     if (statusFilters.length > 0) {
@@ -686,6 +686,8 @@ export default function MapView() {
     arealDynamicsFeature,
     yearBounds
   ]);
+
+  boundsFilterBaseRef.current = () => baseLocationFilters;
 
   const activeToolFilterModule = useMemo(
     () =>
@@ -731,7 +733,7 @@ export default function MapView() {
     return getToolWithinFeature({
       moduleId: activeToolFilterModule,
       map: mapInstance,
-      baseFilters: buildBaseLocationFilters(),
+      baseFilters: baseLocationFilters,
       arealEnabled,
       arealAllMarkers,
       arealRadius,
@@ -747,7 +749,7 @@ export default function MapView() {
     });
   }, [
     activeToolFilterModule,
-    buildBaseLocationFilters,
+    baseLocationFilters,
     arealEnabled,
     arealAllMarkers,
     arealRadius,
@@ -789,8 +791,8 @@ export default function MapView() {
     return null;
   }, [ooptPointsFilterActive, ooptWithinFeature]);
 
-  const buildLocationFilters = useCallback(() => {
-    const filters = buildBaseLocationFilters();
+  const locationFilters = useMemo(() => {
+    const filters = { ...baseLocationFilters };
 
     if (effectiveWithinFeature) {
       filters[WITHIN_FEATURE_FILTER_KEY] = effectiveWithinFeature;
@@ -811,7 +813,7 @@ export default function MapView() {
     }
 
     return filters;
-  }, [buildBaseLocationFilters, boundsSpeciesRegnumFilter, effectiveWithinFeature]);
+  }, [baseLocationFilters, boundsSpeciesRegnumFilter, effectiveWithinFeature]);
 
   const handleUserFindingSaved = useCallback(() => {
     const mapInstance = map.current;
@@ -821,20 +823,17 @@ export default function MapView() {
 
     syncYearBounds();
     reloadLocationsData(mapInstance);
-    updateHeatmapData(mapInstance, buildLocationFilters());
+    updateHeatmapData(mapInstance, locationFilters);
     clearArealDynamicsSliceCache();
-  }, [buildLocationFilters, mapReady, syncYearBounds]);
+  }, [locationFilters, mapReady, syncYearBounds]);
 
   const areaContainedPoints = useMemo(() => {
     if (!areaGeometry || !mapReady) {
       return null;
     }
 
-    return getAreaContainedPointsSummary(areaGeometry, buildLocationFilters());
-  }, [areaGeometry, buildLocationFilters, mapReady]);
-
-  const boundsFilterBase = useCallback(() => buildBaseLocationFilters(), [buildBaseLocationFilters]);
-  boundsFilterBaseRef.current = boundsFilterBase;
+    return getAreaContainedPointsSummary(areaGeometry, locationFilters);
+  }, [areaGeometry, locationFilters, mapReady]);
 
   const boundsContainedSpecies = useMemo(() => {
     if (!selectedBoundsFeature?.feature || !mapReady) {
@@ -843,9 +842,9 @@ export default function MapView() {
 
     return getBoundsContainedSpeciesSummary(
       selectedBoundsFeature.feature,
-      boundsFilterBase()
+      baseLocationFilters
     );
-  }, [selectedBoundsFeature, boundsFilterBase, mapReady]);
+  }, [selectedBoundsFeature, baseLocationFilters, mapReady]);
 
   const boundsContainedPoints = useMemo(() => {
     if (!selectedBoundsFeature?.feature || !mapReady) {
@@ -854,9 +853,9 @@ export default function MapView() {
 
     return getBoundsContainedPointsSummary(
       selectedBoundsFeature.feature,
-      boundsFilterBase()
+      baseLocationFilters
     );
-  }, [selectedBoundsFeature, boundsFilterBase, mapReady]);
+  }, [selectedBoundsFeature, baseLocationFilters, mapReady]);
 
   const toolPointsFilterActive = Boolean(effectiveWithinFeature);
 
@@ -869,9 +868,9 @@ export default function MapView() {
 
     return getContainedPointsSummaryForWithinFeature(
       ooptWithinFeature,
-      buildBaseLocationFilters()
+      baseLocationFilters
     );
-  }, [ooptWithinFeature, buildBaseLocationFilters, mapReady]);
+  }, [ooptWithinFeature, baseLocationFilters, mapReady]);
 
   const activeToolFilterPointsSummary = useMemo(() => {
     if (!activeToolWithinFeature || !mapReady) {
@@ -880,9 +879,9 @@ export default function MapView() {
 
     return getContainedPointsSummaryForWithinFeature(
       activeToolWithinFeature,
-      buildBaseLocationFilters()
+      baseLocationFilters
     );
-  }, [activeToolWithinFeature, buildBaseLocationFilters, mapReady]);
+  }, [activeToolWithinFeature, baseLocationFilters, mapReady]);
 
   const speciesPolygonContainedSpecies = useMemo(() => {
     if (
@@ -896,9 +895,9 @@ export default function MapView() {
     return getSpeciesPolygonContainedSummary(
       activePolygon.polygon,
       activePolygon.nameLatin,
-      buildLocationFilters()
+      locationFilters
     );
-  }, [visibleBuiltPolygons, activePolygon, buildLocationFilters, mapReady]);
+  }, [visibleBuiltPolygons, activePolygon, locationFilters, mapReady]);
 
   const intersectionContainedPoints = useMemo(() => {
     if (!intersectionResult?.hasIntersection || !intersectionResult.feature || !mapReady) {
@@ -907,13 +906,13 @@ export default function MapView() {
 
     return getPolygonIntersectionContainedSummary(
       intersectionResult.feature,
-      buildLocationFilters(),
+      locationFilters,
       [
         intersectionResult.speciesA?.nameLatin,
         intersectionResult.speciesB?.nameLatin
       ]
     );
-  }, [intersectionResult, buildLocationFilters, mapReady]);
+  }, [intersectionResult, locationFilters, mapReady]);
 
   const clearIntersectionDisplay = useCallback(() => {
     setIntersectionResult(null);
@@ -1250,7 +1249,7 @@ export default function MapView() {
       return null;
     }
 
-    const filters = buildLocationFilters();
+    const filters = locationFilters;
 
     if (
       !featureMatchesFilters(popupData, filters) ||
@@ -1265,7 +1264,7 @@ export default function MapView() {
     arealAllMarkers,
     popupData,
     arealRadius,
-    buildLocationFilters,
+    locationFilters,
     mapReady
   ]);
 
@@ -1280,8 +1279,8 @@ export default function MapView() {
       return;
     }
 
-    applyLocationsFilter(map.current, buildLocationFilters());
-  }, [buildLocationFilters]);
+    applyLocationsFilter(map.current, locationFilters);
+  }, [locationFilters]);
 
   useEffect(() => {
     setHoverTooltipsEnabled(!hoverTooltipsDisabled);
@@ -1330,7 +1329,7 @@ export default function MapView() {
 
     setDataSourceFilter(dataSourceMode);
     reloadLocationsData(map.current);
-    updateHeatmapData(map.current, buildLocationFilters());
+    updateHeatmapData(map.current, locationFilters);
     refreshAreal();
     clearSharedPointPin(map.current);
     clearArealDynamicsSliceCache();
@@ -1402,8 +1401,8 @@ export default function MapView() {
       return;
     }
 
-    setHeatmapEnabled(map.current, heatmapEnabled, buildLocationFilters());
-  }, [heatmapEnabled, buildLocationFilters]);
+    setHeatmapEnabled(map.current, heatmapEnabled, locationFilters);
+  }, [heatmapEnabled, locationFilters]);
 
   useEffect(() => {
     if (!mapReady || !map.current || !isFirebaseConfigured()) {
