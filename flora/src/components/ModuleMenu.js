@@ -1,11 +1,15 @@
 import React from "react";
+import { ReactComponent as MainLogo } from "../images/main_logo.svg";
 import { DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
 import "../styles/ModuleMenu.css";
+
+const HOME_URL = `${process.env.PUBLIC_URL || ""}/`;
 
 export const MODULE_IDS = {
   STATUS: "status",
   MAP: "map",
   YEAR: "year",
+  TIMELINE: "timeline",
   FEATURE: "feature",
   AREAL: "areal",
   // Совпадает с заголовком ## polygon в docs/moduleHelp.md.
@@ -19,18 +23,22 @@ export const MODULE_IDS = {
   ABOUT: "about"
 };
 
-const FILTER_MODULE_ITEMS = [
+const POINT_MODULE_ITEMS = [
   { id: MODULE_IDS.FEATURE, label: "Сведения о точке" },
-  { id: MODULE_IDS.YEAR, label: "Год находки" },
   { id: MODULE_IDS.STATUS, label: "Статус МСОП" }
 ];
 
+const TIME_MODULE_ITEMS = [
+  { id: MODULE_IDS.YEAR, label: "Год находки", timeAccent: true },
+  { id: MODULE_IDS.TIMELINE, label: "Таймлайн", timeAccent: true }
+];
+
 const MAP_MODULE_ITEMS = [
-  { id: MODULE_IDS.MAP, label: "Группы точек" },
-  { id: MODULE_IDS.AREAL, label: "Ареал" },
-  { id: MODULE_IDS.POLYGON, label: "Полигон" },
-  { id: MODULE_IDS.BUFFER, label: "Буфер" },
-  { id: MODULE_IDS.AREA, label: "Область" }
+  { id: MODULE_IDS.MAP, label: "Группы точек", mapToolAccent: true },
+  { id: MODULE_IDS.AREAL, label: "Радиус", mapToolAccent: true },
+  { id: MODULE_IDS.BUFFER, label: "Буфер", mapToolAccent: true },
+  { id: MODULE_IDS.POLYGON, label: "Полигон", mapToolAccent: true },
+  { id: MODULE_IDS.AREA, label: "Область", mapToolAccent: true }
 ];
 
 const TEST_MODULE_ITEMS = [
@@ -40,12 +48,12 @@ const TEST_MODULE_ITEMS = [
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
 
 function isPointRequiredModule(id) {
-  return (
-    id === MODULE_IDS.AREAL || id === MODULE_IDS.POLYGON || id === MODULE_IDS.BUFFER
-  );
+  return id === MODULE_IDS.AREAL || id === MODULE_IDS.BUFFER;
 }
 
 const DISABLED_POINT_REQUIRED_TITLE = "Выберите точку";
+const DISABLED_AREAL_BY_BUFFER_TITLE = 'Сначала сбросьте инструмент «Буфер»';
+const DISABLED_BUFFER_BY_AREAL_TITLE = 'Сначала сбросьте инструмент «Радиус»';
 
 function ModuleMenuButton({
   id,
@@ -53,13 +61,16 @@ function ModuleMenuButton({
   activeModule,
   onModuleSelect,
   className = "",
-  // Некоторые модули (например, «Полигон») требуют предварительного выбора точки.
-  disabled = false
+  timeAccent = false,
+  mapToolAccent = false,
+  // Некоторые модули (например, «Радиус») требуют предварительного выбора точки.
+  disabled = false,
+  disabledTitle = DISABLED_POINT_REQUIRED_TITLE
 }) {
   const button = (
     <button
       type="button"
-      className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${disabled ? " module-menu-btn--disabled" : ""}${className ? ` ${className}` : ""}`}
+      className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${timeAccent ? " module-menu-btn--time" : ""}${mapToolAccent ? " module-menu-btn--map-tool" : ""}${disabled ? " module-menu-btn--disabled" : ""}${className ? ` ${className}` : ""}`}
       onClick={() => !disabled && onModuleSelect(id)}
       aria-pressed={activeModule === id}
       disabled={disabled}
@@ -71,7 +82,7 @@ function ModuleMenuButton({
   // У disabled-кнопок не срабатывает title, поэтому оборачиваем в span.
   if (disabled) {
     return (
-      <span className="module-menu-btn-wrap" title={DISABLED_POINT_REQUIRED_TITLE}>
+      <span className="module-menu-btn-wrap" title={disabledTitle}>
         {button}
       </span>
     );
@@ -84,6 +95,8 @@ export default function ModuleMenu({
   activeModule,
   onModuleSelect,
   pointSelected = false,
+  arealBlocked = false,
+  bufferBlocked = false,
   hoverTooltipsDisabled = false,
   onHoverTooltipsDisabledChange,
   osmBasemapEnabled = false,
@@ -91,23 +104,48 @@ export default function ModuleMenu({
   dataSourceMode,
   onDataSourceModeChange
 }) {
-  const renderModuleItem = ({ id, label }) => (
-    <li key={id}>
-      <ModuleMenuButton
-        id={id}
-        label={label}
-        activeModule={activeModule}
-        onModuleSelect={onModuleSelect}
-        disabled={isPointRequiredModule(id) && !pointSelected}
-      />
-    </li>
-  );
+  const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => {
+    const pointRequired = isPointRequiredModule(id) && !pointSelected;
+    const blockedByOtherTool =
+      (id === MODULE_IDS.AREAL && arealBlocked) || (id === MODULE_IDS.BUFFER && bufferBlocked);
+    const disabled = pointRequired || blockedByOtherTool;
+    const disabledTitle = pointRequired
+      ? DISABLED_POINT_REQUIRED_TITLE
+      : id === MODULE_IDS.AREAL
+        ? DISABLED_AREAL_BY_BUFFER_TITLE
+        : DISABLED_BUFFER_BY_AREAL_TITLE;
+
+    return (
+      <li key={id}>
+        <ModuleMenuButton
+          id={id}
+          label={label}
+          activeModule={activeModule}
+          onModuleSelect={onModuleSelect}
+          timeAccent={timeAccent}
+          mapToolAccent={mapToolAccent}
+          disabled={disabled}
+          disabledTitle={disabledTitle}
+        />
+      </li>
+    );
+  };
 
   return (
     <nav className="module-menu" aria-label="Модули приложения">
       <div className="module-menu-dock">
+        <a
+          href={HOME_URL}
+          className="module-menu-logo-link"
+          aria-label="На главную страницу"
+          title="На главную страницу"
+        >
+          <MainLogo className="module-menu-logo" aria-hidden="true" focusable="false" />
+        </a>
         <ul className="module-menu-list">
-          {FILTER_MODULE_ITEMS.map(renderModuleItem)}
+          {POINT_MODULE_ITEMS.map(renderModuleItem)}
+          <li className="module-menu-separator" aria-hidden="true" />
+          {TIME_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator" aria-hidden="true" />
           {MAP_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />

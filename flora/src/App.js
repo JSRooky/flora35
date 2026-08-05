@@ -13,6 +13,8 @@ import {
 import {
   addLocationsLayer,
   applyLocationsFilter,
+  clearSelectedPointHighlight,
+  clearSharedPointPin,
   featureMatchesFilters,
   isFeatureUnclusteredOnMap,
   reloadLocationsData,
@@ -21,7 +23,10 @@ import {
   setClusterPieChartsEnabled,
   setMarkersVisible,
   setHoverTooltipsEnabled,
-  setMapCursorOverride
+  setMapCursorOverride,
+  showSharedPointPin,
+  showSharedPointPopup,
+  updateSelectedPointHighlight
 } from "./components/addLocationsLayer";
 import {
   addHeatmapLayer,
@@ -36,18 +41,36 @@ import {
 import {
   addSpeciesPolygonLayer,
   clearSpeciesPolygonLayer,
+  clearSpeciesPolygonIntersectionLayer,
+  computeSpeciesPolygonIntersection,
+  getPolygonIntersectionContainedSummary,
   getSpeciesPolygonContainedSummary,
-  updateSpeciesPolygonLayer,
+  syncSpeciesPolygonLayer,
+  toggleSpeciesPolygonBuildMode,
+  updateSpeciesPolygonIntersectionLayer,
+  upsertSpeciesPolygon,
   POLYGON_BUILD_MODES
 } from "./components/addSpeciesPolygonLayer";
+import {
+  addArealDynamicsLayer,
+  clearArealDynamicsLayer,
+  syncArealDynamicsLayer
+} from "./components/addArealDynamicsLayer";
+import {
+  buildArealDynamicsSlices,
+  filterSlicesUpToYear
+} from "./components/buildArealDynamicsSlices";
 import {
   addBufferLayer,
   clearBufferLayer,
   updateBufferLayer,
-  DEFAULT_BUFFER_DIAMETERS_KM
+  DEFAULT_BUFFER_RADII_KM
 } from "./components/addBufferLayer";
 import {
   addAreaSelectionLayer,
+  applyAreaGeometryOperation,
+  AREA_DRAW_MODES,
+  AREA_OPERATION_MODES,
   clearAreaSelectionLayer,
   getAreaContainedPointsSummary,
   isAreaDrawingActive,
@@ -57,17 +80,25 @@ import {
   updateAreaSelectionPreview
 } from "./components/addAreaSelectionLayer";
 import FeaturePopup from "./components/FeaturePopup";
-import ArealPopup from "./components/ArealPopup";
+import {
+  focusMapOnSharedPoint,
+  parseSharePointParams
+} from "./components/sharePointLink";
+import ArealPopup, { DEFAULT_AREAL_RADIUS_KM } from "./components/ArealPopup";
 import SpeciesPolygonPopup from "./components/SpeciesPolygonPopup";
 import BufferPopup from "./components/BufferPopup";
 import AreaSelectionPopup from "./components/AreaSelectionPopup";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
 import YearFilterPanel from "./components/YearFilterPanel";
+import TimelineSlider from "./components/TimelineSlider";
+import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
+import FeedbackWidget from "./components/FeedbackWidget";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
+import "./styles/mapToolsTheme.css";
 import "./MapView.css";
 
 const UserSubmissionPanel = lazy(() => import("./components/UserSubmissionPanel"));
@@ -104,25 +135,46 @@ export default function MapView() {
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
   const [activeModule, setActiveModule] = useState(null);
-  // Ареал, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
+  // Радиус, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
   const [arealDockedWithFeature, setArealDockedWithFeature] = useState(false);
   // Буфер, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
   const [bufferDockedWithFeature, setBufferDockedWithFeature] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [arealEnabled, setArealEnabled] = useState(false);
   const [arealAllMarkers, setArealAllMarkers] = useState(false);
-  const [arealRadius, setArealRadius] = useState(5);
+  const [arealRadius, setArealRadius] = useState(DEFAULT_AREAL_RADIUS_KM);
   const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
   const [yearRange, setYearRange] = useState(YEAR_BOUNDS);
-  // Сводка о полигоне, уже отображённом на карте (не путать с выбранной точкой).
-  const [speciesPolygonInfo, setSpeciesPolygonInfo] = useState(null);
-  // Буфер: диаметры зон (красная/жёлтая/зелёная), км; bufferEnabled — включён ли переключатель.
-  const [bufferDiameters, setBufferDiameters] = useState(DEFAULT_BUFFER_DIAMETERS_KM);
+  const [timelineYear, setTimelineYear] = useState(YEAR_BOUNDS.max);
+  const [arealDynamicsEnabled, setArealDynamicsEnabled] = useState(false);
+  const [arealDynamicsFeature, setArealDynamicsFeature] = useState(null);
+  const [arealDynamicsSlices, setArealDynamicsSlices] = useState([]);
+  const [arealDynamicsComputing, setArealDynamicsComputing] = useState(false);
+  const [arealDynamicsHideOthers, setArealDynamicsHideOthers] = useState(false);
+  // Построенные полигоны видов (один на name_latin); activePolygonId — выбранный в списке.
+  const [speciesPolygons, setSpeciesPolygons] = useState([]);
+  const [activePolygonId, setActivePolygonId] = useState(null);
+  const [polygonAddMode, setPolygonAddMode] = useState(false);
+  const [intersectionSpeciesA, setIntersectionSpeciesA] = useState(null);
+  const [intersectionSpeciesB, setIntersectionSpeciesB] = useState(null);
+  const [intersectionResult, setIntersectionResult] = useState(null);
+  const [intersectionPinned, setIntersectionPinned] = useState(false);
+  const [intersectionOnlyMode, setIntersectionOnlyMode] = useState(false);
+  const [intersectionLockedPair, setIntersectionLockedPair] = useState(null);
+  // Буфер: радиусы зон (зелёная / серо-голубая / серая), км; bufferEnabled — включён ли переключатель.
+  const [bufferRadii, setBufferRadii] = useState(DEFAULT_BUFFER_RADII_KM);
   const [bufferEnabled, setBufferEnabled] = useState(false);
   const [bufferSelectionMode, setBufferSelectionMode] = useState(false);
   const [bufferSelectedPoints, setBufferSelectedPoints] = useState([]);
-  const [areaDrawingMode, setAreaDrawingMode] = useState(false);
-  const [areaPolygon, setAreaPolygon] = useState(null);
+
+  const isArealApplied = arealEnabled || arealAllMarkers;
+  const isBufferApplied = bufferEnabled;
+  const AREAL_BLOCKED_BY_BUFFER_TITLE = 'Сначала сбросьте инструмент «Буфер»';
+  const BUFFER_BLOCKED_BY_AREAL_TITLE = 'Сначала сбросьте инструмент «Радиус»';
+  const [areaDrawTool, setAreaDrawTool] = useState(AREA_DRAW_MODES.FREEHAND);
+  const [areaOperationMode, setAreaOperationMode] = useState(AREA_OPERATION_MODES.ADD);
+  const [areaDrawingActive, setAreaDrawingActive] = useState(false);
+  const [areaGeometry, setAreaGeometry] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
   const [osmBasemapEnabled, setOsmBasemapEnabledState] = useState(false);
   const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.ALL);
@@ -130,6 +182,7 @@ export default function MapView() {
   const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
   const [submissionLocationPicking, setSubmissionLocationPicking] = useState(false);
   const hadFoundYearPropertyFilterRef = useRef(false);
+  const pendingSharePointRef = useRef(parseSharePointParams(window.location.search));
 
   const isPanelCollapsed = useCallback(
     (panelId) => panelCollapsed[panelId] ?? false,
@@ -207,8 +260,16 @@ export default function MapView() {
       return;
     }
 
+    if (moduleId === MODULE_IDS.AREAL && isBufferApplied) {
+      return;
+    }
+
+    if (moduleId === MODULE_IDS.BUFFER && isArealApplied) {
+      return;
+    }
+
     if (moduleId === MODULE_IDS.AREAL) {
-      // Из меню «Ареал» открывается отдельно — панель точки не остаётся в стеке.
+      // Из меню «Радиус» открывается отдельно — панель точки не остаётся в стеке.
       setArealDockedWithFeature(false);
       setActiveModule((current) => (current === moduleId ? null : moduleId));
       return;
@@ -232,17 +293,27 @@ export default function MapView() {
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature(false);
     setActiveModule((current) => (current === moduleId ? null : moduleId));
-  }, []);
+  }, [isArealApplied, isBufferApplied]);
 
   const handleOpenArealFromFeature = useCallback(() => {
+    if (isBufferApplied) {
+      return;
+    }
+
     setActiveModule(MODULE_IDS.FEATURE);
-    setArealDockedWithFeature(true);
-  }, []);
+    setBufferDockedWithFeature(false);
+    setArealDockedWithFeature((open) => !open);
+  }, [isBufferApplied]);
 
   const handleOpenBufferFromFeature = useCallback(() => {
+    if (isArealApplied) {
+      return;
+    }
+
     setActiveModule(MODULE_IDS.FEATURE);
-    setBufferDockedWithFeature(true);
-  }, []);
+    setArealDockedWithFeature(false);
+    setBufferDockedWithFeature((open) => !open);
+  }, [isArealApplied]);
 
   const handleYearRangeChange = useCallback((nextRange) => {
     setYearRange((prev) =>
@@ -300,7 +371,9 @@ export default function MapView() {
     propertyFilters,
     statusFilters,
     yearFilterEnabled,
-    yearRange
+    yearRange,
+    activeModule,
+    timelineYear
   };
 
   const bufferStateRef = useRef({});
@@ -308,6 +381,29 @@ export default function MapView() {
     bufferSelectionMode,
     activeModule,
     bufferDockedWithFeature
+  };
+
+  const polygonStateRef = useRef({});
+  polygonStateRef.current = {
+    polygonAddMode,
+    activeModule
+  };
+
+  const pointSelectionStateRef = useRef({});
+  pointSelectionStateRef.current = {
+    popupData,
+    propertyFilters,
+    arealEnabled,
+    arealAllMarkers,
+    speciesPolygons,
+    activePolygonId,
+    bufferEnabled,
+    bufferSelectedPoints,
+    bufferSelectionMode,
+    polygonAddMode,
+    arealDockedWithFeature,
+    bufferDockedWithFeature,
+    activeModule
   };
 
   const submissionStateRef = useRef({});
@@ -335,7 +431,9 @@ export default function MapView() {
       propertyFilters: filters,
       statusFilters: selectedStatuses,
       yearFilterEnabled: yearEnabled,
-      yearRange: selectedYearRange
+      yearRange: selectedYearRange,
+      activeModule: currentModule,
+      timelineYear: selectedTimelineYear
     } = arealStateRef.current;
 
     if (!mapInstance) {
@@ -346,8 +444,12 @@ export default function MapView() {
     if (selectedStatuses.length > 0) {
       combinedFilters.status = selectedStatuses;
     }
-    if (yearEnabled && !Object.prototype.hasOwnProperty.call(filters, "found_year")) {
-      combinedFilters.found_year = selectedYearRange;
+    if (!Object.prototype.hasOwnProperty.call(filters, "found_year")) {
+      if (currentModule === MODULE_IDS.TIMELINE) {
+        combinedFilters.found_year = { min: YEAR_BOUNDS.min, max: selectedTimelineYear };
+      } else if (yearEnabled) {
+        combinedFilters.found_year = selectedYearRange;
+      }
     }
 
     refreshArealDisplay(mapInstance, {
@@ -389,12 +491,35 @@ export default function MapView() {
       filters.status = statusFilters;
     }
 
-    if (yearFilterEnabled && !Object.prototype.hasOwnProperty.call(propertyFilters, "found_year")) {
-      filters.found_year = yearRange;
+    if (!Object.prototype.hasOwnProperty.call(propertyFilters, "found_year")) {
+      if (activeModule === MODULE_IDS.TIMELINE) {
+        filters.found_year = { min: YEAR_BOUNDS.min, max: timelineYear };
+      } else if (yearFilterEnabled) {
+        filters.found_year = yearRange;
+      }
+    }
+
+    if (
+      activeModule === MODULE_IDS.TIMELINE &&
+      arealDynamicsEnabled &&
+      arealDynamicsHideOthers &&
+      arealDynamicsFeature?.properties?.name_latin
+    ) {
+      filters.name_latin = arealDynamicsFeature.properties.name_latin;
     }
 
     return filters;
-  }, [propertyFilters, statusFilters, yearFilterEnabled, yearRange]);
+  }, [
+    propertyFilters,
+    statusFilters,
+    yearFilterEnabled,
+    yearRange,
+    activeModule,
+    timelineYear,
+    arealDynamicsEnabled,
+    arealDynamicsHideOthers,
+    arealDynamicsFeature
+  ]);
 
   const handleUserFindingSaved = useCallback(
     (userpointsCollection) => {
@@ -411,28 +536,309 @@ export default function MapView() {
   );
 
   const areaContainedPoints = useMemo(() => {
-    if (!areaPolygon || !mapReady) {
+    if (!areaGeometry || !mapReady) {
       return null;
     }
 
-    return getAreaContainedPointsSummary(areaPolygon, buildLocationFilters());
-  }, [areaPolygon, buildLocationFilters, mapReady]);
+    return getAreaContainedPointsSummary(areaGeometry, buildLocationFilters());
+  }, [areaGeometry, buildLocationFilters, mapReady]);
+
+  const visibleBuiltPolygons = useMemo(
+    () => speciesPolygons.filter((entry) => entry.built && !entry.hidden),
+    [speciesPolygons]
+  );
+
+  const builtSpeciesPolygons = useMemo(
+    () => speciesPolygons.filter((entry) => entry.built),
+    [speciesPolygons]
+  );
+
+  const activePolygon = useMemo(() => {
+    if (activePolygonId) {
+      const selected = speciesPolygons.find((entry) => entry.id === activePolygonId);
+      if (selected?.built) {
+        return selected;
+      }
+    }
+
+    return visibleBuiltPolygons[0] ?? null;
+  }, [speciesPolygons, activePolygonId, visibleBuiltPolygons]);
 
   const speciesPolygonContainedSpecies = useMemo(() => {
-    if (!speciesPolygonInfo?.built || !speciesPolygonInfo.polygon || !mapReady) {
+    if (
+      visibleBuiltPolygons.length !== 1 ||
+      !activePolygon?.polygon ||
+      !mapReady
+    ) {
       return null;
     }
 
     return getSpeciesPolygonContainedSummary(
-      speciesPolygonInfo.polygon,
-      speciesPolygonInfo.nameLatin,
+      activePolygon.polygon,
+      activePolygon.nameLatin,
       buildLocationFilters()
     );
-  }, [speciesPolygonInfo, buildLocationFilters, mapReady]);
+  }, [visibleBuiltPolygons, activePolygon, buildLocationFilters, mapReady]);
+
+  const intersectionContainedPoints = useMemo(() => {
+    if (!intersectionResult?.hasIntersection || !intersectionResult.feature || !mapReady) {
+      return null;
+    }
+
+    return getPolygonIntersectionContainedSummary(
+      intersectionResult.feature,
+      buildLocationFilters(),
+      [
+        intersectionResult.speciesA?.nameLatin,
+        intersectionResult.speciesB?.nameLatin
+      ]
+    );
+  }, [intersectionResult, buildLocationFilters, mapReady]);
+
+  const clearIntersectionDisplay = useCallback(() => {
+    setIntersectionResult(null);
+    setIntersectionPinned(false);
+    setIntersectionOnlyMode(false);
+
+    if (map.current) {
+      clearSpeciesPolygonIntersectionLayer(map.current);
+    }
+  }, []);
+
+  const clearIntersectionState = useCallback(() => {
+    clearIntersectionDisplay();
+    setIntersectionLockedPair(null);
+  }, [clearIntersectionDisplay]);
+
+  const intersectionActionsLocked = useMemo(() => {
+    if (!intersectionLockedPair) {
+      return false;
+    }
+
+    const hasA = builtSpeciesPolygons.some(
+      (entry) => entry.nameLatin === intersectionLockedPair.latinA
+    );
+    const hasB = builtSpeciesPolygons.some(
+      (entry) => entry.nameLatin === intersectionLockedPair.latinB
+    );
+
+    return hasA && hasB;
+  }, [intersectionLockedPair, builtSpeciesPolygons]);
+
+  const computeIntersectionFromSelection = useCallback(() => {
+    if (!intersectionSpeciesA || !intersectionSpeciesB || intersectionSpeciesA === intersectionSpeciesB) {
+      return null;
+    }
+
+    const entryA = builtSpeciesPolygons.find((entry) => entry.nameLatin === intersectionSpeciesA);
+    const entryB = builtSpeciesPolygons.find((entry) => entry.nameLatin === intersectionSpeciesB);
+
+    if (!entryA?.polygon || !entryB?.polygon) {
+      return null;
+    }
+
+    return {
+      ...computeSpeciesPolygonIntersection(entryA.polygon, entryB.polygon),
+      speciesA: entryA,
+      speciesB: entryB
+    };
+  }, [builtSpeciesPolygons, intersectionSpeciesA, intersectionSpeciesB]);
+
+  useEffect(() => {
+    if (activeModule !== MODULE_IDS.POLYGON) {
+      setPolygonAddMode(false);
+      clearIntersectionState();
+    }
+  }, [activeModule, clearIntersectionState]);
+
+  useEffect(() => {
+    if (activeModule !== MODULE_IDS.TIMELINE) {
+      setArealDynamicsEnabled(false);
+      setArealDynamicsFeature(null);
+      setArealDynamicsSlices([]);
+      setArealDynamicsComputing(false);
+      setArealDynamicsHideOthers(false);
+    }
+  }, [activeModule]);
+
+  useEffect(() => {
+    if (activeModule !== MODULE_IDS.TIMELINE || !arealDynamicsEnabled || !popupData) {
+      return;
+    }
+
+    setArealDynamicsFeature(popupData);
+  }, [activeModule, arealDynamicsEnabled, popupData]);
+
+  useEffect(() => {
+    if (!arealDynamicsEnabled || !arealDynamicsFeature) {
+      setArealDynamicsSlices([]);
+      setArealDynamicsComputing(false);
+      return undefined;
+    }
+
+    setArealDynamicsComputing(true);
+    const timer = window.setTimeout(() => {
+      setArealDynamicsSlices(buildArealDynamicsSlices(arealDynamicsFeature));
+      setArealDynamicsComputing(false);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [arealDynamicsEnabled, arealDynamicsFeature]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    let polygonsToSync = speciesPolygons;
+
+    if (
+      activeModule === MODULE_IDS.TIMELINE &&
+      arealDynamicsEnabled &&
+      arealDynamicsFeature?.properties?.name_latin
+    ) {
+      const activeLatin = arealDynamicsFeature.properties.name_latin;
+      polygonsToSync = speciesPolygons.map((entry) =>
+        entry.nameLatin === activeLatin ? { ...entry, hidden: true } : entry
+      );
+    } else if (
+      intersectionOnlyMode &&
+      intersectionResult?.hasIntersection &&
+      intersectionResult.speciesA &&
+      intersectionResult.speciesB
+    ) {
+      const hiddenLatins = new Set([
+        intersectionResult.speciesA.nameLatin,
+        intersectionResult.speciesB.nameLatin
+      ]);
+
+      polygonsToSync = speciesPolygons.map((entry) =>
+        hiddenLatins.has(entry.nameLatin) ? { ...entry, hidden: true } : entry
+      );
+    }
+
+    syncSpeciesPolygonLayer(map.current, polygonsToSync);
+  }, [
+    speciesPolygons,
+    mapReady,
+    activeModule,
+    arealDynamicsEnabled,
+    arealDynamicsFeature,
+    intersectionOnlyMode,
+    intersectionResult
+  ]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    if (
+      activeModule === MODULE_IDS.TIMELINE &&
+      arealDynamicsEnabled &&
+      arealDynamicsSlices.length > 0
+    ) {
+      syncArealDynamicsLayer(
+        map.current,
+        filterSlicesUpToYear(arealDynamicsSlices, timelineYear)
+      );
+      return;
+    }
+
+    clearArealDynamicsLayer(map.current);
+  }, [
+    activeModule,
+    arealDynamicsEnabled,
+    arealDynamicsSlices,
+    timelineYear,
+    mapReady
+  ]);
+
+  useEffect(() => {
+    if (!intersectionLockedPair) {
+      return;
+    }
+
+    const hasA = builtSpeciesPolygons.some(
+      (entry) => entry.nameLatin === intersectionLockedPair.latinA
+    );
+    const hasB = builtSpeciesPolygons.some(
+      (entry) => entry.nameLatin === intersectionLockedPair.latinB
+    );
+
+    if (!hasA || !hasB) {
+      setIntersectionLockedPair(null);
+    }
+  }, [intersectionLockedPair, builtSpeciesPolygons]);
+
+  useEffect(() => {
+    if (intersectionResult) {
+      setPolygonAddMode(false);
+    }
+  }, [intersectionResult]);
+
+  useEffect(() => {
+    if (!intersectionResult?.hasIntersection) {
+      setIntersectionOnlyMode(false);
+    }
+  }, [intersectionResult]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    if (intersectionResult?.hasIntersection && intersectionResult.feature) {
+      updateSpeciesPolygonIntersectionLayer(map.current, intersectionResult.feature);
+      return;
+    }
+
+    clearSpeciesPolygonIntersectionLayer(map.current);
+  }, [intersectionResult, mapReady]);
+
+  useEffect(() => {
+    if (builtSpeciesPolygons.length < 2) {
+      setIntersectionSpeciesA(null);
+      setIntersectionSpeciesB(null);
+      clearIntersectionState();
+      return;
+    }
+
+    setIntersectionSpeciesA((current) => {
+      if (current && builtSpeciesPolygons.some((entry) => entry.nameLatin === current)) {
+        return current;
+      }
+
+      return builtSpeciesPolygons[0]?.nameLatin ?? null;
+    });
+
+    setIntersectionSpeciesB((current) => {
+      if (current && builtSpeciesPolygons.some((entry) => entry.nameLatin === current)) {
+        return current;
+      }
+
+      return builtSpeciesPolygons[1]?.nameLatin ?? null;
+    });
+  }, [builtSpeciesPolygons, clearIntersectionState]);
+
+  useEffect(() => {
+    if (!intersectionPinned) {
+      return;
+    }
+
+    const nextResult = computeIntersectionFromSelection();
+
+    if (!nextResult) {
+      clearIntersectionState();
+      return;
+    }
+
+    setIntersectionResult(nextResult);
+  }, [speciesPolygons, intersectionPinned, computeIntersectionFromSelection, clearIntersectionState]);
 
   useEffect(() => {
     if (activeModule !== MODULE_IDS.AREA) {
-      setAreaDrawingMode(false);
+      setAreaDrawingActive(false);
     }
   }, [activeModule]);
 
@@ -441,42 +847,64 @@ export default function MapView() {
       return;
     }
 
-    if (areaPolygon) {
-      updateAreaSelectionLayer(map.current, areaPolygon);
+    if (areaGeometry) {
+      updateAreaSelectionLayer(map.current, areaGeometry);
     } else {
       clearAreaSelectionLayer(map.current);
     }
-  }, [areaPolygon, mapReady]);
+  }, [areaGeometry, mapReady]);
 
   useEffect(() => {
     const mapInstance = map.current;
-    if (!mapInstance || !mapReady || activeModule !== MODULE_IDS.AREA || !areaDrawingMode) {
+    if (!mapInstance || !mapReady || activeModule !== MODULE_IDS.AREA || !areaDrawingActive) {
       stopActiveAreaDrawing();
       return;
     }
 
-    startAreaDrawing(mapInstance, {
+    startAreaDrawing(mapInstance, areaDrawTool, {
       onPreview: (coordinates) => {
         updateAreaSelectionPreview(mapInstance, coordinates);
       },
       onComplete: (ringCoordinates) => {
-        setAreaPolygon(ringCoordinates);
-        setAreaDrawingMode(false);
+        setAreaGeometry((current) =>
+          applyAreaGeometryOperation(current, ringCoordinates, areaOperationMode)
+        );
+        setAreaDrawingActive(false);
+      },
+      onCancel: () => {
+        setAreaDrawingActive(false);
+        updateAreaSelectionPreview(mapInstance, []);
       }
     });
 
     return () => {
       stopActiveAreaDrawing();
     };
-  }, [areaDrawingMode, activeModule, mapReady]);
+  }, [areaDrawingActive, areaDrawTool, areaOperationMode, activeModule, mapReady]);
 
-  const handleAreaDrawingModeChange = useCallback(() => {
-    setAreaDrawingMode((prev) => !prev);
+  useEffect(() => {
+    if (!areaGeometry && areaOperationMode === AREA_OPERATION_MODES.SUBTRACT) {
+      setAreaOperationMode(AREA_OPERATION_MODES.ADD);
+    }
+  }, [areaGeometry, areaOperationMode]);
+
+  const handleAreaDrawToolChange = useCallback((nextTool) => {
+    if (areaDrawTool === nextTool && areaDrawingActive) {
+      setAreaDrawingActive(false);
+      return;
+    }
+
+    setAreaDrawTool(nextTool);
+    setAreaDrawingActive(true);
+  }, [areaDrawTool, areaDrawingActive]);
+
+  const handleAreaOperationModeChange = useCallback((nextMode) => {
+    setAreaOperationMode(nextMode);
   }, []);
 
   const handleAreaReset = useCallback(() => {
-    setAreaDrawingMode(false);
-    setAreaPolygon(null);
+    setAreaDrawingActive(false);
+    setAreaGeometry(null);
     if (map.current) {
       clearAreaSelectionLayer(map.current);
     }
@@ -553,9 +981,22 @@ export default function MapView() {
     reloadLocationsData(map.current);
     updateHeatmapData(map.current, buildLocationFilters());
     refreshAreal();
+    clearSharedPointPin(map.current);
     setPopupData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- перестраиваем слои только при смене источника данных
   }, [dataSourceMode, mapReady, refreshAreal]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    if (popupData) {
+      updateSelectedPointHighlight(map.current, popupData);
+    } else {
+      clearSelectedPointHighlight(map.current);
+    }
+  }, [popupData, mapReady]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -599,7 +1040,7 @@ export default function MapView() {
 
   useEffect(() => {
     refreshAreal();
-  }, [popupData, arealEnabled, arealAllMarkers, arealRadius, propertyFilters, statusFilters, yearFilterEnabled, yearRange, refreshAreal]);
+  }, [popupData, arealEnabled, arealAllMarkers, arealRadius, propertyFilters, statusFilters, yearFilterEnabled, yearRange, activeModule, timelineYear, refreshAreal]);
 
   useEffect(() => {
     const mapInstance = map.current;
@@ -607,7 +1048,7 @@ export default function MapView() {
       return;
     }
 
-    // Ареал для одной точки требует выбранную точку; режим "ко всем маркерам"
+    // Радиус для одной точки требует выбранную точку; режим "ко всем маркерам"
     // работает и без неё.
     if (!arealAllMarkers && (!arealEnabled || !popupData)) {
       return;
@@ -690,12 +1131,119 @@ export default function MapView() {
     }
   }, [popupData]);
 
-  const handleSpeciesPolygonReset = useCallback(() => {
+  const handleSpeciesPolygonResetAll = useCallback(() => {
+    setSpeciesPolygons([]);
+    setActivePolygonId(null);
+    setPolygonAddMode(false);
+    setIntersectionSpeciesA(null);
+    setIntersectionSpeciesB(null);
+    setIntersectionResult(null);
+    setIntersectionOnlyMode(false);
+    setIntersectionLockedPair(null);
+
     if (map.current) {
       clearSpeciesPolygonLayer(map.current);
     }
+  }, []);
 
-    setSpeciesPolygonInfo(null);
+  const handleSpeciesPolygonResetOne = useCallback((polygonId) => {
+    setSpeciesPolygons((prev) => prev.filter((entry) => entry.id !== polygonId));
+    setActivePolygonId((prev) => (prev === polygonId ? null : prev));
+
+    if (
+      intersectionSpeciesA === polygonId ||
+      intersectionSpeciesB === polygonId ||
+      intersectionResult?.speciesA?.nameLatin === polygonId ||
+      intersectionResult?.speciesB?.nameLatin === polygonId
+    ) {
+      clearIntersectionState();
+    }
+  }, [
+    clearIntersectionState,
+    intersectionResult,
+    intersectionSpeciesA,
+    intersectionSpeciesB
+  ]);
+
+  const handleSpeciesPolygonToggleHidden = useCallback((polygonId) => {
+    setSpeciesPolygons((prev) =>
+      prev.map((entry) =>
+        entry.id === polygonId ? { ...entry, hidden: !entry.hidden } : entry
+      )
+    );
+  }, []);
+
+  const handleSpeciesPolygonSelect = useCallback((polygonId) => {
+    setActivePolygonId(polygonId);
+  }, []);
+
+  const handleSpeciesPolygonToggleBuildMode = useCallback((polygonId) => {
+    setSpeciesPolygons((prev) => toggleSpeciesPolygonBuildMode(prev, polygonId));
+    setActivePolygonId(polygonId);
+  }, []);
+
+  const handleSpeciesPolygonAddModeChange = useCallback((enabled) => {
+    setPolygonAddMode(enabled);
+  }, []);
+
+  const handleArealDynamicsEnabledChange = useCallback((enabled) => {
+    setArealDynamicsEnabled(enabled);
+
+    if (enabled && popupData) {
+      setArealDynamicsFeature(popupData);
+    }
+
+    if (!enabled) {
+      setArealDynamicsFeature(null);
+      setArealDynamicsSlices([]);
+      setArealDynamicsHideOthers(false);
+    }
+  }, [popupData]);
+
+  const handleArealDynamicsHideOthersChange = useCallback((hideOthers) => {
+    setArealDynamicsHideOthers(hideOthers);
+  }, []);
+
+  const handleArealDynamicsReset = useCallback(() => {
+    setArealDynamicsEnabled(false);
+    setArealDynamicsFeature(null);
+    setArealDynamicsSlices([]);
+    setArealDynamicsHideOthers(false);
+
+    if (map.current) {
+      clearArealDynamicsLayer(map.current);
+    }
+  }, []);
+
+  const handleArealDynamicsYearSelect = useCallback((year) => {
+    setTimelineYear(year);
+  }, []);
+
+  const arealDynamicsSpeciesLabel = useMemo(() => {
+    if (!arealDynamicsFeature) {
+      return "";
+    }
+
+    const nameRu = arealDynamicsFeature.properties?.name_ru || "Без названия";
+    const nameLatin = arealDynamicsFeature.properties?.name_latin;
+
+    return nameLatin ? `${nameRu} (${nameLatin})` : nameRu;
+  }, [arealDynamicsFeature]);
+
+  const applySpeciesPolygonBuild = useCallback((feature, mode) => {
+    if (!feature) {
+      return;
+    }
+
+    const nameLatin = feature.properties?.name_latin;
+
+    setSpeciesPolygons((prev) => upsertSpeciesPolygon(prev, feature, mode));
+
+    if (nameLatin) {
+      setActivePolygonId(nameLatin);
+    }
+
+    setPolygonAddMode(false);
   }, []);
 
   /**
@@ -703,33 +1251,69 @@ export default function MapView() {
    * Смена точки сама по себе полигон не меняет — только явный вызов этой функции.
    */
   const handleSpeciesPolygonBuild = useCallback(() => {
-    if (!map.current || !popupData) {
+    if (!popupData) {
       return;
     }
 
-    const info = updateSpeciesPolygonLayer(map.current, popupData, {
-      mode: POLYGON_BUILD_MODES.CONVEX
-    });
-    setSpeciesPolygonInfo(info);
-  }, [popupData]);
+    applySpeciesPolygonBuild(popupData, POLYGON_BUILD_MODES.CONVEX);
+  }, [popupData, applySpeciesPolygonBuild]);
 
   const handleSpeciesPolygonBuildAllPoints = useCallback(() => {
-    if (!map.current || !popupData) {
+    if (!popupData) {
       return;
     }
 
-    const info = updateSpeciesPolygonLayer(map.current, popupData, {
-      mode: POLYGON_BUILD_MODES.ALL_POINTS
+    const selectedSpecies = popupData.properties?.name_latin;
+    const existing = speciesPolygons.find((entry) => entry.nameLatin === selectedSpecies);
+    const isAllPointsActive =
+      existing?.built && existing.mode === POLYGON_BUILD_MODES.ALL_POINTS;
+
+    applySpeciesPolygonBuild(
+      popupData,
+      isAllPointsActive ? POLYGON_BUILD_MODES.CONVEX : POLYGON_BUILD_MODES.ALL_POINTS
+    );
+  }, [popupData, speciesPolygons, applySpeciesPolygonBuild]);
+
+  const handleIntersectionSpeciesAChange = useCallback((nameLatin) => {
+    setIntersectionSpeciesA(nameLatin);
+    clearIntersectionDisplay();
+  }, [clearIntersectionDisplay]);
+
+  const handleIntersectionSpeciesBChange = useCallback((nameLatin) => {
+    setIntersectionSpeciesB(nameLatin);
+    clearIntersectionDisplay();
+  }, [clearIntersectionDisplay]);
+
+  const handleIntersectionCompute = useCallback(() => {
+    const nextResult = computeIntersectionFromSelection();
+
+    if (!nextResult) {
+      return;
+    }
+
+    setIntersectionResult(nextResult);
+    setIntersectionPinned(true);
+    setIntersectionLockedPair({
+      latinA: intersectionSpeciesA,
+      latinB: intersectionSpeciesB
     });
-    setSpeciesPolygonInfo(info);
-  }, [popupData]);
+    setPolygonAddMode(false);
+  }, [computeIntersectionFromSelection, intersectionSpeciesA, intersectionSpeciesB]);
+
+  const handleIntersectionReset = useCallback(() => {
+    clearIntersectionDisplay();
+  }, [clearIntersectionDisplay]);
+
+  const handleIntersectionOnlyToggle = useCallback(() => {
+    setIntersectionOnlyMode((enabled) => !enabled);
+  }, []);
 
   /**
-   * Меняет диаметр одной зоны буфера, поддерживая порядок «каждая следующая зона не меньше
+   * Меняет радиус одной зоны буфера, поддерживая порядок «каждая следующая зона не меньше
    * предыдущей» — иначе кольца буфера накладывались бы некорректно.
    */
-  const handleBufferDiameterChange = useCallback((index, value) => {
-    setBufferDiameters((prev) => {
+  const handleBufferRadiusChange = useCallback((index, value) => {
+    setBufferRadii((prev) => {
       const next = [...prev];
       next[index] = value;
 
@@ -749,18 +1333,60 @@ export default function MapView() {
     });
   }, []);
 
+  const handleArealReset = useCallback(() => {
+    setArealEnabled(false);
+    setArealAllMarkers(false);
+    setArealRadius(DEFAULT_AREAL_RADIUS_KM);
+  }, []);
+
   const handleBufferReset = useCallback(() => {
     setBufferEnabled(false);
-    setBufferDiameters(DEFAULT_BUFFER_DIAMETERS_KM);
+    setBufferRadii(DEFAULT_BUFFER_RADII_KM);
     setBufferSelectedPoints([]);
     setBufferSelectionMode(false);
   }, []);
 
   const handleBufferEnabledChange = useCallback((enabled) => {
+    if (enabled && isArealApplied) {
+      return;
+    }
+
+    if (enabled) {
+      setArealDockedWithFeature(false);
+    }
+
     setBufferEnabled(enabled);
-  }, []);
+  }, [isArealApplied]);
+
+  const handleArealEnabledChange = useCallback((enabled) => {
+    if (enabled && isBufferApplied) {
+      return;
+    }
+
+    if (enabled) {
+      setBufferDockedWithFeature(false);
+    }
+
+    setArealEnabled(enabled);
+  }, [isBufferApplied]);
+
+  const handleArealAllMarkersChange = useCallback((enabled) => {
+    if (enabled && isBufferApplied) {
+      return;
+    }
+
+    if (enabled) {
+      setBufferDockedWithFeature(false);
+    }
+
+    setArealAllMarkers(enabled);
+  }, [isBufferApplied]);
 
   const handleBufferSelectionModeChange = useCallback(() => {
+    if (isArealApplied) {
+      return;
+    }
+
     setBufferSelectionMode((prev) => {
       const next = !prev;
 
@@ -781,7 +1407,7 @@ export default function MapView() {
 
       return next;
     });
-  }, [popupData]);
+  }, [popupData, isArealApplied]);
 
   const handleArealPointSelect = useCallback((feature) => {
     const mapInstance = map.current;
@@ -804,23 +1430,47 @@ export default function MapView() {
   }, []);
 
   const clearPointSelection = useCallback(() => {
+    const state = pointSelectionStateRef.current;
+
+    if (
+      !state.popupData &&
+      Object.keys(state.propertyFilters).length === 0 &&
+      !state.arealEnabled &&
+      !state.arealAllMarkers &&
+      state.speciesPolygons.length === 0 &&
+      !state.activePolygonId &&
+      !state.bufferEnabled &&
+      state.bufferSelectedPoints.length === 0 &&
+      !state.bufferSelectionMode &&
+      !state.polygonAddMode &&
+      !state.arealDockedWithFeature &&
+      !state.bufferDockedWithFeature &&
+      state.activeModule !== MODULE_IDS.FEATURE &&
+      (!state.activeModule || state.activeModule === MODULE_IDS.POLYGON)
+    ) {
+      return;
+    }
+
     if (map.current) {
+      clearSharedPointPin(map.current);
       hideArealPointHint();
       clearArealLayer(map.current);
-      clearSpeciesPolygonLayer(map.current);
       clearBufferLayer(map.current);
+      clearSpeciesPolygonLayer(map.current);
     }
 
     setPopupData(null);
-    setPropertyFilters({});
+    setPropertyFilters((prev) => (Object.keys(prev).length === 0 ? prev : {}));
     setArealEnabled(false);
     setArealAllMarkers(false);
-    setSpeciesPolygonInfo(null);
-    setBufferDiameters(DEFAULT_BUFFER_DIAMETERS_KM);
+    setSpeciesPolygons((prev) => (prev.length === 0 ? prev : []));
+    setActivePolygonId(null);
+    setBufferRadii(DEFAULT_BUFFER_RADII_KM);
     setBufferEnabled(false);
-    setBufferSelectedPoints([]);
+    setBufferSelectedPoints((prev) => (prev.length === 0 ? prev : []));
     setBufferSelectionMode(false);
-    setActiveModule(null);
+    setPolygonAddMode(false);
+    setActiveModule((current) => (current === MODULE_IDS.POLYGON ? current : null));
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature(false);
   }, []);
@@ -840,11 +1490,49 @@ export default function MapView() {
           : [];
 
     if (bufferEnabled && bufferFeatures.length > 0) {
-      updateBufferLayer(mapInstance, bufferFeatures, bufferDiameters);
+      updateBufferLayer(mapInstance, bufferFeatures, bufferRadii);
     } else {
       clearBufferLayer(mapInstance);
     }
-  }, [bufferEnabled, popupData, bufferSelectedPoints, bufferDiameters, mapReady]);
+  }, [bufferEnabled, popupData, bufferSelectedPoints, bufferRadii, mapReady]);
+
+  useEffect(() => {
+    const pendingShare = pendingSharePointRef.current;
+
+    if (!mapReady || !map.current || !pendingShare?.findingId) {
+      return;
+    }
+
+    const { findingId, zoom } = pendingShare;
+
+    if (!isFindingInDataSource(findingId, dataSourceMode)) {
+      if (dataSourceMode !== DATA_SOURCE_MODES.ALL) {
+        setDataSourceModeState(DATA_SOURCE_MODES.ALL);
+      } else {
+        pendingSharePointRef.current = null;
+      }
+      return;
+    }
+
+    const feature = findFeatureByFindingId(findingId);
+
+    if (!feature) {
+      pendingSharePointRef.current = null;
+      return;
+    }
+
+    pendingSharePointRef.current = null;
+    focusMapOnSharedPoint(map.current, feature, { zoom });
+    showSharedPointPin(map.current, feature);
+    showSharedPointPopup(map.current, feature, {
+      onOpenDetails: (sharedFeature) => {
+        clearSharedPointPin(map.current);
+        setPopupData(sharedFeature);
+        setActiveModule(MODULE_IDS.FEATURE);
+        updateSelectedPointHighlight(map.current, sharedFeature);
+      }
+    });
+  }, [mapReady, dataSourceMode]);
 
   useEffect(() => {
     if (!map.current && ref.current) {
@@ -881,7 +1569,9 @@ export default function MapView() {
             }
 
             dismissArealPointHintOnPointClick(feature);
+            clearSharedPointPin(map.current);
             setPopupData(feature);
+            updateSelectedPointHighlight(map.current, feature);
             // Если какая-то панель уже открыта, оставляем её открытой — просто обновляем
             // данные точки. «Сведения о точке» открываются только если панелей ещё нет.
             setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
@@ -913,6 +1603,23 @@ export default function MapView() {
                 setBufferSelectedPoints([]);
               }
             }
+
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+              polygonStateRef.current;
+
+            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+              const nameLatin = feature.properties?.name_latin;
+
+              setSpeciesPolygons((prev) =>
+                upsertSpeciesPolygon(prev, feature, POLYGON_BUILD_MODES.CONVEX)
+              );
+
+              if (nameLatin) {
+                setActivePolygonId(nameLatin);
+              }
+
+              setPolygonAddMode(false);
+            }
           },
           onMapBackgroundClick: (event) => {
             if (isAreaDrawingActive()) {
@@ -931,6 +1638,7 @@ export default function MapView() {
               return;
             }
 
+            clearSharedPointPin(map.current);
             clearPointSelection();
           },
           clusteringEnabled: DEFAULT_CLUSTERING_ENABLED,
@@ -940,6 +1648,7 @@ export default function MapView() {
         });
         addArealLayer(map.current);
         addSpeciesPolygonLayer(map.current); // слой экспериментального модуля «Полигон»
+        addArealDynamicsLayer(map.current);
         addBufferLayer(map.current);
         addAreaSelectionLayer(map.current);
         addHeatmapLayer(map.current);
@@ -962,6 +1671,8 @@ export default function MapView() {
         activeModule={activeModule}
         onModuleSelect={handleModuleSelect}
         pointSelected={Boolean(popupData)}
+        arealBlocked={isBufferApplied}
+        bufferBlocked={isArealApplied}
         hoverTooltipsDisabled={hoverTooltipsDisabled}
         onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
         osmBasemapEnabled={osmBasemapEnabled}
@@ -970,7 +1681,7 @@ export default function MapView() {
         onDataSourceModeChange={setDataSourceModeState}
       />
       <div ref={ref} className="map-container" />
-      {activeModule !== null && (
+      {activeModule !== null && activeModule !== MODULE_IDS.TIMELINE && (
         <div className="module-panel-stack">
           {activeModule === MODULE_IDS.FEATURE && (
             <FeaturePopup
@@ -984,8 +1695,12 @@ export default function MapView() {
               onFiltersReset={handleFeatureFiltersReset}
               onOpenAreal={handleOpenArealFromFeature}
               arealDockedOpen={arealDockedWithFeature}
+              arealDisabled={isBufferApplied}
+              arealDisabledTitle={AREAL_BLOCKED_BY_BUFFER_TITLE}
               onOpenBuffer={handleOpenBufferFromFeature}
               bufferDockedOpen={bufferDockedWithFeature}
+              bufferDisabled={isArealApplied}
+              bufferDisabledTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
             />
           )}
           {(activeModule === MODULE_IDS.AREAL ||
@@ -996,9 +1711,12 @@ export default function MapView() {
               radius={arealRadius}
               containedPoints={arealContainedPoints}
               onPointSelect={handleArealPointSelect}
-              onEnabledChange={setArealEnabled}
-              onAllMarkersChange={setArealAllMarkers}
+              onEnabledChange={handleArealEnabledChange}
+              onAllMarkersChange={handleArealAllMarkersChange}
+              toolBlocked={isBufferApplied}
+              toolBlockedTitle={AREAL_BLOCKED_BY_BUFFER_TITLE}
               onRadiusChange={setArealRadius}
+              onReset={handleArealReset}
               collapsed={isPanelCollapsed(PANEL_IDS.AREAL)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.AREAL)}
             />
@@ -1041,12 +1759,31 @@ export default function MapView() {
           {activeModule === MODULE_IDS.POLYGON && (
             <SpeciesPolygonPopup
               feature={popupData}
-              polygonInfo={speciesPolygonInfo}
+              polygons={speciesPolygons}
+              activePolygonId={activePolygon?.id ?? null}
+              addMode={polygonAddMode}
               containedSpecies={speciesPolygonContainedSpecies}
               onBuild={handleSpeciesPolygonBuild}
               onBuildAllPoints={handleSpeciesPolygonBuildAllPoints}
-              onReset={handleSpeciesPolygonReset}
+              onResetAll={handleSpeciesPolygonResetAll}
+              onResetOne={handleSpeciesPolygonResetOne}
+              onToggleHidden={handleSpeciesPolygonToggleHidden}
+              onToggleBuildMode={handleSpeciesPolygonToggleBuildMode}
+              onSelectPolygon={handleSpeciesPolygonSelect}
+              onAddModeChange={handleSpeciesPolygonAddModeChange}
               onSpeciesSelect={handleSpeciesPolygonSpeciesSelect}
+              intersectionSpeciesA={intersectionSpeciesA}
+              intersectionSpeciesB={intersectionSpeciesB}
+              intersectionResult={intersectionResult}
+              intersectionContainedPoints={intersectionContainedPoints}
+              intersectionOnlyMode={intersectionOnlyMode}
+              intersectionActionsLocked={intersectionActionsLocked}
+              onIntersectionSpeciesAChange={handleIntersectionSpeciesAChange}
+              onIntersectionSpeciesBChange={handleIntersectionSpeciesBChange}
+              onIntersectionCompute={handleIntersectionCompute}
+              onIntersectionReset={handleIntersectionReset}
+              onIntersectionOnlyToggle={handleIntersectionOnlyToggle}
+              onIntersectionPointSelect={handleAreaPointSelect}
               collapsed={isPanelCollapsed(PANEL_IDS.POLYGON)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.POLYGON)}
             />
@@ -1056,23 +1793,28 @@ export default function MapView() {
             <BufferPopup
               feature={popupData}
               enabled={bufferEnabled}
-              diametersKm={bufferDiameters}
+              radiiKm={bufferRadii}
               selectionMode={bufferSelectionMode}
               selectedCount={bufferSelectedPoints.length}
               onEnabledChange={handleBufferEnabledChange}
               onSelectionModeChange={handleBufferSelectionModeChange}
-              onDiameterChange={handleBufferDiameterChange}
+              onRadiusChange={handleBufferRadiusChange}
               onReset={handleBufferReset}
+              toolBlocked={isArealApplied}
+              toolBlockedTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
               collapsed={isPanelCollapsed(PANEL_IDS.BUFFER)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.BUFFER)}
             />
           ) : null}
           {activeModule === MODULE_IDS.AREA && (
             <AreaSelectionPopup
-              drawingMode={areaDrawingMode}
-              hasArea={Boolean(areaPolygon)}
+              drawTool={areaDrawTool}
+              operationMode={areaOperationMode}
+              onDrawToolChange={handleAreaDrawToolChange}
+              onOperationModeChange={handleAreaOperationModeChange}
+              drawingActive={areaDrawingActive}
+              hasArea={Boolean(areaGeometry)}
               containedPoints={areaContainedPoints}
-              onDrawingModeChange={handleAreaDrawingModeChange}
               onPointSelect={handleAreaPointSelect}
               onReset={handleAreaReset}
               collapsed={isPanelCollapsed(PANEL_IDS.AREA)}
@@ -1097,7 +1839,27 @@ export default function MapView() {
           )}
         </div>
       )}
+      <TimelineSlider
+        visible={activeModule === MODULE_IDS.TIMELINE}
+        year={timelineYear}
+        onYearChange={setTimelineYear}
+      >
+        <ArealDynamicsPanel
+          enabled={arealDynamicsEnabled}
+          onEnabledChange={handleArealDynamicsEnabledChange}
+          speciesLabel={arealDynamicsSpeciesLabel}
+          speciesLatin={arealDynamicsFeature?.properties?.name_latin ?? ""}
+          slices={arealDynamicsSlices}
+          timelineYear={timelineYear}
+          onYearSelect={handleArealDynamicsYearSelect}
+          onReset={handleArealDynamicsReset}
+          hideOthers={arealDynamicsHideOthers}
+          onHideOthersChange={handleArealDynamicsHideOthersChange}
+          computing={arealDynamicsComputing}
+        />
+      </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
+      <FeedbackWidget />
     </>
   );
 }

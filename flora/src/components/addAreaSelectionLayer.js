@@ -1,4 +1,12 @@
-import { booleanPointInPolygon, point, polygon } from "@turf/turf";
+import {
+  booleanPointInPolygon,
+  cleanCoords,
+  difference,
+  featureCollection,
+  point,
+  polygon,
+  union
+} from "@turf/turf";
 import { getFilteredFeatures } from "./addLocationsLayer";
 
 const SOURCE_ID = "area-selection";
@@ -14,10 +22,82 @@ const OUTLINE_COLOR = "#2980b9";
 
 const MIN_VERTEX_COUNT = 3;
 const MIN_DISTANCE_PX = 4;
+const MIN_RECTANGLE_PX = 6;
+
+export const AREA_DRAW_MODES = {
+  FREEHAND: "freehand",
+  RECTANGLE: "rectangle",
+  POLYGON: "polygon"
+};
+
+export const AREA_OPERATION_MODES = {
+  ADD: "add",
+  SUBTRACT: "subtract"
+};
 
 let drawingActive = false;
 let drawingMap = null;
 let drawingHandlers = null;
+let drawingKeyHandler = null;
+let drawingInteractionState = null;
+
+function isValidAreaGeometry(geometry) {
+  if (!geometry) {
+    return false;
+  }
+
+  if (geometry.type === "Polygon") {
+    return geometry.coordinates?.[0]?.length >= 4;
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates.some((rings) => rings[0]?.length >= 4);
+  }
+
+  return false;
+}
+
+function ringToPolygonFeature(ringCoordinates) {
+  return polygon([ringCoordinates]);
+}
+
+function geometryToFeature(geometry) {
+  return {
+    type: "Feature",
+    geometry,
+    properties: {}
+  };
+}
+
+/** Объединяет или вычитает нарисованное кольцо из текущей области. */
+export function applyAreaGeometryOperation(
+  existingGeometry,
+  ringCoordinates,
+  operation = AREA_OPERATION_MODES.ADD
+) {
+  const nextPolygon = ringToPolygonFeature(ringCoordinates);
+
+  if (!existingGeometry) {
+    if (operation === AREA_OPERATION_MODES.SUBTRACT) {
+      return null;
+    }
+
+    return cleanCoords(nextPolygon).geometry;
+  }
+
+  if (operation === AREA_OPERATION_MODES.ADD) {
+    const merged = union(featureCollection([geometryToFeature(existingGeometry), nextPolygon]));
+    return merged ? cleanCoords(merged).geometry : existingGeometry;
+  }
+
+  const subtracted = difference(featureCollection([geometryToFeature(existingGeometry), nextPolygon]));
+
+  if (!subtracted || !isValidAreaGeometry(subtracted.geometry)) {
+    return null;
+  }
+
+  return cleanCoords(subtracted).geometry;
+}
 
 function distancePx(map, coordA, coordB) {
   const pointA = map.project(coordA);
@@ -27,6 +107,59 @@ function distancePx(map, coordA, coordB) {
 
 function setMapDrawingCursor(map, active) {
   map.getCanvas().style.cursor = active ? "crosshair" : "";
+}
+
+function rectangleRingFromCorners(cornerA, cornerB) {
+  const minLng = Math.min(cornerA[0], cornerB[0]);
+  const maxLng = Math.max(cornerA[0], cornerB[0]);
+  const minLat = Math.min(cornerA[1], cornerB[1]);
+  const maxLat = Math.max(cornerA[1], cornerB[1]);
+
+  return [
+    [minLng, minLat],
+    [maxLng, minLat],
+    [maxLng, maxLat],
+    [minLng, maxLat],
+    [minLng, minLat]
+  ];
+}
+
+function attachDrawingHandlers(map, handlers, interactionState = {}) {
+  drawingHandlers = handlers;
+  drawingInteractionState = interactionState;
+
+  Object.entries(handlers).forEach(([eventName, handler]) => {
+    if (handler) {
+      map.on(eventName, handler);
+    }
+  });
+}
+
+function detachDrawingHandlers(map) {
+  if (!map || !drawingHandlers) {
+    return;
+  }
+
+  Object.entries(drawingHandlers).forEach(([eventName, handler]) => {
+    if (handler) {
+      map.off(eventName, handler);
+    }
+  });
+
+  if (drawingKeyHandler) {
+    window.removeEventListener("keydown", drawingKeyHandler);
+    drawingKeyHandler = null;
+  }
+
+  if (drawingInteractionState?.dragPanDisabled) {
+    map.dragPan.enable();
+  }
+
+  if (drawingInteractionState?.doubleClickZoomDisabled) {
+    map.doubleClickZoom.enable();
+  }
+
+  setMapDrawingCursor(map, false);
 }
 
 /** Идёт ли сейчас рисование области на карте. */
@@ -103,8 +236,8 @@ export function updateAreaSelectionPreview(map, coordinates) {
   });
 }
 
-/** Рисует завершённую область на карте. ringCoordinates — замкнутое кольцо [lng, lat]. */
-export function updateAreaSelectionLayer(map, ringCoordinates) {
+/** Рисует завершённую область на карте. */
+export function updateAreaSelectionLayer(map, areaGeometry) {
   const source = map.getSource(SOURCE_ID);
   const previewSource = map.getSource(PREVIEW_SOURCE_ID);
 
@@ -114,7 +247,7 @@ export function updateAreaSelectionLayer(map, ringCoordinates) {
 
   previewSource?.setData(EMPTY_COLLECTION);
 
-  if (!ringCoordinates || ringCoordinates.length < 4) {
+  if (!isValidAreaGeometry(areaGeometry)) {
     source.setData(EMPTY_COLLECTION);
     return;
   }
@@ -124,10 +257,8 @@ export function updateAreaSelectionLayer(map, ringCoordinates) {
     features: [
       {
         type: "Feature",
-        geometry: {
-          type: "Polygon",
-          coordinates: [ringCoordinates]
-        }
+        geometry: areaGeometry,
+        properties: {}
       }
     ]
   });
@@ -143,12 +274,12 @@ export function clearAreaSelectionLayer(map) {
 }
 
 /** Возвращает точки из отфильтрованного набора, попавшие внутрь полигона. */
-export function getPointsWithinArea(ringCoordinates, filters = {}) {
-  if (!ringCoordinates || ringCoordinates.length < 4) {
+export function getPointsWithinArea(areaGeometry, filters = {}) {
+  if (!isValidAreaGeometry(areaGeometry)) {
     return [];
   }
 
-  const areaPolygon = polygon([ringCoordinates]);
+  const areaFeature = geometryToFeature(areaGeometry);
 
   return getFilteredFeatures(filters).filter((feature) => {
     const coordinates = feature.geometry?.coordinates;
@@ -156,13 +287,13 @@ export function getPointsWithinArea(ringCoordinates, filters = {}) {
       return false;
     }
 
-    return booleanPointInPolygon(point(coordinates), areaPolygon);
+    return booleanPointInPolygon(point(coordinates), areaFeature);
   });
 }
 
 /** Сводка по точкам внутри области: количество и отсортированный список. */
-export function getAreaContainedPointsSummary(ringCoordinates, filters = {}) {
-  const points = getPointsWithinArea(ringCoordinates, filters).sort((a, b) => {
+export function getAreaContainedPointsSummary(areaGeometry, filters = {}) {
+  const points = getPointsWithinArea(areaGeometry, filters).sort((a, b) => {
     const nameA = a.properties?.name_ru ?? "";
     const nameB = b.properties?.name_ru ?? "";
     return nameA.localeCompare(nameB, "ru");
@@ -174,16 +305,7 @@ export function getAreaContainedPointsSummary(ringCoordinates, filters = {}) {
   };
 }
 
-/**
- * Включает режим рисования области мышью на карте.
- * onComplete получает замкнутое кольцо координат; onPreview — текущий контур.
- */
-export function startAreaDrawing(map, { onPreview, onComplete }) {
-  stopAreaDrawing(map);
-
-  drawingActive = true;
-  drawingMap = map;
-
+function startFreehandDrawing(map, { onPreview, onComplete }) {
   let coordinates = [];
   let isDrawing = false;
 
@@ -229,46 +351,193 @@ export function startAreaDrawing(map, { onPreview, onComplete }) {
       return;
     }
 
-    const closedRing = [...coordinates, coordinates[0]];
-    onComplete?.(closedRing);
+    onComplete?.([...coordinates, coordinates[0]]);
     coordinates = [];
   };
 
-  const handleMouseUp = () => {
-    finishDrawing();
+  attachDrawingHandlers(
+    map,
+    {
+      mousedown: handleMouseDown,
+      mousemove: handleMouseMove,
+      mouseup: finishDrawing,
+      mouseleave: finishDrawing
+    },
+    { dragPanDisabled: true }
+  );
+}
+
+function startRectangleDrawing(map, { onPreview, onComplete }) {
+  let anchor = null;
+  let current = null;
+  let isDrawing = false;
+
+  const handleMouseDown = (event) => {
+    if (event.originalEvent.button !== 0) {
+      return;
+    }
+
+    anchor = event.lngLat.toArray();
+    current = anchor;
+    isDrawing = true;
+    map.dragPan.disable();
+    setMapDrawingCursor(map, true);
+    onPreview?.(rectangleRingFromCorners(anchor, current));
+    event.preventDefault();
   };
 
-  const handleMouseLeave = () => {
-    finishDrawing();
+  const handleMouseMove = (event) => {
+    if (!isDrawing || !anchor) {
+      return;
+    }
+
+    current = event.lngLat.toArray();
+    onPreview?.(rectangleRingFromCorners(anchor, current));
   };
 
-  map.on("mousedown", handleMouseDown);
-  map.on("mousemove", handleMouseMove);
-  map.on("mouseup", handleMouseUp);
-  map.on("mouseleave", handleMouseLeave);
+  const finishDrawing = () => {
+    if (!isDrawing || !anchor || !current) {
+      return;
+    }
 
-  drawingHandlers = {
-    handleMouseDown,
-    handleMouseMove,
-    handleMouseUp,
-    handleMouseLeave
+    isDrawing = false;
+    map.dragPan.enable();
+    setMapDrawingCursor(map, false);
+
+    if (distancePx(map, anchor, current) < MIN_RECTANGLE_PX) {
+      anchor = null;
+      current = null;
+      onPreview?.([]);
+      return;
+    }
+
+    onComplete?.(rectangleRingFromCorners(anchor, current));
+    anchor = null;
+    current = null;
   };
+
+  const cancelDrawing = () => {
+    if (!isDrawing) {
+      return;
+    }
+
+    isDrawing = false;
+    anchor = null;
+    current = null;
+    map.dragPan.enable();
+    setMapDrawingCursor(map, false);
+    onPreview?.([]);
+  };
+
+  attachDrawingHandlers(
+    map,
+    {
+      mousedown: handleMouseDown,
+      mousemove: handleMouseMove,
+      mouseup: finishDrawing,
+      mouseleave: cancelDrawing
+    },
+    { dragPanDisabled: true }
+  );
+}
+
+function startPolygonDrawing(map, { onPreview, onComplete, onCancel }) {
+  let coordinates = [];
+
+  const finishPolygon = () => {
+    if (coordinates.length < MIN_VERTEX_COUNT) {
+      return;
+    }
+
+    onComplete?.([...coordinates, coordinates[0]]);
+    coordinates = [];
+  };
+
+  const handleClick = (event) => {
+    if (event.originalEvent.detail > 1) {
+      return;
+    }
+
+    coordinates = [...coordinates, event.lngLat.toArray()];
+    onPreview?.(coordinates);
+  };
+
+  const handleDblClick = (event) => {
+    event.preventDefault();
+    finishPolygon();
+  };
+
+  const handleContextMenu = (event) => {
+    event.preventDefault();
+    finishPolygon();
+  };
+
+  const handleMouseMove = (event) => {
+    if (coordinates.length === 0) {
+      return;
+    }
+
+    onPreview?.([...coordinates, event.lngLat.toArray()]);
+  };
+
+  drawingKeyHandler = (event) => {
+    if (event.key === "Escape") {
+      coordinates = [];
+      onPreview?.([]);
+      onCancel?.();
+    }
+  };
+
+  window.addEventListener("keydown", drawingKeyHandler);
+  map.doubleClickZoom.disable();
+  setMapDrawingCursor(map, true);
+
+  attachDrawingHandlers(
+    map,
+    {
+      click: handleClick,
+      dblclick: handleDblClick,
+      contextmenu: handleContextMenu,
+      mousemove: handleMouseMove
+    },
+    { doubleClickZoomDisabled: true }
+  );
+}
+
+/**
+ * Включает режим рисования области на карте.
+ * mode — AREA_DRAW_MODES.FREEHAND | RECTANGLE | POLYGON.
+ * onComplete получает замкнутое кольцо координат; onPreview — текущий контур.
+ */
+export function startAreaDrawing(map, mode, { onPreview, onComplete, onCancel }) {
+  stopAreaDrawing(map);
+
+  drawingActive = true;
+  drawingMap = map;
+
+  if (mode === AREA_DRAW_MODES.RECTANGLE) {
+    startRectangleDrawing(map, { onPreview, onComplete });
+    return;
+  }
+
+  if (mode === AREA_DRAW_MODES.POLYGON) {
+    startPolygonDrawing(map, { onPreview, onComplete, onCancel });
+    return;
+  }
+
+  startFreehandDrawing(map, { onPreview, onComplete });
 }
 
 /** Выключает режим рисования и снимает обработчики с карты. */
 export function stopAreaDrawing(map) {
-  if (map && drawingHandlers) {
-    map.off("mousedown", drawingHandlers.handleMouseDown);
-    map.off("mousemove", drawingHandlers.handleMouseMove);
-    map.off("mouseup", drawingHandlers.handleMouseUp);
-    map.off("mouseleave", drawingHandlers.handleMouseLeave);
-    map.dragPan.enable();
-    setMapDrawingCursor(map, false);
+  if (map) {
+    detachDrawingHandlers(map);
   }
 
   drawingActive = false;
   drawingMap = null;
   drawingHandlers = null;
+  drawingInteractionState = null;
 }
 
 /** Останавливает рисование на карте, на которой оно было начато. */

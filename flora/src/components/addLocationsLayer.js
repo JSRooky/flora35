@@ -1,9 +1,19 @@
 import mapboxgl from "mapbox-gl";
+import {
+  formatPropertyValue,
+  getPropertyLabel
+} from "./featurePropertyLabels";
 import { getFeatureCollection } from "../locations/loadPoints";
 
 const PUBLIC_URL = process.env.PUBLIC_URL || "";
 const PLANT_IMAGE = `${PUBLIC_URL}/images/plant.svg`;
 const ANIMAL_IMAGE = `${PUBLIC_URL}/images/animal.svg`;
+const MAP_PIN_IMAGE = `${PUBLIC_URL}/images/map_pin.svg`;
+const MAP_PIN_SIZE_PX = 32;
+/** Исходный цвет центра булавки в map_pin.svg (заменяется при открытии по share-ссылке). */
+const MAP_PIN_CENTER_FILL = "#e51e1e";
+/** Смещение якоря: точка привязки на 4 px выше нижнего края (остриё — на координатах). */
+const MAP_PIN_ANCHOR_OFFSET_Y_PX = 4;
 
 const CLUSTER_OPTIONS = {
   clusterMaxZoom: 14,
@@ -16,8 +26,36 @@ const REGNUM_COLORS = {
   fungi: "#7a5d8f"
 };
 
+const SHARE_PIN_CENTER_COLORS = [
+  REGNUM_COLORS.plantae,
+  REGNUM_COLORS.animalia,
+  REGNUM_COLORS.fungi,
+  MAP_PIN_CENTER_FILL,
+  "#2563eb",
+  "#ca8a04",
+  "#9333ea",
+  "#0891b2",
+  "#db2777",
+  "#059669"
+];
+
 const DEFAULT_CLUSTER_COLOR = "#4a90e2";
 const DEFAULT_POINT_COLOR = "#4a90e2";
+
+const MARKER_RADIUS = 5;
+const SELECTED_MARKER_SCALE = 2;
+const SELECTED_MARKER_RADIUS = MARKER_RADIUS * SELECTED_MARKER_SCALE;
+const SELECTED_MARKER_PULSE_PERIOD_S = 1.4;
+const SELECTED_MARKER_PULSE_AMPLITUDE_RATIO = 0.14;
+
+const SELECTED_POINT_SOURCE_ID = "locations-selected-point";
+const SELECTED_MARKER_LAYER_ID = "locations-selected-marker";
+const SELECTED_POINT_LAYER_IDS = [SELECTED_MARKER_LAYER_ID];
+
+const EMPTY_FEATURE_COLLECTION = {
+  type: "FeatureCollection",
+  features: []
+};
 
 const CLUSTER_REGNUM_KEYS = ["plantae", "animalia", "fungi"];
 
@@ -38,6 +76,7 @@ let clusterPieChartMarkersOnScreen = {};
 let clusterPieChartRenderHandler = null;
 let clusterPieChartMap = null;
 let currentFilters = {};
+let currentFilteredFeatures = [];
 let interactionHandlers = null;
 let onClusterExpandedCallback = null;
 let onPointClickCallback = null;
@@ -47,6 +86,18 @@ let pointHoverPopupHideTimer = null;
 let clusterHoverRequestId = 0;
 let hoverTooltipsEnabled = true;
 let mapCursorOverride = null;
+let selectedPointFeature = null;
+let selectedPointPulseFrameId = null;
+let selectedPointPulseMap = null;
+let sharedPointPinMarker = null;
+let sharedPointPinFeatureKey = null;
+let sharedPointPinObjectUrl = null;
+let sharedPointPopup = null;
+let sharedPointPopupDetailsHandler = null;
+
+/** Поля, показываемые в компактном окне при открытии share-ссылки. */
+const SHARED_POINT_POPUP_FIELDS = ["regnum", "family", "found_year", "status"];
+let mapPinSvgTemplatePromise = null;
 
 function applyMapCursor(map, cursor) {
   map.getCanvas().style.cursor = mapCursorOverride ?? cursor;
@@ -86,6 +137,45 @@ function buildPointTooltipHtml(nameRu, nameLatin) {
   if (lines.length === 0) {
     return '<div class="point-tooltip-name-ru">Точка данных</div>';
   }
+
+  return lines.join("");
+}
+
+/** HTML компактной карточки точки (share-ссылка). */
+function buildSharedPointPopupHtml(feature) {
+  const properties = feature?.properties ?? {};
+  const { name_ru: nameRu, name_latin: nameLatin } = properties;
+  const title = nameRu || nameLatin || "Точка данных";
+  const lines = [`<div class="shared-point-popup-title">${escapeHtml(title)}</div>`];
+
+  if (nameRu && nameLatin) {
+    lines.push(`<div class="shared-point-popup-subtitle">${escapeHtml(nameLatin)}</div>`);
+  }
+
+  const detailRows = SHARED_POINT_POPUP_FIELDS.flatMap((key) => {
+    const value = properties[key];
+
+    if (value == null || value === "") {
+      return [];
+    }
+
+    return [
+      `<div class="shared-point-popup-row">`,
+      `<span class="shared-point-popup-label">${escapeHtml(getPropertyLabel(key))}:</span>`,
+      `<span class="shared-point-popup-value">${escapeHtml(formatPropertyValue(key, value))}</span>`,
+      `</div>`
+    ];
+  });
+
+  if (detailRows.length > 0) {
+    lines.push(`<div class="shared-point-popup-details">${detailRows.join("")}</div>`);
+  }
+
+  lines.push(
+    '<div class="feature-popup-actions shared-point-popup-actions">',
+    '<button type="button" class="feature-popup-action-btn" data-shared-point-details>Подробнее</button>',
+    "</div>"
+  );
 
   return lines.join("");
 }
@@ -546,6 +636,47 @@ export function getUnclusteredLayerIds() {
   return [getLayerIds().unclustered];
 }
 
+function buildUnclusteredLayerFilter() {
+  const parts = [];
+
+  if (clusteringEnabled) {
+    parts.push(["!", ["has", "point_count"]]);
+  }
+
+  if (sharedPointPinFeatureKey) {
+    parts.push([
+      "!",
+      [
+        "==",
+        ["to-string", ["coalesce", ["get", "finding_id"], ["id"]]],
+        sharedPointPinFeatureKey
+      ]
+    ]);
+  }
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  if (parts.length === 1) {
+    return parts[0];
+  }
+
+  return ["all", ...parts];
+}
+
+function applyUnclusteredLayerFilters(map) {
+  const filter = buildUnclusteredLayerFilter();
+
+  getUnclusteredLayerIds().forEach((layerId) => {
+    if (!map.getLayer(layerId)) {
+      return;
+    }
+
+    map.setFilter(layerId, filter);
+  });
+}
+
 export function getFirstLocationsLayerId(map) {
   const layerIds = [...getClusterLayerIds(), ...getUnclusteredLayerIds()];
   return layerIds.find((layerId) => map.getLayer(layerId));
@@ -592,6 +723,12 @@ function applyMarkersVisibility(map) {
     }
   });
 
+  SELECTED_POINT_LAYER_IDS.forEach((layerId) => {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", visibility);
+    }
+  });
+
   setClusterPieChartMarkersVisibility(markersVisible);
 }
 
@@ -608,6 +745,334 @@ function getPointColorExpression() {
 
 export function getPointColorForRegnum(regnum) {
   return REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR;
+}
+
+function stopSelectedPointPulse() {
+  if (selectedPointPulseFrameId !== null) {
+    cancelAnimationFrame(selectedPointPulseFrameId);
+    selectedPointPulseFrameId = null;
+  }
+
+  const map = selectedPointPulseMap;
+  selectedPointPulseMap = null;
+
+  if (map?.getLayer(SELECTED_MARKER_LAYER_ID)) {
+    map.setPaintProperty(SELECTED_MARKER_LAYER_ID, "circle-radius", SELECTED_MARKER_RADIUS);
+  }
+}
+
+function startSelectedPointPulse(map) {
+  stopSelectedPointPulse();
+
+  if (!map?.getLayer(SELECTED_MARKER_LAYER_ID) || !selectedPointFeature) {
+    return;
+  }
+
+  selectedPointPulseMap = map;
+  const amplitude = SELECTED_MARKER_RADIUS * SELECTED_MARKER_PULSE_AMPLITUDE_RATIO;
+  const startedAt = performance.now();
+
+  const tick = (now) => {
+    if (
+      selectedPointPulseMap !== map ||
+      !map.getLayer(SELECTED_MARKER_LAYER_ID) ||
+      !selectedPointFeature
+    ) {
+      stopSelectedPointPulse();
+      return;
+    }
+
+    const phase = ((now - startedAt) / 1000 / SELECTED_MARKER_PULSE_PERIOD_S) * Math.PI * 2;
+    const radius = SELECTED_MARKER_RADIUS + Math.sin(phase) * amplitude;
+
+    map.setPaintProperty(SELECTED_MARKER_LAYER_ID, "circle-radius", radius);
+    selectedPointPulseFrameId = requestAnimationFrame(tick);
+  };
+
+  selectedPointPulseFrameId = requestAnimationFrame(tick);
+}
+
+function buildSelectedPointFeature(feature) {
+  const coordinates = feature?.geometry?.coordinates;
+  if (!coordinates) {
+    return null;
+  }
+
+  return {
+    type: "Feature",
+    geometry: {
+      type: "Point",
+      coordinates
+    },
+    properties: {
+      color: getPointColorForRegnum(feature.properties?.regnum)
+    }
+  };
+}
+
+function ensureSelectedPointLayers(map) {
+  if (map.getLayer("locations-selected-glow")) {
+    map.removeLayer("locations-selected-glow");
+  }
+
+  if (!map.getSource(SELECTED_POINT_SOURCE_ID)) {
+    map.addSource(SELECTED_POINT_SOURCE_ID, {
+      type: "geojson",
+      data: EMPTY_FEATURE_COLLECTION
+    });
+  }
+
+  if (!map.getLayer(SELECTED_MARKER_LAYER_ID)) {
+    map.addLayer({
+      id: SELECTED_MARKER_LAYER_ID,
+      type: "circle",
+      source: SELECTED_POINT_SOURCE_ID,
+      paint: {
+        "circle-radius": SELECTED_MARKER_RADIUS,
+        "circle-color": ["get", "color"],
+        "circle-stroke-width": 1,
+        "circle-stroke-color": "#ffffff"
+      }
+    });
+  } else {
+    map.setPaintProperty(SELECTED_MARKER_LAYER_ID, "circle-radius", SELECTED_MARKER_RADIUS);
+  }
+}
+
+function repositionSelectedPointLayers(map) {
+  if (!map.getLayer(SELECTED_MARKER_LAYER_ID)) {
+    return;
+  }
+
+  map.moveLayer(SELECTED_MARKER_LAYER_ID);
+}
+
+function refreshSelectedPointHighlight(map) {
+  if (!selectedPointFeature) {
+    return;
+  }
+
+  updateSelectedPointHighlight(map, selectedPointFeature);
+}
+
+function pickSharePinCenterColor() {
+  return SHARE_PIN_CENTER_COLORS[
+    Math.floor(Math.random() * SHARE_PIN_CENTER_COLORS.length)
+  ];
+}
+
+function loadMapPinSvgTemplate() {
+  if (!mapPinSvgTemplatePromise) {
+    mapPinSvgTemplatePromise = fetch(MAP_PIN_IMAGE).then((response) => {
+      if (!response.ok) {
+        throw new Error(`Failed to load map pin SVG: ${response.status}`);
+      }
+
+      return response.text();
+    });
+  }
+
+  return mapPinSvgTemplatePromise;
+}
+
+function colorizeMapPinSvg(svgText, centerColor) {
+  const escapedDefaultFill = MAP_PIN_CENTER_FILL.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  return svgText.replace(new RegExp(`fill:${escapedDefaultFill}`, "i"), `fill:${centerColor}`);
+}
+
+function revokeSharedPointPinObjectUrl() {
+  if (sharedPointPinObjectUrl) {
+    URL.revokeObjectURL(sharedPointPinObjectUrl);
+    sharedPointPinObjectUrl = null;
+  }
+}
+
+function createSharedPointPinElement(imageUrl) {
+  const element = document.createElement("img");
+  element.src = imageUrl;
+  element.width = MAP_PIN_SIZE_PX;
+  element.height = MAP_PIN_SIZE_PX;
+  element.alt = "";
+  element.draggable = false;
+  element.className = "shared-point-pin-marker";
+  element.style.pointerEvents = "none";
+  return element;
+}
+
+function removeSharedPointPopup() {
+  if (!sharedPointPopup) {
+    return;
+  }
+
+  const popup = sharedPointPopup;
+  sharedPointPopup = null;
+  sharedPointPopupDetailsHandler = null;
+  popup.remove();
+}
+
+function removeSharedPointPinMarker(map) {
+  if (sharedPointPinMarker) {
+    sharedPointPinMarker.remove();
+    sharedPointPinMarker = null;
+  }
+
+  revokeSharedPointPinObjectUrl();
+  sharedPointPinFeatureKey = null;
+
+  if (map?.getStyle()) {
+    applyUnclusteredLayerFilters(map);
+  }
+}
+
+/** Компактное окно с основными данными рядом с маркером (share-ссылка). */
+export function showSharedPointPopup(map, feature, { onOpenDetails } = {}) {
+  const coordinates = feature?.geometry?.coordinates;
+
+  if (!map || !coordinates) {
+    return;
+  }
+
+  removeSharedPointPopup();
+
+  const popup = new mapboxgl.Popup({
+    closeButton: true,
+    closeOnClick: false,
+    className: "shared-point-popup",
+    offset: [0, -(MAP_PIN_SIZE_PX + 10)],
+    maxWidth: "280px"
+  });
+
+  popup.setLngLat(coordinates).setHTML(buildSharedPointPopupHtml(feature));
+
+  popup.on("close", () => {
+    if (sharedPointPopup !== popup) {
+      return;
+    }
+
+    sharedPointPopup = null;
+    sharedPointPopupDetailsHandler = null;
+    removeSharedPointPinMarker(map);
+  });
+
+  sharedPointPopup = popup;
+  popup.addTo(map);
+
+  if (onOpenDetails) {
+    const detailsButton = popup.getElement()?.querySelector("[data-shared-point-details]");
+
+    if (detailsButton) {
+      sharedPointPopupDetailsHandler = (event) => {
+        event.preventDefault();
+        onOpenDetails(feature);
+      };
+      detailsButton.addEventListener("click", sharedPointPopupDetailsHandler);
+    }
+  }
+}
+
+/** Временная булавка вместо стандартного маркера (открытие карты по shared-ссылке). */
+export function showSharedPointPin(map, feature) {
+  const coordinates = feature?.geometry?.coordinates;
+
+  if (!map || !coordinates) {
+    return;
+  }
+
+  clearSharedPointPin(map);
+  clearSelectedPointHighlight(map);
+
+  const featureKey = getFeatureKey(feature);
+  sharedPointPinFeatureKey = featureKey;
+  const centerColor = pickSharePinCenterColor();
+
+  applyUnclusteredLayerFilters(map);
+
+  loadMapPinSvgTemplate()
+    .then((svgText) => {
+      if (sharedPointPinFeatureKey !== featureKey) {
+        return;
+      }
+
+      revokeSharedPointPinObjectUrl();
+      sharedPointPinObjectUrl = URL.createObjectURL(
+        new Blob([colorizeMapPinSvg(svgText, centerColor)], { type: "image/svg+xml" })
+      );
+
+      sharedPointPinMarker = new mapboxgl.Marker({
+        element: createSharedPointPinElement(sharedPointPinObjectUrl),
+        anchor: "bottom",
+        offset: [0, MAP_PIN_ANCHOR_OFFSET_Y_PX]
+      })
+        .setLngLat(coordinates)
+        .addTo(map);
+
+      clearSelectedPointHighlight(map);
+    })
+    .catch(() => {
+      if (sharedPointPinFeatureKey !== featureKey) {
+        return;
+      }
+
+      sharedPointPinMarker = new mapboxgl.Marker({
+        element: createSharedPointPinElement(MAP_PIN_IMAGE),
+        anchor: "bottom",
+        offset: [0, MAP_PIN_ANCHOR_OFFSET_Y_PX]
+      })
+        .setLngLat(coordinates)
+        .addTo(map);
+
+      clearSelectedPointHighlight(map);
+    });
+}
+
+export function clearSharedPointPin(map) {
+  removeSharedPointPopup();
+  removeSharedPointPinMarker(map);
+}
+
+function isSharedPointPinActive() {
+  return sharedPointPinFeatureKey != null;
+}
+
+/** Выделяет выбранный маркер: увеличение в 2 раза с белой обводкой и пульсацией. */
+export function updateSelectedPointHighlight(map, feature) {
+  if (isSharedPointPinActive()) {
+    return;
+  }
+
+  selectedPointFeature = feature ?? null;
+
+  if (!map?.getStyle()) {
+    return;
+  }
+
+  const selectedFeature = buildSelectedPointFeature(feature);
+  if (!selectedFeature) {
+    clearSelectedPointHighlight(map);
+    return;
+  }
+
+  ensureSelectedPointLayers(map);
+
+  map.getSource(SELECTED_POINT_SOURCE_ID).setData({
+    type: "FeatureCollection",
+    features: [selectedFeature]
+  });
+
+  repositionSelectedPointLayers(map);
+  startSelectedPointPulse(map);
+}
+
+/** Снимает подсветку выбранного маркера. */
+export function clearSelectedPointHighlight(map) {
+  stopSelectedPointPulse();
+  selectedPointFeature = null;
+
+  const source = map?.getSource(SELECTED_POINT_SOURCE_ID);
+  if (source) {
+    source.setData(EMPTY_FEATURE_COLLECTION);
+  }
 }
 
 function getLocationSourceIds(map) {
@@ -873,7 +1338,7 @@ function addUnclusteredLayer(map, sourceId, regnum = null) {
       "circle-color": regnum
         ? REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR
         : getPointColorExpression(),
-      "circle-radius": 5,
+      "circle-radius": MARKER_RADIUS,
       "circle-stroke-width": 1,
       "circle-stroke-color": "#ffffff"
     }
@@ -933,6 +1398,169 @@ function addClusterLayers(map, sourceId, regnum = null) {
   addUnclusteredLayer(map, sourceId, regnum);
 }
 
+function getFeatureKey(feature) {
+  if (feature.id != null) {
+    return String(feature.id);
+  }
+
+  const findingId = feature.properties?.finding_id;
+  const coordinates = feature.geometry?.coordinates;
+
+  if (findingId != null) {
+    return String(findingId);
+  }
+
+  if (Array.isArray(coordinates)) {
+    return coordinates.join(",");
+  }
+
+  return JSON.stringify(feature.properties ?? {});
+}
+
+function filterValueEqual(a, b) {
+  if (a === b) {
+    return true;
+  }
+
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((value, index) => value === b[index]);
+  }
+
+  if (a && b && typeof a === "object" && typeof b === "object") {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+
+    if (keysA.length !== keysB.length) {
+      return false;
+    }
+
+    return keysA.every((key) => filterValueEqual(a[key], b[key]));
+  }
+
+  return false;
+}
+
+function filtersEqual(a, b) {
+  const keysA = Object.keys(a).sort();
+  const keysB = Object.keys(b).sort();
+
+  if (keysA.join("|") !== keysB.join("|")) {
+    return false;
+  }
+
+  return keysA.every((key) => filterValueEqual(a[key], b[key]));
+}
+
+/** Изменился только верхний предел found_year (типичное движение слайдера таймлайна). */
+function isTimelineYearMaxOnlyChange(prevFilters, nextFilters) {
+  const prevYear = prevFilters.found_year;
+  const nextYear = nextFilters.found_year;
+
+  if (
+    !prevYear ||
+    !nextYear ||
+    typeof prevYear !== "object" ||
+    typeof nextYear !== "object" ||
+    !("min" in prevYear) ||
+    !("max" in prevYear) ||
+    !("min" in nextYear) ||
+    !("max" in nextYear) ||
+    prevYear.min !== nextYear.min ||
+    prevYear.max === nextYear.max
+  ) {
+    return false;
+  }
+
+  const prevRest = { ...prevFilters };
+  const nextRest = { ...nextFilters };
+  delete prevRest.found_year;
+  delete nextRest.found_year;
+
+  const prevKeys = Object.keys(prevRest).sort();
+  const nextKeys = Object.keys(nextRest).sort();
+
+  if (prevKeys.join("|") !== nextKeys.join("|")) {
+    return false;
+  }
+
+  return prevKeys.every((key) => filterValueEqual(prevRest[key], nextRest[key]));
+}
+
+function locationsSourcesExist(map) {
+  if (!clusteringEnabled) {
+    return Boolean(map.getSource("locations"));
+  }
+
+  if (clusterByRegnum) {
+    return getRegnumValues().some((regnum) => map.getSource(getSourceId(regnum)));
+  }
+
+  return Boolean(map.getSource("locations"));
+}
+
+function updateLocationsSourceData(map, filteredFeatures) {
+  const collection = {
+    type: "FeatureCollection",
+    features: filteredFeatures
+  };
+
+  if (!clusteringEnabled) {
+    map.getSource("locations")?.setData(collection);
+    return;
+  }
+
+  if (clusterByRegnum) {
+    getRegnumValues().forEach((regnum) => {
+      const source = map.getSource(getSourceId(regnum));
+      if (!source) {
+        return;
+      }
+
+      source.setData({
+        type: "FeatureCollection",
+        features: filteredFeatures.filter((feature) => feature.properties.regnum === regnum)
+      });
+    });
+    return;
+  }
+
+  map.getSource("locations")?.setData(collection);
+}
+
+/** Добавляет или убирает точки при изменении года таймлайна без пересборки слоёв. */
+function applyTimelineYearChange(map, prevFilters, nextFilters) {
+  const prevMax = prevFilters.found_year.max;
+  const nextMax = nextFilters.found_year.max;
+
+  const baseFilters = { ...nextFilters };
+  delete baseFilters.found_year;
+
+  let newFilteredFeatures;
+
+  if (nextMax > prevMax) {
+    const toAdd = filterFeatures(locationsData.features, {
+      ...baseFilters,
+      found_year: { min: prevMax + 1, max: nextMax }
+    });
+    const existingKeys = new Set(currentFilteredFeatures.map(getFeatureKey));
+
+    newFilteredFeatures = [
+      ...currentFilteredFeatures,
+      ...toAdd.filter((feature) => !existingKeys.has(getFeatureKey(feature)))
+    ];
+  } else {
+    newFilteredFeatures = currentFilteredFeatures.filter((feature) => {
+      const year = feature.properties?.found_year;
+      return typeof year === "number" && year <= nextMax;
+    });
+  }
+
+  currentFilteredFeatures = newFilteredFeatures;
+  currentFilters = nextFilters;
+  updateLocationsSourceData(map, newFilteredFeatures);
+  refreshSelectedPointHighlight(map);
+}
+
 /**
  * Полностью пересоздаёт источники и слои точек.
  * Вызывается при смене фильтров, режима кластеризации или группировки по regnum.
@@ -946,6 +1574,7 @@ function rebuildLocationsLayers(map) {
   removeLocationsFromMap(map);
 
   const filteredFeatures = filterFeatures(locationsData.features, currentFilters);
+  currentFilteredFeatures = filteredFeatures;
 
   if (!clusteringEnabled) {
     map.addSource("locations", {
@@ -994,7 +1623,9 @@ function rebuildLocationsLayers(map) {
 
   attachLocationsInteractions(map);
   applyMarkersVisibility(map);
+  applyUnclusteredLayerFilters(map);
   attachClusterPieChartMarkers(map);
+  refreshSelectedPointHighlight(map);
 }
 
 /** Фильтрует GeoJSON-объекты по properties; массив значений — логика «любой из». */
@@ -1155,6 +1786,19 @@ export function featureMatchesFilters(feature, filters = {}) {
 }
 
 export function applyLocationsFilter(map, filters = {}) {
+  if (
+    map &&
+    locationsSourcesExist(map) &&
+    isTimelineYearMaxOnlyChange(currentFilters, filters)
+  ) {
+    applyTimelineYearChange(map, currentFilters, filters);
+    return;
+  }
+
+  if (map && locationsSourcesExist(map) && filtersEqual(currentFilters, filters)) {
+    return;
+  }
+
   currentFilters = filters;
   rebuildLocationsLayers(map);
 }

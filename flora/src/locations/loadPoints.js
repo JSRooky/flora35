@@ -181,3 +181,49 @@ export function getSpeciesCollection() {
 export function getFeatureCollection() {
   return expandFindingsToFeatures(getSpeciesCollection());
 }
+
+function featureMatchesFindingId(feature, findingId) {
+  const normalizedId = String(findingId);
+  return (
+    String(feature.properties?.finding_id) === normalizedId ||
+    String(feature.id) === normalizedId
+  );
+}
+
+/** Ищет точку по идентификатору находки во всех источниках данных. */
+export function findFeatureByFindingId(findingId) {
+  if (findingId == null || findingId === "") {
+    return null;
+  }
+
+  return (
+    expandFindingsToFeatures(getAllSpeciesCollection()).features.find((feature) =>
+      featureMatchesFindingId(feature, findingId)
+    ) ?? null
+  );
+}
+
+/** Проверяет, попадает ли находка в выбранный источник данных. */
+export function isFindingInDataSource(findingId, mode) {
+  if (findingId == null || findingId === "") {
+    return false;
+  }
+
+  let collection;
+
+  switch (mode) {
+    case DATA_SOURCE_MODES.POINTS:
+      collection = points;
+      break;
+    case DATA_SOURCE_MODES.USERPOINTS:
+      collection = userpointsOverride;
+      break;
+    default:
+      collection = getAllSpeciesCollection();
+      break;
+  }
+
+  return expandFindingsToFeatures(collection).features.some((feature) =>
+    featureMatchesFindingId(feature, findingId)
+  );
+}

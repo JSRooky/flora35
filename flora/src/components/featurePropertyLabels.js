@@ -1,7 +1,7 @@
 /** Человекочитаемые подписи свойств точки данных. */
 export const PROPERTY_LABELS = {
   name_ru: "Название",
-  name_latin: "Лatinь",
+  name_latin: "Латынь",
   regnum: "Царство",
   family: "Семейство",
   found_by: "Обнаружил",

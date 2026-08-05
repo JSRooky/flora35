@@ -41,7 +41,7 @@
   margin: 0;
   font-size: 16px;
   color: #333;
-  border-bottom: 2px solid #27ae60;
+  border-bottom: 2px solid var(--map-tool-accent);
   padding-bottom: 8px;
   flex: 1;
 }
@@ -51,29 +51,22 @@
   padding-bottom: 0;
 }
 
-.popup-panel-toggle {
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.6);
-  color: #333;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  flex-shrink: 0;
-}
-
-.popup-panel-toggle:hover {
-  background: rgba(255, 255, 255, 0.9);
-}
-
 .popup-collapsed-summary {
   margin: 8px 0 0;
   font-size: 13px;
   color: #666;
   line-height: 1.4;
+}
+
+.areal-popup-status {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+  line-height: 1.35;
+}
+
+.areal-popup-status--blocked {
+  color: var(--map-tool-accent-dark);
 }
 
 .areal-switch {
@@ -115,7 +108,7 @@
 }
 
 .areal-switch input:checked + .areal-switch-slider {
-  background: #27ae60;
+  background: var(--map-tool-accent);
 }
 
 .areal-switch input:checked + .areal-switch-slider::after {
@@ -145,7 +138,7 @@
 }
 
 .areal-radius strong {
-  color: #27ae60;
+  color: var(--map-tool-accent);
 }
 
 .areal-radius input[type="range"] {
@@ -162,8 +155,8 @@
   border-radius: 3px;
   background: linear-gradient(
     to right,
-    #27ae60 0%,
-    #27ae60 var(--range-progress, 0%),
+    var(--map-tool-accent) 0%,
+    var(--map-tool-accent) var(--range-progress, 0%),
     #ddd var(--range-progress, 0%),
     #ddd 100%
   );
@@ -176,7 +169,7 @@
   height: 16px;
   margin-top: -5px;
   border-radius: 50%;
-  background: #27ae60;
+  background: var(--map-tool-accent);
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
@@ -191,14 +184,14 @@
 .areal-radius input[type="range"]::-moz-range-progress {
   height: 6px;
   border-radius: 3px 0 0 3px;
-  background: #27ae60;
+  background: var(--map-tool-accent);
 }
 
 .areal-radius input[type="range"]::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #27ae60;
+  background: var(--map-tool-accent);
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
@@ -222,7 +215,7 @@
 }
 
 .areal-contained-points-title strong {
-  color: #27ae60;
+  color: var(--map-tool-accent);
 }
 
 .areal-contained-points-list {
@@ -242,7 +235,7 @@
   background: none;
   font: inherit;
   font-size: 13px;
-  color: #1a6b3c;
+  color: var(--map-tool-accent-text);
   text-align: left;
   line-height: 1.5;
   cursor: pointer;
@@ -251,7 +244,37 @@
 }
 
 .areal-contained-points-item:hover {
-  color: #27ae60;
+  color: var(--map-tool-accent);
+}
+
+.areal-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.areal-reset-btn {
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.areal-reset-btn:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
+.areal-reset-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .areal-contained-points-list li + li {

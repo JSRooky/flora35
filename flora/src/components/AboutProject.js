@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import aboutProjectUrl from "../docs/aboutProject.md";
+import { getFullHelpPageUrl } from "../docs/moduleHelpUrls";
 import { renderMarkdown } from "../docs/renderMarkdown";
 import "../styles/AboutProject.css";
 
@@ -10,6 +11,42 @@ import "../styles/AboutProject.css";
  */
 function resolveMarkdownUrl(source) {
   return source;
+}
+
+const HELP_LINK_MARKER = "<!-- help-link -->";
+
+function AboutProjectHelpLink() {
+  return (
+    <p className="about-project-help-link-wrap">
+      <a
+        className="about-project-help-link"
+        href={getFullHelpPageUrl()}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Об этих и других функциях читайте в справке
+      </a>
+    </p>
+  );
+}
+
+function renderAboutProjectContent(markdown) {
+  const markerIndex = markdown.indexOf(HELP_LINK_MARKER);
+
+  if (markerIndex === -1) {
+    return renderMarkdown(markdown);
+  }
+
+  const before = markdown.slice(0, markerIndex).trimEnd();
+  const after = markdown.slice(markerIndex + HELP_LINK_MARKER.length).trimStart();
+
+  return (
+    <>
+      {renderMarkdown(before)}
+      <AboutProjectHelpLink />
+      {after ? renderMarkdown(after) : null}
+    </>
+  );
 }
 
 export default function AboutProject({ open: openProp, onOpenChange }) {
@@ -86,7 +123,11 @@ export default function AboutProject({ open: openProp, onOpenChange }) {
 
             <div className="about-project-dialog-content">
               {/* loading ещё false в первом кадре после open — проверяем и content */}
-              {loading || !content ? <p>Загрузка...</p> : renderMarkdown(content)}
+              {loading || !content ? (
+                <p>Загрузка...</p>
+              ) : (
+                renderAboutProjectContent(content)
+              )}
             </div>
           </div>
         </div>
