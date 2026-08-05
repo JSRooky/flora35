@@ -47,19 +47,6 @@ const DEFAULT_CLUSTER_COLOR = "#4a90e2";
 const DEFAULT_POINT_COLOR = "#4a90e2";
 
 const MARKER_RADIUS = 5;
-const SELECTED_MARKER_SCALE = 2;
-const SELECTED_MARKER_RADIUS = MARKER_RADIUS * SELECTED_MARKER_SCALE;
-const SELECTED_MARKER_PULSE_PERIOD_S = 1.4;
-const SELECTED_MARKER_PULSE_AMPLITUDE_RATIO = 0.14;
-
-const SELECTED_POINT_SOURCE_ID = "locations-selected-point";
-const SELECTED_MARKER_LAYER_ID = "locations-selected-marker";
-const SELECTED_POINT_LAYER_IDS = [SELECTED_MARKER_LAYER_ID];
-
-const EMPTY_FEATURE_COLLECTION = {
-  type: "FeatureCollection",
-  features: []
-};
 
 const CLUSTER_REGNUM_KEYS = ["plantae", "animalia", "fungi"];
 
@@ -92,14 +79,14 @@ let clusterHoverRequestId = 0;
 let clusterExpandRequestId = 0;
 let hoverTooltipsEnabled = true;
 let mapCursorOverride = null;
-let selectedPointFeature = null;
-let selectedPointPulseFrameId = null;
-let selectedPointPulseMap = null;
 let sharedPointPinMarker = null;
 let sharedPointPinFeatureKey = null;
 let sharedPointPinObjectUrl = null;
 let sharedPointPopup = null;
 let sharedPointPopupDetailsHandler = null;
+let selectedPointPinMarker = null;
+let selectedPointPinFeatureKey = null;
+let selectedPointPinObjectUrl = null;
 
 /** Поля, показываемые в компактном окне при открытии share-ссылки. */
 const SHARED_POINT_POPUP_FIELDS = ["regnum", "family", "found_year", "status"];
@@ -687,16 +674,22 @@ function buildUnclusteredLayerFilter() {
     parts.push(["!", ["has", "point_count"]]);
   }
 
-  if (sharedPointPinFeatureKey) {
+  // Точки, временно заменённые булавкой (map_pin.svg) — открытие по share-ссылке
+  // или выделение точки в «Сведения о точке» — не рисуем обычным маркером.
+  const pinnedFeatureKeys = [...new Set(
+    [sharedPointPinFeatureKey, selectedPointPinFeatureKey].filter(Boolean)
+  )];
+
+  pinnedFeatureKeys.forEach((key) => {
     parts.push([
       "!",
       [
         "==",
         ["to-string", ["coalesce", ["get", "finding_id"], ["id"]]],
-        sharedPointPinFeatureKey
+        key
       ]
     ]);
-  }
+  });
 
   if (parts.length === 0) {
     return null;
@@ -767,12 +760,6 @@ function applyMarkersVisibility(map) {
     }
   });
 
-  SELECTED_POINT_LAYER_IDS.forEach((layerId) => {
-    if (map.getLayer(layerId)) {
-      map.setLayoutProperty(layerId, "visibility", visibility);
-    }
-  });
-
   setClusterPieChartMarkersVisibility(markersVisible);
 }
 
@@ -789,114 +776,6 @@ function getPointColorExpression() {
 
 export function getPointColorForRegnum(regnum) {
   return REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR;
-}
-
-function stopSelectedPointPulse() {
-  if (selectedPointPulseFrameId !== null) {
-    cancelAnimationFrame(selectedPointPulseFrameId);
-    selectedPointPulseFrameId = null;
-  }
-
-  const map = selectedPointPulseMap;
-  selectedPointPulseMap = null;
-
-  if (map?.getLayer(SELECTED_MARKER_LAYER_ID)) {
-    map.setPaintProperty(SELECTED_MARKER_LAYER_ID, "circle-radius", SELECTED_MARKER_RADIUS);
-  }
-}
-
-function startSelectedPointPulse(map) {
-  stopSelectedPointPulse();
-
-  if (!map?.getLayer(SELECTED_MARKER_LAYER_ID) || !selectedPointFeature) {
-    return;
-  }
-
-  selectedPointPulseMap = map;
-  const amplitude = SELECTED_MARKER_RADIUS * SELECTED_MARKER_PULSE_AMPLITUDE_RATIO;
-  const startedAt = performance.now();
-
-  const tick = (now) => {
-    if (
-      selectedPointPulseMap !== map ||
-      !map.getLayer(SELECTED_MARKER_LAYER_ID) ||
-      !selectedPointFeature
-    ) {
-      stopSelectedPointPulse();
-      return;
-    }
-
-    const phase = ((now - startedAt) / 1000 / SELECTED_MARKER_PULSE_PERIOD_S) * Math.PI * 2;
-    const radius = SELECTED_MARKER_RADIUS + Math.sin(phase) * amplitude;
-
-    map.setPaintProperty(SELECTED_MARKER_LAYER_ID, "circle-radius", radius);
-    selectedPointPulseFrameId = requestAnimationFrame(tick);
-  };
-
-  selectedPointPulseFrameId = requestAnimationFrame(tick);
-}
-
-function buildSelectedPointFeature(feature) {
-  const coordinates = feature?.geometry?.coordinates;
-  if (!coordinates) {
-    return null;
-  }
-
-  return {
-    type: "Feature",
-    geometry: {
-      type: "Point",
-      coordinates
-    },
-    properties: {
-      color: getPointColorForRegnum(feature.properties?.regnum)
-    }
-  };
-}
-
-function ensureSelectedPointLayers(map) {
-  if (map.getLayer("locations-selected-glow")) {
-    map.removeLayer("locations-selected-glow");
-  }
-
-  if (!map.getSource(SELECTED_POINT_SOURCE_ID)) {
-    map.addSource(SELECTED_POINT_SOURCE_ID, {
-      type: "geojson",
-      data: EMPTY_FEATURE_COLLECTION
-    });
-  }
-
-  if (!map.getLayer(SELECTED_MARKER_LAYER_ID)) {
-    map.addLayer({
-      id: SELECTED_MARKER_LAYER_ID,
-      type: "circle",
-      source: SELECTED_POINT_SOURCE_ID,
-      paint: {
-        "circle-radius": SELECTED_MARKER_RADIUS,
-        "circle-color": ["get", "color"],
-        "circle-stroke-width": 1,
-        "circle-stroke-color": "#ffffff"
-      }
-    });
-  } else {
-    map.setPaintProperty(SELECTED_MARKER_LAYER_ID, "circle-radius", SELECTED_MARKER_RADIUS);
-  }
-}
-
-function repositionSelectedPointLayers(map) {
-  if (!map.getLayer(SELECTED_MARKER_LAYER_ID)) {
-    return;
-  }
-
-  map.moveLayer(SELECTED_MARKER_LAYER_ID);
-}
-
-function refreshSelectedPointHighlight(map) {
-  if (!selectedPointFeature) {
-    return;
-  }
-
-  updateSelectedPointHighlight(map, selectedPointFeature);
 }
 
 function pickSharePinCenterColor() {
@@ -932,14 +811,22 @@ function revokeSharedPointPinObjectUrl() {
   }
 }
 
-function createSharedPointPinElement(imageUrl) {
+function revokeSelectedPointPinObjectUrl() {
+  if (selectedPointPinObjectUrl) {
+    URL.revokeObjectURL(selectedPointPinObjectUrl);
+    selectedPointPinObjectUrl = null;
+  }
+}
+
+/** DOM-элемент булавки map_pin.svg — используется и для share-ссылки, и для выделенной точки. */
+function createPinMarkerElement(imageUrl) {
   const element = document.createElement("img");
   element.src = imageUrl;
   element.width = MAP_PIN_SIZE_PX;
   element.height = MAP_PIN_SIZE_PX;
   element.alt = "";
   element.draggable = false;
-  element.className = "shared-point-pin-marker";
+  element.className = "map-pin-marker";
   element.style.pointerEvents = "none";
   return element;
 }
@@ -1024,7 +911,6 @@ export function showSharedPointPin(map, feature) {
   }
 
   clearSharedPointPin(map);
-  clearSelectedPointHighlight(map);
 
   const featureKey = getFeatureKey(feature);
   sharedPointPinFeatureKey = featureKey;
@@ -1044,14 +930,12 @@ export function showSharedPointPin(map, feature) {
       );
 
       sharedPointPinMarker = new mapboxgl.Marker({
-        element: createSharedPointPinElement(sharedPointPinObjectUrl),
+        element: createPinMarkerElement(sharedPointPinObjectUrl),
         anchor: "bottom",
         offset: [0, MAP_PIN_ANCHOR_OFFSET_Y_PX]
       })
         .setLngLat(coordinates)
         .addTo(map);
-
-      clearSelectedPointHighlight(map);
     })
     .catch(() => {
       if (sharedPointPinFeatureKey !== featureKey) {
@@ -1059,14 +943,12 @@ export function showSharedPointPin(map, feature) {
       }
 
       sharedPointPinMarker = new mapboxgl.Marker({
-        element: createSharedPointPinElement(MAP_PIN_IMAGE),
+        element: createPinMarkerElement(MAP_PIN_IMAGE),
         anchor: "bottom",
         offset: [0, MAP_PIN_ANCHOR_OFFSET_Y_PX]
       })
         .setLngLat(coordinates)
         .addTo(map);
-
-      clearSelectedPointHighlight(map);
     });
 }
 
@@ -1075,48 +957,87 @@ export function clearSharedPointPin(map) {
   removeSharedPointPinMarker(map);
 }
 
-function isSharedPointPinActive() {
-  return sharedPointPinFeatureKey != null;
+function removeSelectedPointPinMarker(map) {
+  if (selectedPointPinMarker) {
+    selectedPointPinMarker.remove();
+    selectedPointPinMarker = null;
+  }
+
+  revokeSelectedPointPinObjectUrl();
+  selectedPointPinFeatureKey = null;
+
+  if (map?.getStyle()) {
+    applyUnclusteredLayerFilters(map);
+  }
 }
 
-/** Выделяет выбранный маркер: увеличение в 2 раза с белой обводкой и пульсацией. */
+/**
+ * Заменяет обычный маркер выбранной точки булавкой (map_pin.svg) вместо визуальных
+ * эффектов поверх слоя точек — так наведение на другие точки не зависит от того,
+ * какая точка выбрана (см. историю бага с миганием подсказки).
+ */
 export function updateSelectedPointHighlight(map, feature) {
-  if (isSharedPointPinActive()) {
-    return;
-  }
+  const coordinates = feature?.geometry?.coordinates;
 
-  selectedPointFeature = feature ?? null;
-
-  if (!map?.getStyle()) {
-    return;
-  }
-
-  const selectedFeature = buildSelectedPointFeature(feature);
-  if (!selectedFeature) {
+  if (!map || !coordinates) {
     clearSelectedPointHighlight(map);
     return;
   }
 
-  ensureSelectedPointLayers(map);
+  const featureKey = getFeatureKey(feature);
 
-  map.getSource(SELECTED_POINT_SOURCE_ID).setData({
-    type: "FeatureCollection",
-    features: [selectedFeature]
-  });
+  if (featureKey === selectedPointPinFeatureKey) {
+    // Тот же ключ — либо маркер уже создан (просто обновляем позицию), либо ещё
+    // грузится SVG для него же (обработчик promise ниже сам создаст маркер);
+    // в обоих случаях повторный запуск создания маркера привёл бы к утечке
+    // (несколько наложенных друг на друга <img>, см. историю бага).
+    selectedPointPinMarker?.setLngLat(coordinates);
+    return;
+  }
 
-  repositionSelectedPointLayers(map);
-  startSelectedPointPulse(map);
+  removeSelectedPointPinMarker(map);
+  selectedPointPinFeatureKey = featureKey;
+  const centerColor = getPointColorForRegnum(feature.properties?.regnum);
+
+  applyUnclusteredLayerFilters(map);
+
+  loadMapPinSvgTemplate()
+    .then((svgText) => {
+      if (selectedPointPinFeatureKey !== featureKey) {
+        return;
+      }
+
+      revokeSelectedPointPinObjectUrl();
+      selectedPointPinObjectUrl = URL.createObjectURL(
+        new Blob([colorizeMapPinSvg(svgText, centerColor)], { type: "image/svg+xml" })
+      );
+
+      selectedPointPinMarker = new mapboxgl.Marker({
+        element: createPinMarkerElement(selectedPointPinObjectUrl),
+        anchor: "bottom",
+        offset: [0, MAP_PIN_ANCHOR_OFFSET_Y_PX]
+      })
+        .setLngLat(coordinates)
+        .addTo(map);
+    })
+    .catch(() => {
+      if (selectedPointPinFeatureKey !== featureKey) {
+        return;
+      }
+
+      selectedPointPinMarker = new mapboxgl.Marker({
+        element: createPinMarkerElement(MAP_PIN_IMAGE),
+        anchor: "bottom",
+        offset: [0, MAP_PIN_ANCHOR_OFFSET_Y_PX]
+      })
+        .setLngLat(coordinates)
+        .addTo(map);
+    });
 }
 
-/** Снимает подсветку выбранного маркера. */
+/** Снимает булавку с выбранной точки — возвращает обычный маркер. */
 export function clearSelectedPointHighlight(map) {
-  stopSelectedPointPulse();
-  selectedPointFeature = null;
-
-  const source = map?.getSource(SELECTED_POINT_SOURCE_ID);
-  if (source) {
-    source.setData(EMPTY_FEATURE_COLLECTION);
-  }
+  removeSelectedPointPinMarker(map);
 }
 
 function getLocationSourceIds(map) {
@@ -1620,7 +1541,6 @@ function applyTimelineYearChange(map, prevFilters, nextFilters) {
   setCurrentFilteredFeatures(newFilteredFeatures);
   currentFilters = nextFilters;
   updateLocationsSourceData(map, newFilteredFeatures);
-  refreshSelectedPointHighlight(map);
 }
 
 /**
@@ -1687,7 +1607,6 @@ function rebuildLocationsLayers(map) {
   applyMarkersVisibility(map);
   applyUnclusteredLayerFilters(map);
   attachClusterPieChartMarkers(map);
-  refreshSelectedPointHighlight(map);
 }
 
 /** Фильтрует GeoJSON-объекты по properties; массив значений — логика «любой из». */
