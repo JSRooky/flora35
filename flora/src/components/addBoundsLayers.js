@@ -37,7 +37,22 @@ function escapeHtml(text) {
     .replace(/"/g, "&quot;");
 }
 
-function buildBoundsFeaturePopupHtml(hit, { pointsCount = null, speciesCount = null } = {}) {
+function updateBoundsFeatureIsolateButton(button, isIsolated) {
+  if (!button) {
+    return;
+  }
+
+  if (isIsolated) {
+    button.textContent = "Показать все";
+    button.title = "Снова показать остальные полигоны ООПТ и заповедников";
+    return;
+  }
+
+  button.textContent = "Изолировать";
+  button.title = "Скрыть остальные полигоны ООПТ и заповедников";
+}
+
+function buildBoundsFeaturePopupHtml(hit, { pointsCount = null, speciesCount = null, isIsolated = false } = {}) {
   const layerId = hit.definition.id;
   const properties = hit.feature.properties ?? {};
   const title = getBoundsFeatureTitle(properties) || "ООПТ";
@@ -104,7 +119,11 @@ function buildBoundsFeaturePopupHtml(hit, { pointsCount = null, speciesCount = n
   lines.push(
     '<div class="feature-popup-actions shared-point-popup-actions">',
     '<button type="button" class="feature-popup-action-btn" data-bounds-feature-details>Подробнее</button>',
-    '<button type="button" class="feature-popup-action-btn" data-bounds-feature-isolate title="Скрыть остальные полигоны ООПТ и заповедников">Изолировать</button>',
+    `<button type="button" class="feature-popup-action-btn" data-bounds-feature-isolate title="${escapeHtml(
+      isIsolated
+        ? "Снова показать остальные полигоны ООПТ и заповедников"
+        : "Скрыть остальные полигоны ООПТ и заповедников"
+    )}">${escapeHtml(isIsolated ? "Показать все" : "Изолировать")}</button>`,
     "</div>"
   );
 
@@ -139,7 +158,12 @@ function getBoundsFeaturePopupCoordinates(feature, lngLat) {
 }
 
 /** Показывает всплывающее окно со сведениями о полигоне bounds. */
-export function showBoundsFeaturePopup(map, hit, lngLat, { onOpenDetails, onIsolate, filters = {} } = {}) {
+export function showBoundsFeaturePopup(
+  map,
+  hit,
+  lngLat,
+  { onOpenDetails, onIsolate, isIsolated = false, filters = {} } = {}
+) {
   if (!map || !hit?.definition || !hit?.feature) {
     return;
   }
@@ -163,7 +187,8 @@ export function showBoundsFeaturePopup(map, hit, lngLat, { onOpenDetails, onIsol
     .setHTML(
       buildBoundsFeaturePopupHtml(hit, {
         pointsCount: pointsSummary.count,
-        speciesCount: speciesSummary.count
+        speciesCount: speciesSummary.count,
+        isIsolated
       })
     );
 
@@ -200,7 +225,11 @@ export function showBoundsFeaturePopup(map, hit, lngLat, { onOpenDetails, onIsol
     if (isolateButton) {
       boundsFeaturePopupIsolateHandler = (event) => {
         event.preventDefault();
-        onIsolate(hit);
+        const nextIsIsolated = onIsolate(hit);
+        updateBoundsFeatureIsolateButton(
+          isolateButton,
+          typeof nextIsIsolated === "boolean" ? nextIsIsolated : false
+        );
       };
       isolateButton.addEventListener("click", boundsFeaturePopupIsolateHandler);
     }
@@ -243,7 +272,15 @@ export function flyToBoundsFeature(map, feature, hit, options = {}) {
     return;
   }
 
-  const { padding = 48, maxZoom = 11, duration = 800, onOpenDetails, onIsolate, filters = {} } = options;
+  const {
+    padding = 48,
+    maxZoom = 11,
+    duration = 800,
+    onOpenDetails,
+    onIsolate,
+    isIsolated = false,
+    filters = {}
+  } = options;
   const bounds = bbox(feature);
   let popupShown = false;
 
@@ -253,7 +290,7 @@ export function flyToBoundsFeature(map, feature, hit, options = {}) {
     }
 
     popupShown = true;
-    showBoundsFeaturePopup(map, hit, null, { onOpenDetails, onIsolate, filters });
+    showBoundsFeaturePopup(map, hit, null, { onOpenDetails, onIsolate, isIsolated, filters });
   };
 
   map.once("moveend", showPopupOnce);

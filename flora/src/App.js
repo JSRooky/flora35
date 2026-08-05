@@ -321,7 +321,27 @@ export default function MapView() {
   const openBoundsFeatureDetailsRef = useRef(handleOpenBoundsFeatureDetails);
   openBoundsFeatureDetailsRef.current = handleOpenBoundsFeatureDetails;
 
+  const boundsIsolationRef = useRef({
+    active: false,
+    featureKey: null,
+    previousVisibility: {}
+  });
+
+  const clearBoundsIsolation = useCallback(() => {
+    boundsIsolationRef.current = {
+      active: false,
+      featureKey: null,
+      previousVisibility: {}
+    };
+  }, []);
+
+  const isBoundsFeatureIsolated = useCallback((featureKey) => {
+    const isolation = boundsIsolationRef.current;
+    return isolation.active && isolation.featureKey === featureKey;
+  }, []);
+
   const handleBoundsFeatureVisibilityChange = useCallback((featureKey, visible) => {
+    clearBoundsIsolation();
     setBoundsFeatureVisibility((prev) => {
       const next = { ...prev };
 
@@ -333,9 +353,10 @@ export default function MapView() {
 
       return next;
     });
-  }, []);
+  }, [clearBoundsIsolation]);
 
   const handleBoundsGroupVisibilityChange = useCallback((_layerId, featureKeys, visible) => {
+    clearBoundsIsolation();
     setBoundsFeatureVisibility((prev) => {
       const next = { ...prev };
 
@@ -349,19 +370,45 @@ export default function MapView() {
 
       return next;
     });
-  }, []);
+  }, [clearBoundsIsolation]);
 
   const handleIsolateBoundsFeature = useCallback((hit) => {
     const featureKey = getBoundsFeatureVisibilityKey(hit);
 
     if (!featureKey) {
-      return;
+      return false;
     }
 
-    // Ключи, отсутствующие в объекте, уже считаются невидимыми (см. getVisibleDocIdsForLayer),
-    // поэтому достаточно оставить в состоянии только выбранный объект.
-    setBoundsFeatureVisibility({ [featureKey]: true });
-  }, []);
+    const isolation = boundsIsolationRef.current;
+
+    if (isolation.active && isolation.featureKey === featureKey) {
+      setBoundsFeatureVisibility(isolation.previousVisibility);
+      clearBoundsIsolation();
+      return false;
+    }
+
+    if (isolation.active) {
+      setBoundsFeatureVisibility({ [featureKey]: true });
+      boundsIsolationRef.current = {
+        ...isolation,
+        featureKey
+      };
+      return true;
+    }
+
+    setBoundsFeatureVisibility((prev) => {
+      boundsIsolationRef.current = {
+        active: true,
+        featureKey,
+        previousVisibility: prev
+      };
+
+      // Ключи, отсутствующие в объекте, уже считаются невидимыми (см. getVisibleDocIdsForLayer),
+      // поэтому достаточно оставить в состоянии только выбранный объект.
+      return { [featureKey]: true };
+    });
+    return true;
+  }, [clearBoundsIsolation]);
   const isolateBoundsFeatureRef = useRef(handleIsolateBoundsFeature);
   isolateBoundsFeatureRef.current = handleIsolateBoundsFeature;
 
@@ -391,10 +438,11 @@ export default function MapView() {
       flyToBoundsFeature(map.current, feature, { definition, feature }, {
         onOpenDetails: handleOpenBoundsFeatureDetails,
         onIsolate: handleIsolateBoundsFeature,
+        isIsolated: isBoundsFeatureIsolated(entry.key),
         filters: boundsFilterBaseRef.current()
       });
     }
-  }, [handleOpenBoundsFeatureDetails, handleIsolateBoundsFeature]);
+  }, [handleOpenBoundsFeatureDetails, handleIsolateBoundsFeature, isBoundsFeatureIsolated]);
 
   const handleModuleSelect = useCallback((moduleId) => {
     if (moduleId === MODULE_IDS.ABOUT) {
@@ -2243,6 +2291,9 @@ export default function MapView() {
               showBoundsFeaturePopup(map.current, boundsHit, event.lngLat, {
                 onOpenDetails: () => openBoundsFeatureDetailsRef.current?.(),
                 onIsolate: (hit) => isolateBoundsFeatureRef.current?.(hit),
+                isIsolated: isBoundsFeatureIsolated(
+                  getBoundsFeatureVisibilityKey(boundsHit)
+                ),
                 filters: boundsFilterBaseRef.current()
               });
               return;
