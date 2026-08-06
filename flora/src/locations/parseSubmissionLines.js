@@ -205,6 +205,73 @@ function parseSubmissionParts(parts, lineNumber) {
   };
 }
 
+/** Проверяет и нормализует payload находки перед сохранением. */
+export function validateSubmissionPayload(payload) {
+  const name_ru = String(payload?.name_ru ?? "").trim();
+  const name_latin = String(payload?.name_latin ?? "").trim();
+  const family = String(payload?.family ?? "").trim();
+  const found_by = String(payload?.found_by ?? "").trim();
+  const identified_by = String(payload?.identified_by ?? "").trim();
+
+  if (!name_ru) {
+    return { error: "Укажите русское название." };
+  }
+
+  if (!name_latin) {
+    return { error: "Укажите латинское название." };
+  }
+
+  if (!family) {
+    return { error: "Укажите семейство." };
+  }
+
+  const regnumResult = parseRegnum(payload?.regnum);
+  if (regnumResult.error) {
+    return { error: regnumResult.error };
+  }
+
+  const statusResult = parseStatus(payload?.status);
+  if (statusResult.error) {
+    return { error: statusResult.error };
+  }
+
+  const [lng, lat] = payload?.coordinates ?? [];
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { error: "Укажите корректные координаты." };
+  }
+
+  if (lat < -90 || lat > 90) {
+    return { error: "Широта должна быть от −90 до 90." };
+  }
+
+  if (lng < -180 || lng > 180) {
+    return { error: "Долгота должна быть от −180 до 180." };
+  }
+
+  const foundYearResult = parseFoundYear(payload?.found_year);
+  if (foundYearResult.error) {
+    return { error: foundYearResult.error };
+  }
+
+  if (!found_by) {
+    return { error: "Укажите, кем найдено." };
+  }
+
+  return {
+    payload: {
+      name_ru,
+      name_latin,
+      family,
+      regnum: regnumResult.regnum,
+      status: statusResult.status,
+      coordinates: [Number(lng.toFixed(3)), Number(lat.toFixed(3))],
+      found_year: foundYearResult.found_year,
+      found_by,
+      identified_by
+    }
+  };
+}
+
 /**
  * Разбирает текст со списком находок (по одной записи на строку).
  * Разделитель полей — любой из набора (; | tab : / # ~), кроме пробела и запятой.

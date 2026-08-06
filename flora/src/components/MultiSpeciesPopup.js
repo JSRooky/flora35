@@ -1,10 +1,11 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
   formatFindingsCount,
-  formatSubmissionCoordinates,
-  parseSubmissionLines
+  parseSubmissionLines,
+  validateSubmissionPayload
 } from "../locations/parseSubmissionLines";
 import { saveUserFindings } from "../locations/saveUserFinding";
+import MultiSpeciesConfirmTable from "./MultiSpeciesConfirmTable";
 import "../styles/MultiSpeciesPopup.css";
 
 const PLACEHOLDER =
@@ -66,17 +67,78 @@ export default function MultiSpeciesPopup({ open, onClose, onSaved }) {
     setMessage(null);
   }, []);
 
+  const handlePendingRowChange = useCallback((rowIndex, field, value) => {
+    setPendingRows((prev) =>
+      prev.map((row, index) => {
+        if (index !== rowIndex) {
+          return row;
+        }
+
+        if (field === "lat" || field === "lng") {
+          const [currentLng, currentLat] = row.payload.coordinates;
+          const parsed = Number.parseFloat(String(value).replace(",", "."));
+
+          return {
+            ...row,
+            payload: {
+              ...row.payload,
+              coordinates: [
+                field === "lng" && Number.isFinite(parsed) ? parsed : currentLng,
+                field === "lat" && Number.isFinite(parsed) ? parsed : currentLat
+              ]
+            }
+          };
+        }
+
+        if (field === "found_year") {
+          const nextYear = String(value).trim();
+          return {
+            ...row,
+            payload: {
+              ...row.payload,
+              found_year: nextYear === "" ? "" : Number(nextYear)
+            }
+          };
+        }
+
+        return {
+          ...row,
+          payload: {
+            ...row.payload,
+            [field]: value
+          }
+        };
+      })
+    );
+    setMessage(null);
+  }, []);
+
   const handleConfirm = useCallback(async () => {
     if (pendingRows.length === 0) {
       return;
+    }
+
+    const validatedPayloads = [];
+
+    for (let index = 0; index < pendingRows.length; index += 1) {
+      const validation = validateSubmissionPayload(pendingRows[index].payload);
+      if (validation.error) {
+        setMessage({
+          type: "error",
+          text: `Строка ${index + 1}: ${validation.error}`
+        });
+        return;
+      }
+
+      validatedPayloads.push(validation.payload);
     }
 
     setSubmitting(true);
     setMessage(null);
 
     try {
-      await saveUserFindings(pendingRows.map(({ payload }) => payload));
-      const savedCount = pendingRows.length;
+      await saveUserFindings(validatedPayloads);
+      const savedCount = validatedPayloads.length;
       resetState();
       onSaved?.(savedCount);
       onClose?.();
@@ -173,40 +235,15 @@ export default function MultiSpeciesPopup({ open, onClose, onSaved }) {
           <>
             <h3 className="multi-species-title">Подтверждение записи</h3>
             <p className="multi-species-confirm-summary">
-              Будет записано {formatFindingsCount(pendingRows.length)}. Проверьте данные перед
-              сохранением в базу.
+              Будет записано {formatFindingsCount(pendingRows.length)}. Проверьте и при необходимости
+              отредактируйте данные перед сохранением в базу.
             </p>
 
-            <div className="multi-species-table-wrap">
-              <table className="multi-species-table">
-                <thead>
-                  <tr>
-                    <th>№</th>
-                    <th>Название</th>
-                    <th>Лат.</th>
-                    <th>Семейство</th>
-                    <th>Год</th>
-                    <th>Координаты</th>
-                    <th>Найдено</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingRows.map(({ line, payload }, index) => (
-                    <tr key={`${line}-${payload.name_latin}-${index}`}>
-                      <td>{index + 1}</td>
-                      <td>{payload.name_ru}</td>
-                      <td className="multi-species-table-latin">{payload.name_latin}</td>
-                      <td>{payload.family}</td>
-                      <td>{payload.found_year}</td>
-                      <td className="multi-species-table-coords">
-                        {formatSubmissionCoordinates(payload.coordinates)}
-                      </td>
-                      <td>{payload.found_by}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <MultiSpeciesConfirmTable
+              rows={pendingRows}
+              onRowChange={handlePendingRowChange}
+              disabled={submitting}
+            />
 
             {message && (
               <p
@@ -217,15 +254,7 @@ export default function MultiSpeciesPopup({ open, onClose, onSaved }) {
               </p>
             )}
 
-            <div className="multi-species-actions">
-              <button
-                type="button"
-                className="multi-species-save"
-                onClick={handleConfirm}
-                disabled={submitting}
-              >
-                {submitting ? "Запись…" : "Подтвердить"}
-              </button>
+            <div className="multi-species-actions multi-species-actions--confirm">
               <button
                 type="button"
                 className="multi-species-cancel"
@@ -233,6 +262,14 @@ export default function MultiSpeciesPopup({ open, onClose, onSaved }) {
                 disabled={submitting}
               >
                 Назад
+              </button>
+              <button
+                type="button"
+                className="multi-species-save"
+                onClick={handleConfirm}
+                disabled={submitting}
+              >
+                {submitting ? "Запись…" : "Подтвердить"}
               </button>
             </div>
           </>
