@@ -1,3 +1,23 @@
+function appendUniqueFindings(targetFindings, sourceFindings) {
+  const seenIds = new Set(
+    targetFindings.map((finding) => finding?.id).filter(Boolean)
+  );
+
+  for (const finding of sourceFindings ?? []) {
+    const findingId = finding?.id;
+
+    if (findingId && seenIds.has(findingId)) {
+      continue;
+    }
+
+    if (findingId) {
+      seenIds.add(findingId);
+    }
+
+    targetFindings.push(finding);
+  }
+}
+
 /** Объединяет несколько SpeciesCollection в одну коллекцию (findings склеиваются по id вида). */
 export function mergeSpeciesCollections(...collections) {
   const speciesById = new Map();
@@ -18,7 +38,7 @@ export function mergeSpeciesCollections(...collections) {
         return;
       }
 
-      existing.findings.push(...(species.findings ?? []));
+      appendUniqueFindings(existing.findings, species.findings);
     });
   });
 

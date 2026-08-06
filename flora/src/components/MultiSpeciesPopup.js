@@ -1,9 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { createEmptySubmissionRow, countFilledSubmissionRows, getPendingRowsFieldErrors } from "../locations/multiSpeciesRows";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  countFilledSubmissionRows,
+  createEmptySubmissionRow,
+  getFilledSubmissionRows,
+  getPendingRowsFieldErrors,
+  validatePendingRows
+} from "../locations/multiSpeciesRows";
 import {
   formatFindingsCount,
-  parseSubmissionLines,
-  validateSubmissionPayload
+  parseSubmissionLines
 } from "../locations/parseSubmissionLines";
 import { saveUserFindings } from "../locations/saveUserFinding";
 import { buildSubmissionSuggestionData } from "../locations/submissionSuggestions";
@@ -47,33 +52,6 @@ function TrashIcon() {
   );
 }
 
-function validatePendingRows(rows) {
-  if (rows.length === 0) {
-    return {
-      error: {
-        text: "Добавьте хотя бы одну строку."
-      }
-    };
-  }
-
-  const validatedPayloads = [];
-
-  for (let index = 0; index < rows.length; index += 1) {
-    const validation = validateSubmissionPayload(rows[index].payload);
-    if (validation.error) {
-      return {
-        error: {
-          text: `Строка ${index + 1}: ${validation.error}`
-        }
-      };
-    }
-
-    validatedPayloads.push(validation.payload);
-  }
-
-  return { payloads: validatedPayloads };
-}
-
 export default function MultiSpeciesPopup({
   open,
   mode = "text",
@@ -91,6 +69,7 @@ export default function MultiSpeciesPopup({
   const [mapPickHidden, setMapPickHidden] = useState(false);
   const [mapPickRowIndex, setMapPickRowIndex] = useState(null);
   const [invalidFieldsByRow, setInvalidFieldsByRow] = useState({});
+  const submittingRef = useRef(false);
 
   const parsed = useMemo(() => parseSubmissionLines(text), [text]);
   const filledRowCount = useMemo(
@@ -115,6 +94,7 @@ export default function MultiSpeciesPopup({
     setMapPickHidden(false);
     setMapPickRowIndex(null);
     setInvalidFieldsByRow({});
+    submittingRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -238,6 +218,7 @@ export default function MultiSpeciesPopup({
       return;
     }
 
+    const filledRows = getFilledSubmissionRows(pendingRows);
     const fieldErrors = getPendingRowsFieldErrors(pendingRows);
     if (Object.keys(fieldErrors).length > 0) {
       setInvalidFieldsByRow(fieldErrors);
@@ -245,13 +226,14 @@ export default function MultiSpeciesPopup({
       return;
     }
 
-    const validation = validatePendingRows(pendingRows);
+    const validation = validatePendingRows(filledRows);
     if (validation.error) {
       setInvalidFieldsByRow(getPendingRowsFieldErrors(pendingRows));
       setMessage({ type: "error", text: validation.error.text });
       return;
     }
 
+    setPendingRows(filledRows);
     setInvalidFieldsByRow({});
     setStep("confirm");
     setMessage(null);
@@ -416,12 +398,17 @@ export default function MultiSpeciesPopup({
   }, []);
 
   const handleConfirm = useCallback(async () => {
+    if (submittingRef.current || submitting) {
+      return;
+    }
+
     const validation = validatePendingRows(pendingRows);
     if (validation.error) {
       setMessage({ type: "error", text: validation.error.text });
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
     setMessage(null);
 
@@ -432,20 +419,21 @@ export default function MultiSpeciesPopup({
       onSaved?.(savedCount);
       onClose?.();
     } catch (error) {
+      submittingRef.current = false;
       setMessage({
         type: "error",
         text: error?.message || "Не удалось сохранить данные."
       });
       setSubmitting(false);
     }
-  }, [onClose, onSaved, pendingRows, resetState]);
+  }, [onClose, onSaved, pendingRows, resetState, submitting]);
 
   if (!open || mapPickHidden) {
     return null;
   }
 
   const canReviewText = parsed.rows.length > 0 && parsed.errors.length === 0;
-  const canReview = inputMode === "text" ? canReviewText : pendingRows.length > 0;
+  const canReview = inputMode === "text" ? canReviewText : filledRowCount > 0;
 
   const dialogClassName =
     step === "confirm"

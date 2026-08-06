@@ -1,4 +1,7 @@
-import { getSubmissionPayloadInvalidFields } from "./parseSubmissionLines";
+import {
+  getSubmissionPayloadInvalidFields,
+  validateSubmissionPayload
+} from "./parseSubmissionLines";
 
 /** Пустая строка находки для табличного ввода. */
 export function createEmptySubmissionRow(lineNumber = 1) {
@@ -52,11 +55,52 @@ export function countFilledSubmissionRows(rows) {
   return rows.filter(isSubmissionRowFilled).length;
 }
 
+/** Оставляет только строки, в которых пользователь ввёл хотя бы одно значимое поле. */
+export function getFilledSubmissionRows(rows) {
+  return rows.filter(isSubmissionRowFilled);
+}
+
+/** Проверяет заполненные строки перед сохранением. */
+export function validatePendingRows(rows) {
+  const filledRows = getFilledSubmissionRows(rows);
+
+  if (filledRows.length === 0) {
+    return {
+      error: {
+        text: "Добавьте хотя бы одну строку."
+      }
+    };
+  }
+
+  const validatedPayloads = [];
+
+  for (let index = 0; index < filledRows.length; index += 1) {
+    const row = filledRows[index];
+    const validation = validateSubmissionPayload(row.payload);
+
+    if (validation.error) {
+      return {
+        error: {
+          text: `Строка ${row.line ?? index + 1}: ${validation.error}`
+        }
+      };
+    }
+
+    validatedPayloads.push(validation.payload);
+  }
+
+  return { payloads: validatedPayloads };
+}
+
 /** Возвращает ошибки обязательных полей по индексам строк таблицы. */
 export function getPendingRowsFieldErrors(rows) {
   const fieldErrors = {};
 
   rows.forEach((row, index) => {
+    if (!isSubmissionRowFilled(row)) {
+      return;
+    }
+
     const invalidFields = getSubmissionPayloadInvalidFields(row.payload);
     if (invalidFields.length > 0) {
       fieldErrors[index] = invalidFields;
