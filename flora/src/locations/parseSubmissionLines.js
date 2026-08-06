@@ -70,7 +70,7 @@ function parseStatus(value) {
     .toUpperCase();
 
   if (!code) {
-    return { error: "Укажите статус МСОП." };
+    return { status: "LC" };
   }
 
   if (!STATUS_CODES.has(code)) {

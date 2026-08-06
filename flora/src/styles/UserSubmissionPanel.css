@@ -92,11 +92,11 @@
 }
 
 .user-submission-field-marker--empty {
-  background: #dc3545;
+  background: #d4d4d4;
 }
 
 .user-submission-field-marker--filled {
-  background: #1e7e34;
+  background: var(--submit-accent, #007bff);
 }
 
 .user-submission-field input,
@@ -351,7 +351,26 @@
 }
 
 .user-submission-multi-species {
-  margin-left: 0;
+  padding: 8px 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.user-submission-multi-species:hover:not(:disabled) {
+  background: var(--submit-accent-soft);
+  border-color: var(--submit-accent);
+  color: var(--submit-accent-dark);
+}
+
+.user-submission-multi-species:disabled {
+  opacity: 0.65;
+  cursor: default;
 }
 
 .user-submission-submit-wrap {
@@ -386,24 +405,9 @@
   cursor: default;
 }
 
-.user-submission-reset {
-  padding: 8px 14px;
-  border: 1px solid #ccc;
+.user-submission-form-reset-btn {
+  width: 32px;
+  height: 32px;
   border-radius: 6px;
-  background: #fff;
-  color: #333;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.user-submission-reset:hover:not(:disabled) {
-  background: var(--submit-accent-soft);
-  border-color: var(--submit-accent);
-  color: var(--submit-accent-dark);
-}
-
-.user-submission-reset:disabled {
-  opacity: 0.65;
-  cursor: default;
+  box-sizing: border-box;
 }

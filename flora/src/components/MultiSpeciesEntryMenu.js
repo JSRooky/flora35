@@ -29,7 +29,7 @@ export default function MultiSpeciesEntryMenu({ open, disabled, onToggle, onSele
     <div className="user-submission-multi-species-wrap" ref={wrapRef}>
       <button
         type="button"
-        className="user-submission-reset user-submission-multi-species"
+        className="user-submission-multi-species"
         onClick={() => onToggle?.(!open)}
         disabled={disabled}
         aria-haspopup="menu"

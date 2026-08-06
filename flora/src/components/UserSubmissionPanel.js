@@ -235,13 +235,14 @@ export default function UserSubmissionPanel({
 
   const fieldCompletion = useMemo(() => {
     const foundYear = Number(form.found_year);
+    const status = form.status || "LC";
 
     return {
       regnum: Boolean(form.regnum),
       family: Boolean(form.family.trim()),
       name_ru: Boolean(form.name_ru.trim()),
       name_latin: Boolean(form.name_latin.trim()),
-      status: Boolean(form.status),
+      status: Boolean(status),
       coordinates: Boolean(coordinates) || listCoordinates.length > 0,
       found_year: Number.isInteger(foundYear) && foundYear >= 1500 && foundYear <= 2100,
       found_by: Boolean(form.found_by.trim())
@@ -360,7 +361,7 @@ export default function UserSubmissionPanel({
           name_ru: form.name_ru.trim(),
           name_latin: form.name_latin.trim(),
           regnum: form.regnum,
-          status: form.status,
+          status: form.status || "LC",
           family: form.family.trim(),
           found_year: foundYear,
           found_by: form.found_by.trim(),
@@ -499,7 +500,7 @@ export default function UserSubmissionPanel({
                           type="radio"
                           name="status"
                           value={code}
-                          checked={form.status === code}
+                          checked={(form.status || "LC") === code}
                           onChange={(event) => handleFieldChange("status")(event.target.value)}
                         />
                         <span className="user-submission-status-code">{code}</span>
@@ -564,10 +565,6 @@ export default function UserSubmissionPanel({
                   value={form.found_year}
                   onChange={handleFieldChange("found_year")}
                   suggestions={foundYearSuggestions}
-                  type="number"
-                  min="1500"
-                  max="2100"
-                  step="1"
                   required
                   filled={fieldCompletion.found_year}
                 />
@@ -614,11 +611,13 @@ export default function UserSubmissionPanel({
                   </span>
                   <button
                     type="button"
-                    className="user-submission-reset"
+                    className="user-submission-location-reset-btn user-submission-form-reset-btn"
                     onClick={handleReset}
                     disabled={submitting}
+                    aria-label="Сброс"
+                    title="Сброс"
                   >
-                    Сброс
+                    <TrashIcon />
                   </button>
                 </div>
                 <MultiSpeciesEntryMenu
