@@ -611,10 +611,10 @@ export default function MultiSpeciesConfirmTable({
             <th className="multi-species-table-year-col">
               <TableHeaderLabel required>Год</TableHeaderLabel>
             </th>
-            <th className={isEntry ? "multi-species-coords-col" : undefined}>
+            <th className="multi-species-coords-col">
               <TableHeaderLabel required>Широта</TableHeaderLabel>
             </th>
-            <th className={isEntry ? "multi-species-coords-col multi-species-coords-lng-col" : undefined}>
+            <th className={`multi-species-coords-col${isEntry ? " multi-species-coords-lng-col" : ""}`}>
               <TableHeaderLabel required>Долгота</TableHeaderLabel>
             </th>
             <th className="multi-species-table-found-col">

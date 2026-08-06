@@ -130,13 +130,19 @@ export function findingDocsToSpeciesCollection(docs, dataset = null) {
       });
     }
 
-    speciesById.get(speciesId).findings.push({
-      id: record.finding_id ?? parseFirestoreDocId(doc.id).findingId,
-      coordinates: record.coordinates,
-      found_by: record.found_by,
-      identified_by: record.identified_by,
-      found_year: record.found_year
-    });
+    const speciesEntry = speciesById.get(speciesId);
+    const findingId = record.finding_id ?? parseFirestoreDocId(doc.id).findingId;
+    const alreadyAdded = speciesEntry.findings.some((finding) => finding.id === findingId);
+
+    if (!alreadyAdded) {
+      speciesEntry.findings.push({
+        id: findingId,
+        coordinates: record.coordinates,
+        found_by: record.found_by,
+        identified_by: record.identified_by,
+        found_year: record.found_year
+      });
+    }
   });
 
   return {
@@ -179,13 +185,18 @@ export function submissionDocsToSpeciesCollection(docs) {
       });
     }
 
-    speciesById.get(speciesId).findings.push({
-      id: findingId,
-      coordinates: record.coordinates,
-      found_by: record.found_by ?? "",
-      identified_by: record.identified_by ?? "",
-      found_year: record.found_year ?? null
-    });
+    const speciesEntry = speciesById.get(speciesId);
+    const alreadyAdded = speciesEntry.findings.some((finding) => finding.id === findingId);
+
+    if (!alreadyAdded) {
+      speciesEntry.findings.push({
+        id: findingId,
+        coordinates: record.coordinates,
+        found_by: record.found_by ?? "",
+        identified_by: record.identified_by ?? "",
+        found_year: record.found_year ?? null
+      });
+    }
   });
 
   return {
