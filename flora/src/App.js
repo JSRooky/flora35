@@ -893,6 +893,11 @@ export default function MapView() {
     clearArealDynamicsSliceCache();
   }, [locationFilters, mapReady, syncYearBounds]);
 
+  const handleSubmissionCoordinatesReset = useCallback(() => {
+    setSubmissionCoordinates(null);
+    setSubmissionLocationPicking(false);
+  }, []);
+
   const areaContainedPoints = useMemo(() => {
     if (!areaGeometry || !mapReady) {
       return null;
@@ -2559,10 +2564,8 @@ export default function MapView() {
                 collapsed={isPanelCollapsed(PANEL_IDS.SUBMIT)}
                 onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.SUBMIT)}
                 onSaved={handleUserFindingSaved}
-                onReset={() => {
-                  setSubmissionCoordinates(null);
-                  setSubmissionLocationPicking(false);
-                }}
+                onReset={handleSubmissionCoordinatesReset}
+                onCoordinatesReset={handleSubmissionCoordinatesReset}
               />
             </Suspense>
           )}

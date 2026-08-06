@@ -1,6 +1,7 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { formatPointsCount } from "../locations/parseCoordinatesList";
-import { saveUserFinding } from "../locations/saveUserFinding";
+import { formatFindingsCount } from "../locations/parseSubmissionLines";
+import { saveUserFinding, saveUserFindings } from "../locations/saveUserFinding";
 import {
   buildSubmissionSuggestionData,
   filterSpeciesByNameLatin,
@@ -8,6 +9,7 @@ import {
   filterTextSuggestions
 } from "../locations/submissionSuggestions";
 import CoordinatesListPopup from "./CoordinatesListPopup";
+import MultiSpeciesPopup from "./MultiSpeciesPopup";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import SubmissionAutocompleteField from "./SubmissionAutocompleteField";
 import SubmissionFieldLabel from "./SubmissionFieldLabel";
@@ -51,8 +53,9 @@ function applySpeciesToForm(species) {
   };
 }
 
-function isSubmissionFormComplete(form, coordinates) {
-  if (!coordinates) {
+function isSubmissionFormComplete(form, coordinates, listCoordinates) {
+  const hasLocation = Boolean(coordinates) || listCoordinates.length > 0;
+  if (!hasLocation) {
     return false;
   }
 
@@ -69,6 +72,52 @@ function isSubmissionFormComplete(form, coordinates) {
   return Number.isInteger(foundYear) && foundYear >= 1500 && foundYear <= 2100;
 }
 
+function TrashIcon() {
+  return (
+    <svg
+      className="user-submission-location-reset-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <polyline
+        points="3 6 5 6 21 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <line
+        x1="10"
+        y1="11"
+        x2="10"
+        y2="17"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <line
+        x1="14"
+        y1="11"
+        x2="14"
+        y2="17"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export default function UserSubmissionPanel({
   coordinates,
   locationPickingActive = false,
@@ -76,7 +125,8 @@ export default function UserSubmissionPanel({
   collapsed: collapsedProp,
   onCollapsedChange,
   onSaved,
-  onReset
+  onReset,
+  onCoordinatesReset
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
   const isControlled = collapsedProp !== undefined;
@@ -89,6 +139,14 @@ export default function UserSubmissionPanel({
   const [message, setMessage] = useState(null);
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## submit в docs/moduleHelp.md
   const [listInputOpen, setListInputOpen] = useState(false);
+  const [multiSpeciesOpen, setMultiSpeciesOpen] = useState(false);
+  const [listCoordinates, setListCoordinates] = useState([]);
+
+  useEffect(() => {
+    if (coordinates) {
+      setListCoordinates([]);
+    }
+  }, [coordinates]);
 
   const suggestionData = buildSubmissionSuggestionData();
 
@@ -123,8 +181,8 @@ export default function UserSubmissionPanel({
   );
 
   const canSave = useMemo(
-    () => isSubmissionFormComplete(form, coordinates),
-    [coordinates, form]
+    () => isSubmissionFormComplete(form, coordinates, listCoordinates),
+    [coordinates, form, listCoordinates]
   );
 
   const fieldCompletion = useMemo(() => {
@@ -136,11 +194,11 @@ export default function UserSubmissionPanel({
       name_ru: Boolean(form.name_ru.trim()),
       name_latin: Boolean(form.name_latin.trim()),
       status: Boolean(form.status),
-      coordinates: Boolean(coordinates),
+      coordinates: Boolean(coordinates) || listCoordinates.length > 0,
       found_year: Number.isInteger(foundYear) && foundYear >= 1500 && foundYear <= 2100,
       found_by: Boolean(form.found_by.trim())
     };
-  }, [coordinates, form]);
+  }, [coordinates, form, listCoordinates]);
 
   const handleFieldChange = useCallback((field) => (value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -159,6 +217,7 @@ export default function UserSubmissionPanel({
     setForm(EMPTY_FORM);
     setMessage(null);
     setListInputOpen(false);
+    setListCoordinates([]);
     onReset?.();
   }, [onReset]);
 
@@ -166,21 +225,40 @@ export default function UserSubmissionPanel({
     onLocationPickingChange?.(!locationPickingActive);
   }, [locationPickingActive, onLocationPickingChange]);
 
+  const handleCoordinatesReset = useCallback(() => {
+    onLocationPickingChange?.(false);
+    onCoordinatesReset?.();
+  }, [onCoordinatesReset, onLocationPickingChange]);
+
+  const canResetCoordinates = Boolean(coordinates || locationPickingActive);
+
   const handleListInputOpen = useCallback(() => {
     onLocationPickingChange?.(false);
     setListInputOpen(true);
     setMessage(null);
   }, [onLocationPickingChange]);
 
-  const handleListInputSaved = useCallback(
+  const handleListInputConfirmed = useCallback(
+    (coordinatesList) => {
+      setListCoordinates(coordinatesList);
+      onCoordinatesReset?.();
+      setMessage({
+        type: "success",
+        text: `Запомнено ${formatPointsCount(coordinatesList.length)}.`
+      });
+    },
+    [onCoordinatesReset]
+  );
+
+  const handleMultiSpeciesSaved = useCallback(
     (savedCount) => {
       onSaved?.();
       setMessage({
         type: "success",
         text:
           savedCount === 1
-            ? "Координаты записаны в базу и добавлены на карту."
-            : `Записано ${formatPointsCount(savedCount)} в базу и добавлено на карту.`
+            ? "Находка записана в базу и добавлена на карту."
+            : `Записано ${formatFindingsCount(savedCount)} в базу и добавлено на карту.`
       });
     },
     [onSaved]
@@ -190,10 +268,10 @@ export default function UserSubmissionPanel({
     async (event) => {
       event.preventDefault();
 
-      if (!coordinates) {
+      if (!coordinates && listCoordinates.length === 0) {
         setMessage({
           type: "error",
-          text: "Нажмите «Указать место» и кликните по карте."
+          text: "Укажите место на карте или введите координаты списком."
         });
         return;
       }
@@ -218,7 +296,7 @@ export default function UserSubmissionPanel({
       setMessage(null);
 
       try {
-        await saveUserFinding({
+        const payloadBase = {
           name_ru: form.name_ru.trim(),
           name_latin: form.name_latin.trim(),
           regnum: form.regnum,
@@ -226,15 +304,33 @@ export default function UserSubmissionPanel({
           family: form.family.trim(),
           found_year: foundYear,
           found_by: form.found_by.trim(),
-          identified_by: form.identified_by.trim(),
-          coordinates
-        });
+          identified_by: form.identified_by.trim()
+        };
+
+        if (listCoordinates.length > 0) {
+          await saveUserFindings(
+            listCoordinates.map((entryCoordinates) => ({
+              ...payloadBase,
+              coordinates: entryCoordinates
+            }))
+          );
+        } else {
+          await saveUserFinding({
+            ...payloadBase,
+            coordinates
+          });
+        }
 
         setForm(EMPTY_FORM);
+        setListCoordinates([]);
+        onReset?.();
         onSaved?.();
         setMessage({
           type: "success",
-          text: "Данные сохранены в базе и добавлены на карту."
+          text:
+            listCoordinates.length > 1
+              ? `Данные сохранены: ${formatPointsCount(listCoordinates.length)} добавлены на карту.`
+              : "Данные сохранены в базе и добавлены на карту."
         });
       } catch (error) {
         setMessage({
@@ -245,7 +341,7 @@ export default function UserSubmissionPanel({
         setSubmitting(false);
       }
     },
-    [coordinates, form, onSaved]
+    [coordinates, form, listCoordinates, onReset, onSaved]
   );
 
   return (
@@ -359,30 +455,43 @@ export default function UserSubmissionPanel({
                     Место находки
                   </SubmissionFieldLabel>
                   <div className="user-submission-location-row">
-                    <output className="user-submission-coordinates">
-                      {coordinates
-                        ? formatCoordinates(coordinates)
-                        : locationPickingActive
-                          ? "Кликните по карте"
-                          : "Не указано"}
-                    </output>
                     <div className="user-submission-location-actions">
+                      <div className="user-submission-location-pick-group">
+                        <button
+                          type="button"
+                          className={`user-submission-location-btn user-submission-location-btn--pick${
+                            locationPickingActive ? " user-submission-location-btn--active" : ""
+                          }${coordinates && !locationPickingActive ? " user-submission-location-btn--filled" : ""}`}
+                          onClick={handleLocationPickingToggle}
+                          aria-pressed={locationPickingActive}
+                        >
+                          {locationPickingActive
+                            ? "Отмена"
+                            : coordinates
+                              ? formatCoordinates(coordinates)
+                              : "Указать место"}
+                        </button>
+                        <button
+                          type="button"
+                          className="user-submission-location-reset-btn"
+                          onClick={handleCoordinatesReset}
+                          disabled={!canResetCoordinates}
+                          aria-label="Сбросить место находки"
+                          title="Сбросить место"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
                       <button
                         type="button"
-                        className={`user-submission-location-btn${
-                          locationPickingActive ? " user-submission-location-btn--active" : ""
+                        className={`user-submission-location-btn user-submission-location-btn--list${
+                          listCoordinates.length > 0 ? " user-submission-location-btn--filled" : ""
                         }`}
-                        onClick={handleLocationPickingToggle}
-                        aria-pressed={locationPickingActive}
-                      >
-                        {locationPickingActive ? "Отмена" : "Указать место"}
-                      </button>
-                      <button
-                        type="button"
-                        className="user-submission-location-btn"
                         onClick={handleListInputOpen}
                       >
-                        Ввод списком
+                        {listCoordinates.length > 0
+                          ? formatPointsCount(listCoordinates.length)
+                          : "Ввод списком"}
                       </button>
                     </div>
                   </div>
@@ -428,25 +537,35 @@ export default function UserSubmissionPanel({
               )}
 
               <div className="user-submission-actions">
-                <span
-                  className="user-submission-submit-wrap"
-                  title={!submitting && !canSave ? "Заполните обязательные поля" : undefined}
-                >
-                  <button
-                    type="submit"
-                    className="user-submission-submit"
-                    disabled={submitting || !canSave}
+                <div className="user-submission-actions-primary">
+                  <span
+                    className="user-submission-submit-wrap"
+                    title={!submitting && !canSave ? "Заполните обязательные поля" : undefined}
                   >
-                    {submitting ? "Сохранение…" : "Сохранить"}
+                    <button
+                      type="submit"
+                      className="user-submission-submit"
+                      disabled={submitting || !canSave}
+                    >
+                      {submitting ? "Сохранение…" : "Сохранить"}
+                    </button>
+                  </span>
+                  <button
+                    type="button"
+                    className="user-submission-reset"
+                    onClick={handleReset}
+                    disabled={submitting}
+                  >
+                    Сброс
                   </button>
-                </span>
+                </div>
                 <button
                   type="button"
-                  className="user-submission-reset"
-                  onClick={handleReset}
+                  className="user-submission-reset user-submission-multi-species"
+                  onClick={() => setMultiSpeciesOpen(true)}
                   disabled={submitting}
                 >
-                  Сброс
+                  Несколько видов
                 </button>
               </div>
             </form>
@@ -458,8 +577,13 @@ export default function UserSubmissionPanel({
       <CoordinatesListPopup
         open={listInputOpen}
         onClose={() => setListInputOpen(false)}
-        form={form}
-        onSaved={handleListInputSaved}
+        onConfirm={handleListInputConfirmed}
+      />
+
+      <MultiSpeciesPopup
+        open={multiSpeciesOpen}
+        onClose={() => setMultiSpeciesOpen(false)}
+        onSaved={handleMultiSpeciesSaved}
       />
     </>
   );
