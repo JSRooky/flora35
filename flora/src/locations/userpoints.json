@@ -8,6 +8,7 @@
       "family": "",
       "name_ru": "Ятрышник шлемоносный",
       "name_latin": "Orchis militaris",
+      "description_md": "species/primula_veris.md",
       "findings": [
         {
           "id": "orchis-militaris-001",

@@ -1,4 +1,5 @@
 import mapboxgl from "mapbox-gl";
+import { circle } from "@turf/turf";
 import {
   getFilteredFeatures,
   getPointColorForRegnum,
@@ -233,31 +234,17 @@ function normalizeArealItems(items) {
 }
 
 /**
- * Строит GeoJSON-полигон — аппроксимацию круга на сфере.
+ * Строит GeoJSON-полигон — геодезический круг (Turf).
  * radiusKm — радиус в километрах от центра.
  */
 function createCirclePolygon(center, radiusKm, color, steps = 64) {
-  const [lng, lat] = center;
-  const coords = [];
-  const earthRadiusKm = 6371;
-
-  for (let i = 0; i <= steps; i++) {
-    const angle = (i / steps) * 2 * Math.PI;
-    const dx = radiusKm * Math.cos(angle);
-    const dy = radiusKm * Math.sin(angle);
-    const newLat = lat + (dy / earthRadiusKm) * (180 / Math.PI);
-    const newLng =
-      lng +
-      ((dx / earthRadiusKm) * (180 / Math.PI)) / Math.cos((lat * Math.PI) / 180);
-    coords.push([newLng, newLat]);
-  }
+  const circleFeature = circle(center, radiusKm, { units: "kilometers", steps });
 
   return {
-    type: "Feature",
-    properties: { color },
-    geometry: {
-      type: "Polygon",
-      coordinates: [coords]
+    ...circleFeature,
+    properties: {
+      ...circleFeature.properties,
+      color
     }
   };
 }

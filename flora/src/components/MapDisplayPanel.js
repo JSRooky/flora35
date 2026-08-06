@@ -65,7 +65,7 @@ export default function MapDisplayPanel({
       <div className="map-display-panel-header">
         <h3 className="map-display-panel-title">Группы точек</h3>
         <div className="popup-panel-header-actions">
-          <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
           <button
             type="button"
             className="map-display-panel-toggle"
@@ -159,14 +159,14 @@ export default function MapDisplayPanel({
 
           <hr />
 
-          <label className="map-display-switch" title="Показывать точки на карте">
+          <label className="map-display-switch" title="Скрыть все маркеры точек на карте">
             <input
               type="checkbox"
-              checked={markersVisible}
-              onChange={(e) => onMarkersVisibleChange?.(e.target.checked)}
+              checked={!markersVisible}
+              onChange={(e) => onMarkersVisibleChange?.(!e.target.checked)}
             />
             <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">Маркеры</span>
+            <span className="map-display-switch-label">Скрыть точки</span>
           </label>
 
           <label className="map-display-switch" title="Показать тепловую карту по всем точкам">
@@ -180,7 +180,7 @@ export default function MapDisplayPanel({
           </label>
         </div>
       )}
-      <ModuleHelpPanel sectionId={MODULE_IDS.MAP} open={helpOpen} />
+      <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.MAP} open={helpOpen} />
     </aside>
   );
 }

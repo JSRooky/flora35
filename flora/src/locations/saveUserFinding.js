@@ -1,23 +1,45 @@
-const API_PATH = `${process.env.PUBLIC_URL || ""}/api/userpoints`;
+import { isFirebaseConfigured } from "../firebase/config";
+import { submitUserFinding } from "../firebase/submitFinding";
+import { refreshLocationsFromFirestore } from "./loadPoints";
 
 /**
- * Сохраняет пользовательскую находку в src/locations/userpoints.json (только npm start).
- * @returns {Promise<{ type: string, species: object[] }>}
+ * Сохраняет пользовательскую находку в Firestore (коллекция user_submissions)
+ * и обновляет данные на карте из базы.
  */
+async function refreshMapAfterSave({ count = 1 } = {}) {
+  const refreshed = await refreshLocationsFromFirestore();
+  if (!refreshed) {
+    const pointLabel = count === 1 ? "точку" : "точки";
+    const savedLabel =
+      count === 1
+        ? "Находка сохранена, но не удалось обновить карту."
+        : "Находки сохранены, но не удалось обновить карту.";
+
+    throw new Error(
+      `${savedLabel} Обновите страницу, чтобы увидеть ${pointLabel}.`
+    );
+  }
+}
+
 export async function saveUserFinding(payload) {
-  const response = await fetch(API_PATH, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const data = await response.json();
-
-  if (!response.ok || !data.ok) {
-    throw new Error(data.error || "Не удалось сохранить данные.");
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase не настроен. Добавьте переменные окружения Firebase.");
   }
 
-  return data.collection;
+  await submitUserFinding(payload);
+  await refreshMapAfterSave();
+}
+
+/** Сохраняет несколько находок одного вида и один раз обновляет карту. */
+export async function saveUserFindings(payloads) {
+  if (!isFirebaseConfigured()) {
+    throw new Error("Firebase не настроен. Добавьте переменные окружения Firebase.");
+  }
+
+  if (payloads.length === 0) {
+    throw new Error("Нет координат для сохранения.");
+  }
+
+  await Promise.all(payloads.map((payload) => submitUserFinding(payload)));
+  await refreshMapAfterSave({ count: payloads.length });
 }

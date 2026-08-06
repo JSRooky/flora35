@@ -17,10 +17,26 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "cross-env GENERATE_SOURCEMAP=false react-scripts start",
+    "copy-help-docs": "node scripts/copy-help-docs.js",
+    "prestart": "npm run copy-help-docs",
+    "prebuild": "npm run copy-help-docs",
+    "start": "node scripts/start-dev.js",
     "build": "cross-env GENERATE_SOURCEMAP=false react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy:firestore-rules": "firebase deploy --only firestore:rules",
+    "import:firestore-locations": "node scripts/import-locations-to-firestore.mjs",
+    "import:firestore-locations:dry-run": "node scripts/import-locations-to-firestore.mjs --dry-run",
+    "import:firestore-submissions": "node scripts/import-user-submissions-to-firestore.mjs",
+    "import:firestore-submissions:dry-run": "node scripts/import-user-submissions-to-firestore.mjs --dry-run",
+    "import:firestore-bounds": "node scripts/import-bounds-to-firestore.mjs",
+    "import:firestore-bounds:dry-run": "node scripts/import-bounds-to-firestore.mjs --dry-run",
+    "generate:oopt-findings": "node scripts/generate-oopt-findings.mjs --import",
+    "generate:oopt-findings:dry-run": "node scripts/generate-oopt-findings.mjs --dry-run",
+    "audit:locations": "node scripts/audit-firestore-locations.mjs --dry-run",
+    "audit:locations:fix-local": "node scripts/audit-firestore-locations.mjs --fix-local",
+    "audit:locations:fix-firestore": "node scripts/audit-firestore-locations.mjs --fix-firestore",
+    "audit:locations:fix-all": "node scripts/audit-firestore-locations.mjs --fix-local --fix-firestore"
   },
   "eslintConfig": {
     "extends": [
@@ -42,6 +58,8 @@
   },
   "devDependencies": {
     "cross-env": "^10.1.0",
+    "firebase-admin": "^13.0.0",
+    "firebase-tools": "^15.0.0",
     "worker-loader": "^3.0.8"
   }
 }

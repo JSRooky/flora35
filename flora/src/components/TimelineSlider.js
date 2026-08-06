@@ -1,8 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
-import { getYearBounds } from "./yearBounds";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { getTimelineColors, TIMELINE_GRADIENT_LIGHT } from "./timelineColors";
 import "../styles/TimelineSlider.css";
 
-const YEAR_BOUNDS = getYearBounds();
 const ANIMATION_MS = 450;
 
 function getRangeProgress(value, min, max) {
@@ -20,73 +19,25 @@ function buildYearTicks(minYear, maxYear) {
     ticks.push({
       year: tickYear,
       major: tickYear % 10 === 0,
-      ratio: (tickYear - minYear) / (maxYear - minYear || 1),
+      ratio: (tickYear - minYear) / (maxYear - minYear || 1)
     });
   }
 
   return ticks;
 }
 
-const YEAR_TICKS = buildYearTicks(YEAR_BOUNDS.min, YEAR_BOUNDS.max);
-
-const TIMELINE_GRADIENT = {
-  start: "#d32f2f",
-  middle: "#1565c0",
-  end: "#2b9e08",
-};
-
-function parseHex(hex) {
-  const value = hex.replace("#", "");
-
-  return {
-    r: Number.parseInt(value.slice(0, 2), 16),
-    g: Number.parseInt(value.slice(2, 4), 16),
-    b: Number.parseInt(value.slice(4, 6), 16),
-  };
-}
-
-function clampRatio(ratio) {
-  return Math.min(1, Math.max(0, ratio));
-}
-
-function lerpChannel(start, end, ratio) {
-  return Math.round(start + (end - start) * ratio);
-}
-
-function lerpRgb(startHex, endHex, ratio) {
-  const start = parseHex(startHex);
-  const end = parseHex(endHex);
-
-  return {
-    r: lerpChannel(start.r, end.r, ratio),
-    g: lerpChannel(start.g, end.g, ratio),
-    b: lerpChannel(start.b, end.b, ratio),
-  };
-}
-
-function getColorAtRatio(ratio) {
-  const t = clampRatio(ratio);
-
-  if (t <= 0.5) {
-    return lerpRgb(TIMELINE_GRADIENT.start, TIMELINE_GRADIENT.middle, t / 0.5);
-  }
-
-  return lerpRgb(TIMELINE_GRADIENT.middle, TIMELINE_GRADIENT.end, (t - 0.5) / 0.5);
-}
-
-function getTimelineColors(ratio) {
-  const { r, g, b } = getColorAtRatio(ratio);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-  return {
-    accent: `rgb(${r}, ${g}, ${b})`,
-    accentSoft: `rgba(${r}, ${g}, ${b}, 0.45)`,
-    filledDot: luminance > 0.58 ? "rgba(0, 0, 0, 0.28)" : "rgba(255, 255, 255, 0.65)",
-  };
-}
-
-export default function TimelineSlider({ visible, year, onYearChange }) {
-  const { min: minYear, max: maxYear } = YEAR_BOUNDS;
+export default function TimelineSlider({
+  visible,
+  year,
+  onYearChange,
+  yearBounds,
+  children = null
+}) {
+  const { min: minYear, max: maxYear } = yearBounds;
+  const yearTicks = useMemo(
+    () => buildYearTicks(minYear, maxYear),
+    [minYear, maxYear]
+  );
   const wasVisibleRef = useRef(false);
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -128,7 +79,14 @@ export default function TimelineSlider({ visible, year, onYearChange }) {
       aria-label="Таймлайн по годам"
       aria-hidden={closing}
     >
-      <div className="timeline-slider-wrap">
+      <div
+        className="timeline-slider-wrap"
+        style={{
+          "--timeline-accent": timelineColors.accent,
+          "--timeline-accent-soft": timelineColors.accentSoft
+        }}
+      >
+        {children ? <div className="timeline-slider-dynamics">{children}</div> : null}
         <div className="timeline-slider-panel">
           <div className="timeline-slider-row">
             <span className="timeline-slider-bound">{minYear}</span>
@@ -137,11 +95,9 @@ export default function TimelineSlider({ visible, year, onYearChange }) {
               style={{
                 "--range-progress": `${rangeProgress}%`,
                 "--range-ratio": Math.max(filledRatio, 0.001),
-                "--timeline-gradient-start": TIMELINE_GRADIENT.start,
-                "--timeline-gradient-middle": TIMELINE_GRADIENT.middle,
-                "--timeline-gradient-end": TIMELINE_GRADIENT.end,
-                "--timeline-accent": timelineColors.accent,
-                "--timeline-accent-soft": timelineColors.accentSoft,
+                "--timeline-gradient-start": TIMELINE_GRADIENT_LIGHT.start,
+                "--timeline-gradient-middle": TIMELINE_GRADIENT_LIGHT.middle,
+                "--timeline-gradient-end": TIMELINE_GRADIENT_LIGHT.end
               }}
             >
               <span className="timeline-slider-year-wrap" aria-hidden="true">
@@ -149,7 +105,7 @@ export default function TimelineSlider({ visible, year, onYearChange }) {
               </span>
               <div className="timeline-slider-track">
                 <div className="timeline-slider-ticks" aria-hidden="true">
-                  {YEAR_TICKS.map(({ year: tickYear, major, ratio }) => {
+                  {yearTicks.map(({ year: tickYear, major, ratio }) => {
                     const isFilled = ratio <= filledRatio;
                     const tickColors = getTimelineColors(ratio);
 
@@ -164,9 +120,9 @@ export default function TimelineSlider({ visible, year, onYearChange }) {
                           ...(isFilled
                             ? {
                                 "--tick-accent": tickColors.accent,
-                                "--tick-filled-dot": tickColors.filledDot,
+                                "--tick-filled-dot": tickColors.filledDot
                               }
-                            : {}),
+                            : {})
                         }}
                       />
                     );

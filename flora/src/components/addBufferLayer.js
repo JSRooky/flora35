@@ -8,20 +8,20 @@ const EMPTY_COLLECTION = {
 };
 
 /**
- * Зоны буфера — от внутренней (красной) к внешней (зелёной).
- * maxDiameterKm первой зоны — 5 км, у каждой следующей на 5 км больше предыдущей.
+ * Зоны буфера — от внутренней (зелёной) к внешней (серой).
+ * maxRadiusKm первой зоны — 5 км, у каждой следующей на 5 км больше предыдущей.
  */
 export const BUFFER_ZONES = [
-  { id: "red", label: "Красная зона", color: "#e74c3c", maxDiameterKm: 5 },
-  { id: "yellow", label: "Жёлтая зона", color: "#f1c40f", maxDiameterKm: 10 },
-  { id: "green", label: "Зелёная зона", color: "#27ae60", maxDiameterKm: 15 }
+  { id: "inner", label: "Внутренняя зона", color: "#27ae60", probabilityLabel: "высокая", maxRadiusKm: 5 },
+  { id: "middle", label: "Средняя зона", color: "#8fa8bc", probabilityLabel: "средняя", maxRadiusKm: 10 },
+  { id: "outer", label: "Внешняя зона", color: "#9aa0a6", probabilityLabel: "низкая", maxRadiusKm: 15 }
 ];
 
-export const BUFFER_MIN_DIAMETER_KM = 0.2;
-export const BUFFER_DIAMETER_STEP_KM = 0.1;
+export const BUFFER_MIN_RADIUS_KM = 0.1;
+export const BUFFER_RADIUS_STEP_KM = 0.1;
 
-/** Диаметры зон по умолчанию (км) — минимально видимый буфер. */
-export const DEFAULT_BUFFER_DIAMETERS_KM = BUFFER_ZONES.map(() => BUFFER_MIN_DIAMETER_KM);
+/** Радиусы зон по умолчанию (км) — минимально видимый буфер. */
+export const DEFAULT_BUFFER_RADII_KM = BUFFER_ZONES.map(() => BUFFER_MIN_RADIUS_KM);
 
 /** Добавляет на карту слой заливки и контура буфера (изначально пустой). */
 export function addBufferLayer(map) {
@@ -56,7 +56,7 @@ export function addBufferLayer(map) {
 }
 
 /** Объединяет окружности одного радиуса вокруг нескольких центров. */
-function unionCircles(centers, radiusKm) {
+export function unionCircles(centers, radiusKm) {
   if (!centers.length) {
     return null;
   }
@@ -87,14 +87,21 @@ function normalizeCenters(centers) {
 }
 
 /**
- * Строит кольца буфера вокруг одной или нескольких точек по диаметрам зон (км).
+ * Строит кольца буфера вокруг одной или нескольких точек по радиусам зон (км).
  * Каждая следующая зона — это кольцо между своим и предыдущим радиусом (Turf difference),
  * а не просто круг поверх предыдущего: так цвета зон не смешиваются при наложении.
  */
-export function buildBufferRings(centers, diametersKm) {
+export function buildBufferRings(centers, radiiKm) {
   const normalizedCenters = normalizeCenters(centers);
-  const circles = diametersKm
-    .map((diameterKm) => unionCircles(normalizedCenters, Math.max(diameterKm, 0) / 2))
+  const safeRadiiKm = BUFFER_ZONES.map((zone, index) => {
+    const value = radiiKm?.[index];
+    const radiusKm =
+      typeof value === "number" && !Number.isNaN(value) ? value : BUFFER_MIN_RADIUS_KM;
+
+    return Math.min(Math.max(radiusKm, 0), zone.maxRadiusKm);
+  });
+  const circles = safeRadiiKm
+    .map((radiusKm) => unionCircles(normalizedCenters, radiusKm))
     .filter(Boolean);
 
   const rings = [];
@@ -107,7 +114,7 @@ export function buildBufferRings(centers, diametersKm) {
         : difference(featureCollection([circleFeature, circles[index - 1]]));
 
     if (!ringGeometry) {
-      // Диаметр зоны равен (или меньше) диаметру предыдущей — кольцо нулевой ширины.
+      // Радиус зоны равен (или меньше) радиуса предыдущей — кольцо нулевой ширины.
       return;
     }
 
@@ -117,7 +124,7 @@ export function buildBufferRings(centers, diametersKm) {
         color: zone.color,
         zoneId: zone.id,
         zoneLabel: zone.label,
-        diameterKm: diametersKm[index]
+        radiusKm: safeRadiiKm[index]
       }
     });
   });
@@ -126,7 +133,7 @@ export function buildBufferRings(centers, diametersKm) {
 }
 
 /** Рисует буфер вокруг одной или нескольких точек и возвращает сводку для панели. */
-export function updateBufferLayer(map, features, diametersKm) {
+export function updateBufferLayer(map, features, radiiKm) {
   const source = map.getSource(SOURCE_ID);
   const featureList = Array.isArray(features) ? features : features ? [features] : [];
   const centers = featureList
@@ -137,7 +144,7 @@ export function updateBufferLayer(map, features, diametersKm) {
     return { built: false };
   }
 
-  const rings = buildBufferRings(centers, diametersKm);
+  const rings = buildBufferRings(centers, radiiKm);
 
   source.setData({
     type: "FeatureCollection",
@@ -146,8 +153,26 @@ export function updateBufferLayer(map, features, diametersKm) {
 
   return {
     built: rings.length > 0,
-    diametersKm: [...diametersKm]
+    radiiKm: [...radiiKm]
   };
+}
+
+/** Возвращает внешнюю границу буфера (объединение окружностей максимального радиуса). */
+export function getBufferOuterFeature(features, radiiKm) {
+  const featureList = Array.isArray(features) ? features : features ? [features] : [];
+  const centers = featureList.map((feature) => feature?.geometry?.coordinates).filter(Boolean);
+
+  if (!centers.length) {
+    return null;
+  }
+
+  const outerRadiusKm = radiiKm?.[radiiKm.length - 1];
+  const radiusKm =
+    typeof outerRadiusKm === "number" && !Number.isNaN(outerRadiusKm)
+      ? outerRadiusKm
+      : BUFFER_MIN_RADIUS_KM;
+
+  return unionCircles(centers, radiusKm);
 }
 
 /** Очищает слой буфера на карте. */

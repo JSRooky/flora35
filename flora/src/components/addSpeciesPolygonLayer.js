@@ -1,5 +1,24 @@
-import { booleanPointInPolygon, buffer, convex, featureCollection, lineString, point, polygon } from "@turf/turf";
+import {
+  area,
+  booleanIntersects,
+  booleanPointInPolygon,
+  buffer,
+  cleanCoords,
+  convex,
+  distance,
+  featureCollection,
+  intersect,
+  lineString,
+  multiPolygon,
+  nearestPointOnLine,
+  point,
+  polygon,
+  polygonToLine,
+  rewind,
+  truncate
+} from "@turf/turf";
 import { getFilteredFeatures, getPointColorForRegnum } from "./addLocationsLayer";
+import { getFeaturesByNameLatin } from "../locations/loadPoints";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -7,14 +26,28 @@ const EMPTY_COLLECTION = {
 };
 
 const SOURCE_ID = "species-polygon";
-const DOT_SPACING = 9;
-const DOT_PATTERN_ID = `species-polygon-dots-staggered-${DOT_SPACING}`;
-const DOT_PATTERN_WIDTH = DOT_SPACING;
-const DOT_PATTERN_HEIGHT = DOT_SPACING * 2;
-const DOT_RADIUS = 1.35;
-const DOT_PATTERN_OPACITY = 0.72;
-const OUTLINE_WIDTH = 2;
-const OUTLINE_DASHARRAY = [2, 2];
+const INTERSECTION_SOURCE_ID = "species-polygon-intersection";
+
+const POLYGON_FILL_OPACITY = 0.14;
+const POLYGON_OUTLINE_WIDTH = 1.25;
+const POLYGON_OUTLINE_OPACITY = 0.7;
+const POLYGON_OUTLINE_DASHARRAY = [6, 5];
+const POLYGON_GLOW_WIDTH = 4;
+const POLYGON_GLOW_BLUR = 1.4;
+const POLYGON_GLOW_OPACITY = 0.12;
+
+const INTERSECTION_FILL_COLOR = "#ddd6fe";
+const INTERSECTION_FILL_OPACITY = 0.22;
+const INTERSECTION_OUTLINE_COLOR = "#8b5cf6";
+const INTERSECTION_OUTLINE_WIDTH = 1.25;
+const INTERSECTION_OUTLINE_OPACITY = 0.72;
+const INTERSECTION_OUTLINE_DASHARRAY = [5, 4];
+const INTERSECTION_GLOW_WIDTH = 4;
+const INTERSECTION_GLOW_BLUR = 0.5;
+const INTERSECTION_GLOW_OPACITY = 0.1;
+
+const CLIP_COORDINATE_PRECISION = 7;
+const BOUNDARY_SNAP_TOLERANCE_KM = 0.01;
 
 export const POLYGON_BUILD_MODES = {
   CONVEX: "convex",
@@ -28,14 +61,7 @@ export function getSpeciesKey(feature) {
 
 /** Все точки набора данных, относящиеся к тому же виду. */
 export function getPointsForSpecies(feature) {
-  const speciesKey = getSpeciesKey(feature);
-  if (!speciesKey) {
-    return [];
-  }
-
-  return getFilteredFeatures().filter(
-    (candidate) => candidate.properties?.name_latin === speciesKey
-  );
+  return getFeaturesByNameLatin(getSpeciesKey(feature));
 }
 
 /**
@@ -100,7 +126,7 @@ function buildAllPointsPolygon(coordinates) {
   return polygon([ring]);
 }
 
-function buildPolygonFromCoordinates(coordinates, mode = POLYGON_BUILD_MODES.CONVEX) {
+export function buildPolygonFromCoordinates(coordinates, mode = POLYGON_BUILD_MODES.CONVEX) {
   if (mode === POLYGON_BUILD_MODES.ALL_POINTS) {
     return buildAllPointsPolygon(coordinates);
   }
@@ -108,66 +134,163 @@ function buildPolygonFromCoordinates(coordinates, mode = POLYGON_BUILD_MODES.CON
   return buildConvexPolygon(coordinates);
 }
 
-function drawDotInPattern(data, width, height, centerX, centerY, red, green, blue, alpha) {
-  const radiusSquared = DOT_RADIUS * DOT_RADIUS;
-  const minX = Math.floor(centerX - DOT_RADIUS - 1);
-  const maxX = Math.ceil(centerX + DOT_RADIUS + 1);
-  const minY = Math.floor(centerY - DOT_RADIUS - 1);
-  const maxY = Math.ceil(centerY + DOT_RADIUS + 1);
+const SPECIES_POLYGON_FILL_PAINT = {
+  "fill-color": ["get", "outlineColor"],
+  "fill-opacity": POLYGON_FILL_OPACITY,
+  "fill-antialias": true
+};
 
-  for (let y = minY; y <= maxY; y += 1) {
-    if (y < 0 || y >= height) {
-      continue;
-    }
+const SPECIES_POLYGON_GLOW_PAINT = {
+  "line-color": ["get", "outlineColor"],
+  "line-width": POLYGON_GLOW_WIDTH,
+  "line-opacity": POLYGON_GLOW_OPACITY,
+  "line-blur": POLYGON_GLOW_BLUR
+};
 
-    for (let x = minX; x <= maxX; x += 1) {
-      const deltaX = x + 0.5 - centerX;
-      const deltaY = y + 0.5 - centerY;
+const SPECIES_POLYGON_OUTLINE_PAINT = {
+  "line-color": ["get", "outlineColor"],
+  "line-width": POLYGON_OUTLINE_WIDTH,
+  "line-opacity": POLYGON_OUTLINE_OPACITY,
+  "line-dasharray": POLYGON_OUTLINE_DASHARRAY
+};
 
-      if (deltaX * deltaX + deltaY * deltaY > radiusSquared) {
-        continue;
-      }
+const INTERSECTION_FILL_PAINT = {
+  "fill-color": INTERSECTION_FILL_COLOR,
+  "fill-opacity": INTERSECTION_FILL_OPACITY,
+  "fill-antialias": true
+};
 
-      const wrappedX = ((x % width) + width) % width;
-      const index = (y * width + wrappedX) * 4;
-      data[index] = red;
-      data[index + 1] = green;
-      data[index + 2] = blue;
-      data[index + 3] = alpha;
-    }
-  }
-}
+const INTERSECTION_GLOW_PAINT = {
+  "line-color": INTERSECTION_OUTLINE_COLOR,
+  "line-width": INTERSECTION_GLOW_WIDTH,
+  "line-opacity": INTERSECTION_GLOW_OPACITY,
+  "line-blur": INTERSECTION_GLOW_BLUR
+};
 
-/** Повторяющийся паттерн точек в шахматном порядке (смещение каждого второго ряда). */
-function createDotPatternImage(red, green, blue, alpha = 255) {
-  const width = DOT_PATTERN_WIDTH;
-  const height = DOT_PATTERN_HEIGHT;
-  const data = new Uint8Array(width * height * 4);
+const INTERSECTION_OUTLINE_PAINT = {
+  "line-color": INTERSECTION_OUTLINE_COLOR,
+  "line-width": INTERSECTION_OUTLINE_WIDTH,
+  "line-opacity": INTERSECTION_OUTLINE_OPACITY,
+  "line-dasharray": INTERSECTION_OUTLINE_DASHARRAY
+};
 
-  drawDotInPattern(data, width, height, width / 2, height / 4, red, green, blue, alpha);
-  drawDotInPattern(data, width, height, 0, (height * 3) / 4, red, green, blue, alpha);
-
-  return { width, height, data };
-}
-
-function ensureSpeciesPolygonDotPattern(map) {
-  if (map.hasImage(DOT_PATTERN_ID)) {
+function applyPaintProperties(map, layerId, paint) {
+  if (!map.getLayer(layerId)) {
     return;
   }
 
-  map.addImage(DOT_PATTERN_ID, createDotPatternImage(29, 29, 31), { pixelRatio: 2 });
+  Object.entries(paint).forEach(([property, value]) => {
+    map.setPaintProperty(layerId, property, value);
+  });
+}
+
+function ensureSpeciesPolygonGlowLayer(map) {
+  if (map.getLayer("species-polygon-outline-glow") || !map.getSource(SOURCE_ID)) {
+    return;
+  }
+
+  const beforeLayerId = map.getLayer("species-polygon-outline")
+    ? "species-polygon-outline"
+    : undefined;
+
+  map.addLayer(
+    {
+      id: "species-polygon-outline-glow",
+      type: "line",
+      source: SOURCE_ID,
+      paint: SPECIES_POLYGON_GLOW_PAINT
+    },
+    beforeLayerId
+  );
+}
+
+function applySpeciesPolygonLayerStyles(map) {
+  if (!map.getLayer("species-polygon-fill")) {
+    return;
+  }
+
+  if (map.getPaintProperty("species-polygon-fill", "fill-pattern")) {
+    map.removePaintProperty("species-polygon-fill", "fill-pattern");
+  }
+
+  applyPaintProperties(map, "species-polygon-fill", SPECIES_POLYGON_FILL_PAINT);
+  ensureSpeciesPolygonGlowLayer(map);
+  applyPaintProperties(map, "species-polygon-outline-glow", SPECIES_POLYGON_GLOW_PAINT);
+  applyPaintProperties(map, "species-polygon-outline", SPECIES_POLYGON_OUTLINE_PAINT);
+}
+
+function ensureSpeciesPolygonIntersectionGlowLayer(map) {
+  if (map.getLayer("species-polygon-intersection-glow") || !map.getSource(INTERSECTION_SOURCE_ID)) {
+    return;
+  }
+
+  const beforeLayerId = map.getLayer("species-polygon-intersection-outline")
+    ? "species-polygon-intersection-outline"
+    : undefined;
+
+  map.addLayer(
+    {
+      id: "species-polygon-intersection-glow",
+      type: "line",
+      source: INTERSECTION_SOURCE_ID,
+      paint: INTERSECTION_GLOW_PAINT
+    },
+    beforeLayerId
+  );
+}
+
+function applySpeciesPolygonIntersectionLayerStyles(map) {
+  if (!map.getLayer("species-polygon-intersection-fill")) {
+    return;
+  }
+
+  applyPaintProperties(map, "species-polygon-intersection-fill", INTERSECTION_FILL_PAINT);
+  ensureSpeciesPolygonIntersectionGlowLayer(map);
+  applyPaintProperties(map, "species-polygon-intersection-glow", INTERSECTION_GLOW_PAINT);
+  applyPaintProperties(map, "species-polygon-intersection-outline", INTERSECTION_OUTLINE_PAINT);
+}
+
+function ensureSpeciesPolygonIntersectionLayers(map) {
+  if (!map.getSource(INTERSECTION_SOURCE_ID)) {
+    map.addSource(INTERSECTION_SOURCE_ID, {
+      type: "geojson",
+      data: EMPTY_COLLECTION
+    });
+
+    map.addLayer({
+      id: "species-polygon-intersection-fill",
+      type: "fill",
+      source: INTERSECTION_SOURCE_ID,
+      paint: INTERSECTION_FILL_PAINT
+    });
+
+    map.addLayer({
+      id: "species-polygon-intersection-glow",
+      type: "line",
+      source: INTERSECTION_SOURCE_ID,
+      paint: INTERSECTION_GLOW_PAINT
+    });
+
+    map.addLayer({
+      id: "species-polygon-intersection-outline",
+      type: "line",
+      source: INTERSECTION_SOURCE_ID,
+      paint: INTERSECTION_OUTLINE_PAINT
+    });
+
+    return;
+  }
+
+  applySpeciesPolygonIntersectionLayerStyles(map);
 }
 
 /** Добавляет на карту слой полигона вида (изначально пустой). */
 export function addSpeciesPolygonLayer(map) {
   if (map.getSource(SOURCE_ID)) {
-    if (map.getLayer("species-polygon-outline")) {
-      map.setPaintProperty("species-polygon-outline", "line-dasharray", OUTLINE_DASHARRAY);
-    }
+    applySpeciesPolygonLayerStyles(map);
+    ensureSpeciesPolygonIntersectionLayers(map);
     return;
   }
-
-  ensureSpeciesPolygonDotPattern(map);
 
   map.addSource(SOURCE_ID, {
     type: "geojson",
@@ -178,82 +301,148 @@ export function addSpeciesPolygonLayer(map) {
     id: "species-polygon-fill",
     type: "fill",
     source: SOURCE_ID,
-    paint: {
-      "fill-pattern": DOT_PATTERN_ID,
-      "fill-opacity": DOT_PATTERN_OPACITY,
-      "fill-antialias": true
-    }
+    paint: SPECIES_POLYGON_FILL_PAINT
+  });
+
+  map.addLayer({
+    id: "species-polygon-outline-glow",
+    type: "line",
+    source: SOURCE_ID,
+    paint: SPECIES_POLYGON_GLOW_PAINT
   });
 
   map.addLayer({
     id: "species-polygon-outline",
     type: "line",
     source: SOURCE_ID,
-    paint: {
-      "line-color": ["get", "outlineColor"],
-      "line-width": OUTLINE_WIDTH,
-      "line-opacity": 0.9,
-      "line-dasharray": OUTLINE_DASHARRAY
-    }
+    paint: SPECIES_POLYGON_OUTLINE_PAINT
   });
+
+  ensureSpeciesPolygonIntersectionLayers(map);
+}
+
+/** Первая точка вида — для перестроения полигона по name_latin. */
+export function getRepresentativeFeatureForSpecies(nameLatin) {
+  if (!nameLatin) {
+    return null;
+  }
+
+  return getFilteredFeatures().find(
+    (candidate) => candidate.properties?.name_latin === nameLatin
+  ) ?? null;
+}
+
+/** Переключает режим построения полигона: выпуклая оболочка ↔ все точки. */
+export function toggleSpeciesPolygonBuildMode(polygons, polygonId) {
+  const existing = polygons.find((entry) => entry.id === polygonId);
+  if (!existing) {
+    return polygons;
+  }
+
+  const feature = getRepresentativeFeatureForSpecies(existing.nameLatin);
+  if (!feature) {
+    return polygons;
+  }
+
+  const nextMode =
+    existing.mode === POLYGON_BUILD_MODES.ALL_POINTS
+      ? POLYGON_BUILD_MODES.CONVEX
+      : POLYGON_BUILD_MODES.ALL_POINTS;
+
+  if (nextMode === POLYGON_BUILD_MODES.ALL_POINTS && existing.pointCount < 3) {
+    return polygons;
+  }
+
+  return upsertSpeciesPolygon(polygons, feature, nextMode);
 }
 
 /**
- * Строит полигон (выпуклая оболочка Turf.js) по всем точкам выбранного вида
- * и отображает его на карте.
- * Возвращает сводку для панели модуля: built, pointCount, nameRu, nameLatin, mode.
+ * Строит запись полигона вида без обновления карты.
+ * id совпадает с name_latin — один полигон на вид.
  */
-export function updateSpeciesPolygonLayer(
-  map,
+export function buildSpeciesPolygonEntry(
   feature,
-  { mode = POLYGON_BUILD_MODES.CONVEX } = {}
+  { mode = POLYGON_BUILD_MODES.CONVEX, hidden = false } = {}
 ) {
-  const source = map.getSource(SOURCE_ID);
-  if (!source) {
-    return { built: false, pointCount: 0 };
-  }
-
+  const nameLatin = feature.properties?.name_latin ?? "";
+  const nameRu = feature.properties?.name_ru ?? "";
   const speciesPoints = getPointsForSpecies(feature);
   const coordinates = speciesPoints
     .map((speciesFeature) => speciesFeature.geometry?.coordinates)
     .filter(Boolean);
 
-  const polygon = buildPolygonFromCoordinates(coordinates, mode);
+  const polygonFeature = buildPolygonFromCoordinates(coordinates, mode);
 
-  if (!polygon) {
-    source.setData(EMPTY_COLLECTION);
-    return {
-      built: false,
-      pointCount: coordinates.length,
-      nameRu: feature.properties?.name_ru,
-      nameLatin: feature.properties?.name_latin,
-      mode
-    };
+  if (!polygonFeature || !nameLatin) {
+    return null;
   }
 
-  const color = getPointColorForRegnum(feature.properties?.regnum);
+  const outlineColor = getPointColorForRegnum(feature.properties?.regnum);
 
-  polygon.properties = {
-    ...polygon.properties,
-    outlineColor: color,
-    name_latin: feature.properties?.name_latin,
-    name_ru: feature.properties?.name_ru,
-    pointCount: coordinates.length
+  polygonFeature.properties = {
+    ...polygonFeature.properties,
+    outlineColor,
+    name_latin: nameLatin,
+    name_ru: nameRu,
+    pointCount: coordinates.length,
+    polygonId: nameLatin
   };
+
+  return {
+    id: nameLatin,
+    built: true,
+    pointCount: coordinates.length,
+    nameRu,
+    nameLatin,
+    polygon: polygonFeature,
+    mode,
+    outlineColor,
+    hidden
+  };
+}
+
+/** Добавляет или обновляет полигон вида в массиве (ключ — name_latin). */
+export function upsertSpeciesPolygon(polygons, feature, mode) {
+  const nameLatin = feature.properties?.name_latin ?? "";
+  const existingIndex = polygons.findIndex((entry) => entry.nameLatin === nameLatin);
+  const existing = existingIndex >= 0 ? polygons[existingIndex] : null;
+  const entry = buildSpeciesPolygonEntry(feature, {
+    mode,
+    hidden: existing?.hidden ?? false
+  });
+
+  if (!entry) {
+    if (existingIndex >= 0) {
+      return polygons.filter((_, index) => index !== existingIndex);
+    }
+
+    return polygons;
+  }
+
+  if (existingIndex >= 0) {
+    const next = [...polygons];
+    next[existingIndex] = entry;
+    return next;
+  }
+
+  return [...polygons, entry];
+}
+
+/** Синхронизирует GeoJSON-источник с массивом полигонов (скрытые не отображаются). */
+export function syncSpeciesPolygonLayer(map, polygons) {
+  const source = map.getSource(SOURCE_ID);
+  if (!source) {
+    return;
+  }
+
+  const features = polygons
+    .filter((entry) => entry.built && entry.polygon && !entry.hidden)
+    .map((entry) => entry.polygon);
 
   source.setData({
     type: "FeatureCollection",
-    features: [polygon]
+    features
   });
-
-  return {
-    built: true,
-    pointCount: coordinates.length,
-    nameRu: feature.properties?.name_ru,
-    nameLatin: feature.properties?.name_latin,
-    polygon,
-    mode
-  };
 }
 
 /**
@@ -312,6 +501,208 @@ export function getSpeciesPolygonContainedSummary(polygonFeature, excludeSpecies
 /** Очищает слой полигона вида на карте. */
 export function clearSpeciesPolygonLayer(map) {
   const source = map.getSource(SOURCE_ID);
+  if (!source) {
+    return;
+  }
+
+  source.setData(EMPTY_COLLECTION);
+  clearSpeciesPolygonIntersectionLayer(map);
+}
+
+function normalizePolygonFeatureForClip(feature) {
+  if (!feature?.geometry) {
+    return feature;
+  }
+
+  return truncate(cleanCoords(rewind(feature)), {
+    precision: CLIP_COORDINATE_PRECISION,
+    coordinates: 2
+  });
+}
+
+function getPolygonBoundaryLineFeatures(...features) {
+  return features.flatMap((feature) => {
+    if (!feature?.geometry) {
+      return [];
+    }
+
+    const line = polygonToLine(feature);
+
+    if (line.type === "FeatureCollection") {
+      return line.features;
+    }
+
+    return [line];
+  });
+}
+
+function snapCoordinateToParentBoundaries(coordinate, boundaryLines) {
+  const originalPoint = point(coordinate);
+  let snappedCoordinate = coordinate;
+  let nearestDistance = BOUNDARY_SNAP_TOLERANCE_KM;
+
+  boundaryLines.forEach((lineFeature) => {
+    const nearest = nearestPointOnLine(lineFeature, originalPoint);
+    const separation = distance(originalPoint, nearest, { units: "kilometers" });
+
+    if (separation < nearestDistance) {
+      nearestDistance = separation;
+      snappedCoordinate = nearest.geometry.coordinates;
+    }
+  });
+
+  return snappedCoordinate;
+}
+
+function snapRingToParentBoundaries(ring, boundaryLines) {
+  if (!ring.length) {
+    return ring;
+  }
+
+  const isClosed =
+    ring.length > 1 &&
+    ring[0][0] === ring[ring.length - 1][0] &&
+    ring[0][1] === ring[ring.length - 1][1];
+  const openRing = isClosed ? ring.slice(0, -1) : [...ring];
+  const snappedOpenRing = openRing.map((coordinate) =>
+    snapCoordinateToParentBoundaries(coordinate, boundaryLines)
+  );
+
+  if (snappedOpenRing.length === 0) {
+    return ring;
+  }
+
+  return [...snappedOpenRing, snappedOpenRing[0]];
+}
+
+function snapIntersectionFeatureToParentBoundaries(intersectionFeature, parentA, parentB) {
+  if (!intersectionFeature?.geometry) {
+    return intersectionFeature;
+  }
+
+  const boundaryLines = getPolygonBoundaryLineFeatures(parentA, parentB);
+  const { geometry, properties } = intersectionFeature;
+
+  if (geometry.type === "Polygon") {
+    return polygon(
+      geometry.coordinates.map((ring) => snapRingToParentBoundaries(ring, boundaryLines)),
+      properties
+    );
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    return multiPolygon(
+      geometry.coordinates.map((polygonCoordinates) =>
+        polygonCoordinates.map((ring) => snapRingToParentBoundaries(ring, boundaryLines))
+      ),
+      properties
+    );
+  }
+
+  return intersectionFeature;
+}
+
+/**
+ * Вычисляет пересечение двух GeoJSON-полигонов.
+ * Возвращает feature, флаг наличия пересечения и площадь в км².
+ */
+export function computeSpeciesPolygonIntersection(polygonFeatureA, polygonFeatureB) {
+  if (!polygonFeatureA?.geometry || !polygonFeatureB?.geometry) {
+    return { feature: null, hasIntersection: false, areaKm2: 0 };
+  }
+
+  const normalizedA = normalizePolygonFeatureForClip(polygonFeatureA);
+  const normalizedB = normalizePolygonFeatureForClip(polygonFeatureB);
+
+  if (!booleanIntersects(normalizedA, normalizedB)) {
+    return { feature: null, hasIntersection: false, areaKm2: 0 };
+  }
+
+  const feature = intersect(featureCollection([normalizedA, normalizedB]));
+
+  if (!feature?.geometry) {
+    return { feature: null, hasIntersection: false, areaKm2: 0 };
+  }
+
+  const alignedFeature = snapIntersectionFeatureToParentBoundaries(
+    feature,
+    normalizedA,
+    normalizedB
+  );
+  const resultFeature = truncate(alignedFeature, {
+    precision: CLIP_COORDINATE_PRECISION,
+    coordinates: 2
+  });
+
+  return {
+    feature: resultFeature,
+    hasIntersection: true,
+    areaKm2: area(resultFeature) / 1_000_000
+  };
+}
+
+/** Точки из отфильтрованного набора внутри произвольного полигона. */
+export function getPointsWithinPolygonFeature(polygonFeature, filters = {}) {
+  if (!polygonFeature?.geometry) {
+    return [];
+  }
+
+  return getFilteredFeatures(filters).filter((feature) => {
+    const coordinates = feature.geometry?.coordinates;
+    if (!coordinates) {
+      return false;
+    }
+
+    return booleanPointInPolygon(point(coordinates), polygonFeature);
+  });
+}
+
+/** Сводка по точкам внутри полигона пересечения. */
+export function getPolygonIntersectionContainedSummary(
+  polygonFeature,
+  filters = {},
+  excludeSpeciesLatins = []
+) {
+  const excludedSpecies = new Set(excludeSpeciesLatins.filter(Boolean));
+
+  const points = getPointsWithinPolygonFeature(polygonFeature, filters)
+    .filter((feature) => {
+      const nameLatin = feature.properties?.name_latin;
+      return !nameLatin || !excludedSpecies.has(nameLatin);
+    })
+    .sort((a, b) => {
+      const nameA = a.properties?.name_ru ?? "";
+      const nameB = b.properties?.name_ru ?? "";
+      return nameA.localeCompare(nameB, "ru");
+    });
+
+  return {
+    count: points.length,
+    points
+  };
+}
+
+/** Рисует зону пересечения на карте. */
+export function updateSpeciesPolygonIntersectionLayer(map, intersectionFeature) {
+  const source = map.getSource(INTERSECTION_SOURCE_ID);
+  if (!source) {
+    return;
+  }
+
+  if (!intersectionFeature?.geometry) {
+    source.setData(EMPTY_COLLECTION);
+    return;
+  }
+
+  source.setData({
+    type: "FeatureCollection",
+    features: [intersectionFeature]
+  });
+}
+
+/** Убирает зону пересечения с карты. */
+export function clearSpeciesPolygonIntersectionLayer(map) {
+  const source = map.getSource(INTERSECTION_SOURCE_ID);
   if (!source) {
     return;
   }

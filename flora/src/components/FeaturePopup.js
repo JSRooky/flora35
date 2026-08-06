@@ -91,8 +91,12 @@ export default function FeaturePopup({
   onFiltersReset,
   onOpenAreal,
   arealDockedOpen = false,
+  arealDisabled = false,
+  arealDisabledTitle,
   onOpenBuffer,
-  bufferDockedOpen = false
+  bufferDockedOpen = false,
+  bufferDisabled = false,
+  bufferDisabledTitle
 }) {
   const [showImages, setShowImages] = useState(false);
   const [showSpeciesDescription, setShowSpeciesDescription] = useState(false);
@@ -103,6 +107,7 @@ export default function FeaturePopup({
   const shareUrl = useMemo(() => buildSharePointUrl(feature), [feature]);
 
   useEffect(() => {
+    setShowImages(false);
     setShowSpeciesDescription(false);
     setSharePanelOpen(false);
     setShareCopied(false);
@@ -282,9 +287,11 @@ export default function FeaturePopup({
                         type="button"
                         className={`feature-popup-action-btn${arealDockedOpen ? " feature-popup-action-btn--active" : ""}`}
                         onClick={onOpenAreal}
-                        disabled={arealDockedOpen}
+                        aria-pressed={arealDockedOpen}
+                        disabled={arealDisabled}
+                        title={arealDisabled ? arealDisabledTitle : undefined}
                       >
-                        {arealDockedOpen ? "Ареал открыт" : "Ареал"}
+                        Радиус
                       </button>
                     )}
                     {onOpenBuffer && (
@@ -292,9 +299,11 @@ export default function FeaturePopup({
                         type="button"
                         className={`feature-popup-action-btn${bufferDockedOpen ? " feature-popup-action-btn--active" : ""}`}
                         onClick={onOpenBuffer}
-                        disabled={bufferDockedOpen}
+                        aria-pressed={bufferDockedOpen}
+                        disabled={bufferDisabled}
+                        title={bufferDisabled ? bufferDisabledTitle : undefined}
                       >
-                        {bufferDockedOpen ? "Буфер открыт" : "Буфер"}
+                        Буфер
                       </button>
                     )}
                     <button

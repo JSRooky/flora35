@@ -5,6 +5,7 @@ import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/ArealPopup.css";
 const RADIUS_MIN = 0.5;
 const RADIUS_MAX = 15;
+export const DEFAULT_AREAL_RADIUS_KM = 5;
 
 /** Процент заполнения слайдера радиуса для CSS-переменной --range-progress. */
 function getRangeProgress(value) {
@@ -17,10 +18,10 @@ function getCollapsedSummary(enabled, allMarkers, radius) {
   }
 
   if (enabled) {
-    return `Ареал: ${radius} км`;
+    return `Радиус: ${radius} км`;
   }
 
-  return "Ареал выключен";
+  return "Радиус выключен";
 }
 
 function formatContainedPointsCount(count) {
@@ -58,23 +59,28 @@ export default function ArealPopup({
   radius,
   containedPoints = null,
   onPointSelect,
-  onEnabledChange,  onAllMarkersChange,
+  onEnabledChange,
+  onAllMarkersChange,
   onRadiusChange,
+  onReset,
+  toolBlocked = false,
+  toolBlockedTitle,
   collapsed = false,
   onCollapsedChange
 }) {
-  // Радиус доступен, если включён ареал для одной точки или для всех маркеров.
+  // Радиус доступен, если включён для одной точки или для всех маркеров.
   const isActive = enabled || allMarkers;
   const hasContainedPoints = containedPoints?.count > 0;
+  const canReset = isActive || radius !== DEFAULT_AREAL_RADIUS_KM;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## areal в docs/moduleHelp.md
 
   return (
     <div className={`areal-popup ${collapsed ? "areal-popup--collapsed" : ""}`}>
       <div className="areal-popup-header">
-        <h3 className="areal-popup-title">Ареал</h3>
+        <h3 className="areal-popup-title">Радиус</h3>
         <div className="popup-panel-header-actions">
-          <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
           <button
             type="button"
             className="popup-panel-toggle"
@@ -94,22 +100,29 @@ export default function ArealPopup({
         </p>
       ) : (
         <div className="areal-popup-content">
-          {/* Режим «одна точка» недоступен, когда включён ареал ко всем маркерам. */}
-          <label className={`areal-switch ${allMarkers ? "areal-switch--disabled" : ""}`}>
+          {toolBlocked && (
+            <p className="areal-popup-status areal-popup-status--blocked" title={toolBlockedTitle}>
+              {toolBlockedTitle}
+            </p>
+          )}
+
+          {/* Режим «одна точка» недоступен, когда включён радиус ко всем маркерам. */}
+          <label className={`areal-switch ${allMarkers || toolBlocked ? "areal-switch--disabled" : ""}`}>
             <input
             type="checkbox"
             checked={enabled}
-            disabled={allMarkers}
+            disabled={allMarkers || toolBlocked}
             onChange={(e) => onEnabledChange(e.target.checked)}
           />
           <span className="areal-switch-slider" />
-          <span className="areal-switch-label">Установить ареал</span>
+          <span className="areal-switch-label">Установить радиус</span>
         </label>
 
-        <label className="areal-switch">
+        <label className={`areal-switch ${toolBlocked ? "areal-switch--disabled" : ""}`}>
           <input
             type="checkbox"
             checked={allMarkers}
+            disabled={toolBlocked}
             onChange={(e) => onAllMarkersChange(e.target.checked)}
           />
           <span className="areal-switch-slider" />
@@ -118,7 +131,7 @@ export default function ArealPopup({
 
         <div className={`areal-radius ${isActive ? "" : "areal-radius--disabled"}`}>
           <label htmlFor="areal-radius-slider">
-            Радиус ареала: <strong>{radius} км</strong>
+            Радиус: <strong>{radius} км</strong>
           </label>
           <input
             id="areal-radius-slider"
@@ -133,11 +146,13 @@ export default function ArealPopup({
           />
         </div>
 
-        {hasContainedPoints && (
+        {hasContainedPoints ? (
           <div className="areal-contained-points">
             <p className="areal-contained-points-title">
-              В ареале: <strong>{formatContainedPointsCount(containedPoints.count)}</strong>
+              В радиусе:{" "}
+              <strong>{formatContainedPointsCount(containedPoints.count)}</strong>
             </p>
+
             <ul className="areal-contained-points-list">
               {containedPoints.points.map((feature) => (
                 <li key={getArealPointKey(feature)}>
@@ -150,11 +165,23 @@ export default function ArealPopup({
                   </button>
                 </li>
               ))}
-            </ul>          </div>
-        )}
+            </ul>
+          </div>
+        ) : null}
+
+        <div className="areal-actions">
+          <button
+            type="button"
+            className="areal-reset-btn"
+            onClick={onReset}
+            disabled={!canReset}
+          >
+            Сброс
+          </button>
+        </div>
         </div>
       )}
-      <ModuleHelpPanel sectionId={MODULE_IDS.AREAL} open={helpOpen} />
+      <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.AREAL} open={helpOpen} />
     </div>
   );
 }

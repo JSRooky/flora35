@@ -13,6 +13,8 @@
 .module-menu-dock {
   pointer-events: auto;
   display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   padding: 6px 8px;
   border-radius: 8px;
@@ -24,6 +26,27 @@
     0 8px 32px rgba(0, 0, 0, 0.12),
     0 2px 8px rgba(0, 0, 0, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.module-menu-logo-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-radius: 6px;
+  line-height: 0;
+  transition: background-color 0.2s ease;
+}
+
+.module-menu-logo-link:hover {
+  background: rgba(0, 122, 255, 0.1);
+}
+
+.module-menu-logo {
+  display: block;
+  width: 30px;
+  height: 30px;
 }
 
 .module-menu-list {
@@ -115,6 +138,22 @@
   background: rgba(43, 158, 8, 0.16);
 }
 
+.module-menu-btn--map-tool:hover {
+  background: var(--map-tool-accent-soft);
+}
+
+.module-menu-btn--map-tool.module-menu-btn--active {
+  color: var(--map-tool-accent);
+}
+
+.module-menu-btn--map-tool.module-menu-btn--active::after {
+  background: var(--map-tool-accent);
+}
+
+.module-menu-btn--map-tool.module-menu-btn--active:hover {
+  background: var(--map-tool-accent-soft-hover);
+}
+
 .module-menu-btn--disabled,
 .module-menu-btn:disabled {
   color: rgba(29, 29, 31, 0.35);
@@ -130,6 +169,13 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+}
+
+.module-menu-account-item {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 2px;
 }
 
 .module-menu-switch {
@@ -267,6 +313,12 @@
 
   .module-menu-dock {
     padding: 5px 6px;
+    gap: 6px;
+  }
+
+  .module-menu-logo {
+    width: 26px;
+    height: 26px;
   }
 
   .module-menu-btn {

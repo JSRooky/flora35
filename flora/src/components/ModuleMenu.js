@@ -1,7 +1,10 @@
 import React from "react";
+import { ReactComponent as MainLogo } from "../images/main_logo.svg";
 import { DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
-import { FEATURE_FLAGS, FEATURE_UNAVAILABLE_TITLE } from "../config/featureFlags";
+import UserAccountControl from "./UserAccountControl";
 import "../styles/ModuleMenu.css";
+
+const HOME_URL = `${process.env.PUBLIC_URL || ""}/`;
 
 export const MODULE_IDS = {
   STATUS: "status",
@@ -16,7 +19,10 @@ export const MODULE_IDS = {
   BUFFER: "buffer",
   // Совпадает с заголовком ## area в docs/moduleHelp.md.
   AREA: "area",
-  // Экспериментальный модуль ввода пользовательских данных через Firebase.
+  OOPT: "oopt",
+  // Совпадает с заголовком ## oopt-feature в docs/moduleHelp.md.
+  OOPT_FEATURE: "oopt-feature",
+  // Модуль ввода пользовательских данных в Firestore.
   SUBMIT: "submit",
   ABOUT: "about"
 };
@@ -32,26 +38,27 @@ const TIME_MODULE_ITEMS = [
 ];
 
 const MAP_MODULE_ITEMS = [
-  { id: MODULE_IDS.MAP, label: "Группы точек" },
-  { id: MODULE_IDS.AREAL, label: "Ареал" },
-  { id: MODULE_IDS.POLYGON, label: "Полигон" },
-  { id: MODULE_IDS.BUFFER, label: "Буфер" },
-  { id: MODULE_IDS.AREA, label: "Область" }
+  { id: MODULE_IDS.MAP, label: "Группы точек", mapToolAccent: true },
+  { id: MODULE_IDS.AREAL, label: "Радиус", mapToolAccent: true },
+  { id: MODULE_IDS.BUFFER, label: "Буфер", mapToolAccent: true },
+  { id: MODULE_IDS.POLYGON, label: "Полигон", mapToolAccent: true },
+  { id: MODULE_IDS.AREA, label: "Область", mapToolAccent: true },
+  { id: MODULE_IDS.OOPT, label: "ООПТ", mapToolAccent: true }
 ];
 
 const TEST_MODULE_ITEMS = [
-  { id: MODULE_IDS.SUBMIT, label: "Ввод данных о находке" }
+  { id: MODULE_IDS.SUBMIT, label: "Новая находка" }
 ];
 
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
 
 function isPointRequiredModule(id) {
-  return (
-    id === MODULE_IDS.AREAL || id === MODULE_IDS.POLYGON || id === MODULE_IDS.BUFFER
-  );
+  return id === MODULE_IDS.AREAL || id === MODULE_IDS.BUFFER;
 }
 
 const DISABLED_POINT_REQUIRED_TITLE = "Выберите точку";
+const DISABLED_AREAL_BY_BUFFER_TITLE = 'Сначала сбросьте инструмент «Буфер»';
+const DISABLED_BUFFER_BY_AREAL_TITLE = 'Сначала сбросьте инструмент «Радиус»';
 
 function ModuleMenuButton({
   id,
@@ -60,14 +67,15 @@ function ModuleMenuButton({
   onModuleSelect,
   className = "",
   timeAccent = false,
-  // Некоторые модули (например, «Полигон») требуют предварительного выбора точки.
+  mapToolAccent = false,
+  // Некоторые модули (например, «Радиус») требуют предварительного выбора точки.
   disabled = false,
-  disabledTitle = DISABLED_POINT_REQUIRED_TITLE,
+  disabledTitle = DISABLED_POINT_REQUIRED_TITLE
 }) {
   const button = (
     <button
       type="button"
-      className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${timeAccent ? " module-menu-btn--time" : ""}${disabled ? " module-menu-btn--disabled" : ""}${className ? ` ${className}` : ""}`}
+      className={`module-menu-btn${activeModule === id ? " module-menu-btn--active" : ""}${timeAccent ? " module-menu-btn--time" : ""}${mapToolAccent ? " module-menu-btn--map-tool" : ""}${disabled ? " module-menu-btn--disabled" : ""}${className ? ` ${className}` : ""}`}
       onClick={() => !disabled && onModuleSelect(id)}
       aria-pressed={activeModule === id}
       disabled={disabled}
@@ -92,36 +100,55 @@ export default function ModuleMenu({
   activeModule,
   onModuleSelect,
   pointSelected = false,
+  arealBlocked = false,
+  bufferBlocked = false,
   hoverTooltipsDisabled = false,
   onHoverTooltipsDisabledChange,
   osmBasemapEnabled = false,
   onOsmBasemapEnabledChange,
   dataSourceMode,
-  onDataSourceModeChange
+  onDataSourceModeChange,
+  accountUser = null,
+  onAccountClick
 }) {
-  const renderModuleItem = ({
-    id,
-    label,
-    timeAccent = false,
-    forceDisabled = false,
-    disabledTitle,
-  }) => (
-    <li key={id}>
-      <ModuleMenuButton
-        id={id}
-        label={label}
-        activeModule={activeModule}
-        onModuleSelect={onModuleSelect}
-        timeAccent={timeAccent}
-        disabled={forceDisabled || (isPointRequiredModule(id) && !pointSelected)}
-        disabledTitle={disabledTitle}
-      />
-    </li>
-  );
+  const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => {
+    const pointRequired = isPointRequiredModule(id) && !pointSelected;
+    const blockedByOtherTool =
+      (id === MODULE_IDS.AREAL && arealBlocked) || (id === MODULE_IDS.BUFFER && bufferBlocked);
+    const disabled = pointRequired || blockedByOtherTool;
+    const disabledTitle = pointRequired
+      ? DISABLED_POINT_REQUIRED_TITLE
+      : id === MODULE_IDS.AREAL
+        ? DISABLED_AREAL_BY_BUFFER_TITLE
+        : DISABLED_BUFFER_BY_AREAL_TITLE;
+
+    return (
+      <li key={id}>
+        <ModuleMenuButton
+          id={id}
+          label={label}
+          activeModule={activeModule}
+          onModuleSelect={onModuleSelect}
+          timeAccent={timeAccent}
+          mapToolAccent={mapToolAccent}
+          disabled={disabled}
+          disabledTitle={disabledTitle}
+        />
+      </li>
+    );
+  };
 
   return (
     <nav className="module-menu" aria-label="Модули приложения">
       <div className="module-menu-dock">
+        <a
+          href={HOME_URL}
+          className="module-menu-logo-link"
+          aria-label="На главную страницу"
+          title="На главную страницу"
+        >
+          <MainLogo className="module-menu-logo" aria-hidden="true" focusable="false" />
+        </a>
         <ul className="module-menu-list">
           {POINT_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator" aria-hidden="true" />
@@ -175,18 +202,18 @@ export default function ModuleMenu({
                 onChange={(event) => onOsmBasemapEnabledChange?.(event.target.checked)}
               />
               <span className="module-menu-switch-slider" aria-hidden="true" />
-              <span className="module-menu-switch-label">OpenStreetMap</span>
+              <span className="module-menu-switch-label">OSM</span>
             </label>
           </li>
           <li className="module-menu-toggle-item">
-            <label className="module-menu-switch" title="Отключить подсказки при наведении на точки и кластеры">
+            <label className="module-menu-switch" title="Показывать подсказки при наведении на точки и кластеры">
               <input
                 type="checkbox"
-                checked={hoverTooltipsDisabled}
-                onChange={(event) => onHoverTooltipsDisabledChange?.(event.target.checked)}
+                checked={!hoverTooltipsDisabled}
+                onChange={(event) => onHoverTooltipsDisabledChange?.(!event.target.checked)}
               />
               <span className="module-menu-switch-slider" aria-hidden="true" />
-              <span className="module-menu-switch-label">Отключить подсказки</span>
+              <span className="module-menu-switch-label">Подсказки</span>
             </label>
           </li>
           <li>
@@ -196,6 +223,10 @@ export default function ModuleMenu({
               activeModule={activeModule}
               onModuleSelect={onModuleSelect}
             />
+          </li>
+          <li className="module-menu-separator" aria-hidden="true" />
+          <li className="module-menu-account-item">
+            <UserAccountControl user={accountUser} onAccountClick={onAccountClick} />
           </li>
         </ul>
       </div>
