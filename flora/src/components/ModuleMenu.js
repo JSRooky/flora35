@@ -1,6 +1,7 @@
 import React from "react";
 import { ReactComponent as MainLogo } from "../images/main_logo.svg";
 import { DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
+import { FEATURE_FLAGS, FEATURE_UNAVAILABLE_TITLE } from "../config/featureFlags";
 import UserAccountControl from "./UserAccountControl";
 import "../styles/ModuleMenu.css";
 
