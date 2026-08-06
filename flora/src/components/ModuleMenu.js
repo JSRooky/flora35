@@ -112,16 +112,25 @@ export default function ModuleMenu({
   accountUser = null,
   onAccountClick
 }) {
-  const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => {
+  const renderModuleItem = ({
+    id,
+    label,
+    timeAccent = false,
+    mapToolAccent = false,
+    forceDisabled = false,
+    disabledTitle: disabledTitleOverride
+  }) => {
     const pointRequired = isPointRequiredModule(id) && !pointSelected;
     const blockedByOtherTool =
       (id === MODULE_IDS.AREAL && arealBlocked) || (id === MODULE_IDS.BUFFER && bufferBlocked);
-    const disabled = pointRequired || blockedByOtherTool;
-    const disabledTitle = pointRequired
-      ? DISABLED_POINT_REQUIRED_TITLE
-      : id === MODULE_IDS.AREAL
-        ? DISABLED_AREAL_BY_BUFFER_TITLE
-        : DISABLED_BUFFER_BY_AREAL_TITLE;
+    const disabled = forceDisabled || pointRequired || blockedByOtherTool;
+    const disabledTitle =
+      disabledTitleOverride ??
+      (pointRequired
+        ? DISABLED_POINT_REQUIRED_TITLE
+        : id === MODULE_IDS.AREAL
+          ? DISABLED_AREAL_BY_BUFFER_TITLE
+          : DISABLED_BUFFER_BY_AREAL_TITLE);
 
     return (
       <li key={id}>
