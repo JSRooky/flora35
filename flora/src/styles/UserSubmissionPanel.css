@@ -10,7 +10,6 @@
   overflow-x: hidden;
   background-color: rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(20px);
-  border: 1px solid var(--submit-accent-border);
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   padding: 12px 16px;
@@ -103,7 +102,7 @@
 .user-submission-field input,
 .user-submission-field select,
 .user-submission-field textarea,
-.user-submission-autocomplete input {
+.user-submission-autocomplete .submission-autocomplete-wrap input {
   box-sizing: border-box;
   width: 100%;
   padding: 6px 10px;
@@ -111,39 +110,6 @@
   border-radius: 4px;
   font: inherit;
   background: rgba(255, 255, 255, 0.85);
-}
-
-.user-submission-autocomplete-wrap {
-  position: relative;
-}
-
-.user-submission-suggestions {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  max-height: 180px;
-  margin: 0;
-  padding: 4px 0;
-  overflow-y: auto;
-  list-style: none;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-
-.user-submission-suggestion {
-  padding: 6px 10px;
-  font-size: 13px;
-  color: #333;
-  cursor: pointer;
-}
-
-.user-submission-suggestion:hover,
-.user-submission-suggestion--active {
-  background: var(--submit-accent-soft);
 }
 
 .user-submission-location-field {
@@ -347,8 +313,45 @@
   gap: 8px;
 }
 
-.user-submission-multi-species {
+.user-submission-multi-species-wrap {
+  position: relative;
   margin-left: auto;
+}
+
+.user-submission-multi-species-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 4px 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.user-submission-multi-species-menu-item {
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: #333;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.user-submission-multi-species-menu-item:hover {
+  background: var(--submit-accent-soft, rgba(0, 123, 255, 0.12));
+  color: var(--submit-accent-dark, #0056b3);
+}
+
+.user-submission-multi-species {
+  margin-left: 0;
 }
 
 .user-submission-submit-wrap {

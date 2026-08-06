@@ -206,6 +206,52 @@ function parseSubmissionParts(parts, lineNumber) {
 }
 
 /** Проверяет и нормализует payload находки перед сохранением. */
+export function getSubmissionPayloadInvalidFields(payload) {
+  const invalidFields = [];
+
+  if (!String(payload?.name_ru ?? "").trim()) {
+    invalidFields.push("name_ru");
+  }
+
+  if (!String(payload?.name_latin ?? "").trim()) {
+    invalidFields.push("name_latin");
+  }
+
+  if (!String(payload?.family ?? "").trim()) {
+    invalidFields.push("family");
+  }
+
+  const regnumResult = parseRegnum(payload?.regnum);
+  if (regnumResult.error) {
+    invalidFields.push("regnum");
+  }
+
+  const statusResult = parseStatus(payload?.status);
+  if (statusResult.error) {
+    invalidFields.push("status");
+  }
+
+  const [lng, lat] = payload?.coordinates ?? [];
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+    invalidFields.push("lat");
+  }
+
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+    invalidFields.push("lng");
+  }
+
+  const foundYearResult = parseFoundYear(payload?.found_year);
+  if (foundYearResult.error) {
+    invalidFields.push("found_year");
+  }
+
+  if (!String(payload?.found_by ?? "").trim()) {
+    invalidFields.push("found_by");
+  }
+
+  return invalidFields;
+}
+
 export function validateSubmissionPayload(payload) {
   const name_ru = String(payload?.name_ru ?? "").trim();
   const name_latin = String(payload?.name_latin ?? "").trim();

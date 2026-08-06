@@ -238,6 +238,7 @@ export default function MapView() {
   const [panelCollapsed, setPanelCollapsed] = useState({});
   const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
   const [submissionLocationPicking, setSubmissionLocationPicking] = useState(false);
+  const submissionMapPickHandlerRef = useRef(null);
   const hadFoundYearPropertyFilterRef = useRef(false);
   const previousYearFilterEnabledRef = useRef(false);
   const pendingSharePointRef = useRef(parseSharePointParams(window.location.search));
@@ -638,6 +639,17 @@ export default function MapView() {
     active: activeModule === MODULE_IDS.SUBMIT,
     pickingLocation: submissionLocationPicking,
     setCoordinates: (coords) => {
+      if (submissionMapPickHandlerRef.current) {
+        const handler = submissionMapPickHandlerRef.current;
+        submissionMapPickHandlerRef.current = null;
+        handler([
+          Number(coords[0].toFixed(3)),
+          Number(coords[1].toFixed(3))
+        ]);
+        setSubmissionLocationPicking(false);
+        return;
+      }
+
       setSubmissionCoordinates([
         Number(coords[0].toFixed(3)),
         Number(coords[1].toFixed(3))
@@ -2561,6 +2573,7 @@ export default function MapView() {
                 coordinates={submissionCoordinates}
                 locationPickingActive={submissionLocationPicking}
                 onLocationPickingChange={setSubmissionLocationPicking}
+                submissionMapPickHandlerRef={submissionMapPickHandlerRef}
                 collapsed={isPanelCollapsed(PANEL_IDS.SUBMIT)}
                 onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.SUBMIT)}
                 onSaved={handleUserFindingSaved}

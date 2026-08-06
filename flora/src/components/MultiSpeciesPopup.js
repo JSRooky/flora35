@@ -1,10 +1,12 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { createEmptySubmissionRow, countFilledSubmissionRows, getPendingRowsFieldErrors } from "../locations/multiSpeciesRows";
 import {
   formatFindingsCount,
   parseSubmissionLines,
   validateSubmissionPayload
 } from "../locations/parseSubmissionLines";
 import { saveUserFindings } from "../locations/saveUserFinding";
+import { buildSubmissionSuggestionData } from "../locations/submissionSuggestions";
 import MultiSpeciesConfirmTable from "./MultiSpeciesConfirmTable";
 import "../styles/MultiSpeciesPopup.css";
 
@@ -15,59 +17,279 @@ const PLACEHOLDER =
   "Медведка обыкновенная; Meles meles; Mustelidae; animalia; LC; 63.456, 32.789; 2021; Иванов; Петров\n" +
   "Клюква; Vaccinium vitis-idaea; Ericaceae; plantae; LC; 63.500 32.800; 2020; Сидоров;";
 
-export default function MultiSpeciesPopup({ open, onClose, onSaved }) {
+function TrashIcon() {
+  return (
+    <svg
+      className="multi-species-discard-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <polyline
+        points="3 6 5 6 21 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <line x1="10" y1="11" x2="10" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <line x1="14" y1="11" x2="14" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function validatePendingRows(rows) {
+  if (rows.length === 0) {
+    return {
+      error: {
+        text: "Добавьте хотя бы одну строку."
+      }
+    };
+  }
+
+  const validatedPayloads = [];
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const validation = validateSubmissionPayload(rows[index].payload);
+    if (validation.error) {
+      return {
+        error: {
+          text: `Строка ${index + 1}: ${validation.error}`
+        }
+      };
+    }
+
+    validatedPayloads.push(validation.payload);
+  }
+
+  return { payloads: validatedPayloads };
+}
+
+export default function MultiSpeciesPopup({
+  open,
+  mode = "text",
+  onClose,
+  onSaved,
+  onMapPickStart,
+  onMapPickAbort
+}) {
+  const [inputMode, setInputMode] = useState("text");
   const [text, setText] = useState("");
   const [step, setStep] = useState("input");
   const [pendingRows, setPendingRows] = useState([]);
   const [message, setMessage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [mapPickHidden, setMapPickHidden] = useState(false);
+  const [mapPickRowIndex, setMapPickRowIndex] = useState(null);
+  const [invalidFieldsByRow, setInvalidFieldsByRow] = useState({});
 
   const parsed = useMemo(() => parseSubmissionLines(text), [text]);
+  const filledRowCount = useMemo(
+    () => countFilledSubmissionRows(pendingRows),
+    [pendingRows]
+  );
+  const suggestionData = useMemo(() => {
+    if (!open) {
+      return null;
+    }
+
+    return buildSubmissionSuggestionData();
+  }, [open]);
 
   const resetState = useCallback(() => {
+    setInputMode("text");
     setText("");
     setStep("input");
     setPendingRows([]);
     setMessage(null);
     setSubmitting(false);
+    setMapPickHidden(false);
+    setMapPickRowIndex(null);
+    setInvalidFieldsByRow({});
   }, []);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    setInputMode(mode);
+    setText("");
+    setStep("input");
+    setMessage(null);
+    setSubmitting(false);
+
+    if (mode === "table") {
+      setPendingRows([createEmptySubmissionRow(1)]);
+    } else {
+      setPendingRows([]);
+    }
+  }, [mode, open]);
+
+  useEffect(() => {
+    if (!open) {
+      setMapPickHidden(false);
+      setMapPickRowIndex(null);
+    }
+  }, [open]);
 
   const handleClose = useCallback(() => {
     if (submitting) {
       return;
     }
 
+    if (mapPickHidden) {
+      onMapPickAbort?.();
+    }
+
     resetState();
     onClose?.();
-  }, [onClose, resetState, submitting]);
+  }, [mapPickHidden, onClose, onMapPickAbort, resetState, submitting]);
+
+  const handleMapPickStart = useCallback(
+    (rowIndex) => {
+      if (submitting || !onMapPickStart) {
+        return;
+      }
+
+      setMapPickRowIndex(rowIndex);
+      setMapPickHidden(true);
+      setMessage(null);
+
+      onMapPickStart(
+        rowIndex,
+        (coords) => {
+          const [lng, lat] = coords;
+
+          setPendingRows((prev) =>
+            prev.map((row, index) =>
+              index === rowIndex
+                ? {
+                    ...row,
+                    payload: {
+                      ...row.payload,
+                      coordinates: [
+                        Number(Number(lng).toFixed(3)),
+                        Number(Number(lat).toFixed(3))
+                      ]
+                    }
+                  }
+                : row
+            )
+          );
+          setInvalidFieldsByRow((prev) => {
+            const rowFields = prev[rowIndex];
+            if (!rowFields?.some((field) => field === "lat" || field === "lng")) {
+              return prev;
+            }
+
+            const nextFields = rowFields.filter((field) => field !== "lat" && field !== "lng");
+            if (nextFields.length === 0) {
+              const next = { ...prev };
+              delete next[rowIndex];
+              return next;
+            }
+
+            return {
+              ...prev,
+              [rowIndex]: nextFields
+            };
+          });
+          setMapPickHidden(false);
+          setMapPickRowIndex(null);
+        },
+        () => {
+          setMapPickHidden(false);
+          setMapPickRowIndex(null);
+        }
+      );
+    },
+    [onMapPickStart, submitting]
+  );
 
   const handleReview = useCallback(() => {
-    if (parsed.errors.length > 0) {
-      const firstError = parsed.errors[0];
-      setMessage({
-        type: "error",
-        text: `Строка ${firstError.line}: ${firstError.text}`
-      });
+    if (inputMode === "text") {
+      if (parsed.errors.length > 0) {
+        const firstError = parsed.errors[0];
+        setMessage({
+          type: "error",
+          text: `Строка ${firstError.line}: ${firstError.text}`
+        });
+        return;
+      }
+
+      if (parsed.rows.length === 0) {
+        setMessage({ type: "error", text: "Введите хотя бы одну строку с данными находки." });
+        return;
+      }
+
+      setPendingRows(parsed.rows);
+      setStep("confirm");
+      setMessage(null);
       return;
     }
 
-    if (parsed.rows.length === 0) {
-      setMessage({ type: "error", text: "Введите хотя бы одну строку с данными находки." });
+    const fieldErrors = getPendingRowsFieldErrors(pendingRows);
+    if (Object.keys(fieldErrors).length > 0) {
+      setInvalidFieldsByRow(fieldErrors);
+      setMessage({ type: "error", text: "Заполните обязательные поля." });
       return;
     }
 
-    setPendingRows(parsed.rows);
+    const validation = validatePendingRows(pendingRows);
+    if (validation.error) {
+      setInvalidFieldsByRow(getPendingRowsFieldErrors(pendingRows));
+      setMessage({ type: "error", text: validation.error.text });
+      return;
+    }
+
+    setInvalidFieldsByRow({});
     setStep("confirm");
     setMessage(null);
-  }, [parsed]);
+  }, [inputMode, parsed, pendingRows]);
 
   const handleBack = useCallback(() => {
     setStep("input");
-    setPendingRows([]);
     setMessage(null);
+    setInvalidFieldsByRow({});
+
+    if (inputMode === "text") {
+      setPendingRows([]);
+    }
+  }, [inputMode]);
+
+  const clearInvalidField = useCallback((rowIndex, field) => {
+    setInvalidFieldsByRow((prev) => {
+      const rowFields = prev[rowIndex];
+      if (!rowFields?.includes(field)) {
+        return prev;
+      }
+
+      const nextFields = rowFields.filter((item) => item !== field);
+      if (nextFields.length === 0) {
+        const next = { ...prev };
+        delete next[rowIndex];
+        return next;
+      }
+
+      return {
+        ...prev,
+        [rowIndex]: nextFields
+      };
+    });
   }, []);
 
   const handlePendingRowChange = useCallback((rowIndex, field, value) => {
+    clearInvalidField(rowIndex, field);
     setPendingRows((prev) =>
       prev.map((row, index) => {
         if (index !== rowIndex) {
@@ -75,16 +297,16 @@ export default function MultiSpeciesPopup({ open, onClose, onSaved }) {
         }
 
         if (field === "lat" || field === "lng") {
-          const [currentLng, currentLat] = row.payload.coordinates;
-          const parsed = Number.parseFloat(String(value).replace(",", "."));
+          const [currentLng, currentLat] = row.payload.coordinates ?? [];
+          const parsedValue = Number.parseFloat(String(value).replace(",", "."));
 
           return {
             ...row,
             payload: {
               ...row.payload,
               coordinates: [
-                field === "lng" && Number.isFinite(parsed) ? parsed : currentLng,
-                field === "lat" && Number.isFinite(parsed) ? parsed : currentLat
+                field === "lng" && Number.isFinite(parsedValue) ? parsedValue : currentLng,
+                field === "lat" && Number.isFinite(parsedValue) ? parsedValue : currentLat
               ]
             }
           };
@@ -111,34 +333,101 @@ export default function MultiSpeciesPopup({ open, onClose, onSaved }) {
       })
     );
     setMessage(null);
+  }, [clearInvalidField]);
+
+  const handleAddRow = useCallback(() => {
+    setPendingRows((prev) => [...prev, createEmptySubmissionRow(prev.length + 1)]);
+    setMessage(null);
+  }, []);
+
+  const handleRemoveRow = useCallback((rowIndex) => {
+    setPendingRows((prev) => {
+      if (prev.length <= 1) {
+        return prev;
+      }
+
+      return prev.filter((_, index) => index !== rowIndex);
+    });
+    setInvalidFieldsByRow((prev) => {
+      const next = {};
+
+      Object.entries(prev).forEach(([indexKey, fields]) => {
+        const index = Number(indexKey);
+        if (index === rowIndex) {
+          return;
+        }
+
+        const nextIndex = index > rowIndex ? index - 1 : index;
+        next[nextIndex] = fields;
+      });
+
+      return next;
+    });
+    setMessage(null);
+  }, []);
+
+  const handleRowSpeciesSelect = useCallback((rowIndex, species) => {
+    setInvalidFieldsByRow((prev) => {
+      const rowFields = prev[rowIndex];
+      if (!rowFields?.length) {
+        return prev;
+      }
+
+      const fieldsToClear = new Set([
+        "name_ru",
+        "name_latin",
+        "family",
+        "regnum",
+        "status"
+      ]);
+      const nextFields = rowFields.filter((field) => !fieldsToClear.has(field));
+      if (nextFields.length === 0) {
+        const next = { ...prev };
+        delete next[rowIndex];
+        return next;
+      }
+
+      return {
+        ...prev,
+        [rowIndex]: nextFields
+      };
+    });
+
+    setPendingRows((prev) =>
+      prev.map((row, index) => {
+        if (index !== rowIndex) {
+          return row;
+        }
+
+        return {
+          ...row,
+          payload: {
+            ...row.payload,
+            name_ru: species.name_ru ?? "",
+            name_latin: species.name_latin ?? "",
+            regnum: species.regnum ?? row.payload.regnum ?? "",
+            status: species.status ?? row.payload.status ?? "LC",
+            family: species.family ?? ""
+          }
+        };
+      })
+    );
+    setMessage(null);
   }, []);
 
   const handleConfirm = useCallback(async () => {
-    if (pendingRows.length === 0) {
+    const validation = validatePendingRows(pendingRows);
+    if (validation.error) {
+      setMessage({ type: "error", text: validation.error.text });
       return;
-    }
-
-    const validatedPayloads = [];
-
-    for (let index = 0; index < pendingRows.length; index += 1) {
-      const validation = validateSubmissionPayload(pendingRows[index].payload);
-      if (validation.error) {
-        setMessage({
-          type: "error",
-          text: `Строка ${index + 1}: ${validation.error}`
-        });
-        return;
-      }
-
-      validatedPayloads.push(validation.payload);
     }
 
     setSubmitting(true);
     setMessage(null);
 
     try {
-      await saveUserFindings(validatedPayloads);
-      const savedCount = validatedPayloads.length;
+      await saveUserFindings(validation.payloads);
+      const savedCount = validation.payloads.length;
       resetState();
       onSaved?.(savedCount);
       onClose?.();
@@ -151,18 +440,33 @@ export default function MultiSpeciesPopup({ open, onClose, onSaved }) {
     }
   }, [onClose, onSaved, pendingRows, resetState]);
 
-  if (!open) {
+  if (!open || mapPickHidden) {
     return null;
   }
 
-  const canReview = parsed.rows.length > 0 && parsed.errors.length === 0;
+  const canReviewText = parsed.rows.length > 0 && parsed.errors.length === 0;
+  const canReview = inputMode === "text" ? canReviewText : pendingRows.length > 0;
+
+  const dialogClassName =
+    step === "confirm"
+      ? " multi-species-dialog--confirm"
+      : inputMode === "table"
+        ? " multi-species-dialog--table-entry"
+        : "";
+
+  const dialogLabel =
+    step === "confirm"
+      ? "Подтверждение записи"
+      : inputMode === "table"
+        ? "Несколько видов — таблица"
+        : "Несколько видов — текст";
 
   return (
     <div className="multi-species-overlay" onClick={handleClose}>
       <div
-        className={`multi-species-dialog${step === "confirm" ? " multi-species-dialog--confirm" : ""}`}
+        className={`multi-species-dialog${dialogClassName}`}
         role="dialog"
-        aria-label={step === "confirm" ? "Подтверждение записи" : "Несколько видов"}
+        aria-label={dialogLabel}
         aria-modal="true"
         onClick={(event) => event.stopPropagation()}
       >
@@ -176,7 +480,7 @@ export default function MultiSpeciesPopup({ open, onClose, onSaved }) {
           ×
         </button>
 
-        {step === "input" ? (
+        {step === "input" && inputMode === "text" ? (
           <>
             <h3 className="multi-species-title">Несколько видов</h3>
             <p className="multi-species-hint">
@@ -231,7 +535,61 @@ export default function MultiSpeciesPopup({ open, onClose, onSaved }) {
               </button>
             </div>
           </>
-        ) : (
+        ) : null}
+
+        {step === "input" && inputMode === "table" ? (
+          <>
+            <h3 className="multi-species-title">Несколько видов</h3>
+            <p className="multi-species-hint">Заполните ячейки таблицы для каждой находки.</p>
+
+            <MultiSpeciesConfirmTable
+              rows={pendingRows}
+              onRowChange={handlePendingRowChange}
+              onRowSpeciesSelect={handleRowSpeciesSelect}
+              onMapPickStart={handleMapPickStart}
+              mapPickRowIndex={mapPickRowIndex}
+              suggestionData={suggestionData}
+              onAddRow={handleAddRow}
+              onRemoveRow={handleRemoveRow}
+              invalidFieldsByRow={invalidFieldsByRow}
+              disabled={submitting}
+              variant="entry"
+            />
+
+            {message && (
+              <p
+                className={`multi-species-message multi-species-message--${message.type}`}
+                role="status"
+              >
+                {message.text}
+              </p>
+            )}
+
+            <div className="multi-species-actions multi-species-actions--entry">
+              <p className="multi-species-entry-count">Записей: {filledRowCount}</p>
+              <button
+                type="button"
+                className="multi-species-discard-btn"
+                onClick={handleClose}
+                disabled={submitting}
+                aria-label="Отменить"
+                title="Отменить"
+              >
+                <TrashIcon />
+              </button>
+              <button
+                type="button"
+                className="multi-species-save"
+                onClick={handleReview}
+                disabled={submitting || !canReview}
+              >
+                Записать
+              </button>
+            </div>
+          </>
+        ) : null}
+
+        {step === "confirm" ? (
           <>
             <h3 className="multi-species-title">Подтверждение записи</h3>
             <p className="multi-species-confirm-summary">
@@ -242,6 +600,8 @@ export default function MultiSpeciesPopup({ open, onClose, onSaved }) {
             <MultiSpeciesConfirmTable
               rows={pendingRows}
               onRowChange={handlePendingRowChange}
+              onRowSpeciesSelect={handleRowSpeciesSelect}
+              suggestionData={suggestionData}
               disabled={submitting}
             />
 
@@ -273,7 +633,7 @@ export default function MultiSpeciesPopup({ open, onClose, onSaved }) {
               </button>
             </div>
           </>
-        )}
+        ) : null}
       </div>
     </div>
   );

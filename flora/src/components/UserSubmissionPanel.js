@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatPointsCount } from "../locations/parseCoordinatesList";
 import { formatFindingsCount } from "../locations/parseSubmissionLines";
 import { saveUserFinding, saveUserFindings } from "../locations/saveUserFinding";
@@ -9,6 +9,7 @@ import {
   filterTextSuggestions
 } from "../locations/submissionSuggestions";
 import CoordinatesListPopup from "./CoordinatesListPopup";
+import MultiSpeciesEntryMenu from "./MultiSpeciesEntryMenu";
 import MultiSpeciesPopup from "./MultiSpeciesPopup";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import SubmissionAutocompleteField from "./SubmissionAutocompleteField";
@@ -122,6 +123,7 @@ export default function UserSubmissionPanel({
   coordinates,
   locationPickingActive = false,
   onLocationPickingChange,
+  submissionMapPickHandlerRef,
   collapsed: collapsedProp,
   onCollapsedChange,
   onSaved,
@@ -140,13 +142,59 @@ export default function UserSubmissionPanel({
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## submit в docs/moduleHelp.md
   const [listInputOpen, setListInputOpen] = useState(false);
   const [multiSpeciesOpen, setMultiSpeciesOpen] = useState(false);
+  const [multiSpeciesMode, setMultiSpeciesMode] = useState("text");
+  const [multiSpeciesMenuOpen, setMultiSpeciesMenuOpen] = useState(false);
   const [listCoordinates, setListCoordinates] = useState([]);
+  const multiSpeciesMapPickCancelRef = useRef(null);
 
   useEffect(() => {
     if (coordinates) {
       setListCoordinates([]);
     }
   }, [coordinates]);
+
+  useEffect(() => {
+    if (locationPickingActive || !submissionMapPickHandlerRef?.current) {
+      return;
+    }
+
+    multiSpeciesMapPickCancelRef.current?.();
+    multiSpeciesMapPickCancelRef.current = null;
+    submissionMapPickHandlerRef.current = null;
+  }, [locationPickingActive, submissionMapPickHandlerRef]);
+
+  const handleMultiSpeciesMapPickStart = useCallback(
+    (rowIndex, applyCoordinates, onCancel) => {
+      if (!submissionMapPickHandlerRef) {
+        return;
+      }
+
+      submissionMapPickHandlerRef.current = (pickedCoordinates) => {
+        applyCoordinates(pickedCoordinates);
+        submissionMapPickHandlerRef.current = null;
+        multiSpeciesMapPickCancelRef.current = null;
+      };
+      multiSpeciesMapPickCancelRef.current = onCancel;
+      onLocationPickingChange(true);
+    },
+    [onLocationPickingChange, submissionMapPickHandlerRef]
+  );
+
+  const handleMultiSpeciesMapPickAbort = useCallback(() => {
+    multiSpeciesMapPickCancelRef.current = null;
+    if (submissionMapPickHandlerRef) {
+      submissionMapPickHandlerRef.current = null;
+    }
+    onLocationPickingChange(false);
+  }, [onLocationPickingChange, submissionMapPickHandlerRef]);
+
+  useEffect(() => {
+    if (multiSpeciesOpen || !submissionMapPickHandlerRef?.current) {
+      return;
+    }
+
+    handleMultiSpeciesMapPickAbort();
+  }, [handleMultiSpeciesMapPickAbort, multiSpeciesOpen, submissionMapPickHandlerRef]);
 
   const suggestionData = buildSubmissionSuggestionData();
 
@@ -264,6 +312,18 @@ export default function UserSubmissionPanel({
     [onSaved]
   );
 
+  const handleMultiSpeciesTextOpen = useCallback(() => {
+    setMultiSpeciesMode("text");
+    setMultiSpeciesOpen(true);
+    setMultiSpeciesMenuOpen(false);
+  }, []);
+
+  const handleMultiSpeciesTableOpen = useCallback(() => {
+    setMultiSpeciesMode("table");
+    setMultiSpeciesOpen(true);
+    setMultiSpeciesMenuOpen(false);
+  }, []);
+
   const handleSubmit = useCallback(
     async (event) => {
       event.preventDefault();
@@ -371,6 +431,8 @@ export default function UserSubmissionPanel({
           <div className="user-submission-panel-content">
             <form className="user-submission-form" onSubmit={handleSubmit}>
               <fieldset className="user-submission-fieldset">
+                <legend className="user-submission-legend">Систематика</legend>
+
                 <label className="user-submission-field">
                   <SubmissionFieldLabel required filled={fieldCompletion.regnum}>
                     Царство
@@ -448,7 +510,7 @@ export default function UserSubmissionPanel({
               </fieldset>
 
               <fieldset className="user-submission-fieldset">
-                <legend className="user-submission-legend">Находка</legend>
+                <legend className="user-submission-legend">Информация о находке</legend>
 
                 <div className="user-submission-field user-submission-location-field">
                   <SubmissionFieldLabel required filled={fieldCompletion.coordinates}>
@@ -559,14 +621,13 @@ export default function UserSubmissionPanel({
                     Сброс
                   </button>
                 </div>
-                <button
-                  type="button"
-                  className="user-submission-reset user-submission-multi-species"
-                  onClick={() => setMultiSpeciesOpen(true)}
+                <MultiSpeciesEntryMenu
+                  open={multiSpeciesMenuOpen}
                   disabled={submitting}
-                >
-                  Несколько видов
-                </button>
+                  onToggle={setMultiSpeciesMenuOpen}
+                  onSelectText={handleMultiSpeciesTextOpen}
+                  onSelectTable={handleMultiSpeciesTableOpen}
+                />
               </div>
             </form>
           </div>
@@ -582,8 +643,11 @@ export default function UserSubmissionPanel({
 
       <MultiSpeciesPopup
         open={multiSpeciesOpen}
+        mode={multiSpeciesMode}
         onClose={() => setMultiSpeciesOpen(false)}
         onSaved={handleMultiSpeciesSaved}
+        onMapPickStart={handleMultiSpeciesMapPickStart}
+        onMapPickAbort={handleMultiSpeciesMapPickAbort}
       />
     </>
   );
