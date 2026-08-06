@@ -4,6 +4,7 @@ import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import PolygonModeIcon from "./PolygonModeIcon";
 import "../styles/ArealDynamicsPanel.css";
 
+// Не показываем площадь для пустых/некорректных значений и округляем малые площади.
 function formatAreaKm2(value) {
   if (!Number.isFinite(value) || value <= 0) {
     return "";
@@ -16,6 +17,7 @@ function formatAreaKm2(value) {
   return `${value.toFixed(value < 1 ? 2 : 1)} км²`;
 }
 
+/** Склонение «+N находка/находки/находок» для русского интерфейса. */
 function formatNewPointsCount(count) {
   const mod10 = count % 10;
   const mod100 = count % 100;

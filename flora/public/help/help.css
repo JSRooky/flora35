@@ -153,6 +153,12 @@ body {
   margin: 0 0 12px;
 }
 
+.help-content hr {
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  margin: 16px 0;
+}
+
 .help-content ul {
   margin: 0 0 12px;
   padding-left: 22px;

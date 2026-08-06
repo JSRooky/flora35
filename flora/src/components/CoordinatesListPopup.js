@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { formatPointsCount, parseCoordinatesList } from "../locations/parseCoordinatesList";
 import "../styles/CoordinatesListPopup.css";
 
+/** Диалог ввода списка координат находок (по одной паре «широта, долгота» на строку). */
 export default function CoordinatesListPopup({ open, onClose, onConfirm }) {
   const [text, setText] = useState("");
   const [message, setMessage] = useState(null);
@@ -14,6 +15,7 @@ export default function CoordinatesListPopup({ open, onClose, onConfirm }) {
   }, [onClose]);
 
   const handleSave = useCallback(() => {
+    // Показываем только первую ошибку, чтобы не перегружать пользователя.
     if (parsed.errors.length > 0) {
       const firstError = parsed.errors[0];
       setMessage({

@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+/** Считает фиксированные координаты списка подсказок для рендера через портал (иначе он обрежется overflow родителя). */
 function usePortalDropdownStyle(open, containerRef, placement, value, suggestions) {
   const [style, setStyle] = useState(null);
 
@@ -17,6 +18,7 @@ function usePortalDropdownStyle(open, containerRef, placement, value, suggestion
       }
 
       const rect = input.getBoundingClientRect();
+      // Не даём списку схлопнуться у узких полей.
       const width = Math.max(rect.width, 180);
 
       if (placement === "drop-up") {
@@ -41,6 +43,7 @@ function usePortalDropdownStyle(open, containerRef, placement, value, suggestion
     };
 
     updatePosition();
+    // capture: true, чтобы ловить скролл во вложенных контейнерах, а не только document.
     window.addEventListener("scroll", updatePosition, true);
     window.addEventListener("resize", updatePosition);
 
@@ -53,6 +56,7 @@ function usePortalDropdownStyle(open, containerRef, placement, value, suggestion
   return style;
 }
 
+/** Текстовое поле с выпадающим списком подсказок (используется как в форме, так и в таблице находок). */
 export default function SubmissionAutocompleteInput({
   value,
   onChange,
@@ -82,6 +86,7 @@ export default function SubmissionAutocompleteInput({
   const getLabel = getSuggestionLabel ?? ((item) => String(item));
   const getKey = getSuggestionKey ?? ((item, index) => `${getLabel(item)}-${index}`);
 
+  // Подсказки показываем только при непустом вводе и открытом списке.
   const filteredSuggestions = useMemo(() => {
     if (!open || !String(value).trim()) {
       return [];
@@ -109,6 +114,7 @@ export default function SubmissionAutocompleteInput({
 
     const handlePointerDown = (event) => {
       if (!containerRef.current?.contains(event.target)) {
+        // Список подсказок может рендериться в портале вне containerRef, поэтому проверяем его отдельно.
         const listNode = document.getElementById(listboxId);
         if (listNode?.contains(event.target)) {
           return;

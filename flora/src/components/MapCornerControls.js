@@ -3,6 +3,7 @@ import { ReactComponent as FilterIcon } from "../images/filter_icon.svg";
 import FeedbackWidget from "./FeedbackWidget";
 import "../styles/MapCornerControls.css";
 
+/** Плавающая панель в углу карты: кнопка фильтра по ООПТ и виджет обратной связи. */
 export default function MapCornerControls({
   ooptFilterEnabled = false,
   ooptFilterAvailable = false,

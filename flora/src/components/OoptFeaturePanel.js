@@ -12,6 +12,7 @@ import { ReactComponent as FilterIcon } from "../images/filter_icon.svg";
 import "../styles/FeaturePopup.css";
 import "../styles/OoptFeaturePanel.css";
 
+// Эти ключи уже показаны отдельно как заголовок — исключаем их из общего списка полей.
 const TITLE_PROPERTY_KEYS = new Set(["title", "NAME_RU", "NAME"]);
 
 function ListIcon({ className = "" }) {
@@ -31,6 +32,7 @@ function ListIcon({ className = "" }) {
     </svg>
   );
 }
+/** Панель со сведениями о выбранном объекте ООПТ: свойства, площадь и точки внутри контура. */
 export default function OoptFeaturePanel({
   layerDefinition,
   feature,

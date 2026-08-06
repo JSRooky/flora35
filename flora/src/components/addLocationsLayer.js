@@ -655,6 +655,8 @@ function getLayerIds(regnum = null) {
   };
 }
 
+/** ID слоёв с одиночными точками — зависит от кластеризации и группировки по regnum. */
+/** ID слоёв с одиночными (не кластеризованными) точками — зависят от кластеризации и группировки по regnum. */
 export function getUnclusteredLayerIds() {
   if (!clusteringEnabled) {
     return [getLayerIds().unclustered];
@@ -714,6 +716,8 @@ function applyUnclusteredLayerFilters(map) {
   });
 }
 
+/** ID первого существующего на карте слоя точек — ориентир для вставки слоёв под маркерами. */
+/** ID первого существующего на карте слоя точек — ориентир, под какой слой вставлять новые. */
 export function getFirstLocationsLayerId(map) {
   const layerIds = [...getClusterLayerIds(), ...getUnclusteredLayerIds()];
   return layerIds.find((layerId) => map.getLayer(layerId));
@@ -774,6 +778,8 @@ function getPointColorExpression() {
   ];
 }
 
+/** Цвет точки по regnum (растение/животное/гриб), с запасным цветом по умолчанию. */
+/** Цвет точки по regnum (растение/животное/гриб), с запасным цветом по умолчанию. */
 export function getPointColorForRegnum(regnum) {
   return REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR;
 }
@@ -1655,6 +1661,8 @@ export function filterFeatures(features, filters = {}) {
   return result;
 }
 
+/** Координаты отфильтрованных точек набора данных. */
+/** Координаты точек набора данных, прошедших фильтры. */
 export function getFilteredFeatureCenters(filters = {}) {
   if (!locationsData) {
     return [];
@@ -1665,6 +1673,8 @@ export function getFilteredFeatureCenters(filters = {}) {
   );
 }
 
+/** Точки набора данных с учётом фильтров. */
+/** Точки набора данных, прошедшие фильтры. */
 export function getFilteredFeatures(filters = {}) {
   if (!locationsData) {
     return [];
@@ -1799,6 +1809,8 @@ export function featureMatchesFilters(feature, filters = {}) {
   return filterFeatures([feature], filters).length > 0;
 }
 
+/** Применяет фильтры точек: пересобирает слои или, для движения таймлайна, только обновляет данные. */
+/** Применяет фильтры точек: пересобирает слои, кроме частного случая сдвига года таймлайна. */
 export function applyLocationsFilter(map, filters = {}) {
   if (
     map &&
@@ -1817,37 +1829,47 @@ export function applyLocationsFilter(map, filters = {}) {
   rebuildLocationsLayers(map);
 }
 
+/** Сбрасывает все фильтры точек. */
+/** Сбрасывает все фильтры точек. */
 export function clearLocationsFilter(map) {
   applyLocationsFilter(map, {});
 }
 
+/** Включает/выключает группировку кластеров по regnum и пересобирает слои. */
+/** Включает/выключает группировку кластеров по regnum и пересобирает слои. */
 export function setClusterByRegnum(map, enabled) {
   clusterByRegnum = enabled;
   rebuildLocationsLayers(map);
 }
 
+/** Включает/выключает кластеризацию точек и пересобирает слои. */
 export function setClusteringEnabled(map, enabled) {
   clusteringEnabled = enabled;
   rebuildLocationsLayers(map);
 }
 
+/** Показывает/скрывает маркеры точек и диаграммы кластеров. */
 export function setMarkersVisible(map, visible) {
   markersVisible = visible;
   applyMarkersVisibility(map);
 }
 
+/** Включена ли группировка кластеров по regnum. */
 export function isClusterByRegnumEnabled() {
   return clusterByRegnum;
 }
 
+/** Включена ли кластеризация точек. */
 export function isClusteringEnabled() {
   return clusteringEnabled;
 }
 
+/** Видимы ли сейчас маркеры точек. */
 export function isMarkersVisible() {
   return markersVisible;
 }
 
+/** Включает/выключает круговые диаграммы regnum в кластерах и пересобирает слои. */
 export function setClusterPieChartsEnabled(map, enabled) {
   if (!enabled) {
     detachClusterPieChartMarkers(map);
@@ -1857,6 +1879,7 @@ export function setClusterPieChartsEnabled(map, enabled) {
   rebuildLocationsLayers(map);
 }
 
+/** Включены ли круговые диаграммы regnum в кластерах. */
 export function isClusterPieChartsEnabled() {
   return clusterPieChartsEnabled;
 }

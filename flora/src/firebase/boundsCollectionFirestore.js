@@ -39,10 +39,12 @@ export function getBoundsCollectionName(layerDefinitionOrId) {
   return `bounds_${layerId}`;
 }
 
+/** Находит описание слоя bounds по его id. */
 export function getBoundsLayerDefinition(layerId) {
   return layerDefinitionById.get(layerId) ?? null;
 }
 
+/** Находит id слоя bounds по имени исходного GeoJSON-файла. */
 export function getBoundsLayerIdFromSourceFile(sourceFile) {
   const definition = BOUNDS_LAYER_DEFINITIONS.find(
     (item) => item.sourceFile === sourceFile
@@ -110,6 +112,7 @@ export function getBoundsFeatureKey(layerId, properties, featureIndex = 0) {
   return `${layerId}:${buildBoundsFeatureDocId(properties, featureIndex)}`;
 }
 
+/** Разбирает составной ключ featureKey обратно на layerId и docId. */
 export function parseBoundsFeatureKey(featureKey) {
   const colonIndex = featureKey.indexOf(":");
   if (colonIndex === -1) {
@@ -122,6 +125,7 @@ export function parseBoundsFeatureKey(featureKey) {
   };
 }
 
+// Подзаголовок объекта зависит от слоя: у каждого свой набор полей properties.
 function getBoundsFeatureSubtitle(layerId, properties = {}) {
   if (layerId === "oopt_pol") {
     return properties.category_t ?? properties.status_tit ?? null;
@@ -160,10 +164,12 @@ export function buildBoundsCatalogFromGeoJSON(layerId, featureCollection) {
     .sort((left, right) => left.title.localeCompare(right.title, "ru", { numeric: true }));
 }
 
+/** Ищет запись каталога bounds по составному ключу. */
 export function findBoundsCatalogEntry(catalog, featureKey) {
   return catalog.find((entry) => entry.key === featureKey) ?? null;
 }
 
+/** Считает число видимых объектов bounds по карте флагов видимости. */
 export function countVisibleBoundsFeatures(featureVisibility = {}) {
   return Object.values(featureVisibility).filter(Boolean).length;
 }
@@ -177,6 +183,7 @@ export function serializeBoundsGeometry(geometry) {
   return JSON.stringify(geometry);
 }
 
+/** Восстанавливает geometry объекта из его представления в документе Firestore. */
 export function parseBoundsGeometry(record) {
   if (!record) {
     return null;

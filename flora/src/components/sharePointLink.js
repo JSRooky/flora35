@@ -46,12 +46,14 @@ export function buildSharePointUrl(feature) {
   return url.toString();
 }
 
+/** Копирует текст в буфер обмена; при отсутствии Clipboard API — через скрытый textarea. */
 export async function copyTextToClipboard(text) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
     return;
   }
 
+  // Фолбэк для старых браузеров/небезопасного контекста без navigator.clipboard.
   const textarea = document.createElement("textarea");
   textarea.value = text;
   textarea.setAttribute("readonly", "");

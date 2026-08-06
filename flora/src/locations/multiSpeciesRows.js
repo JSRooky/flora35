@@ -21,6 +21,7 @@ export function createEmptySubmissionRow(lineNumber = 1) {
   };
 }
 
+/** Достаёт числовые координаты [lng, lat] из payload строки, если они валидны. */
 export function getSubmissionRowCoordinates(payload) {
   const [lng, lat] = payload?.coordinates ?? [];
   return {
@@ -51,6 +52,7 @@ export function isSubmissionRowFilled(row) {
   );
 }
 
+/** Считает количество заполненных строк. */
 export function countFilledSubmissionRows(rows) {
   return rows.filter(isSubmissionRowFilled).length;
 }

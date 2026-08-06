@@ -29,10 +29,12 @@ export function getFullHelpPageUrl() {
   return `${base}/help/index.html`;
 }
 
+/** Человекочитаемое название раздела справки (или сам sectionId, если названия нет). */
 export function getModuleHelpSectionLabel(sectionId) {
   return HELP_SECTION_LABELS[sectionId] ?? sectionId;
 }
 
+/** Проверяет, есть ли для модуля отдельный раздел в полной справке. */
 export function hasModuleHelpFullSection(sectionId) {
   return HELP_SECTION_IDS.includes(sectionId);
 }

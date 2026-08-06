@@ -1,3 +1,4 @@
+// Добавляет находки из sourceFindings в targetFindings, пропуская дубликаты по id.
 function appendUniqueFindings(targetFindings, sourceFindings) {
   const seenIds = new Set(
     targetFindings.map((finding) => finding?.id).filter(Boolean)

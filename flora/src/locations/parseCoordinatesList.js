@@ -48,6 +48,7 @@ export function parseCoordinatesList(text) {
   return { coordinates, errors };
 }
 
+/** Формирует строку «N точка/точки/точек» с учётом склонения числительного. */
 export function formatPointsCount(count) {
   const mod10 = count % 10;
   const mod100 = count % 100;

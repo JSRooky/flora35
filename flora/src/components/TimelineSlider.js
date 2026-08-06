@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getTimelineColors, TIMELINE_GRADIENT_LIGHT } from "./timelineColors";
 import "../styles/TimelineSlider.css";
 
+// Должно совпадать с длительностью CSS-transition закрытия в TimelineSlider.css.
 const ANIMATION_MS = 450;
 
 function getRangeProgress(value, min, max) {
@@ -26,6 +27,7 @@ function buildYearTicks(minYear, maxYear) {
   return ticks;
 }
 
+/** Слайдер-таймлайн по годам с анимированным появлением/скрытием. */
 export default function TimelineSlider({
   visible,
   year,
@@ -58,6 +60,7 @@ export default function TimelineSlider({
       return undefined;
     }
 
+    // Держим компонент смонтированным на время анимации закрытия, затем убираем из DOM.
     setClosing(true);
     const timer = window.setTimeout(() => {
       wasVisibleRef.current = false;

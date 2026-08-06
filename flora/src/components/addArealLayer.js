@@ -188,6 +188,7 @@ export function getArealContainedPointsSummary(centerFeature, radiusKm, filters 
   };
 }
 
+/** Ключ точки для сравнения записей ареала (координаты + вид + год находки). */
 export function getArealPointKey(feature) {
   const [lng, lat] = feature.geometry?.coordinates ?? [];
   const { name_latin: nameLatin = "", found_year: foundYear = "" } = feature.properties ?? {};
@@ -402,6 +403,7 @@ export function showArealPointHint(map, feature) {
   }, AREAL_HINT_VISIBLE_MS);
 }
 
+/** Скрывает подсказку с названием точки над ареалом. */
 export function hideArealPointHint() {
   arealPointHintGeneration += 1;
   clearArealPointHintTimer();

@@ -167,6 +167,7 @@ const DEFAULT_CLUSTER_BY_REGNUM = true;
 const DEFAULT_CLUSTER_PIE_CHARTS = false;
 const DEFAULT_MARKERS_VISIBLE = true;
 
+/** Корневой компонент карты: состояние всех инструментов/фильтров/слоёв и инициализация Mapbox. */
 export default function MapView() {
   const ref = useRef(null);
   const map = useRef(null);
@@ -241,6 +242,7 @@ export default function MapView() {
   const submissionMapPickHandlerRef = useRef(null);
   const hadFoundYearPropertyFilterRef = useRef(false);
   const previousYearFilterEnabledRef = useRef(false);
+  // Параметры share-ссылки на конкретную точку разбираем один раз при монтировании.
   const pendingSharePointRef = useRef(parseSharePointParams(window.location.search));
 
   const isPanelCollapsed = useCallback(
@@ -319,9 +321,13 @@ export default function MapView() {
   const handleOpenBoundsFeatureDetails = useCallback(() => {
     expandPanel(PANEL_IDS.OOPT_FEATURE);
   }, [expandPanel]);
+  // Ref-копия колбэка: обработчики карты (созданные один раз) должны видеть
+  // его актуальную версию, не пересоздавая при этом подписки на карте.
   const openBoundsFeatureDetailsRef = useRef(handleOpenBoundsFeatureDetails);
   openBoundsFeatureDetailsRef.current = handleOpenBoundsFeatureDetails;
 
+  // Состояние «изоляции» одного объекта ООПТ (скрыть остальные), чтобы можно
+  // было вернуть прежнюю видимость слоёв при повторном клике.
   const boundsIsolationRef = useRef({
     active: false,
     featureKey: null,
@@ -375,6 +381,8 @@ export default function MapView() {
     });
   }, [clearBoundsIsolation]);
 
+  // Переключает изоляцию объекта ООПТ: первый клик прячет остальные объекты,
+  // повторный клик по тому же объекту или изоляция другого — возвращает исходную видимость.
   const handleIsolateBoundsFeature = useCallback((hit) => {
     const featureKey = getBoundsFeatureVisibilityKey(hit);
 
@@ -558,6 +566,7 @@ export default function MapView() {
       return;
     }
 
+    // Пока пользователь выбирает точку на карте для новой находки, курсор меняется на специальный.
     setMapCursorOverride(
       mapInstance,
       submissionLocationPicking ? GET_LOCATION_CURSOR : null
@@ -588,6 +597,9 @@ export default function MapView() {
     }
   }, [hasFoundYearPropertyFilter]);
 
+  // Снимок актуального состояния в ref: колбэки ниже создаются с пустыми
+  // зависимостями (стабильная ссылка для подписок на карту), но должны читать
+  // свежие значения state на момент вызова, а не значения из замыкания.
   const arealStateRef = useRef({});
   arealStateRef.current = {
     popupData,
@@ -2075,6 +2087,8 @@ export default function MapView() {
   const clearPointSelection = useCallback(() => {
     const state = pointSelectionStateRef.current;
 
+    // Ранний выход, если ничего из связанного с выбором точки не активно —
+    // избегаем лишних сбросов состояния и перерисовки слоёв карты.
     if (
       !state.popupData &&
       Object.keys(state.propertyFilters).length === 0 &&
@@ -2191,6 +2205,7 @@ export default function MapView() {
     });
   }, [mapReady, dataSourceMode]);
 
+  // Инициализация карты Mapbox и всех слоёв/обработчиков — выполняется один раз при монтировании.
   useEffect(() => {
     if (!map.current && ref.current) {
       map.current = initMap(ref.current);

@@ -34,6 +34,7 @@ function getCollapsedSummary(
   return parts.join(", ");
 }
 
+/** Панель настроек отображения точек на карте: кластеризация, тепловая карта, видимость маркеров. */
 export default function MapDisplayPanel({
   markersVisible = true,
   onMarkersVisibleChange,

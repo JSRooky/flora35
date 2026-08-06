@@ -60,6 +60,8 @@ function unionPolygonFeatures(features) {
   return result;
 }
 
+// Приоритет: область пересечения двух полигонов, иначе активный полигон,
+// иначе объединение всех видимых построенных полигонов.
 function getPolygonWithinFeature({
   visibleBuiltPolygons,
   activePolygon,

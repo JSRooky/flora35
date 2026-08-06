@@ -236,6 +236,7 @@ export function showBoundsFeaturePopup(
   }
 }
 
+/** Скрывает и снимает обработчики popup со сведениями о полигоне bounds. */
 export function hideBoundsFeaturePopup() {
   const popupElement = boundsFeaturePopup?.getElement();
 
@@ -611,6 +612,7 @@ export async function ensureBoundsLayerGeoJSON(layerId) {
   return geojson;
 }
 
+/** Возвращает уже загруженный GeoJSON слоя из кэша без обращения к Firestore. */
 export function getCachedBoundsLayerGeoJSON(layerId) {
   return dataCache.get(layerId) ?? null;
 }

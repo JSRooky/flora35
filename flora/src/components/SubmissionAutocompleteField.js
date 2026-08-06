@@ -3,6 +3,7 @@ import SubmissionAutocompleteInput from "./SubmissionAutocompleteInput";
 import SubmissionFieldLabel from "./SubmissionFieldLabel";
 import "../styles/SubmissionAutocomplete.css";
 
+/** Поле формы находки: подпись + текстовый ввод с автодополнением. */
 export default function SubmissionAutocompleteField({
   label,
   value,

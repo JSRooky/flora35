@@ -7,6 +7,7 @@ import "../styles/FeaturePopup.css";
 import "../styles/ArealPopup.css";
 import "../styles/BoundsSpeciesListPopup.css";
 
+// Добавляем латинское название, если русское имя повторяется среди видов списка.
 function getSpeciesLabel(species, speciesList) {
   const hasDuplicateName = speciesList.filter((item) => item.nameRu === species.nameRu).length > 1;
 
@@ -272,6 +273,7 @@ export default function BoundsSpeciesListPopup({
     [speciesTree]
   );
 
+  // Наружу передаём null, если видимы все царства, иначе — список видимых.
   const publishRegnumVisibility = useCallback(
     (nextVisibility) => {
       if (!groupByRegnumEnabled || treeRegnums.length === 0) {
@@ -291,10 +293,12 @@ export default function BoundsSpeciesListPopup({
     [groupByRegnumEnabled, onRegnumVisibilityChange, treeRegnums]
   );
 
+  // При пересчёте дерева (новые данные, смена группировки) разворачиваем все узлы заново.
   useEffect(() => {
     setExpandedNodes(new Set(treeNodeKeys));
   }, [treeNodeKeys]);
 
+  // Сбрасываем фильтр видимости по царствам при каждом открытии и закрытии панели.
   useEffect(() => {
     if (!open) {
       setRegnumVisibility({});
@@ -307,6 +311,7 @@ export default function BoundsSpeciesListPopup({
     onRegnumVisibilityChange?.(null);
   }, [open, onRegnumVisibilityChange]);
 
+  // Без группировки по царству индивидуальный фильтр видимости не имеет смысла.
   useEffect(() => {
     if (!open || groupByRegnumEnabled) {
       return;

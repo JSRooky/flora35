@@ -96,6 +96,7 @@ function ModuleMenuButton({
   return button;
 }
 
+/** Верхнее меню модулей приложения: выбор активного модуля и общие переключатели карты. */
 export default function ModuleMenu({
   activeModule,
   onModuleSelect,
@@ -113,6 +114,7 @@ export default function ModuleMenu({
 }) {
   const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => {
     const pointRequired = isPointRequiredModule(id) && !pointSelected;
+    // Радиус и Буфер — взаимоисключающие инструменты карты, активный блокирует другой.
     const blockedByOtherTool =
       (id === MODULE_IDS.AREAL && arealBlocked) || (id === MODULE_IDS.BUFFER && bufferBlocked);
     const disabled = pointRequired || blockedByOtherTool;

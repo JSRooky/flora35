@@ -52,6 +52,7 @@ export function buildSubmissionFindingId(nameLatin) {
   return `${speciesId}-${Date.now().toString(36)}-${randomSuffix}`;
 }
 
+/** Публичная обёртка над slugifyNameLatin для получения species_id. */
 export function slugifySpeciesId(nameLatin) {
   return slugifyNameLatin(nameLatin);
 }
@@ -132,6 +133,7 @@ export function findingDocsToSpeciesCollection(docs, dataset = null) {
 
     const speciesEntry = speciesById.get(speciesId);
     const findingId = record.finding_id ?? parseFirestoreDocId(doc.id).findingId;
+    // Защита от дублей, если один и тот же finding_id встретится в снапшоте дважды.
     const alreadyAdded = speciesEntry.findings.some((finding) => finding.id === findingId);
 
     if (!alreadyAdded) {
@@ -186,6 +188,7 @@ export function submissionDocsToSpeciesCollection(docs) {
     }
 
     const speciesEntry = speciesById.get(speciesId);
+    // Защита от дублей, если один и тот же finding_id встретится в снапшоте дважды.
     const alreadyAdded = speciesEntry.findings.some((finding) => finding.id === findingId);
 
     if (!alreadyAdded) {
@@ -205,6 +208,7 @@ export function submissionDocsToSpeciesCollection(docs) {
   };
 }
 
+/** Разделяет документы findings на две коллекции по полю dataset. */
 export function splitFindingDocsByDataset(docs) {
   const pointsDocs = [];
   const userpointsDocs = [];

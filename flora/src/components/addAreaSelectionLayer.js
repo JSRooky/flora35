@@ -61,6 +61,7 @@ function ringToPolygonFeature(ringCoordinates) {
   return polygon([ringCoordinates]);
 }
 
+/** Оборачивает геометрию в GeoJSON Feature. */
 export function geometryToFeature(geometry) {
   return {
     type: "Feature",

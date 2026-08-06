@@ -18,6 +18,7 @@ export const FEEDBACK_CHANNELS = [
   }
 ];
 
+/** Возвращает только видимые каналы обратной связи. */
 export function getFeedbackChannels() {
   return FEEDBACK_CHANNELS.filter(({ visible = true }) => visible);
 }

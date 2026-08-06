@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from "react";
 
+/** Кнопка-меню выбора способа ввода нескольких видов: строкой текста или таблицей. */
 export default function MultiSpeciesEntryMenu({ open, disabled, onToggle, onSelectText, onSelectTable }) {
   const wrapRef = useRef(null);
 
@@ -21,6 +22,7 @@ export default function MultiSpeciesEntryMenu({ open, disabled, onToggle, onSele
       return undefined;
     }
 
+    // Закрываем меню при клике вне него.
     document.addEventListener("mousedown", handleDocumentClick);
     return () => document.removeEventListener("mousedown", handleDocumentClick);
   }, [handleDocumentClick, open]);

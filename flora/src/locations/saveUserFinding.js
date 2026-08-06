@@ -2,10 +2,8 @@ import { isFirebaseConfigured } from "../firebase/config";
 import { submitUserFinding } from "../firebase/submitFinding";
 import { refreshLocationsFromFirestore } from "./loadPoints";
 
-/**
- * Сохраняет пользовательскую находку в Firestore (коллекция user_submissions)
- * и обновляет данные на карте из базы.
- */
+// Обновляет данные карты из Firestore после сохранения находки(ок);
+// если обновление не удалось, бросает ошибку (сама находка при этом уже сохранена).
 async function refreshMapAfterSave({ count = 1 } = {}) {
   const refreshed = await refreshLocationsFromFirestore();
   if (!refreshed) {
@@ -21,6 +19,7 @@ async function refreshMapAfterSave({ count = 1 } = {}) {
   }
 }
 
+/** Сохраняет пользовательскую находку в Firestore (коллекция user_submissions) и обновляет карту. */
 export async function saveUserFinding(payload) {
   if (!isFirebaseConfigured()) {
     throw new Error("Firebase не настроен. Добавьте переменные окружения Firebase.");
