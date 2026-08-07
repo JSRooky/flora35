@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REACT_APP_MAPBOX_TOKEN: ${{ secrets.REACT_APP_MAPBOX_TOKEN }}
+      REACT_APP_YANDEX_MAPS_API_KEY: ${{ secrets.REACT_APP_YANDEX_MAPS_API_KEY }}
       REACT_APP_FIREBASE_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
       REACT_APP_FIREBASE_AUTH_DOMAIN: ${{ secrets.REACT_APP_FIREBASE_AUTH_DOMAIN }}
       REACT_APP_FIREBASE_PROJECT_ID: ${{ secrets.REACT_APP_FIREBASE_PROJECT_ID }}
@@ -45,6 +46,9 @@ jobs:
           fi
           if [ -z "$REACT_APP_FIREBASE_API_KEY" ] || [ -z "$REACT_APP_FIREBASE_PROJECT_ID" ]; then
             echo "::warning::Firebase secrets are not set — модуль «Ввод данных» на GitHub Pages работать не будет"
+          fi
+          if [ -z "$REACT_APP_YANDEX_MAPS_API_KEY" ]; then
+            echo "::warning::REACT_APP_YANDEX_MAPS_API_KEY is not set — подложка Яндекс Карт на GitHub Pages будет недоступна"
           fi
 
       - name: Install dependencies
