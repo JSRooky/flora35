@@ -25,12 +25,15 @@
 
 .basemap-picker-toggle {
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: var(--module-menu-dock-height, 44px);
   height: var(--module-menu-dock-height, 44px);
   padding: 2px;
   border: none;
   border-radius: var(--module-menu-dock-radius, 8px);
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   box-shadow: none;
@@ -42,12 +45,12 @@
 }
 
 .basemap-picker-toggle--open {
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.92);
 }
 
 .basemap-picker-toggle:hover {
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.88);
 }
 
 .basemap-picker-toggle:focus-visible {
@@ -95,7 +98,7 @@
   padding: 2px;
   border: none;
   border-radius: var(--module-menu-dock-radius, 8px);
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   box-shadow: none;
@@ -109,7 +112,7 @@
 }
 
 .basemap-picker-option:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.92);
 }
 
 .basemap-picker-panel-wrap--open .basemap-picker-option {
@@ -133,57 +136,39 @@
   cursor: not-allowed;
 }
 
-.basemap-picker-preview {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 6px;
-  background-color: #e8e8e8;
-  background-size: cover;
-  background-position: center;
-}
-
-.basemap-picker-preview--mapbox {
-  background:
-    linear-gradient(180deg, rgba(170, 218, 255, 0.95) 0%, rgba(212, 231, 189, 0.95) 42%, rgba(242, 239, 233, 0.95) 100%),
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.35) 0,
-      rgba(255, 255, 255, 0.35) 8px,
-      transparent 8px,
-      transparent 16px
-    );
-}
-
-.basemap-picker-preview--osm {
-  background:
-    linear-gradient(180deg, rgba(181, 214, 240, 0.95) 0%, rgba(200, 230, 180, 0.95) 52%, rgba(235, 230, 220, 0.95) 100%),
-    repeating-linear-gradient(
-      -45deg,
-      rgba(255, 255, 255, 0.22) 0,
-      rgba(255, 255, 255, 0.22) 6px,
-      transparent 6px,
-      transparent 12px
-    );
-}
-
-.basemap-picker-preview--yandex {
-  position: relative;
-  background:
-    linear-gradient(180deg, rgba(197, 223, 245, 0.95) 0%, rgba(216, 236, 196, 0.95) 48%, rgba(240, 235, 227, 0.95) 100%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.25) 0 50%, transparent 50% 100%);
-}
-
-.basemap-picker-preview--yandex::after {
-  content: "";
+.basemap-picker-icon-defs {
   position: absolute;
-  left: 6px;
-  bottom: 6px;
-  width: 10px;
-  height: 6px;
-  border-radius: 2px;
-  background: #fc3f1d;
-  box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.45);
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.basemap-picker-icon {
+  display: block;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.basemap-picker-icon path {
+  fill: #1d1d1f;
+  fill: url(#basemap-icon-fill-gradient);
+  transition: fill 0.2s ease;
+}
+
+.basemap-picker-toggle:hover .basemap-picker-icon--mapbox path,
+.basemap-picker-option:hover:not(:disabled) .basemap-picker-icon--mapbox path {
+  fill: url(#basemap-icon-mapbox-hover-gradient);
+}
+
+.basemap-picker-toggle:hover .basemap-picker-icon--osm path,
+.basemap-picker-option:hover:not(:disabled) .basemap-picker-icon--osm path {
+  fill: url(#basemap-icon-osm-hover-gradient);
+}
+
+.basemap-picker-toggle:hover .basemap-picker-icon--yandex path,
+.basemap-picker-option:hover:not(:disabled) .basemap-picker-icon--yandex path {
+  fill: url(#basemap-icon-yandex-hover-gradient);
 }
 
 @media (max-width: 768px) {
@@ -194,6 +179,11 @@
   .basemap-picker {
     top: calc(8px + var(--module-menu-dock-height, 38px) + 10px);
     right: 10px;
+  }
+
+  .basemap-picker-icon {
+    width: 22px;
+    height: 22px;
   }
 }
 
