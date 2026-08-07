@@ -1,8 +1,9 @@
 import React from "react";
 import { ReactComponent as MainLogo } from "../images/main_logo.svg";
 import { DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
+import { BASEMAP_MODES, BASEMAP_OPTIONS } from "../config/basemapOptions";
+import { isYandexMapsApiKeyConfigured } from "./addYandexBasemapLayer";
 import "../styles/ModuleMenu.css";
-
 const HOME_URL = `${process.env.PUBLIC_URL || ""}/`;
 
 export const MODULE_IDS = {
@@ -20,8 +21,7 @@ export const MODULE_IDS = {
   AREA: "area",
   // Экспериментальный модуль ввода пользовательских данных через Firebase.
   SUBMIT: "submit",
-  ABOUT: "about"
-};
+  ABOUT: "about"};
 
 const POINT_MODULE_ITEMS = [
   { id: MODULE_IDS.FEATURE, label: "Сведения о точке" },
@@ -44,7 +44,6 @@ const MAP_MODULE_ITEMS = [
 const TEST_MODULE_ITEMS = [
   { id: MODULE_IDS.SUBMIT, label: "Ввод данных о находке" }
 ];
-
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
 
 function isPointRequiredModule(id) {
@@ -99,12 +98,12 @@ export default function ModuleMenu({
   bufferBlocked = false,
   hoverTooltipsDisabled = false,
   onHoverTooltipsDisabledChange,
-  osmBasemapEnabled = false,
-  onOsmBasemapEnabledChange,
+  basemapMode = BASEMAP_MODES.MAPBOX,
+  onBasemapModeChange,
   dataSourceMode,
   onDataSourceModeChange
 }) {
-  const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => {
+  const yandexAvailable = isYandexMapsApiKeyConfigured();  const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => {
     const pointRequired = isPointRequiredModule(id) && !pointSelected;
     const blockedByOtherTool =
       (id === MODULE_IDS.AREAL && arealBlocked) || (id === MODULE_IDS.BUFFER && bufferBlocked);
@@ -171,19 +170,39 @@ export default function ModuleMenu({
               </select>
             </label>
           </li>
-          <li className="module-menu-toggle-item">
-            <label className="module-menu-switch" title="Использовать подложку OpenStreetMap вместо стандартной карты">
-              <input
-                type="checkbox"
-                checked={osmBasemapEnabled}
-                onChange={(event) => onOsmBasemapEnabledChange?.(event.target.checked)}
-              />
-              <span className="module-menu-switch-slider" aria-hidden="true" />
-              <span className="module-menu-switch-label">OpenStreetMap</span>
+          <li className="module-menu-toggle-item module-menu-data-source">
+            <label className="module-menu-data-source-field" htmlFor="module-menu-basemap-select">
+              <span className="module-menu-data-source-label">Карты</span>
+              <select
+                id="module-menu-basemap-select"
+                className="module-menu-data-source-select"
+                value={basemapMode}
+                title={
+                  BASEMAP_OPTIONS.find(({ value }) => value === basemapMode)?.title
+                }
+                onChange={(event) => onBasemapModeChange?.(event.target.value)}
+              >
+                {BASEMAP_OPTIONS.map(({ value, label, title }) => {
+                  const disabled = value === BASEMAP_MODES.YANDEX && !yandexAvailable;
+                  return (
+                    <option
+                      key={value}
+                      value={value}
+                      disabled={disabled}
+                      title={
+                        disabled
+                          ? "Задайте REACT_APP_YANDEX_MAPS_API_KEY в .env.local"
+                          : title
+                      }
+                    >
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
             </label>
           </li>
-          <li className="module-menu-toggle-item">
-            <label className="module-menu-switch" title="Отключить подсказки при наведении на точки и кластеры">
+          <li className="module-menu-toggle-item">            <label className="module-menu-switch" title="Отключить подсказки при наведении на точки и кластеры">
               <input
                 type="checkbox"
                 checked={hoverTooltipsDisabled}

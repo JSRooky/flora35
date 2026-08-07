@@ -39,6 +39,11 @@ import {
   setOsmBasemapEnabled
 } from "./components/addOsmBasemapLayer";
 import {
+  addYandexBasemapLayer,
+  setYandexBasemapEnabled
+} from "./components/addYandexBasemapLayer";
+import { BASEMAP_MODES } from "./config/basemapOptions";
+import {
   addSpeciesPolygonLayer,
   clearSpeciesPolygonLayer,
   clearSpeciesPolygonIntersectionLayer,
@@ -176,7 +181,7 @@ export default function MapView() {
   const [areaDrawingActive, setAreaDrawingActive] = useState(false);
   const [areaGeometry, setAreaGeometry] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
-  const [osmBasemapEnabled, setOsmBasemapEnabledState] = useState(false);
+  const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
   const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.ALL);
   const [panelCollapsed, setPanelCollapsed] = useState({});
   const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
@@ -969,8 +974,21 @@ export default function MapView() {
       return;
     }
 
-    setOsmBasemapEnabled(map.current, osmBasemapEnabled);
-  }, [osmBasemapEnabled, mapReady]);
+    if (basemapMode === BASEMAP_MODES.YANDEX) {
+      setOsmBasemapEnabled(map.current, false);
+      setYandexBasemapEnabled(map.current, true);
+      return;
+    }
+
+    setYandexBasemapEnabled(map.current, false);
+
+    if (basemapMode === BASEMAP_MODES.OSM) {
+      setOsmBasemapEnabled(map.current, true);
+      return;
+    }
+
+    setOsmBasemapEnabled(map.current, false);
+  }, [basemapMode, mapReady]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -1540,6 +1558,7 @@ export default function MapView() {
 
       map.current.on("load", () => {
         addOsmBasemapLayer(map.current);
+        addYandexBasemapLayer(map.current);
         addLocationsLayer(map.current, {
           onClusterExpanded: (leaves) => {
             const { arealEnabled: enabled, arealAllMarkers: allMarkers } =
@@ -1673,8 +1692,8 @@ export default function MapView() {
         bufferBlocked={isArealApplied}
         hoverTooltipsDisabled={hoverTooltipsDisabled}
         onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
-        osmBasemapEnabled={osmBasemapEnabled}
-        onOsmBasemapEnabledChange={setOsmBasemapEnabledState}
+        basemapMode={basemapMode}
+        onBasemapModeChange={setBasemapMode}
         dataSourceMode={dataSourceMode}
         onDataSourceModeChange={setDataSourceModeState}
       />
