@@ -17,4 +17,6 @@
   --polygon-intersection-border: rgba(139, 92, 246, 0.22);
   --polygon-surface: rgba(255, 255, 255, 0.42);
   --polygon-surface-border: rgba(0, 0, 0, 0.06);
+  --module-menu-dock-height: 44px;
+  --module-menu-dock-radius: 8px;
 }
