@@ -5,6 +5,38 @@
   overflow: hidden;
 }
 
+/* Логотип Mapbox — только при использовании карт Mapbox. */
+.map-container--alt-basemap .mapboxgl-ctrl-logo {
+  display: none !important;
+}
+
+.yandex-basemap-logo {
+  position: fixed;
+  left: 10px;
+  bottom: 0;
+  z-index: 10;
+  display: block;
+  line-height: 0;
+  text-decoration: none;
+}
+
+.yandex-basemap-logo-image {
+  display: block;
+  width: 88px;
+  height: auto;
+}
+
+@media (max-width: 768px) {
+  .yandex-basemap-logo {
+    left: 8px;
+    bottom: 0;
+  }
+
+  .yandex-basemap-logo-image {
+    width: 72px;
+  }
+}
+
 .module-panel-stack {
   position: fixed;
   top: 68px;

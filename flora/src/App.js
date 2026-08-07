@@ -148,6 +148,7 @@ import MapCornerControls from "./components/MapCornerControls";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
+import { ReactComponent as YandexLogo } from "./images/yndex_logo_ru.svg";
 import "./styles/mapToolsTheme.css";
 import "./MapView.css";
 
@@ -2428,7 +2429,24 @@ export default function MapView() {
         dataSourceMode={dataSourceMode}
         onDataSourceModeChange={setDataSourceModeState}
       />
-      <div ref={ref} className="map-container" />
+      <div
+        ref={ref}
+        className={`map-container${
+          basemapMode !== BASEMAP_MODES.MAPBOX ? " map-container--alt-basemap" : ""
+        }`}
+      />
+      {basemapMode === BASEMAP_MODES.YANDEX && (
+        <a
+          href="https://yandex.ru/maps"
+          className="yandex-basemap-logo"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Яндекс Карты"
+          title="Яндекс Карты"
+        >
+          <YandexLogo className="yandex-basemap-logo-image" aria-hidden="true" focusable="false" />
+        </a>
+      )}
       {showModulePanelStack && (
         <div className="module-panel-stack">
           {activeModule === MODULE_IDS.FEATURE && (
