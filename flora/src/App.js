@@ -140,6 +140,7 @@ import BufferPopup from "./components/BufferPopup";
 import AreaSelectionPopup from "./components/AreaSelectionPopup";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
+import BasemapPicker from "./components/BasemapPicker";
 import YearFilterPanel from "./components/YearFilterPanel";
 import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
@@ -2424,8 +2425,6 @@ export default function MapView() {
         bufferBlocked={isArealApplied}
         hoverTooltipsDisabled={hoverTooltipsDisabled}
         onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
-        basemapMode={basemapMode}
-        onBasemapModeChange={setBasemapMode}
         dataSourceMode={dataSourceMode}
         onDataSourceModeChange={setDataSourceModeState}
       />
@@ -2447,6 +2446,7 @@ export default function MapView() {
           <YandexLogo className="yandex-basemap-logo-image" aria-hidden="true" focusable="false" />
         </a>
       )}
+      <BasemapPicker basemapMode={basemapMode} onBasemapModeChange={setBasemapMode} />
       {showModulePanelStack && (
         <div className="module-panel-stack">
           {activeModule === MODULE_IDS.FEATURE && (

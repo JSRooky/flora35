@@ -1,8 +1,6 @@
 import React from "react";
 import { ReactComponent as MainLogo } from "../images/main_logo.svg";
 import { DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
-import { BASEMAP_MODES, BASEMAP_OPTIONS } from "../config/basemapOptions";
-import { isYandexMapsApiKeyConfigured } from "./addYandexBasemapLayer";
 import UserAccountControl from "./UserAccountControl";
 import "../styles/ModuleMenu.css";
 
@@ -107,15 +105,11 @@ export default function ModuleMenu({
   bufferBlocked = false,
   hoverTooltipsDisabled = false,
   onHoverTooltipsDisabledChange,
-  basemapMode = BASEMAP_MODES.MAPBOX,
-  onBasemapModeChange,
   dataSourceMode,
   onDataSourceModeChange,
   accountUser = null,
   onAccountClick
 }) {
-  const yandexAvailable = isYandexMapsApiKeyConfigured();
-
   const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => {
     const pointRequired = isPointRequiredModule(id) && !pointSelected;
     // Радиус и Буфер — взаимоисключающие инструменты карты, активный блокирует другой.
@@ -181,38 +175,6 @@ export default function ModuleMenu({
                     {label}
                   </option>
                 ))}
-              </select>
-            </label>
-          </li>
-          <li className="module-menu-toggle-item module-menu-data-source">
-            <label className="module-menu-data-source-field" htmlFor="module-menu-basemap-select">
-              <span className="module-menu-data-source-label">Карты</span>
-              <select
-                id="module-menu-basemap-select"
-                className="module-menu-data-source-select"
-                value={basemapMode}
-                title={
-                  BASEMAP_OPTIONS.find(({ value }) => value === basemapMode)?.title
-                }
-                onChange={(event) => onBasemapModeChange?.(event.target.value)}
-              >
-                {BASEMAP_OPTIONS.map(({ value, label, title }) => {
-                  const disabled = value === BASEMAP_MODES.YANDEX && !yandexAvailable;
-                  return (
-                    <option
-                      key={value}
-                      value={value}
-                      disabled={disabled}
-                      title={
-                        disabled
-                          ? "Задайте REACT_APP_YANDEX_MAPS_API_KEY в .env.local"
-                          : title
-                      }
-                    >
-                      {label}
-                    </option>
-                  );
-                })}
               </select>
             </label>
           </li>
