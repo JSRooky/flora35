@@ -1,6 +1,6 @@
-/** Ограничения интерфейса для ветки prod_test. */
+/** Ограничения интерфейса для продакшена. */
 export const FEATURE_FLAGS = {
-  submitModuleDisabled: true,
+  submitModuleDisabled: false,
   dataSourceSelectDisabled: false,
 };
 
