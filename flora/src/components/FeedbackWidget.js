@@ -19,6 +19,7 @@ function FeedbackChannelIcon({ id }) {
   return <Icon className="feedback-widget-icon-image" aria-hidden="true" focusable="false" />;
 }
 
+/** Панель иконок-ссылок для обратной связи (Telegram, Max и т.п.). */
 export default function FeedbackWidget() {
   const channels = getFeedbackChannels();
 

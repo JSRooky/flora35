@@ -70,6 +70,7 @@ function isSubmissionFormComplete(form, coordinates, listCoordinates) {
   }
 
   const foundYear = Number(form.found_year);
+  // Разумный диапазон года находки, чтобы отсечь опечатки.
   return Number.isInteger(foundYear) && foundYear >= 1500 && foundYear <= 2100;
 }
 
@@ -119,6 +120,7 @@ function TrashIcon() {
   );
 }
 
+/** Панель формы добавления новой находки (модуль «Новая находка»): одиночный ввод и переход к вводу нескольких видов. */
 export default function UserSubmissionPanel({
   coordinates,
   locationPickingActive = false,
@@ -147,12 +149,14 @@ export default function UserSubmissionPanel({
   const [listCoordinates, setListCoordinates] = useState([]);
   const multiSpeciesMapPickCancelRef = useRef(null);
 
+  // Точка на карте и список координат взаимоисключающие — выбор точки сбрасывает список.
   useEffect(() => {
     if (coordinates) {
       setListCoordinates([]);
     }
   }, [coordinates]);
 
+  // Если выбор точки на карте прервали снаружи (например, сменили модуль) — отменяем ожидание клика для формы нескольких видов.
   useEffect(() => {
     if (locationPickingActive || !submissionMapPickHandlerRef?.current) {
       return;
@@ -163,6 +167,7 @@ export default function UserSubmissionPanel({
     submissionMapPickHandlerRef.current = null;
   }, [locationPickingActive, submissionMapPickHandlerRef]);
 
+  // Карта — не React-компонент, поэтому обработчик клика по ней передаётся через ref.
   const handleMultiSpeciesMapPickStart = useCallback(
     (rowIndex, applyCoordinates, onCancel) => {
       if (!submissionMapPickHandlerRef) {
@@ -180,6 +185,7 @@ export default function UserSubmissionPanel({
     [onLocationPickingChange, submissionMapPickHandlerRef]
   );
 
+  // Откатывает состояние выбора точки на карте, если пользователь отменил выбор.
   const handleMultiSpeciesMapPickAbort = useCallback(() => {
     multiSpeciesMapPickCancelRef.current = null;
     if (submissionMapPickHandlerRef) {
@@ -188,6 +194,7 @@ export default function UserSubmissionPanel({
     onLocationPickingChange(false);
   }, [onLocationPickingChange, submissionMapPickHandlerRef]);
 
+  // Попап с несколькими видами закрыли, пока карта ждала клик, — отменяем выбор точки.
   useEffect(() => {
     if (multiSpeciesOpen || !submissionMapPickHandlerRef?.current) {
       return;
@@ -368,6 +375,7 @@ export default function UserSubmissionPanel({
           identified_by: form.identified_by.trim()
         };
 
+        // Если указан список координат — по находке на каждую точку, иначе одна находка по выбранной точке.
         if (listCoordinates.length > 0) {
           await saveUserFindings(
             listCoordinates.map((entryCoordinates) => ({

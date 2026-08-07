@@ -95,6 +95,7 @@ export function setDataSourceFilter(mode) {
   featureCacheVersion += 1;
 }
 
+/** Текущий выбранный источник данных. */
 export function getDataSourceFilter() {
   return dataSourceFilter;
 }
@@ -191,6 +192,7 @@ function getAllFeatureCollection() {
   return cachedAllFeatureCollection;
 }
 
+// Сравнение через String(), т.к. id может приходить и числом, и строкой.
 function featureMatchesFindingId(feature, findingId) {
   const normalizedId = String(findingId);
   return (

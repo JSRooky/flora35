@@ -1,5 +1,6 @@
 /** Разворачивает species-centric points.json в GeoJSON FeatureCollection для карты. */
 export function expandFindingsToFeatures(data) {
+  // Данные уже в формате GeoJSON — преобразование не требуется.
   if (data.type === "FeatureCollection" && Array.isArray(data.features)) {
     return data;
   }
@@ -10,6 +11,7 @@ export function expandFindingsToFeatures(data) {
 
   const features = data.species.flatMap((species) =>
     (species.findings ?? []).map((finding, index) => {
+      // Если у находки нет id, генерируем стабильный на основе id вида и позиции в списке.
       const findingId = finding.id ?? `${species.id}-${index + 1}`;
 
       return {

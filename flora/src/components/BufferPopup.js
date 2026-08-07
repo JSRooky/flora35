@@ -22,6 +22,7 @@ function formatRadius(value) {
   return `${value.toFixed(1)} км`;
 }
 
+/** Склонение «точка/точки/точек» для русского интерфейса. */
 function formatSelectedPointsCount(count) {
   const mod10 = count % 10;
   const mod100 = count % 100;
@@ -79,6 +80,7 @@ export default function BufferPopup({
   const hasPoints = Boolean(feature) || selectedCount > 0;
   const selectionToggleLabel = selectionMode ? "Режим добавления и удаления" : "Добавить";
   const buildBlocked = toolBlocked && !enabled;
+  // Подстраховка на случай отсутствующих/некорректных значений радиуса — берём минимум.
   const zoneRadii = useMemo(
     () =>
       BUFFER_ZONES.map((_, index) => {
@@ -147,6 +149,7 @@ export default function BufferPopup({
           )}
 
           {BUFFER_ZONES.map((zone, index) => {
+            // Зоны вложены друг в друга: следующая зона не может быть уже предыдущей.
             const minRadius = index === 0 ? BUFFER_MIN_RADIUS_KM : zoneRadii[index - 1];
             const value = zoneRadii[index];
             const zoneDisabled = !hasPoints || !enabled || buildBlocked;

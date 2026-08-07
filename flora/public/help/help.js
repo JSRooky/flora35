@@ -16,18 +16,27 @@ const HELP_SECTION_IDS = Object.keys(HELP_SECTION_LABELS);
 
 const LIST_LINE_PATTERN = /^([*\-+])\s+(.*)$/;
 const IMAGE_LINE_PATTERN = /^!\[([^\]]*)\]\(([^)]+)\)$/;
+const INLINE_FORMAT_PATTERN = /(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/;
+const HORIZONTAL_RULE_LINE_PATTERN = /^\s{0,3}(-{3,}|\*{3,}|_{3,})\s*$/;
 
 let markdownBaseUrl = null;
 
+function isHorizontalRuleLine(line) {
+  return HORIZONTAL_RULE_LINE_PATTERN.test(line);
+}
+
+/** Читает id запрошенного раздела из query-параметра ?section=, иначе берёт первый по умолчанию. */
 function getRequestedSection() {
   const params = new URLSearchParams(window.location.search);
   return params.get("section") || HELP_SECTION_IDS[0];
 }
 
+/** Путь до страницы карты (на уровень выше страницы справки). */
 function getMapUrl() {
   return new URL("../", window.location.href).pathname;
 }
 
+/** Извлекает текст раздела markdown по заголовку `## sectionId`. */
 function extractMarkdownSection(markdown, sectionId) {
   if (!markdown || !sectionId) {
     return "";
@@ -43,32 +52,43 @@ function extractMarkdownSection(markdown, sectionId) {
 
   const sectionStart = match.index + match[0].length;
   const rest = normalized.slice(sectionStart);
+  // Обрезаем текст до следующего заголовка ## или до конца файла.
   const nextSectionMatch = rest.match(/^##\s+/m);
   const sectionBody = nextSectionMatch ? rest.slice(0, nextSectionMatch.index) : rest;
 
   return sectionBody.trim();
 }
 
+/** Собирает список id всех разделов (`## id`) в порядке их следования в файле — для навигации. */
 function parseSections(markdown) {
   const normalized = markdown.replace(/\r\n/g, "\n");
   const matches = [...normalized.matchAll(/^##\s+(\S+)\s*$/gm)];
   return matches.map((match) => match[1]);
 }
 
+/** Разбирает `**жирный**`, `*курсив*`/`_курсив_` в тексте на строки и DOM-узлы `<strong>`/`<em>`. */
 function renderInline(text) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-
-  return parts
-    .map((part) => {
+  return text
+    .split(INLINE_FORMAT_PATTERN)
+    .filter((part) => part.length > 0)
+    .flatMap((part) => {
       if (part.startsWith("**") && part.endsWith("**")) {
         const strong = document.createElement("strong");
         strong.textContent = part.slice(2, -2);
-        return strong;
+        return [strong];
       }
 
-      return document.createTextNode(part);
-    })
-    .filter(Boolean);
+      if (
+        (part.startsWith("*") && part.endsWith("*")) ||
+        (part.startsWith("_") && part.endsWith("_"))
+      ) {
+        const em = document.createElement("em");
+        em.textContent = part.slice(1, -1);
+        return [em];
+      }
+
+      return [document.createTextNode(part)];
+    });
 }
 
 function appendInline(parent, text) {
@@ -84,6 +104,8 @@ function getListItemText(line) {
   return match ? match[2].trim() : line.trim();
 }
 
+// Абсолютные пути и URL (со схемой или начинающиеся с /) отдаём как есть, относительные —
+// разрешаем относительно каталога markdown-файла (markdownBaseUrl).
 function resolveImageSrc(src) {
   if (!markdownBaseUrl || /^([a-z][a-z0-9+.-]*:|\/\/|\/)/i.test(src)) {
     return src;
@@ -92,6 +114,7 @@ function resolveImageSrc(src) {
   return new URL(src, markdownBaseUrl).href;
 }
 
+/** Рендерит блок вида `![alt](src)` как `<figure><img></figure>`, иначе возвращает null. */
 function renderImageBlock(firstLine) {
   const match = firstLine.trim().match(IMAGE_LINE_PATTERN);
 
@@ -108,6 +131,8 @@ function renderImageBlock(firstLine) {
   return figure;
 }
 
+// Рендерит один блок markdown (разделённый пустой строкой фрагмент) в DOM-узлы:
+// изображение, заголовок, либо последовательность абзацев/списков/линий.
 function renderBlock(block) {
   const lines = block.split("\n");
   const firstLine = lines[0];
@@ -137,13 +162,6 @@ function renderBlock(block) {
     const heading = document.createElement("h1");
     appendInline(heading, firstLine.slice(2).trim());
     fragment.appendChild(heading);
-    return fragment;
-  }
-
-  if (!lines.some(isListLine)) {
-    const paragraph = document.createElement("p");
-    appendInline(paragraph, lines.join(" "));
-    fragment.appendChild(paragraph);
     return fragment;
   }
 
@@ -177,6 +195,13 @@ function renderBlock(block) {
   };
 
   lines.forEach((line) => {
+    if (isHorizontalRuleLine(line)) {
+      flushParagraph();
+      flushList();
+      fragment.appendChild(document.createElement("hr"));
+      return;
+    }
+
     if (isListLine(line)) {
       flushParagraph();
       listItems.push(getListItemText(line));
@@ -195,6 +220,7 @@ function renderBlock(block) {
   return fragment;
 }
 
+/** Рендерит markdown-текст раздела в DocumentFragment с DOM-узлами. */
 function renderMarkdown(markdown) {
   const container = document.createDocumentFragment();
   const blocks = markdown.replace(/\r\n/g, "\n").trim().split(/\n{2,}/);
@@ -206,6 +232,7 @@ function renderMarkdown(markdown) {
   return container;
 }
 
+/** Строит список ссылок навигации по разделам, подсвечивая активный. */
 function buildNav(sections, activeSection) {
   const navList = document.getElementById("help-nav-list");
   navList.textContent = "";
@@ -226,6 +253,7 @@ function buildNav(sections, activeSection) {
   });
 }
 
+/** Отображает содержимое выбранного раздела справки и обновляет заголовок вкладки и навигацию. */
 function showSection(sectionId, markdown, sections) {
   const label = HELP_SECTION_LABELS[sectionId] || sectionId;
   document.title = `${label} — Как это работает`;
@@ -252,6 +280,7 @@ function showError() {
   document.getElementById("help-error").hidden = false;
 }
 
+/** Точка входа страницы: загружает markdown, определяет активный раздел и рендерит его. */
 async function initHelpPage() {
   const backLink = document.getElementById("help-back-link");
   backLink.href = getMapUrl();
@@ -271,6 +300,7 @@ async function initHelpPage() {
     const sections = parseSections(markdown);
     const activeSection = sections.includes(sectionId) ? sectionId : sections[0];
 
+    // Если запрошенного раздела нет в файле, переключаемся на первый и синхронизируем URL в адресной строке.
     if (sectionId !== activeSection) {
       const params = new URLSearchParams(window.location.search);
       params.set("section", activeSection);

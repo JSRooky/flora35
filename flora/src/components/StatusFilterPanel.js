@@ -14,6 +14,7 @@ export const STATUS_OPTIONS = [
   { code: "LC", label: "Вызывающий наименьшие опасения" }
 ];
 
+/** Панель фильтра точек по природоохранному статусу (МСОП). */
 export default function StatusFilterPanel({
   activeStatusFilters = [],
   onStatusFilterChange,

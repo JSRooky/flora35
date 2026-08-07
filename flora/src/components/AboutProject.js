@@ -49,6 +49,7 @@ function renderAboutProjectContent(markdown) {
   );
 }
 
+/** Диалог «О проекте» с содержимым из markdown, подгружаемым при открытии. */
 export default function AboutProject({ open: openProp, onOpenChange }) {
   const [openInternal, setOpenInternal] = useState(false);
   const isControlled = openProp !== undefined;

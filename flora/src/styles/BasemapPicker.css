@@ -1,0 +1,195 @@
+.basemap-picker {
+  position: fixed;
+  top: calc(10px + var(--module-menu-dock-height, 44px) + 14px);
+  right: 16px;
+  z-index: 1101;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  pointer-events: none;
+}
+
+.basemap-picker-toggle-wrap,
+.basemap-picker-toggle,
+.basemap-picker-panel-wrap--open .basemap-picker-option {
+  pointer-events: auto;
+}
+
+.basemap-picker-toggle-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.basemap-picker-toggle {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--module-menu-dock-height, 44px);
+  height: var(--module-menu-dock-height, 44px);
+  padding: 2px;
+  border: none;
+  border-radius: var(--module-menu-dock-radius, 8px);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: none;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.basemap-picker-toggle--open {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.basemap-picker-toggle:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.basemap-picker-toggle:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+.basemap-picker-panel-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  width: 100%;
+  opacity: 0;
+  transform: translateY(-8px);
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    grid-template-rows 0.28s ease,
+    opacity 0.28s ease,
+    transform 0.28s ease;
+}
+
+.basemap-picker-panel-wrap--open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.basemap-picker-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 0;
+  padding-top: 8px;
+  overflow: hidden;
+}
+
+.basemap-picker-option {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--module-menu-dock-height, 44px);
+  height: var(--module-menu-dock-height, 44px);
+  padding: 2px;
+  border: none;
+  border-radius: var(--module-menu-dock-radius, 8px);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: none;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s ease,
+    background-color 0.2s ease;
+}
+
+.basemap-picker-option:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.basemap-picker-panel-wrap--open .basemap-picker-option {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.basemap-picker-panel-wrap--open .basemap-picker-option--disabled {
+  opacity: 0.45;
+}
+
+.basemap-picker-panel-wrap--open .basemap-picker-option:nth-child(1) {
+  transition-delay: 0.04s;
+}
+
+.basemap-picker-panel-wrap--open .basemap-picker-option:nth-child(2) {
+  transition-delay: 0.08s;
+}
+
+.basemap-picker-option--disabled {
+  cursor: not-allowed;
+}
+
+.basemap-picker-icon-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.basemap-picker-icon {
+  display: block;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.basemap-picker-icon path {
+  fill: #1d1d1f;
+  fill: url(#basemap-icon-fill-gradient);
+  transition: fill 0.2s ease;
+}
+
+.basemap-picker-toggle:hover .basemap-picker-icon--mapbox path,
+.basemap-picker-option:hover:not(:disabled) .basemap-picker-icon--mapbox path {
+  fill: url(#basemap-icon-mapbox-hover-gradient);
+}
+
+.basemap-picker-toggle:hover .basemap-picker-icon--osm path,
+.basemap-picker-option:hover:not(:disabled) .basemap-picker-icon--osm path {
+  fill: url(#basemap-icon-osm-hover-gradient);
+}
+
+.basemap-picker-toggle:hover .basemap-picker-icon--yandex path,
+.basemap-picker-option:hover:not(:disabled) .basemap-picker-icon--yandex path {
+  fill: url(#basemap-icon-yandex-hover-gradient);
+}
+
+@media (max-width: 768px) {
+  :root {
+    --module-menu-dock-height: 38px;
+  }
+
+  .basemap-picker {
+    top: calc(8px + var(--module-menu-dock-height, 38px) + 10px);
+    right: 10px;
+  }
+
+  .basemap-picker-icon {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .basemap-picker-panel-wrap,
+  .basemap-picker-option {
+    transition: none;
+  }
+}

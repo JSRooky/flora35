@@ -24,6 +24,7 @@ function getCollapsedSummary(enabled, allMarkers, radius) {
   return "Радиус выключен";
 }
 
+/** Склонение «точка/точки/точек» для русского интерфейса. */
 function formatContainedPointsCount(count) {
   const mod10 = count % 10;
   const mod100 = count % 100;
@@ -39,6 +40,7 @@ function formatContainedPointsCount(count) {
   return `${count} точек`;
 }
 
+// Добавляем латинское название, если русское имя точки повторяется в списке.
 function getPointLabel(feature, points) {
   const nameRu = feature.properties?.name_ru || "Без названия";
   const hasDuplicateName = points.filter(

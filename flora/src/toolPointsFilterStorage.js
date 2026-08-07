@@ -2,6 +2,7 @@ import { MODULE_IDS } from "./components/ModuleMenu";
 
 const STORAGE_KEY = "flora35-tool-points-filter";
 
+/** Инструменты, для которых поддерживается переключатель «Только эти» (фильтр точек). */
 export const TOOL_POINTS_FILTER_MODULES = [
   MODULE_IDS.MAP,
   MODULE_IDS.AREAL,
@@ -11,6 +12,7 @@ export const TOOL_POINTS_FILTER_MODULES = [
   MODULE_IDS.OOPT
 ];
 
+// Состояние по умолчанию — все переключатели выключены.
 function createDefaultState() {
   return Object.fromEntries(TOOL_POINTS_FILTER_MODULES.map((moduleId) => [moduleId, false]));
 }

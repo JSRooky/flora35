@@ -17,6 +17,7 @@ function normalizeToken(value) {
     .toLowerCase();
 }
 
+/** Формирует строку «N находка/находки/находок» с учётом склонения числительного. */
 export function formatFindingsCount(count) {
   const mod10 = count % 10;
   const mod100 = count % 100;
@@ -32,6 +33,8 @@ export function formatFindingsCount(count) {
   return `${count} находок`;
 }
 
+// Подбирает разделитель полей: берёт кандидата с наибольшим числом вхождений,
+// но только если вхождений достаточно для минимального набора полей.
 function detectDelimiter(line) {
   let bestDelimiter = null;
   let bestCount = 0;
@@ -47,6 +50,7 @@ function detectDelimiter(line) {
   return bestDelimiter;
 }
 
+// Ищет царство по русскому или латинскому алиасу (REGNUM_ALIASES).
 function parseRegnum(value) {
   const token = normalizeToken(value);
   if (!token) {
@@ -64,6 +68,7 @@ function parseRegnum(value) {
   return { regnum: match[0] };
 }
 
+// Пустой статус трактуется как LC (наименьшая обеспокоенность), иначе — код МСОП из STATUS_CODES.
 function parseStatus(value) {
   const code = String(value ?? "")
     .trim()
@@ -80,6 +85,7 @@ function parseStatus(value) {
   return { status: code };
 }
 
+// Разбирает одно поле координат вида "широта, долгота" (запятая — тоже десятичный разделитель).
 function parseCoordinateField(value) {
   const trimmed = String(value ?? "").trim();
   if (!trimmed) {
@@ -111,6 +117,7 @@ function parseCoordinateField(value) {
   };
 }
 
+// Год находки ограничен разумным диапазоном 1500–2100.
 function parseFoundYear(value) {
   const foundYear = Number(String(value ?? "").trim());
   if (!Number.isInteger(foundYear) || foundYear < 1500 || foundYear > 2100) {
@@ -120,6 +127,7 @@ function parseFoundYear(value) {
   return { found_year: foundYear };
 }
 
+// Валидирует и собирает payload находки из массива полей одной строки текста.
 function parseSubmissionParts(parts, lineNumber) {
   if (parts.length < FIELD_COUNT_MIN) {
     return {
@@ -205,7 +213,7 @@ function parseSubmissionParts(parts, lineNumber) {
   };
 }
 
-/** Проверяет и нормализует payload находки перед сохранением. */
+/** Возвращает список имён некорректных/незаполненных полей payload (для подсветки в таблице). */
 export function getSubmissionPayloadInvalidFields(payload) {
   const invalidFields = [];
 
@@ -252,6 +260,7 @@ export function getSubmissionPayloadInvalidFields(payload) {
   return invalidFields;
 }
 
+/** Проверяет и нормализует payload находки перед сохранением, возвращает ошибку либо готовый payload. */
 export function validateSubmissionPayload(payload) {
   const name_ru = String(payload?.name_ru ?? "").trim();
   const name_latin = String(payload?.name_latin ?? "").trim();
@@ -370,6 +379,7 @@ export function parseSubmissionLines(text) {
   return { rows, errors, delimiter };
 }
 
+/** Форматирует координаты для отображения в интерфейсе как "широта, долгота". */
 export function formatSubmissionCoordinates(coordinates) {
   const [lng, lat] = coordinates;
   return `${lat.toFixed(3)}, ${lng.toFixed(3)}`;

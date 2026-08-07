@@ -96,6 +96,12 @@
   margin: 0 0 8px;
 }
 
+.module-help-panel-content hr {
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  margin: 10px 0;
+}
+
 .module-help-panel-content p:last-child,
 .module-help-panel-content ul:last-child {
   margin-bottom: 0;

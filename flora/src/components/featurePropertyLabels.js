@@ -27,8 +27,10 @@ const REGNUM_LABELS = {
   fungi: "Грибы"
 };
 
+/** Порядок отображения царств в списках и деревьях видов. */
 export const REGNUM_ORDER = ["plantae", "animalia", "fungi"];
 
+/** Подпись царства для UI; для неизвестных значений возвращает исходное значение. */
 export function getRegnumLabel(value) {
   if (!value) {
     return "Без царства";
@@ -37,6 +39,7 @@ export function getRegnumLabel(value) {
   return REGNUM_LABELS[value] ?? String(value);
 }
 
+/** Подпись семейства для UI (используется как есть, без словаря). */
 export function getFamilyLabel(value) {
   if (!value) {
     return "Без семейства";
@@ -105,10 +108,12 @@ export function buildSpeciesRegnumFamilyTree(species) {
   });
 }
 
+/** Человекочитаемая подпись поля свойства точки. */
 export function getPropertyLabel(key) {
   return PROPERTY_LABELS[key] ?? key;
 }
 
+/** Человекочитаемое значение поля свойства точки. */
 export function formatPropertyValue(key, value) {
   if (key === "regnum") {
     return REGNUM_LABELS[value] ?? String(value);
@@ -117,6 +122,7 @@ export function formatPropertyValue(key, value) {
   return String(value);
 }
 
+/** Сортирует пары [key, value] по PROPERTY_DISPLAY_ORDER, остальные — в конец по алфавиту. */
 export function sortPropertyEntries(entries) {
   const order = new Map(PROPERTY_DISPLAY_ORDER.map((key, index) => [key, index]));
 

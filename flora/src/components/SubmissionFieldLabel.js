@@ -1,5 +1,6 @@
 import React from "react";
 
+/** Подпись поля формы находки с индикатором обязательности и заполненности. */
 export default function SubmissionFieldLabel({
   children,
   filled = false,

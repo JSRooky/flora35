@@ -52,6 +52,7 @@ function TrashIcon() {
   );
 }
 
+/** Диалог массового добавления находок: ввод текстом или таблицей, затем подтверждение перед сохранением. */
 export default function MultiSpeciesPopup({
   open,
   mode = "text",
@@ -69,6 +70,7 @@ export default function MultiSpeciesPopup({
   const [mapPickHidden, setMapPickHidden] = useState(false);
   const [mapPickRowIndex, setMapPickRowIndex] = useState(null);
   const [invalidFieldsByRow, setInvalidFieldsByRow] = useState({});
+  // Дублирует submitting: state обновляется асинхронно и не успевает защитить от повторного клика до перерендера.
   const submittingRef = useRef(false);
 
   const parsed = useMemo(() => parseSubmissionLines(text), [text]);
@@ -97,6 +99,7 @@ export default function MultiSpeciesPopup({
     submittingRef.current = false;
   }, []);
 
+  // При каждом открытии попапа готовим форму под выбранный режим: таблица сразу с одной пустой строкой.
   useEffect(() => {
     if (!open) {
       return;
@@ -150,6 +153,7 @@ export default function MultiSpeciesPopup({
         (coords) => {
           const [lng, lat] = coords;
 
+          // Округляем до тех же 3 знаков, что и при ручном вводе координат.
           setPendingRows((prev) =>
             prev.map((row, index) =>
               index === rowIndex
@@ -280,6 +284,7 @@ export default function MultiSpeciesPopup({
 
         if (field === "lat" || field === "lng") {
           const [currentLng, currentLat] = row.payload.coordinates ?? [];
+          // Допускаем запятую как десятичный разделитель наравне с точкой.
           const parsedValue = Number.parseFloat(String(value).replace(",", "."));
 
           return {
@@ -296,6 +301,7 @@ export default function MultiSpeciesPopup({
 
         if (field === "found_year") {
           const nextYear = String(value).trim();
+          // Пустое значение оставляем строкой (поле не заполнено), иначе приводим к числу.
           return {
             ...row,
             payload: {
@@ -330,6 +336,7 @@ export default function MultiSpeciesPopup({
 
       return prev.filter((_, index) => index !== rowIndex);
     });
+    // После удаления строки сдвигаем индексы ошибок валидации на позициях после неё.
     setInvalidFieldsByRow((prev) => {
       const next = {};
 
@@ -349,6 +356,7 @@ export default function MultiSpeciesPopup({
   }, []);
 
   const handleRowSpeciesSelect = useCallback((rowIndex, species) => {
+    // Выбор вида из подсказки закрывает ошибки валидации по связанным с видом полям.
     setInvalidFieldsByRow((prev) => {
       const rowFields = prev[rowIndex];
       if (!rowFields?.length) {
@@ -398,6 +406,7 @@ export default function MultiSpeciesPopup({
   }, []);
 
   const handleConfirm = useCallback(async () => {
+    // Защита от повторной отправки при быстром двойном клике.
     if (submittingRef.current || submitting) {
       return;
     }
@@ -428,6 +437,7 @@ export default function MultiSpeciesPopup({
     }
   }, [onClose, onSaved, pendingRows, resetState, submitting]);
 
+  // Прячем попап на время выбора точки на карте, чтобы он её не перекрывал.
   if (!open || mapPickHidden) {
     return null;
   }

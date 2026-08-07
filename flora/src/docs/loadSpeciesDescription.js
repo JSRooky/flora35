@@ -1,9 +1,12 @@
+// Webpack-контекст: заранее собирает все .md-файлы из ./species, чтобы получить их URL после сборки.
 const speciesDescriptions = require.context("./species", false, /\.md$/);
 
+// Ключи контекста имеют вид "./name.md" — убираем префикс "./", чтобы сопоставить с description_md.
 const urlByPath = new Map(
   speciesDescriptions.keys().map((key) => [`species/${key.slice(2)}`, speciesDescriptions(key)])
 );
 
+// Кэш загруженного текста и промисов "в процессе", чтобы не грузить один файл повторно параллельно.
 const contentCache = new Map();
 const loadPromises = new Map();
 

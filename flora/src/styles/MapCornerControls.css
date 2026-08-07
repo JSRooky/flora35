@@ -1,7 +1,7 @@
 .map-corner-controls {
   position: fixed;
   left: 20px;
-  bottom: 16px;
+  bottom: 48px;
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -86,7 +86,7 @@
 @media (max-width: 768px) {
   .map-corner-controls {
     left: 10px;
-    bottom: 12px;
+    bottom: 40px;
     gap: 6px;
   }
 

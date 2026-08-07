@@ -48,6 +48,8 @@ function ensureArealDynamicsLayers(map) {
   }
 }
 
+// Слои bounds/полигонов могут добавляться после этого слоя — поднимаем динамику
+// ареала наверх, чтобы срезы не перекрывались другими полигонами.
 function moveArealDynamicsLayersToTop(map) {
   if (!map.getLayer("areal-dynamics-fill")) {
     return;
@@ -62,6 +64,7 @@ export function addArealDynamicsLayer(map) {
   ensureArealDynamicsLayers(map);
 }
 
+/** Рисует переданные срезы динамики ареала на карте, создавая слои при необходимости. */
 export function syncArealDynamicsLayer(map, slices) {
   ensureArealDynamicsLayers(map);
 
@@ -83,6 +86,7 @@ export function syncArealDynamicsLayer(map, slices) {
   moveArealDynamicsLayersToTop(map);
 }
 
+/** Очищает слой динамики ареала на карте. */
 export function clearArealDynamicsLayer(map) {
   syncArealDynamicsLayer(map, []);
 }

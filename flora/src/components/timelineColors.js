@@ -4,6 +4,8 @@ const TIMELINE_GRADIENT = {
   end: "#2b9e08",
 };
 
+// Осветление и усиление насыщенности применяются к базовому градиенту,
+// чтобы получить более яркую палитру для UI, не меняя опорные цвета TIMELINE_GRADIENT.
 const TIMELINE_LIGHTEN = 0.32;
 const TIMELINE_SATURATE = 1.45;
 
@@ -118,6 +120,7 @@ function hslToRgb({ h, s, l }) {
   };
 }
 
+// Насыщенность проще усиливать в HSL, поэтому конвертируем туда и обратно в RGB.
 function saturateRgb(rgb, amount = TIMELINE_SATURATE) {
   const hsl = rgbToHsl(rgb);
   return hslToRgb({
@@ -141,10 +144,12 @@ function rgbToHex({ r, g, b }) {
     .join("")}`;
 }
 
+/** Осветлённый и более насыщенный вариант исходного hex-цвета градиента. */
 export function getProcessedHex(hex) {
   return rgbToCss(processTimelineRgb(parseHex(hex)));
 }
 
+/** Цвет градиента таймлайна (start → middle → end) в точке ratio [0..1]. */
 export function getColorAtRatio(ratio) {
   const t = clampRatio(ratio);
   let rgb;
@@ -158,16 +163,20 @@ export function getColorAtRatio(ratio) {
   return processTimelineRgb(rgb);
 }
 
+/** Цвет градиента таймлайна в формате CSS rgb(). */
 export function getTimelineColorCss(ratio) {
   return rgbToCss(getColorAtRatio(ratio));
 }
 
+/** Цвет градиента таймлайна в формате hex (для GeoJSON fillColor и т.п.). */
 export function getTimelineColorHex(ratio) {
   return rgbToHex(getColorAtRatio(ratio));
 }
 
+/** Набор цветов для отрисовки таймлайна: акцент, полупрозрачный акцент и цвет точки-метки. */
 export function getTimelineColors(ratio) {
   const { r, g, b } = getColorAtRatio(ratio);
+  // Яркость по формуле luma — чтобы подобрать контрастный цвет метки (тёмный/светлый).
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 
   return {
@@ -177,6 +186,7 @@ export function getTimelineColors(ratio) {
   };
 }
 
+/** Позиция года в диапазоне [minYear, maxYear] от 0 до 1 для выбора цвета. */
 export function getYearColorRatio(year, minYear, maxYear) {
   if (maxYear === minYear) {
     return 0;
@@ -185,6 +195,7 @@ export function getYearColorRatio(year, minYear, maxYear) {
   return (year - minYear) / (maxYear - minYear);
 }
 
+/** Опорные цвета градиента (осветлённые) для CSS-переменных таймлайна. */
 export const TIMELINE_GRADIENT_LIGHT = {
   start: getProcessedHex(TIMELINE_GRADIENT.start),
   middle: getProcessedHex(TIMELINE_GRADIENT.middle),

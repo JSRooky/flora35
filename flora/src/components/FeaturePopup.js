@@ -80,6 +80,7 @@ function CheckIcon() {
   );
 }
 
+/** Панель со сведениями о выбранной точке данных: свойства, фильтры, иллюстрации, доп. инструменты. */
 export default function FeaturePopup({
   feature,
   collapsed = false,
@@ -118,6 +119,7 @@ export default function FeaturePopup({
       return undefined;
     }
 
+    // Автоматически скрываем индикатор «скопировано» через 2 секунды.
     const timerId = window.setTimeout(() => setShareCopied(false), 2000);
     return () => window.clearTimeout(timerId);
   }, [shareCopied]);

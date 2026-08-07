@@ -136,6 +136,7 @@ export function buildArealDynamicsSlices(
   return slices;
 }
 
+/** Сбрасывает кеш срезов динамики ареала (для вида или полностью). */
 export function clearArealDynamicsSliceCache(nameLatin) {
   if (nameLatin) {
     [...SLICE_CACHE.keys()].forEach((key) => {
@@ -149,6 +150,7 @@ export function clearArealDynamicsSliceCache(nameLatin) {
   SLICE_CACHE.clear();
 }
 
+/** Оставляет только срезы вплоть до выбранного года таймлайна. */
 export function filterSlicesUpToYear(slices, maxYear) {
   return slices.filter((slice) => slice.year <= maxYear);
 }

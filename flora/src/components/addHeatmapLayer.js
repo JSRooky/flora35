@@ -97,6 +97,7 @@ export function setHeatmapEnabled(map, enabled, filters = {}) {
   map.setLayoutProperty(LAYER_ID, "visibility", enabled ? "visible" : "none");
 }
 
+/** Обновляет данные тепловой карты по фильтрам, только если слой сейчас видим. */
 export function updateHeatmapData(map, filters = {}) {
   if (!map.getLayer(LAYER_ID)) {
     return;

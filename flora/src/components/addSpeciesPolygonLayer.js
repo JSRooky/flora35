@@ -64,10 +64,7 @@ export function getPointsForSpecies(feature) {
   return getFeaturesByNameLatin(getSpeciesKey(feature));
 }
 
-/**
- * Строит GeoJSON-полигон по набору координат.
- * Turf convex требует минимум три точки; для одной и двух — буфер вокруг точки/отрезка.
- */
+/** Убирает повторяющиеся координаты (с точностью до 6 знаков после запятой). */
 function dedupeCoordinates(coordinates) {
   const seen = new Set();
 
@@ -83,6 +80,10 @@ function dedupeCoordinates(coordinates) {
   });
 }
 
+/**
+ * Строит GeoJSON-полигон по набору координат.
+ * Turf convex требует минимум три точки; для одной и двух — буфер вокруг точки/отрезка.
+ */
 function buildConvexPolygon(coordinates) {
   if (coordinates.length === 0) {
     return null;
@@ -126,6 +127,7 @@ function buildAllPointsPolygon(coordinates) {
   return polygon([ring]);
 }
 
+/** Строит полигон по координатам: режим ALL_POINTS — через все точки, иначе — выпуклая оболочка. */
 export function buildPolygonFromCoordinates(coordinates, mode = POLYGON_BUILD_MODES.CONVEX) {
   if (mode === POLYGON_BUILD_MODES.ALL_POINTS) {
     return buildAllPointsPolygon(coordinates);
@@ -189,6 +191,7 @@ function ensureSpeciesPolygonGlowLayer(map) {
     return;
   }
 
+  // Вставляем свечение перед контуром, чтобы контур оставался поверх него.
   const beforeLayerId = map.getLayer("species-polygon-outline")
     ? "species-polygon-outline"
     : undefined;
@@ -224,6 +227,7 @@ function ensureSpeciesPolygonIntersectionGlowLayer(map) {
     return;
   }
 
+  // Вставляем свечение перед контуром, чтобы контур оставался поверх него.
   const beforeLayerId = map.getLayer("species-polygon-intersection-outline")
     ? "species-polygon-intersection-outline"
     : undefined;

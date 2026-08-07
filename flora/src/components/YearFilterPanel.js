@@ -19,6 +19,7 @@ function getCollapsedSummary(enabled, range, lockedByPropertyFilter) {
   return `${range.min} — ${range.max}`;
 }
 
+/** Панель фильтра точек по диапазону годов с двойным ползунком. */
 export default function YearFilterPanel({
   enabled = false,
   onEnabledChange,
@@ -35,7 +36,9 @@ export default function YearFilterPanel({
   const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
   const [draftRange, setDraftRange] = useState(range);
   const [activeThumb, setActiveThumb] = useState(null);
+  // Актуальное значение draftRange для обработчиков без пересоздания при каждом рендере.
   const draftRangeRef = useRef(draftRange);
+  // Пока идёт перетаскивание, не даём внешнему range перезаписать локальный черновик.
   const isDraggingRef = useRef(false);
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## year в docs/moduleHelp.md

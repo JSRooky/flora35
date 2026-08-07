@@ -43,6 +43,7 @@ export function getBoundsFeatureFillColor(layerId, properties = {}) {
   return BOUNDS_LAYER_FILL_COLORS[layerId] ?? NATURE_RESERVE_FILL_BY_BOUNDARY.default;
 }
 
+/** Значение поля для панели сведений bounds (с учётом field.format), или null, если пусто. */
 export function formatBoundsPropertyValue(field, properties) {
   const rawValue = properties?.[field.key];
   if (rawValue == null || rawValue === "") {
@@ -73,6 +74,7 @@ export function getBoundsFeatureHeadingParts(layerId, properties = {}) {
   return { category, title };
 }
 
+// Выбираем единицы измерения по величине площади, чтобы избежать "0.00 км²".
 function formatAreaKm2(areaKm2) {
   if (areaKm2 < 0.01) {
     return `${(areaKm2 * 1_000_000).toFixed(0)} м²`;

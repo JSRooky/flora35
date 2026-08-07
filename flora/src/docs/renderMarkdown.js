@@ -1,15 +1,35 @@
 import React from "react";
 
+// Пункт списка: маркер *, - или + в начале строки.
 const LIST_LINE_PATTERN = /^([*\-+])\s+(.*)$/;
+// Инлайн-разметка: **жирный**, *курсив* или _курсив_.
+const INLINE_FORMAT_PATTERN = /(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/;
+// Горизонтальная линия: строка из трёх и более -, * или _.
+const HORIZONTAL_RULE_LINE_PATTERN = /^\s{0,3}(-{3,}|\*{3,}|_{3,})\s*$/;
 
+function isHorizontalRuleLine(line) {
+  return HORIZONTAL_RULE_LINE_PATTERN.test(line);
+}
+
+// Разбивает текст по разметке жирный/курсив и оборачивает найденные части в React-элементы.
 function renderInline(text) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={index}>{part.slice(2, -2)}</strong>;
-    }
+  return text
+    .split(INLINE_FORMAT_PATTERN)
+    .filter((part) => part.length > 0)
+    .map((part, index) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={index}>{part.slice(2, -2)}</strong>;
+      }
 
-    return part;
-  });
+      if (
+        (part.startsWith("*") && part.endsWith("*")) ||
+        (part.startsWith("_") && part.endsWith("_"))
+      ) {
+        return <em key={index}>{part.slice(1, -1)}</em>;
+      }
+
+      return part;
+    });
 }
 
 function isListLine(line) {
@@ -21,6 +41,7 @@ function getListItemText(line) {
   return match ? match[2].trim() : line.trim();
 }
 
+// Рендерит один блок markdown (разделённый пустой строкой фрагмент) в React-элементы.
 function renderBlock(block, blockIndex) {
   const lines = block.split("\n");
   const firstLine = lines[0];
@@ -37,15 +58,9 @@ function renderBlock(block, blockIndex) {
     return <h4 key={blockIndex}>{renderInline(firstLine.slice(4).trim())}</h4>;
   }
 
-  if (/^(-{3,}|\*{3,}|_{3,})$/.test(firstLine.trim()) && lines.length === 1) {
-    return <hr key={blockIndex} />;
-  }
-
-  if (!lines.some(isListLine)) {
-    return <p key={blockIndex}>{renderInline(lines.join(" "))}</p>;
-  }
-
   const elements = [];
+  // Строки накапливаются в буфер и превращаются в элемент только при завершении абзаца/списка
+  // (переходе к другому типу строки), чтобы соседние строки объединялись в один <p>/<ul>.
   let paragraphLines = [];
   let listItems = [];
   let partIndex = 0;
@@ -81,6 +96,14 @@ function renderBlock(block, blockIndex) {
   };
 
   lines.forEach((line) => {
+    if (isHorizontalRuleLine(line)) {
+      flushParagraph();
+      flushList();
+      elements.push(<hr key={`${blockIndex}-hr-${partIndex}`} />);
+      partIndex += 1;
+      return;
+    }
+
     if (isListLine(line)) {
       flushParagraph();
       listItems.push(getListItemText(line));
@@ -96,9 +119,14 @@ function renderBlock(block, blockIndex) {
   flushParagraph();
   flushList();
 
+  if (elements.length === 1) {
+    return elements[0];
+  }
+
   return <React.Fragment key={blockIndex}>{elements}</React.Fragment>;
 }
 
+/** Рендерит markdown-текст в массив React-элементов (упрощённый парсер). */
 export function renderMarkdown(markdown) {
   const normalized = markdown.replace(/\r\n/g, "\n");
   const blocks = normalized.trim().split(/\n{2,}/);

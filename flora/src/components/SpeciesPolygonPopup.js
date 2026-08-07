@@ -36,6 +36,8 @@ function getSpeciesLabel(species, speciesList) {
   return species.nameRu;
 }
 
+// Добавляем латинское название, если русское имя ареала повторяется среди построенных полигонов.
+// Добавляем латинское название, если русское имя ареала повторяется в списке.
 function getArealLabel(entry, polygons) {
   const hasDuplicateName = polygons.filter((item) => item.nameRu === entry.nameRu).length > 1;
 
@@ -46,6 +48,8 @@ function getArealLabel(entry, polygons) {
   return `Ареал — ${entry.nameRu || entry.nameLatin || "Без названия"}`;
 }
 
+// Добавляем латинское название, если русское имя вида повторяется среди построенных полигонов.
+// Добавляем латинское название, если русское имя вида повторяется среди построенных полигонов.
 function getSpeciesOptionLabel(entry, polygons) {
   const hasDuplicateName = polygons.filter((item) => item.nameRu === entry.nameRu).length > 1;
 
@@ -56,6 +60,7 @@ function getSpeciesOptionLabel(entry, polygons) {
   return entry.nameRu || entry.nameLatin || "Без названия";
 }
 
+/** Склонение «точка/точки/точек» для русского интерфейса. */
 function formatContainedPointsCount(count) {
   const mod10 = count % 10;
   const mod100 = count % 100;
@@ -83,6 +88,7 @@ function formatAreaKm2(areaKm2) {
   return `${areaKm2.toFixed(2)} км²`;
 }
 
+// Добавляем латинское название, если русское имя точки повторяется в списке.
 function getPointLabel(feature, points) {
   const nameRu = feature.properties?.name_ru || "Без названия";
   const hasDuplicateName = points.filter(
@@ -209,6 +215,7 @@ function TrashIcon() {
   );
 }
 
+// Приоритет сводки: активное пересечение → единственный построенный ареал → их общее число.
 function getCollapsedSummary(polygons, containedSpecies, intersectionResult, builtPolygons) {
   if (intersectionResult?.hasIntersection && intersectionResult.speciesA && intersectionResult.speciesB) {
     const labelA = getSpeciesOptionLabel(intersectionResult.speciesA, builtPolygons);
@@ -280,6 +287,7 @@ export default function SpeciesPolygonPopup({
   const speciesLatin = feature?.properties?.name_latin;
   const pointCount = feature ? getPointsForSpecies(feature).length : 0;
   const canBuild = Boolean(feature) && pointCount > 0;
+  // Оболочку (all points) можно построить только минимум по 3 точкам.
   const canBuildAllPoints = canBuild && pointCount >= 3;
   const currentSpeciesEntry = speciesLatin
     ? builtPolygons.find((entry) => entry.nameLatin === speciesLatin)
@@ -297,6 +305,7 @@ export default function SpeciesPolygonPopup({
   const canComputeIntersection =
     canIntersect && intersectionSpeciesA && intersectionSpeciesB && !sameIntersectionSpecies;
   const hasIntersectionResult = Boolean(intersectionResult);
+  // Пока показано пересечение, блокируем добавление/пересчёт, чтобы не потерять его исходные полигоны.
   const addPolygonDisabled = intersectionActionsLocked;
   const computeIntersectionDisabled = !canComputeIntersection || intersectionActionsLocked;
   const intersectionLockedHint =
@@ -305,10 +314,12 @@ export default function SpeciesPolygonPopup({
   const hasIntersectionPoints = intersectionContainedPoints?.count > 0;
   const [intersectionListVisible, setIntersectionListVisible] = useState(false);
 
+  // Сворачиваем список видов в полигоне при изменении набора построенных ареалов или выбора.
   useEffect(() => {
     setListVisible(false);
   }, [builtPolygons.length, activePolygonId, containedSpecies?.count]);
 
+  // Сворачиваем список точек пересечения при пересчёте самого пересечения.
   useEffect(() => {
     setIntersectionListVisible(false);
   }, [

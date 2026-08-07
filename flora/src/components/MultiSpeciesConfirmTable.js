@@ -43,6 +43,7 @@ function TableInput({ className = "", invalid = false, ...props }) {
   );
 }
 
+// Универсальная ячейка таблицы: обычный ввод, ввод с автодополнением или текст в режиме просмотра.
 function TableCell({
   editing,
   displayValue,
@@ -275,6 +276,7 @@ function TableCoordsCells({
   const latInvalid = invalidFields.includes("lat");
   const lngInvalid = invalidFields.includes("lng");
 
+  // В entry-варианте строка всегда редактируемая, поэтому координаты вводятся напрямую (с кнопкой выбора на карте).
   if (isEntry) {
     return (
       <>
@@ -354,6 +356,7 @@ function TableCoordsCells({
   );
 }
 
+// Столбцы, общие для entry- и review-таблиц, вынесены отдельно, чтобы не дублировать JSX.
 function renderDataCells({
   payload,
   index,
@@ -528,6 +531,10 @@ function renderDataCells({
   );
 }
 
+/**
+ * Таблица находок для массового ввода: variant="entry" — создание строк (все сразу редактируемые),
+ * variant="review" — подтверждение перед сохранением (редактирование строк по одной).
+ */
 export default function MultiSpeciesConfirmTable({
   rows,
   onRowChange,
@@ -554,6 +561,7 @@ export default function MultiSpeciesConfirmTable({
   const suggestionPlacement = isEntry ? "drop-down" : "drop-up";
   const [editingRows, setEditingRows] = useState(() => new Set());
 
+  // Автоматически открываем редактирование указанной строки, например после выбора вида на карте.
   useEffect(() => {
     if (isEntry || autoEditRowIndex == null || autoEditRowIndex < 0) {
       return;

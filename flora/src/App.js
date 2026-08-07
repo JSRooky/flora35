@@ -72,6 +72,11 @@ import {
   setOsmBasemapEnabled
 } from "./components/addOsmBasemapLayer";
 import {
+  addYandexBasemapLayer,
+  setYandexBasemapEnabled
+} from "./components/addYandexBasemapLayer";
+import { BASEMAP_MODES } from "./config/basemapOptions";
+import {
   addSpeciesPolygonLayer,
   clearSpeciesPolygonLayer,
   clearSpeciesPolygonIntersectionLayer,
@@ -135,6 +140,7 @@ import BufferPopup from "./components/BufferPopup";
 import AreaSelectionPopup from "./components/AreaSelectionPopup";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
+import BasemapPicker from "./components/BasemapPicker";
 import YearFilterPanel from "./components/YearFilterPanel";
 import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
@@ -144,6 +150,7 @@ import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { FEATURE_FLAGS } from "./config/featureFlags";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
+import { ReactComponent as YandexLogo } from "./images/yndex_logo_ru.svg";
 import "./styles/mapToolsTheme.css";
 import "./MapView.css";
 
@@ -168,6 +175,7 @@ const DEFAULT_CLUSTER_BY_REGNUM = true;
 const DEFAULT_CLUSTER_PIE_CHARTS = false;
 const DEFAULT_MARKERS_VISIBLE = true;
 
+/** Корневой компонент карты: состояние всех инструментов/фильтров/слоёв и инициализация Mapbox. */
 export default function MapView() {
   const ref = useRef(null);
   const map = useRef(null);
@@ -234,7 +242,7 @@ export default function MapView() {
   const [areaDrawingActive, setAreaDrawingActive] = useState(false);
   const [areaGeometry, setAreaGeometry] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
-  const [osmBasemapEnabled, setOsmBasemapEnabledState] = useState(false);
+  const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
   const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.ALL);
   const [panelCollapsed, setPanelCollapsed] = useState({});
   const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
@@ -242,6 +250,7 @@ export default function MapView() {
   const submissionMapPickHandlerRef = useRef(null);
   const hadFoundYearPropertyFilterRef = useRef(false);
   const previousYearFilterEnabledRef = useRef(false);
+  // Параметры share-ссылки на конкретную точку разбираем один раз при монтировании.
   const pendingSharePointRef = useRef(parseSharePointParams(window.location.search));
 
   const isPanelCollapsed = useCallback(
@@ -320,9 +329,13 @@ export default function MapView() {
   const handleOpenBoundsFeatureDetails = useCallback(() => {
     expandPanel(PANEL_IDS.OOPT_FEATURE);
   }, [expandPanel]);
+  // Ref-копия колбэка: обработчики карты (созданные один раз) должны видеть
+  // его актуальную версию, не пересоздавая при этом подписки на карте.
   const openBoundsFeatureDetailsRef = useRef(handleOpenBoundsFeatureDetails);
   openBoundsFeatureDetailsRef.current = handleOpenBoundsFeatureDetails;
 
+  // Состояние «изоляции» одного объекта ООПТ (скрыть остальные), чтобы можно
+  // было вернуть прежнюю видимость слоёв при повторном клике.
   const boundsIsolationRef = useRef({
     active: false,
     featureKey: null,
@@ -376,6 +389,8 @@ export default function MapView() {
     });
   }, [clearBoundsIsolation]);
 
+  // Переключает изоляцию объекта ООПТ: первый клик прячет остальные объекты,
+  // повторный клик по тому же объекту или изоляция другого — возвращает исходную видимость.
   const handleIsolateBoundsFeature = useCallback((hit) => {
     const featureKey = getBoundsFeatureVisibilityKey(hit);
 
@@ -563,6 +578,7 @@ export default function MapView() {
       return;
     }
 
+    // Пока пользователь выбирает точку на карте для новой находки, курсор меняется на специальный.
     setMapCursorOverride(
       mapInstance,
       submissionLocationPicking ? GET_LOCATION_CURSOR : null
@@ -593,6 +609,9 @@ export default function MapView() {
     }
   }, [hasFoundYearPropertyFilter]);
 
+  // Снимок актуального состояния в ref: колбэки ниже создаются с пустыми
+  // зависимостями (стабильная ссылка для подписок на карту), но должны читать
+  // свежие значения state на момент вызова, а не значения из замыкания.
   const arealStateRef = useRef({});
   arealStateRef.current = {
     popupData,
@@ -1379,8 +1398,21 @@ export default function MapView() {
       return;
     }
 
-    setOsmBasemapEnabled(map.current, osmBasemapEnabled);
-  }, [osmBasemapEnabled, mapReady]);
+    if (basemapMode === BASEMAP_MODES.YANDEX) {
+      setOsmBasemapEnabled(map.current, false);
+      setYandexBasemapEnabled(map.current, true);
+      return;
+    }
+
+    setYandexBasemapEnabled(map.current, false);
+
+    if (basemapMode === BASEMAP_MODES.OSM) {
+      setOsmBasemapEnabled(map.current, true);
+      return;
+    }
+
+    setOsmBasemapEnabled(map.current, false);
+  }, [basemapMode, mapReady]);
 
   const handleSpeciesPolygonResetAll = useCallback(() => {
     setSpeciesPolygons([]);
@@ -2080,6 +2112,8 @@ export default function MapView() {
   const clearPointSelection = useCallback(() => {
     const state = pointSelectionStateRef.current;
 
+    // Ранний выход, если ничего из связанного с выбором точки не активно —
+    // избегаем лишних сбросов состояния и перерисовки слоёв карты.
     if (
       !state.popupData &&
       Object.keys(state.propertyFilters).length === 0 &&
@@ -2196,6 +2230,7 @@ export default function MapView() {
     });
   }, [mapReady, dataSourceMode]);
 
+  // Инициализация карты Mapbox и всех слоёв/обработчиков — выполняется один раз при монтировании.
   useEffect(() => {
     const pendingShare = pendingSharePointRef.current;
 
@@ -2236,6 +2271,7 @@ export default function MapView() {
         syncYearBounds();
 
         addOsmBasemapLayer(map.current);
+        addYandexBasemapLayer(map.current);
         addLocationsLayer(map.current, {
           onClusterExpanded: (leaves) => {
             const { arealEnabled: enabled, arealAllMarkers: allMarkers } =
@@ -2425,12 +2461,28 @@ export default function MapView() {
         bufferBlocked={isArealApplied}
         hoverTooltipsDisabled={hoverTooltipsDisabled}
         onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
-        osmBasemapEnabled={osmBasemapEnabled}
-        onOsmBasemapEnabledChange={setOsmBasemapEnabledState}
         dataSourceMode={dataSourceMode}
         onDataSourceModeChange={setDataSourceModeState}
       />
-      <div ref={ref} className="map-container" />
+      <div
+        ref={ref}
+        className={`map-container${
+          basemapMode !== BASEMAP_MODES.MAPBOX ? " map-container--alt-basemap" : ""
+        }`}
+      />
+      {basemapMode === BASEMAP_MODES.YANDEX && (
+        <a
+          href="https://yandex.ru/maps"
+          className="yandex-basemap-logo"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Яндекс Карты"
+          title="Яндекс Карты"
+        >
+          <YandexLogo className="yandex-basemap-logo-image" aria-hidden="true" focusable="false" />
+        </a>
+      )}
+      <BasemapPicker basemapMode={basemapMode} onBasemapModeChange={setBasemapMode} />
       {showModulePanelStack && (
         <div className="module-panel-stack">
           {activeModule === MODULE_IDS.FEATURE && (

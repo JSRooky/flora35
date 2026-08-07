@@ -11,6 +11,7 @@ function getAllCatalogEntries(catalogByLayerId) {
   return BOUNDS_LAYER_DEFINITIONS.flatMap(({ id }) => catalogByLayerId[id] ?? []);
 }
 
+// toLocaleLowerCase("ru") нужен для корректного сравнения регистра кириллических букв.
 function normalizeSearchQuery(value) {
   return value.trim().toLocaleLowerCase("ru");
 }
@@ -106,6 +107,7 @@ function BoundsGroupSection({
             <input
               type="checkbox"
               checked={allVisible}
+              // Частичную видимость группы (indeterminate) нельзя задать через JSX-атрибут — выставляем через ref.
               ref={(element) => {
                 if (element) {
                   element.indeterminate = someVisible;
@@ -168,6 +170,7 @@ function BoundsGroupSection({
   );
 }
 
+/** Панель управления слоями ООПТ: поиск, показ/скрытие групп и отдельных объектов. */
 export default function OoptPanel({
   catalogByLayerId = {},
   featureVisibility = {},

@@ -97,6 +97,7 @@ function ModuleMenuButton({
   return button;
 }
 
+/** Верхнее меню модулей приложения: выбор активного модуля и общие переключатели карты. */
 export default function ModuleMenu({
   activeModule,
   onModuleSelect,
@@ -105,8 +106,6 @@ export default function ModuleMenu({
   bufferBlocked = false,
   hoverTooltipsDisabled = false,
   onHoverTooltipsDisabledChange,
-  osmBasemapEnabled = false,
-  onOsmBasemapEnabledChange,
   dataSourceMode,
   onDataSourceModeChange,
   accountUser = null,
@@ -121,6 +120,7 @@ export default function ModuleMenu({
     disabledTitle: disabledTitleOverride
   }) => {
     const pointRequired = isPointRequiredModule(id) && !pointSelected;
+    // Радиус и Буфер — взаимоисключающие инструменты карты, активный блокирует другой.
     const blockedByOtherTool =
       (id === MODULE_IDS.AREAL && arealBlocked) || (id === MODULE_IDS.BUFFER && bufferBlocked);
     const disabled = forceDisabled || pointRequired || blockedByOtherTool;
@@ -202,17 +202,6 @@ export default function ModuleMenu({
                   </option>
                 ))}
               </select>
-            </label>
-          </li>
-          <li className="module-menu-toggle-item">
-            <label className="module-menu-switch" title="Использовать подложку OpenStreetMap вместо стандартной карты">
-              <input
-                type="checkbox"
-                checked={osmBasemapEnabled}
-                onChange={(event) => onOsmBasemapEnabledChange?.(event.target.checked)}
-              />
-              <span className="module-menu-switch-slider" aria-hidden="true" />
-              <span className="module-menu-switch-label">OSM</span>
             </label>
           </li>
           <li className="module-menu-toggle-item">

@@ -2,6 +2,7 @@ import { getAllSpeciesCollection } from "./loadPoints";
 
 const MAX_SUGGESTIONS = 8;
 
+// Сортирует так, чтобы совпадения по началу строки шли раньше, затем — по алфавиту (ru-локаль).
 function sortByQueryMatch(items, query, getLabel) {
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -71,6 +72,7 @@ export function buildSubmissionSuggestionData() {
   };
 }
 
+/** Фильтрует и сортирует текстовые подсказки (family/found_by/identified_by/found_year) по запросу. */
 export function filterTextSuggestions(items, query) {
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -83,6 +85,7 @@ export function filterTextSuggestions(items, query) {
   return sortByQueryMatch(matches, query, (item) => item).slice(0, MAX_SUGGESTIONS);
 }
 
+/** Подсказки видов по русскому названию, отфильтрованные и отсортированные по запросу. */
 export function filterSpeciesByNameRu(speciesList, query) {
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -97,6 +100,7 @@ export function filterSpeciesByNameRu(speciesList, query) {
   return sortByQueryMatch(matches, query, (species) => species.name_ru).slice(0, MAX_SUGGESTIONS);
 }
 
+/** Подсказки видов по латинскому названию, отфильтрованные и отсортированные по запросу. */
 export function filterSpeciesByNameLatin(speciesList, query) {
   const normalizedQuery = query.trim().toLowerCase();
 
