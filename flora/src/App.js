@@ -100,6 +100,7 @@ import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
 import FeedbackWidget from "./components/FeedbackWidget";
+import ReportExportPanel from "./components/report/ReportExportPanel";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
@@ -117,7 +118,8 @@ const PANEL_IDS = {
   POLYGON: "polygon",
   BUFFER: "buffer",
   AREA: "area",
-  SUBMIT: "submit"
+  SUBMIT: "submit",
+  REPORT: "report"
 };
 
 const DEFAULT_CLUSTERING_ENABLED = true;
@@ -239,6 +241,9 @@ export default function MapView() {
         break;
       case MODULE_IDS.SUBMIT:
         expandPanel(PANEL_IDS.SUBMIT);
+        break;
+      case MODULE_IDS.REPORT:
+        expandPanel(PANEL_IDS.REPORT);
         break;
       default:
         break;
@@ -950,6 +955,44 @@ export default function MapView() {
     buildLocationFilters,
     mapReady
   ]);
+
+  const reportBufferFeatures = useMemo(() => {
+    if (bufferSelectedPoints.length > 0) {
+      return bufferSelectedPoints;
+    }
+
+    return popupData ? [popupData] : [];
+  }, [bufferSelectedPoints, popupData]);
+
+  const reportContext = useMemo(
+    () => ({
+      locationFilters: buildLocationFilters(),
+      selectedPoint: popupData,
+      bufferSelectedPoints,
+      areaGeometry,
+      arealContainedPoints,
+      activePolygon,
+      intersectionContainedPoints,
+      bufferEnabled,
+      bufferFeatures: reportBufferFeatures,
+      bufferRadiiKm: bufferRadii,
+      dataSourceMode,
+      toolFilterPointsSummary: null
+    }),
+    [
+      buildLocationFilters,
+      popupData,
+      bufferSelectedPoints,
+      areaGeometry,
+      arealContainedPoints,
+      activePolygon,
+      intersectionContainedPoints,
+      bufferEnabled,
+      reportBufferFeatures,
+      bufferRadii,
+      dataSourceMode
+    ]
+  );
 
   useEffect(() => {
     if (!arealEnabled && !arealAllMarkers) {
@@ -1853,6 +1896,13 @@ export default function MapView() {
                 }}
               />
             </Suspense>
+          )}
+          {activeModule === MODULE_IDS.REPORT && (
+            <ReportExportPanel
+              reportContext={reportContext}
+              collapsed={isPanelCollapsed(PANEL_IDS.REPORT)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.REPORT)}
+            />
           )}
         </div>
       )}

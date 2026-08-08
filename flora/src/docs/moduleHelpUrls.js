@@ -9,7 +9,8 @@ export const HELP_SECTION_LABELS = {
   "areal-dynamics": "Динамика ареала",
   status: "Статус МСОП",
   map: "Группы точек",
-  submit: "Ввод данных о находке"
+  submit: "Ввод данных о находке",
+  report: "Отчёт"
 };
 
 export const HELP_SECTION_IDS = Object.keys(HELP_SECTION_LABELS);

@@ -21,7 +21,10 @@ export const MODULE_IDS = {
   AREA: "area",
   // Экспериментальный модуль ввода пользовательских данных через Firebase.
   SUBMIT: "submit",
-  ABOUT: "about"};
+  // Экспериментальный модуль выгрузки отчёта по точкам.
+  REPORT: "report",
+  ABOUT: "about"
+};
 
 const POINT_MODULE_ITEMS = [
   { id: MODULE_IDS.FEATURE, label: "Сведения о точке" },
@@ -42,7 +45,8 @@ const MAP_MODULE_ITEMS = [
 ];
 
 const TEST_MODULE_ITEMS = [
-  { id: MODULE_IDS.SUBMIT, label: "Ввод данных о находке" }
+  { id: MODULE_IDS.SUBMIT, label: "Ввод данных о находке" },
+  { id: MODULE_IDS.REPORT, label: "Отчёт" }
 ];
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
 
