@@ -7,7 +7,13 @@ export const PROPERTY_LABELS = {
   found_by: "Обнаружил",
   identified_by: "Определил",
   found_year: "Год находки",
-  status: "Статус"
+  status: "Статус",
+  kingdom: "Царство (GBIF)",
+  basisOfRecord: "Тип записи",
+  datasetKey: "Набор данных",
+  gbif_key: "GBIF ID",
+  gbif_url: "Ссылка GBIF",
+  source: "Источник"
 };
 
 /** Предпочтительный порядок полей в панели «Сведения о точке». */
@@ -15,10 +21,14 @@ export const PROPERTY_DISPLAY_ORDER = [
   "name_ru",
   "name_latin",
   "regnum",
+  "kingdom",
   "family",
   "found_year",
   "found_by",
-  "identified_by"
+  "identified_by",
+  "basisOfRecord",
+  "gbif_key",
+  "datasetKey"
 ];
 
 const REGNUM_LABELS = {

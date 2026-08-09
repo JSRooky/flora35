@@ -146,6 +146,8 @@ import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
+import { addGbifLayer } from "./components/addGbifLayer";
+import GbifPanel from "./components/GbifPanel";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
@@ -166,7 +168,8 @@ const PANEL_IDS = {
   AREA: "area",
   OOPT: "oopt",
   OOPT_FEATURE: "oopt-feature",
-  SUBMIT: "submit"
+  SUBMIT: "submit",
+  GBIF: "gbif"
 };
 
 const DEFAULT_CLUSTERING_ENABLED = true;
@@ -243,6 +246,9 @@ export default function MapView() {
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
   const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.ALL);
+  const [gbifOnly, setGbifOnly] = useState(false);
+  const markersVisibleBeforeGbifOnlyRef = useRef(DEFAULT_MARKERS_VISIBLE);
+  const heatmapEnabledBeforeGbifOnlyRef = useRef(false);
   const [panelCollapsed, setPanelCollapsed] = useState({});
   const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
   const [submissionLocationPicking, setSubmissionLocationPicking] = useState(false);
@@ -305,6 +311,9 @@ export default function MapView() {
         break;
       case MODULE_IDS.SUBMIT:
         expandPanel(PANEL_IDS.SUBMIT);
+        break;
+      case MODULE_IDS.GBIF:
+        expandPanel(PANEL_IDS.GBIF);
         break;
       default:
         break;
@@ -1479,13 +1488,31 @@ export default function MapView() {
     }
   }, [popupData, mapReady]);
 
+  const handleGbifOnlyChange = useCallback(
+    (enabled) => {
+      if (enabled) {
+        markersVisibleBeforeGbifOnlyRef.current = markersVisible;
+        heatmapEnabledBeforeGbifOnlyRef.current = heatmapEnabled;
+        setMarkersVisibleState(false);
+        setHeatmapEnabledState(false);
+      } else {
+        setMarkersVisibleState(markersVisibleBeforeGbifOnlyRef.current);
+        setHeatmapEnabledState(heatmapEnabledBeforeGbifOnlyRef.current);
+      }
+
+      setGbifOnly(enabled);
+    },
+    [markersVisible, heatmapEnabled]
+  );
+
   useEffect(() => {
     if (!map.current || !mapReady) {
       return;
     }
 
-    setMarkersVisible(map.current, mapMarkersVisible);
-  }, [mapMarkersVisible, mapReady]);
+    // В режиме «Только GBIF» локальные маркеры всегда скрыты.
+    setMarkersVisible(map.current, gbifOnly ? false : mapMarkersVisible);
+  }, [mapMarkersVisible, gbifOnly, mapReady]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -1516,8 +1543,9 @@ export default function MapView() {
       return;
     }
 
-    setHeatmapEnabled(map.current, heatmapEnabled, locationFilters);
-  }, [heatmapEnabled, locationFilters]);
+    // В режиме «Только GBIF» теплокарту по локальным точкам гасим.
+    setHeatmapEnabled(map.current, gbifOnly ? false : heatmapEnabled, locationFilters);
+  }, [heatmapEnabled, gbifOnly, locationFilters]);
 
   useEffect(() => {
     if (!mapReady || !map.current || !isFirebaseConfigured()) {
@@ -2371,6 +2399,30 @@ export default function MapView() {
         addBufferLayer(map.current);
         addAreaSelectionLayer(map.current);
         addHeatmapLayer(map.current);
+        addGbifLayer(map.current, {
+          onPointClick: (feature) => {
+            if (isAreaDrawingActive()) {
+              return;
+            }
+
+            if (
+              submissionStateRef.current.active &&
+              submissionStateRef.current.pickingLocation
+            ) {
+              const coords = feature?.geometry?.coordinates;
+              if (coords) {
+                submissionStateRef.current.setCoordinates(coords);
+              }
+              return;
+            }
+
+            clearSharedPointPin(map.current);
+            clearSelectedPointHighlight(map.current);
+            setPopupData(feature);
+            // GBIF больше не показывает Mapbox-popup — сразу открываем «Сведения о точке».
+            setActiveModule(MODULE_IDS.FEATURE);
+          }
+        });
         setMapReady(true);
       });
     }
@@ -2633,6 +2685,15 @@ export default function MapView() {
                 onCoordinatesReset={handleSubmissionCoordinatesReset}
               />
             </Suspense>
+          )}
+          {activeModule === MODULE_IDS.GBIF && (
+            <GbifPanel
+              map={map.current}
+              collapsed={isPanelCollapsed(PANEL_IDS.GBIF)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.GBIF)}
+              gbifOnly={gbifOnly}
+              onGbifOnlyChange={handleGbifOnlyChange}
+            />
           )}
         </div>
       )}

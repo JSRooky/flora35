@@ -10,6 +10,7 @@ import {
   getPropertyLabel,
   sortPropertyEntries
 } from "./featurePropertyLabels";
+import { countGbifFeaturesByNameLatin } from "../gbif/gbifStore";
 import { buildSharePointUrl, copyTextToClipboard } from "./sharePointLink";
 import "../styles/FeaturePopup.css";
 
@@ -19,8 +20,38 @@ const INTERNAL_PROPERTIES = new Set([
   "images",
   "species_id",
   "finding_id",
-  "description_md"
+  "description_md",
+  "source",
+  "gbif_url"
 ]);
+
+/** Поля GBIF, которые уводим в раскрывающийся блок «Информация из GBIF». */
+const GBIF_META_PROPERTIES = new Set(["basisOfRecord", "gbif_key", "datasetKey"]);
+
+const GBIF_META_DISPLAY_ORDER = ["basisOfRecord", "gbif_key", "datasetKey"];
+
+function isGbifFeature(feature) {
+  return feature?.properties?.source === "gbif";
+}
+
+function hasDisplayValue(value) {
+  return value != null && value !== "";
+}
+
+function sortGbifMetaEntries(entries) {
+  const order = new Map(GBIF_META_DISPLAY_ORDER.map((key, index) => [key, index]));
+
+  return [...entries].sort(([keyA], [keyB]) => {
+    const orderA = order.has(keyA) ? order.get(keyA) : Number.MAX_SAFE_INTEGER;
+    const orderB = order.has(keyB) ? order.get(keyB) : Number.MAX_SAFE_INTEGER;
+
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+
+    return keyA.localeCompare(keyB);
+  });
+}
 
 /**
  * Собирает URL иллюстраций из properties.
@@ -104,15 +135,22 @@ export default function FeaturePopup({
   const [helpOpen, setHelpOpen] = useState(false); // блок справки из docs/moduleHelp.md, раздел ## feature
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [gbifInfoOpen, setGbifInfoOpen] = useState(false);
 
-  const shareUrl = useMemo(() => buildSharePointUrl(feature), [feature]);
+  const shareUrl = useMemo(() => {
+    if (isGbifFeature(feature)) {
+      return null;
+    }
+    return buildSharePointUrl(feature);
+  }, [feature]);
 
   useEffect(() => {
     setShowImages(false);
     setShowSpeciesDescription(false);
     setSharePanelOpen(false);
     setShareCopied(false);
-  }, [feature?.id, feature?.properties?.finding_id]);
+    setGbifInfoOpen(false);
+  }, [feature?.id, feature?.properties?.finding_id, feature?.properties?.gbif_key]);
 
   useEffect(() => {
     if (!shareCopied) {
@@ -142,24 +180,46 @@ export default function FeaturePopup({
     setShareCopied(true);
   };
 
+  const fromGbif = isGbifFeature(feature);
   const collapsedSummary = feature
     ? feature.properties?.name_ru ||
       feature.properties?.name_latin ||
-      "Точка данных"
+      (fromGbif ? `GBIF #${feature.properties?.gbif_key ?? ""}` : "Точка данных")
     : "Точка не выбрана";
 
   const properties = feature?.properties;
-  const speciesPointCount = feature ? getPointsForSpecies(feature).length : 0;
+  const speciesPointCount = feature
+    ? fromGbif
+      ? countGbifFeaturesByNameLatin(properties?.name_latin)
+      : getPointsForSpecies(feature).length
+    : 0;
   const images = properties ? getImages(properties) : [];
   const descriptionPath = properties?.description_md;
+  const gbifUrl = properties?.gbif_url;
   // status выводится отдельно — у него свой фильтр через StatusFilterPanel.
+  // Для GBIF фильтры свойств не применяем: они действуют на локальный слой.
   const displayProperties = properties
     ? sortPropertyEntries(
         Object.entries(properties).filter(
-          ([key]) => !INTERNAL_PROPERTIES.has(key) && key !== "status"
+          ([key, value]) =>
+            !INTERNAL_PROPERTIES.has(key) &&
+            !GBIF_META_PROPERTIES.has(key) &&
+            key !== "status" &&
+            hasDisplayValue(value) &&
+            // kingdom дублирует regnum, если оба есть.
+            !(key === "kingdom" && properties.regnum)
         )
       )
     : [];
+
+  const gbifMetaProperties =
+    fromGbif && properties
+      ? sortGbifMetaEntries(
+          Object.entries(properties).filter(
+            ([key, value]) => GBIF_META_PROPERTIES.has(key) && hasDisplayValue(value)
+          )
+        )
+      : [];
 
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const hasPropertyFilters = Object.keys(activeFilters).length > 0;
@@ -199,8 +259,17 @@ export default function FeaturePopup({
 
             {feature ? (
               <>
+                {fromGbif && (
+                  <div className="popup-item">
+                    <strong>Источник:</strong>
+                    <span>GBIF</span>
+                  </div>
+                )}
+
                 <div className="popup-item">
-                  <strong>Точек вида на карте:</strong>
+                  <strong>
+                    {fromGbif ? "Точек вида в GBIF-слое:" : "Точек вида на карте:"}
+                  </strong>
                   <span>{formatPointCount(speciesPointCount)}</span>
                 </div>
 
@@ -209,33 +278,40 @@ export default function FeaturePopup({
                     <hr />
                     <div className="popup-section-header">
                       <h4>Основное</h4>
-                      <button
-                        type="button"
-                        className="popup-filters-reset"
-                        onClick={() => onFiltersReset?.()}
-                        disabled={!canResetFilters}
-                        aria-label="Сбросить все фильтры свойств"
-                        title="Сбросить все фильтры свойств"
-                      >
-                        Сброс
-                      </button>
+                      {!fromGbif && (
+                        <button
+                          type="button"
+                          className="popup-filters-reset"
+                          onClick={() => onFiltersReset?.()}
+                          disabled={!canResetFilters}
+                          aria-label="Сбросить все фильтры свойств"
+                          title="Сбросить все фильтры свойств"
+                        >
+                          Сброс
+                        </button>
+                      )}
                     </div>
 
                     {displayProperties.map(([key, value]) => (
-                      <div key={key} className="popup-item popup-item--filter">
+                      <div
+                        key={key}
+                        className={`popup-item${fromGbif ? "" : " popup-item--filter"}`}
+                      >
                         <div className="popup-item-text">
                           <strong>{getPropertyLabel(key)}:</strong>
                           <span>{formatPropertyValue(key, value)}</span>
                         </div>
-                        <label className="property-switch" title="Показать маркеры с этим свойством">
-                          <input
-                            type="checkbox"
-                            // Фильтр по точному совпадению пары ключ–значение.
-                            checked={activeFilters[key] === value}
-                            onChange={(e) => onFilterChange?.(key, value, e.target.checked)}
-                          />
-                          <span className="property-switch-slider" />
-                        </label>
+                        {!fromGbif && (
+                          <label className="property-switch" title="Показать маркеры с этим свойством">
+                            <input
+                              type="checkbox"
+                              // Фильтр по точному совпадению пары ключ–значение.
+                              checked={activeFilters[key] === value}
+                              onChange={(e) => onFilterChange?.(key, value, e.target.checked)}
+                            />
+                            <span className="property-switch-slider" />
+                          </label>
+                        )}
                       </div>
                     ))}
 
@@ -260,11 +336,32 @@ export default function FeaturePopup({
                   </>
                 )}
 
+                {gbifMetaProperties.length > 0 && (
+                  <details
+                    className="feature-gbif-info"
+                    open={gbifInfoOpen}
+                    onToggle={(event) => setGbifInfoOpen(event.currentTarget.open)}
+                  >
+                    <summary className="feature-gbif-info-summary">Информация из GBIF</summary>
+                    <div className="feature-gbif-info-body">
+                      {gbifMetaProperties.map(([key, value]) => (
+                        <div key={key} className="popup-item">
+                          <div className="popup-item-text">
+                            <strong>{getPropertyLabel(key)}:</strong>
+                            <span>{formatPropertyValue(key, value)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+
                 {(descriptionPath ||
                   images.length > 0 ||
                   onOpenAreal ||
                   onOpenBuffer ||
-                  feature) && (
+                  gbifUrl ||
+                  (!fromGbif && feature)) && (
                   <div className="feature-popup-actions">
                     {descriptionPath && (
                       <button
@@ -308,17 +405,29 @@ export default function FeaturePopup({
                         Буфер
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className={`feature-popup-share-btn${sharePanelOpen ? " feature-popup-share-btn--active" : ""}`}
-                      onClick={handleShareClick}
-                      aria-label="Поделиться точкой"
-                      aria-expanded={sharePanelOpen}
-                      title="Поделиться точкой"
-                      disabled={!shareUrl}
-                    >
-                      <ShareIcon />
-                    </button>
+                    {gbifUrl && (
+                      <a
+                        className="feature-popup-action-btn"
+                        href={gbifUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Открыть на GBIF
+                      </a>
+                    )}
+                    {!fromGbif && (
+                      <button
+                        type="button"
+                        className={`feature-popup-share-btn${sharePanelOpen ? " feature-popup-share-btn--active" : ""}`}
+                        onClick={handleShareClick}
+                        aria-label="Поделиться точкой"
+                        aria-expanded={sharePanelOpen}
+                        title="Поделиться точкой"
+                        disabled={!shareUrl}
+                      >
+                        <ShareIcon />
+                      </button>
+                    )}
                   </div>
                 )}
               </>

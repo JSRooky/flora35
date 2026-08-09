@@ -24,6 +24,8 @@ export const MODULE_IDS = {
   OOPT_FEATURE: "oopt-feature",
   // Модуль ввода пользовательских данных в Firestore.
   SUBMIT: "submit",
+  // Загрузка находок GBIF на отдельный слой карты.
+  GBIF: "gbif",
   ABOUT: "about"
 };
 
@@ -47,7 +49,8 @@ const MAP_MODULE_ITEMS = [
 ];
 
 const TEST_MODULE_ITEMS = [
-  { id: MODULE_IDS.SUBMIT, label: "Новая находка" }
+  { id: MODULE_IDS.SUBMIT, label: "Новая находка" },
+  { id: MODULE_IDS.GBIF, label: "Данные GBIF" }
 ];
 
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
