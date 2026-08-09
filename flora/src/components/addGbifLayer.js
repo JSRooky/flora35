@@ -8,6 +8,11 @@ import {
   getPointColorExpression,
   getPointColorForRegnum
 } from "./pointColors";
+import {
+  COORDINATES_ORIGINAL_PROP,
+  getFeatureCoordinates,
+  spreadCoincidentFeatures
+} from "./spreadCoincidentPoints";
 import "../styles/GbifPanel.css";
 
 export const GBIF_SOURCE_ID = "gbif-locations";
@@ -23,6 +28,14 @@ const CLUSTER_OPTIONS = {
 const MARKER_RADIUS = 5;
 const REGNUM_KEYS = ["plantae", "animalia", "fungi"];
 
+/** Агрегаты царств для «Кластеры-диаграммы» (тот же инструмент, что у локальных точек). */
+const CLUSTER_REGNUM_PROPERTIES = Object.fromEntries(
+  REGNUM_KEYS.map((regnum) => [
+    regnum,
+    ["+", ["case", ["==", ["get", "regnum"], regnum], 1, 0]]
+  ])
+);
+
 const EMPTY_FEATURE_COLLECTION = {
   type: "FeatureCollection",
   features: []
@@ -33,6 +46,7 @@ let onPointClickCallback = null;
 let layerVisible = true;
 let gbifClusteringEnabled = true;
 let gbifClusterByRegnum = true;
+let gbifClusterPieChartsEnabled = false;
 /** Ключи точек, скрытых под булавкой выделения / share. */
 let hiddenPointFeatureKeys = [];
 
@@ -96,6 +110,10 @@ function getAllGbifLayerIds() {
       const ids = getGbifLayerIds(regnum);
       return [ids.clusters, ids.clusterCount, ids.unclustered];
     });
+  }
+
+  if (gbifClusterPieChartsEnabled) {
+    return [GBIF_CLUSTER_LAYER_ID, GBIF_UNCLUSTERED_LAYER_ID];
   }
 
   return [GBIF_CLUSTER_LAYER_ID, GBIF_CLUSTER_COUNT_LAYER_ID, GBIF_UNCLUSTERED_LAYER_ID];
@@ -167,17 +185,31 @@ function resolveClickedFeature(rawFeature) {
   const gbifKey = rawFeature?.properties?.gbif_key;
   const fromStore = findGbifFeatureByKey(gbifKey);
 
-  if (fromStore) {
-    return fromStore;
-  }
-
-  return {
+  const base = fromStore ?? {
     type: "Feature",
     id: rawFeature.id ?? (gbifKey != null ? `gbif-${gbifKey}` : undefined),
     geometry: rawFeature.geometry,
     properties: {
       ...rawFeature.properties,
       source: rawFeature.properties?.source ?? "gbif"
+    }
+  };
+
+  const original =
+    getFeatureCoordinates(rawFeature) ??
+    getFeatureCoordinates(base) ??
+    base.geometry?.coordinates;
+
+  // Булавка/клик — на видимой (возможно разведённой) позиции;
+  // в properties храним исходные координаты для share/инструментов.
+  return {
+    ...base,
+    geometry: rawFeature.geometry ?? base.geometry,
+    properties: {
+      ...base.properties,
+      ...(Array.isArray(original)
+        ? { [COORDINATES_ORIGINAL_PROP]: original }
+        : {})
     }
   };
 }
@@ -367,6 +399,7 @@ function addClusterGbifLayers(map, sourceId, layerIds, regnum = null) {
   const clusterColor = regnum
     ? REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR
     : DEFAULT_CLUSTER_COLOR;
+  const usePieCharts = gbifClusterPieChartsEnabled && !regnum;
 
   map.addLayer({
     id: layerIds.clusters,
@@ -375,27 +408,38 @@ function addClusterGbifLayers(map, sourceId, layerIds, regnum = null) {
     filter: ["has", "point_count"],
     paint: {
       "circle-color": clusterColor,
-      "circle-radius": ["step", ["get", "point_count"], 16, 50, 20, 200, 26],
-      "circle-stroke-width": 1.5,
-      "circle-stroke-color": "#ffffff"
+      // В режиме диаграмм круг невидим, но остаётся hit-target под SVG-маркером.
+      "circle-radius": usePieCharts
+        ? ["step", ["get", "point_count"], 18, 10, 24, 30, 32]
+        : ["step", ["get", "point_count"], 16, 50, 20, 200, 26],
+      "circle-stroke-width": usePieCharts ? 0 : 1.5,
+      "circle-stroke-color": "#ffffff",
+      "circle-opacity": usePieCharts ? 0 : 1,
+      "circle-stroke-opacity": usePieCharts ? 0 : 1
     }
   });
 
-  map.addLayer({
-    id: layerIds.clusterCount,
-    type: "symbol",
-    source: sourceId,
-    filter: ["has", "point_count"],
-    layout: {
-      "text-field": ["get", "point_count_abbreviated"],
-      "text-size": 12
-    },
-    paint: {
-      "text-color": "#ffffff"
-    }
-  });
+  if (!usePieCharts) {
+    map.addLayer({
+      id: layerIds.clusterCount,
+      type: "symbol",
+      source: sourceId,
+      filter: ["has", "point_count"],
+      layout: {
+        "text-field": ["get", "point_count_abbreviated"],
+        "text-size": 12
+      },
+      paint: {
+        "text-color": "#ffffff"
+      }
+    });
+  }
 
   addUnclusteredGbifLayer(map, sourceId, layerIds.unclustered, regnum);
+}
+
+function toMapGbifFeatures(features) {
+  return spreadCoincidentFeatures(features);
 }
 
 function rebuildGbifLayers(map) {
@@ -404,18 +448,19 @@ function rebuildGbifLayers(map) {
   }
 
   const collection = getGbifFeatureCollection();
+  const mapFeatures = toMapGbifFeatures(collection.features ?? []);
   removeGbifFromMap(map);
 
   if (!gbifClusteringEnabled) {
     map.addSource(GBIF_SOURCE_ID, {
       type: "geojson",
-      data: collection
+      data: { type: "FeatureCollection", features: mapFeatures }
     });
     addUnclusteredGbifLayer(map, GBIF_SOURCE_ID, GBIF_UNCLUSTERED_LAYER_ID);
   } else if (gbifClusterByRegnum) {
     REGNUM_KEYS.forEach((regnum) => {
       const sourceId = getGbifSourceId(regnum);
-      const features = (collection.features ?? []).filter(
+      const features = mapFeatures.filter(
         (feature) => feature.properties?.regnum === regnum
       );
 
@@ -430,7 +475,7 @@ function rebuildGbifLayers(map) {
     });
 
     // Точки без regnum — в общий независящий от царства источник.
-    const otherFeatures = (collection.features ?? []).filter(
+    const otherFeatures = mapFeatures.filter(
       (feature) => !REGNUM_KEYS.includes(feature.properties?.regnum)
     );
     if (otherFeatures.length > 0) {
@@ -449,9 +494,10 @@ function rebuildGbifLayers(map) {
   } else {
     map.addSource(GBIF_SOURCE_ID, {
       type: "geojson",
-      data: collection,
+      data: { type: "FeatureCollection", features: mapFeatures },
       cluster: true,
-      ...CLUSTER_OPTIONS
+      ...CLUSTER_OPTIONS,
+      ...(gbifClusterPieChartsEnabled ? { clusterProperties: CLUSTER_REGNUM_PROPERTIES } : {})
     });
     addClusterGbifLayers(map, GBIF_SOURCE_ID, {
       clusters: GBIF_CLUSTER_LAYER_ID,
@@ -501,6 +547,7 @@ export function setGbifData(map, collection) {
   }
 
   const data = collection?.type === "FeatureCollection" ? collection : EMPTY_FEATURE_COLLECTION;
+  const mapFeatures = toMapGbifFeatures(data.features ?? []);
   const hasSource = getGbifSourceIds().some((sourceId) => map.getSource(sourceId))
     || map.getSource(GBIF_SOURCE_ID);
 
@@ -509,7 +556,10 @@ export function setGbifData(map, collection) {
   }
 
   if (!gbifClusteringEnabled) {
-    map.getSource(GBIF_SOURCE_ID)?.setData(data);
+    map.getSource(GBIF_SOURCE_ID)?.setData({
+      type: "FeatureCollection",
+      features: mapFeatures
+    });
   } else if (gbifClusterByRegnum) {
     REGNUM_KEYS.forEach((regnum) => {
       const source = map.getSource(getGbifSourceId(regnum));
@@ -519,7 +569,7 @@ export function setGbifData(map, collection) {
 
       source.setData({
         type: "FeatureCollection",
-        features: (data.features ?? []).filter(
+        features: mapFeatures.filter(
           (feature) => feature.properties?.regnum === regnum
         )
       });
@@ -529,13 +579,16 @@ export function setGbifData(map, collection) {
     if (otherSource) {
       otherSource.setData({
         type: "FeatureCollection",
-        features: (data.features ?? []).filter(
+        features: mapFeatures.filter(
           (feature) => !REGNUM_KEYS.includes(feature.properties?.regnum)
         )
       });
     }
   } else {
-    map.getSource(GBIF_SOURCE_ID)?.setData(data);
+    map.getSource(GBIF_SOURCE_ID)?.setData({
+      type: "FeatureCollection",
+      features: mapFeatures
+    });
   }
 
   applyGbifUnclusteredFilter(map);
@@ -551,6 +604,8 @@ export function setGbifVisibility(map, visible) {
   layerVisible = Boolean(visible);
   if (map) {
     applyVisibility(map);
+    // Чтобы «Кластеры-диаграммы» сразу убрали/вернули SVG по слою GBIF.
+    map.triggerRepaint?.();
   }
 }
 
@@ -584,12 +639,29 @@ export function setGbifClusterByRegnum(map, enabled) {
   }
 }
 
+/** Включает/выключает «Кластеры-диаграммы» для слоя GBIF (тот же режим, что у локальных точек). */
+export function setGbifClusterPieChartsEnabled(map, enabled) {
+  const next = Boolean(enabled);
+  if (gbifClusterPieChartsEnabled === next) {
+    return;
+  }
+
+  gbifClusterPieChartsEnabled = next;
+  if (map && gbifClusteringEnabled) {
+    rebuildGbifLayers(map);
+  }
+}
+
 export function isGbifClusteringEnabled() {
   return gbifClusteringEnabled;
 }
 
 export function isGbifClusterByRegnumEnabled() {
   return gbifClusterByRegnum;
+}
+
+export function isGbifClusterPieChartsEnabled() {
+  return gbifClusterPieChartsEnabled;
 }
 
 /** Задаёт обработчик клика по точке GBIF (панель «Сведения о точке»). */

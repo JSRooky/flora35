@@ -1,5 +1,6 @@
 import { isFirebaseConfigured } from "../firebase/config";
 import { loadLocationsFromFirestore } from "../firebase/loadLocationsFromFirestore";
+import { findGbifFeatureByKey } from "../gbif/gbifStore";
 import { expandFindingsToFeatures } from "./expandFindings";
 import { mergeSpeciesCollections } from "./mergeSpeciesCollections";
 import localPointsCollection from "./points.json";
@@ -226,17 +227,30 @@ function featureMatchesFindingId(feature, findingId) {
   );
 }
 
+function resolveGbifKeyFromFindingId(findingId) {
+  const normalizedId = String(findingId);
+  if (normalizedId.startsWith("gbif-")) {
+    return normalizedId.slice("gbif-".length);
+  }
+  return normalizedId;
+}
+
 /** Ищет точку по идентификатору находки во всех источниках данных. */
 export function findFeatureByFindingId(findingId) {
   if (findingId == null || findingId === "") {
     return null;
   }
 
-  return (
+  const localFeature =
     getAllFeatureCollection().features.find((feature) =>
       featureMatchesFindingId(feature, findingId)
-    ) ?? null
-  );
+    ) ?? null;
+
+  if (localFeature) {
+    return localFeature;
+  }
+
+  return findGbifFeatureByKey(resolveGbifKeyFromFindingId(findingId));
 }
 
 /** Проверяет, попадает ли находка в выбранный источник данных. */
@@ -245,23 +259,24 @@ export function isFindingInDataSource(findingId, mode) {
     return false;
   }
 
-  let collection;
+  const gbifFeature = findGbifFeatureByKey(resolveGbifKeyFromFindingId(findingId));
 
   switch (mode) {
     case DATA_SOURCE_MODES.POINTS:
-      collection = pointsCollection;
-      break;
+      return expandFindingsToFeatures(pointsCollection).features.some((feature) =>
+        featureMatchesFindingId(feature, findingId)
+      );
     case DATA_SOURCE_MODES.USERPOINTS:
-      collection = userpointsCollection;
-      break;
+      return expandFindingsToFeatures(userpointsCollection).features.some((feature) =>
+        featureMatchesFindingId(feature, findingId)
+      );
     case DATA_SOURCE_MODES.GBIF:
-      return false;
+      return Boolean(gbifFeature);
     default:
-      collection = getAllSpeciesCollection();
-      break;
+      return (
+        expandFindingsToFeatures(getAllSpeciesCollection()).features.some((feature) =>
+          featureMatchesFindingId(feature, findingId)
+        ) || Boolean(gbifFeature)
+      );
   }
-
-  return expandFindingsToFeatures(collection).features.some((feature) =>
-    featureMatchesFindingId(feature, findingId)
-  );
 }

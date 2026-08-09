@@ -148,13 +148,14 @@ import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
-import { addGbifLayer, setGbifData, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum } from "./components/addGbifLayer";
+import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum, setGbifClusterPieChartsEnabled } from "./components/addGbifLayer";
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
+import { findGbifFeatureByKey } from "./gbif/gbifStore";
 import {
-  findGbifFeatureByKey,
-  getGbifFeatureCollection
-} from "./gbif/gbifStore";
-import { resolveRussianName } from "./names/russianNameResolver";
+  clearRussianNameChoice,
+  lookupRussianNameCandidates,
+  saveRussianNameChoice
+} from "./names/russianNameResolver";
 import GbifPanel from "./components/GbifPanel";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
@@ -560,32 +561,6 @@ export default function MapView() {
     setBufferDockedWithFeature((open) => !open);
   }, [isArealApplied]);
 
-  const handleResolveRussianName = useCallback(async (feature) => {
-    const nameLatin = feature?.properties?.name_latin;
-    const gbifKey = feature?.properties?.gbif_key;
-    if (!nameLatin) {
-      return { nameRu: null, source: null };
-    }
-
-    const result = await resolveRussianName({
-      nameLatin,
-      speciesKey: feature?.properties?.species_key ?? null
-    });
-
-    if (result.nameRu) {
-      if (map.current) {
-        setGbifData(map.current, getGbifFeatureCollection());
-      }
-
-      const nextFeature =
-        (gbifKey != null ? findGbifFeatureByKey(gbifKey) : null) ?? feature;
-
-      setPopupData(nextFeature);
-    }
-
-    return result;
-  }, []);
-
   const handleYearRangeChange = useCallback((nextRange) => {
     setYearRange((prev) =>
       prev.min === nextRange.min && prev.max === nextRange.max ? prev : nextRange
@@ -982,6 +957,76 @@ export default function MapView() {
 
     return filters;
   }, [baseLocationFilters, boundsSpeciesRegnumFilter, effectiveWithinFeature]);
+
+  const handleLookupRussianName = useCallback(async (feature, { force = false } = {}) => {
+    const nameLatin = feature?.properties?.name_latin;
+    if (!nameLatin) {
+      return { candidates: [], cached: false };
+    }
+
+    return lookupRussianNameCandidates({
+      nameLatin,
+      speciesKey: feature?.properties?.species_key ?? null,
+      force
+    });
+  }, []);
+
+  const handleApplyRussianName = useCallback(async (feature, choice) => {
+    const nameLatin = feature?.properties?.name_latin;
+    const gbifKey = feature?.properties?.gbif_key;
+    if (!nameLatin || !choice?.nameRu) {
+      return;
+    }
+
+    await saveRussianNameChoice(nameLatin, {
+      nameRu: choice.nameRu,
+      source: choice.source
+    });
+
+    if (map.current) {
+      applyGbifLocationsFilter(map.current, locationFilters);
+    }
+
+    const fromStore =
+      gbifKey != null ? findGbifFeatureByKey(gbifKey) : null;
+    const baseFeature = fromStore ?? feature;
+
+    // Всегда новый объект с выбранным name_ru — иначе React может не перерисовать
+    // панель, если enrich вернул ту же ссылку без изменений.
+    setPopupData({
+      ...baseFeature,
+      properties: {
+        ...baseFeature.properties,
+        name_ru: choice.nameRu
+      }
+    });
+  }, [locationFilters]);
+
+  const handleClearRussianName = useCallback(async (feature) => {
+    const nameLatin = feature?.properties?.name_latin;
+    const gbifKey = feature?.properties?.gbif_key;
+    if (!nameLatin) {
+      return;
+    }
+
+    await clearRussianNameChoice(nameLatin);
+
+    if (map.current) {
+      applyGbifLocationsFilter(map.current, locationFilters);
+    }
+
+    const fromStore =
+      gbifKey != null ? findGbifFeatureByKey(gbifKey) : null;
+    const baseFeature = fromStore ?? feature;
+
+    setPopupData({
+      ...baseFeature,
+      properties: {
+        ...baseFeature.properties,
+        name_ru: null
+      }
+    });
+  }, [locationFilters]);
 
   const handleUserFindingSaved = useCallback(() => {
     const mapInstance = map.current;
@@ -1628,6 +1673,8 @@ export default function MapView() {
       return;
     }
 
+    // Один переключатель «Кластеры-диаграммы» — и для локальных точек, и для GBIF.
+    setGbifClusterPieChartsEnabled(map.current, clusterPieCharts);
     setClusterPieChartsEnabled(map.current, clusterPieCharts);
   }, [clusterPieCharts, clusteringEnabled, mapReady]);
 
@@ -2675,7 +2722,9 @@ export default function MapView() {
               bufferDockedOpen={bufferDockedWithFeature}
               bufferDisabled={isArealApplied}
               bufferDisabledTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
-              onResolveRussianName={handleResolveRussianName}
+              onLookupRussianName={handleLookupRussianName}
+              onApplyRussianName={handleApplyRussianName}
+              onClearRussianName={handleClearRussianName}
             />
           )}
           {(activeModule === MODULE_IDS.AREAL ||

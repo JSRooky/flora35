@@ -1,14 +1,20 @@
 import { matchScientificName } from "../gbif/speciesLookup";
 import { getAllSpeciesCollection } from "../locations/loadPoints";
-import { getCachedRussianName, setCachedRussianName } from "./nameRuCache";
+import { getCachedRussianName, setCachedRussianName, clearCachedRussianName } from "./nameRuCache";
 import {
+  collectRussianVernaculars,
   isRussianVernacular,
-  normalizeLatinName,
-  pickRussianVernacular
+  normalizeLatinName
 } from "./vernacularUtils";
 
 const GBIF_SPECIES_URL = "https://api.gbif.org/v1/species";
 const WIKIDATA_SPARQL_URL = "https://query.wikidata.org/sparql";
+
+const SOURCE_LABELS = {
+  local: "Локальные данные",
+  gbif: "GBIF",
+  wikidata: "Wikidata"
+};
 
 async function fetchJson(url, { signal, headers = {} } = {}) {
   const response = await fetch(url, { signal, headers });
@@ -18,11 +24,37 @@ async function fetchJson(url, { signal, headers = {} } = {}) {
   return response.json();
 }
 
-function findLocalRussianName(nameLatin) {
+function addCandidate(bucket, seen, nameRu, source) {
+  const name = String(nameRu ?? "").trim();
+  if (!name || !isRussianVernacular(name)) {
+    return;
+  }
+
+  const key = name.toLowerCase();
+  if (seen.has(key)) {
+    const existing = bucket.find((item) => item.nameRu.toLowerCase() === key);
+    if (existing && !existing.sources.includes(source)) {
+      existing.sources.push(source);
+    }
+    return;
+  }
+
+  seen.add(key);
+  bucket.push({
+    nameRu: name,
+    source,
+    sources: [source]
+  });
+}
+
+function findLocalRussianNames(nameLatin) {
   const normalized = normalizeLatinName(nameLatin).toLowerCase();
   if (!normalized) {
-    return null;
+    return [];
   }
+
+  const names = [];
+  const seen = new Set();
 
   for (const species of getAllSpeciesCollection().species ?? []) {
     const latin = String(species.name_latin ?? "").trim();
@@ -30,27 +62,54 @@ function findLocalRussianName(nameLatin) {
       continue;
     }
 
-    if (normalizeLatinName(latin).toLowerCase() === normalized) {
-      const nameRu = String(species.name_ru ?? "").trim();
-      return nameRu || null;
+    if (normalizeLatinName(latin).toLowerCase() !== normalized) {
+      continue;
     }
+
+    const nameRu = String(species.name_ru ?? "").trim();
+    if (!nameRu) {
+      continue;
+    }
+
+    const key = nameRu.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    names.push(nameRu);
   }
 
-  return null;
+  return names;
 }
 
-async function fetchGbifRussianName(speciesKey, { signal } = {}) {
+async function fetchGbifRussianNames(speciesKey, { signal } = {}) {
   if (speciesKey == null || speciesKey === "") {
-    return null;
+    return [];
   }
 
   const key = String(speciesKey);
+  const names = [];
+  const seen = new Set();
+
+  const pushName = (value) => {
+    const name = String(value ?? "").trim();
+    if (!name || !isRussianVernacular(name)) {
+      return;
+    }
+
+    const normalized = name.toLowerCase();
+    if (seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    names.push(name);
+  };
 
   try {
     const usage = await fetchJson(`${GBIF_SPECIES_URL}/${key}?language=ru`, { signal });
-    if (usage?.vernacularName && isRussianVernacular(usage.vernacularName)) {
-      return usage.vernacularName;
-    }
+    pushName(usage?.vernacularName);
   } catch {
     // fallback to vernacularNames list
   }
@@ -59,10 +118,12 @@ async function fetchGbifRussianName(speciesKey, { signal } = {}) {
     const payload = await fetchJson(`${GBIF_SPECIES_URL}/${key}/vernacularNames?limit=100`, {
       signal
     });
-    return pickRussianVernacular(payload?.results ?? payload);
+    collectRussianVernaculars(payload?.results ?? payload).forEach(pushName);
   } catch {
-    return null;
+    // keep whatever we already collected
   }
+
+  return names;
 }
 
 async function resolveSpeciesKey(nameLatin, speciesKey, { signal } = {}) {
@@ -78,25 +139,26 @@ function escapeSparqlString(value) {
   return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-async function fetchWikidataRussianName(nameLatin, { signal } = {}) {
+async function fetchWikidataRussianNames(nameLatin, { signal } = {}) {
   const sciName = normalizeLatinName(nameLatin);
   if (!sciName) {
-    return null;
+    return [];
   }
 
   const query = `
-SELECT ?commonName ?label WHERE {
+SELECT DISTINCT ?name WHERE {
   ?taxon wdt:P225 "${escapeSparqlString(sciName)}" .
-  OPTIONAL {
-    ?taxon wdt:P1843 ?commonName .
-    FILTER(LANG(?commonName) = "ru")
+  {
+    ?taxon wdt:P1843 ?name .
+    FILTER(LANG(?name) = "ru")
   }
-  OPTIONAL {
-    ?taxon rdfs:label ?label .
-    FILTER(LANG(?label) = "ru")
+  UNION
+  {
+    ?taxon rdfs:label ?name .
+    FILTER(LANG(?name) = "ru")
   }
 }
-LIMIT 1`.trim();
+LIMIT 20`.trim();
 
   const url = `${WIKIDATA_SPARQL_URL}?query=${encodeURIComponent(query)}`;
 
@@ -107,70 +169,156 @@ LIMIT 1`.trim();
     }
   });
 
-  const binding = payload?.results?.bindings?.[0];
-  if (!binding) {
-    return null;
+  const names = [];
+  const seen = new Set();
+
+  (payload?.results?.bindings ?? []).forEach((binding) => {
+    const name = String(binding?.name?.value ?? "").trim();
+    if (!name || !isRussianVernacular(name)) {
+      return;
+    }
+
+    const key = name.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    names.push(name);
+  });
+
+  return names;
+}
+
+/** Человекочитаемая метка источника варианта названия. */
+export function getRussianNameSourceLabel(source) {
+  if (Array.isArray(source)) {
+    return source.map((item) => SOURCE_LABELS[item] ?? item).filter(Boolean).join(", ");
   }
 
-  const commonName = binding.commonName?.value;
-  if (commonName && isRussianVernacular(commonName)) {
-    return commonName;
-  }
-
-  const label = binding.label?.value;
-  if (label && isRussianVernacular(label)) {
-    return label;
-  }
-
-  return null;
+  return SOURCE_LABELS[source] ?? source ?? "";
 }
 
 /**
- * Ищет русское название вида по латинскому имени.
- * @returns {Promise<{ nameRu: string|null, source: 'local'|'gbif'|'wikidata'|null, cached: boolean }>}
+ * Ищет варианты русского названия вида (без автосохранения выбора).
+ * @returns {Promise<{
+ *   candidates: Array<{ nameRu: string, source: string, sources: string[] }>,
+ *   cached: boolean
+ * }>}
  */
-export async function resolveRussianName({ nameLatin, speciesKey = null, signal } = {}) {
+export async function lookupRussianNameCandidates({
+  nameLatin,
+  speciesKey = null,
+  signal,
+  force = false
+} = {}) {
   const normalizedLatin = normalizeLatinName(nameLatin);
   if (!normalizedLatin) {
-    return { nameRu: null, source: null, cached: false };
+    return { candidates: [], cached: false };
   }
 
-  const cached = await getCachedRussianName(normalizedLatin);
-  if (cached) {
-    return {
-      nameRu: cached.nameRu,
-      source: cached.source,
-      cached: true
-    };
+  if (!force) {
+    const cached = await getCachedRussianName(normalizedLatin);
+    if (cached) {
+      if (cached.nameRu) {
+        return {
+          candidates: [
+            {
+              nameRu: cached.nameRu,
+              source: cached.source,
+              sources: cached.source ? [cached.source] : []
+            }
+          ],
+          cached: true
+        };
+      }
+
+      return { candidates: [], cached: true };
+    }
   }
 
-  const localName = findLocalRussianName(normalizedLatin);
-  if (localName) {
-    await setCachedRussianName(normalizedLatin, { nameRu: localName, source: "local" });
-    return { nameRu: localName, source: "local", cached: false };
-  }
+  const candidates = [];
+  const seen = new Set();
+
+  findLocalRussianNames(normalizedLatin).forEach((nameRu) => {
+    addCandidate(candidates, seen, nameRu, "local");
+  });
 
   const resolvedKey = await resolveSpeciesKey(normalizedLatin, speciesKey, { signal });
   if (signal?.aborted) {
     throw new DOMException("Aborted", "AbortError");
   }
 
-  const gbifName = await fetchGbifRussianName(resolvedKey, { signal });
-  if (gbifName) {
-    await setCachedRussianName(normalizedLatin, { nameRu: gbifName, source: "gbif" });
-    return { nameRu: gbifName, source: "gbif", cached: false };
-  }
+  const gbifNames = await fetchGbifRussianNames(resolvedKey, { signal });
+  gbifNames.forEach((nameRu) => {
+    addCandidate(candidates, seen, nameRu, "gbif");
+  });
 
   if (signal?.aborted) {
     throw new DOMException("Aborted", "AbortError");
   }
 
-  const wikidataName = await fetchWikidataRussianName(normalizedLatin, { signal });
-  if (wikidataName) {
-    await setCachedRussianName(normalizedLatin, { nameRu: wikidataName, source: "wikidata" });
-    return { nameRu: wikidataName, source: "wikidata", cached: false };
+  try {
+    const wikidataNames = await fetchWikidataRussianNames(normalizedLatin, { signal });
+    wikidataNames.forEach((nameRu) => {
+      addCandidate(candidates, seen, nameRu, "wikidata");
+    });
+  } catch {
+    // Wikidata — необязательный источник; ошибки не блокируют GBIF/local.
   }
 
-  await setCachedRussianName(normalizedLatin, { nameRu: null, source: null });
-  return { nameRu: null, source: null, cached: false };
+  if (candidates.length === 0) {
+    if (force) {
+      // Не затираем уже выбранное имя, если повторный поиск ничего не нашёл.
+      const existing = await getCachedRussianName(normalizedLatin);
+      if (!existing?.nameRu) {
+        await setCachedRussianName(normalizedLatin, { nameRu: null, source: null });
+      }
+    } else {
+      await setCachedRussianName(normalizedLatin, { nameRu: null, source: null });
+    }
+  }
+
+  return { candidates, cached: false };
+}
+
+/** Сохраняет выбранное пользователем русское название в overlay. */
+export async function saveRussianNameChoice(nameLatin, { nameRu, source = null } = {}) {
+  const normalizedLatin = normalizeLatinName(nameLatin);
+  if (!normalizedLatin || !nameRu) {
+    return null;
+  }
+
+  return setCachedRussianName(normalizedLatin, {
+    nameRu,
+    source: Array.isArray(source) ? source[0] ?? null : source
+  });
+}
+
+/** Сбрасывает сохранённое русское название (и отрицательный кэш) для вида. */
+export async function clearRussianNameChoice(nameLatin) {
+  return clearCachedRussianName(normalizeLatinName(nameLatin));
+}
+
+/**
+ * Ищет русское название вида по латинскому имени.
+ * Для UI с выбором варианта предпочтительнее lookupRussianNameCandidates + saveRussianNameChoice.
+ * @returns {Promise<{ nameRu: string|null, source: 'local'|'gbif'|'wikidata'|null, cached: boolean }>}
+ */
+export async function resolveRussianName({ nameLatin, speciesKey = null, signal } = {}) {
+  const result = await lookupRussianNameCandidates({ nameLatin, speciesKey, signal });
+  const first = result.candidates[0] ?? null;
+
+  if (first && !result.cached) {
+    await saveRussianNameChoice(nameLatin, {
+      nameRu: first.nameRu,
+      source: first.source
+    });
+  }
+
+  return {
+    nameRu: first?.nameRu ?? null,
+    source: first?.source ?? null,
+    cached: result.cached
+  };
 }

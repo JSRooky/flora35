@@ -173,6 +173,30 @@ export async function setCachedRussianName(nameLatin, { nameRu, source = null } 
   return entry;
 }
 
+/** Удаляет запись overlay (выбранное имя или «не найдено»). */
+export async function clearCachedRussianName(nameLatin) {
+  const key = cacheKey(nameLatin);
+  if (!key) {
+    return false;
+  }
+
+  memoryCache.delete(key);
+
+  try {
+    const db = await openDb();
+    try {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      await idbRequest(tx.objectStore(STORE_NAME).delete(key));
+    } finally {
+      db.close();
+    }
+  } catch (error) {
+    console.warn("Failed to clear name-ru cache:", error);
+  }
+
+  return true;
+}
+
 /** Sync: seed overlay в память без записи в IDB (для миграции перед batch persist). */
 export function seedOverlayInMemory(nameLatin, { nameRu, source = null } = {}) {
   const key = cacheKey(nameLatin);

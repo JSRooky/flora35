@@ -7,8 +7,10 @@ import {
 import { getFeatureCollection } from "../locations/loadPoints";
 import { findGbifFeatureByKey, getGbifFeatureCollection } from "../gbif/gbifStore";
 import {
+  GBIF_SOURCE_ID,
   getGbifInteractiveLayerIds,
   getGbifSourceIds,
+  isGbifClusterPieChartsEnabled,
   isGbifLayerVisible,
   setGbifData,
   setGbifHiddenPointFeatureKeys
@@ -20,6 +22,11 @@ import {
   getPointColorExpression,
   getPointColorForRegnum
 } from "./pointColors";
+import {
+  getFeatureCoordinates,
+  restoreOriginalCoordinates,
+  spreadCoincidentFeatures
+} from "./spreadCoincidentPoints";
 
 export { getPointColorForRegnum } from "./pointColors";
 
@@ -433,15 +440,6 @@ function removeOrphanedClusterPieChartMarkers(map) {
   });
 }
 
-function setClusterPieChartMarkersVisibility(visible) {
-  Object.values(clusterPieChartMarkersOnScreen).forEach((marker) => {
-    const element = marker.getElement();
-    if (element) {
-      element.style.display = visible ? "" : "none";
-    }
-  });
-}
-
 function detachClusterPieChartMarkers(map = clusterPieChartMap) {
   if (clusterPieChartRenderHandler && clusterPieChartMap) {
     clusterPieChartMap.off("render", clusterPieChartRenderHandler);
@@ -454,47 +452,65 @@ function detachClusterPieChartMarkers(map = clusterPieChartMap) {
 }
 
 function getVisibleClusterFeatures(map) {
-  const features = map.querySourceFeatures("locations");
   const clustersById = new Map();
 
-  features.forEach((feature) => {
-    const props = feature.properties;
-
-    if (!props?.cluster) {
+  const collectFromSource = (sourceId, keyPrefix) => {
+    if (!map.getSource(sourceId) || !map.isSourceLoaded(sourceId)) {
       return;
     }
 
-    const clusterId = props.cluster_id;
+    map.querySourceFeatures(sourceId).forEach((feature) => {
+      const props = feature.properties;
 
-    if (clusterId === undefined || !feature.geometry?.coordinates) {
-      return;
-    }
+      if (!props?.cluster) {
+        return;
+      }
 
-    clustersById.set(clusterId, feature);
-  });
+      const clusterId = props.cluster_id;
+
+      if (clusterId === undefined || !feature.geometry?.coordinates) {
+        return;
+      }
+
+      clustersById.set(`${keyPrefix}:${clusterId}`, feature);
+    });
+  };
+
+  if (markersVisible) {
+    collectFromSource("locations", "locations");
+  }
+
+  // Тот же инструмент «Кластеры-диаграммы» — и для видимого слоя GBIF.
+  if (isGbifLayerVisible() && isGbifClusterPieChartsEnabled()) {
+    collectFromSource(GBIF_SOURCE_ID, "gbif");
+  }
 
   return clustersById;
 }
 
 function updateClusterPieChartMarkers(map) {
-  if (!clusterPieChartsEnabled || !clusteringEnabled || clusterByRegnum || !markersVisible) {
+  const showLocations = markersVisible;
+  const showGbif = isGbifLayerVisible() && isGbifClusterPieChartsEnabled();
+
+  if (
+    !clusterPieChartsEnabled ||
+    !clusteringEnabled ||
+    clusterByRegnum ||
+    (!showLocations && !showGbif)
+  ) {
     removeAllClusterPieChartMarkers();
     removeOrphanedClusterPieChartMarkers(map);
-    return;
-  }
-
-  if (!map.getSource("locations") || !map.isSourceLoaded("locations")) {
     return;
   }
 
   const clusterFeatures = getVisibleClusterFeatures(map);
   const nextMarkers = {};
 
-  clusterFeatures.forEach((feature, clusterId) => {
+  clusterFeatures.forEach((feature, markerKey) => {
     const props = feature.properties;
     const coordinates = feature.geometry.coordinates;
     const signature = getClusterPieChartSignature(props);
-    let marker = nextMarkers[clusterId] ?? clusterPieChartMarkersOnScreen[clusterId];
+    let marker = nextMarkers[markerKey] ?? clusterPieChartMarkersOnScreen[markerKey];
 
     if (!marker) {
       const element = createClusterPieChartElement(props);
@@ -523,11 +539,11 @@ function updateClusterPieChartMarkers(map) {
       marker.setLngLat(coordinates);
     }
 
-    nextMarkers[clusterId] = marker;
+    nextMarkers[markerKey] = marker;
   });
 
-  Object.entries(clusterPieChartMarkersOnScreen).forEach(([clusterId, marker]) => {
-    if (!nextMarkers[clusterId]) {
+  Object.entries(clusterPieChartMarkersOnScreen).forEach(([markerKey, marker]) => {
+    if (!nextMarkers[markerKey]) {
       marker.remove();
     }
   });
@@ -792,7 +808,8 @@ function applyMarkersVisibility(map) {
     }
   });
 
-  setClusterPieChartMarkersVisibility(markersVisible);
+  // Не прячем все диаграммы разом: в режиме GBIF остаются диаграммы слоя GBIF.
+  updateClusterPieChartMarkers(map);
 }
 
 function pickSharePinCenterColor() {
@@ -1187,7 +1204,7 @@ function attachLocationsInteractions(map) {
               return;
             }
 
-            onClusterExpandedCallback?.(leaves);
+            onClusterExpandedCallback?.(leaves.map(restoreOriginalCoordinates));
           });
         });
       });
@@ -1234,6 +1251,8 @@ function attachLocationsInteractions(map) {
   const pointClick = (event) => {
     const feature = event.features?.[0];
     if (feature) {
+      // Оставляем geometry на разведённых координатах (булавка на видимом маркере);
+      // исходные координаты — в properties.coordinates_original.
       onPointClickCallback?.(feature);
     }
   };
@@ -1509,10 +1528,15 @@ function locationsSourcesExist(map) {
   return Boolean(map.getSource("locations"));
 }
 
+function toMapFeatures(features) {
+  return spreadCoincidentFeatures(features);
+}
+
 function updateLocationsSourceData(map, filteredFeatures) {
+  const mapFeatures = toMapFeatures(filteredFeatures);
   const collection = {
     type: "FeatureCollection",
-    features: filteredFeatures
+    features: mapFeatures
   };
 
   if (!clusteringEnabled) {
@@ -1529,7 +1553,7 @@ function updateLocationsSourceData(map, filteredFeatures) {
 
       source.setData({
         type: "FeatureCollection",
-        features: filteredFeatures.filter((feature) => feature.properties.regnum === regnum)
+        features: mapFeatures.filter((feature) => feature.properties.regnum === regnum)
       });
     });
     return;
@@ -1600,13 +1624,14 @@ function rebuildLocationsLayers(map) {
 
   const filteredFeatures = filterFeatures(locationsData.features, currentFilters);
   setCurrentFilteredFeatures(filteredFeatures);
+  const mapFeatures = toMapFeatures(filteredFeatures);
 
   if (!clusteringEnabled) {
     map.addSource("locations", {
       type: "geojson",
       data: {
         type: "FeatureCollection",
-        features: filteredFeatures
+        features: mapFeatures
       }
     });
 
@@ -1615,7 +1640,7 @@ function rebuildLocationsLayers(map) {
     // Отдельный кластеризуемый источник на каждое царство — кластеры не смешивают regnum.
     getRegnumValues().forEach((regnum) => {
       const sourceId = getSourceId(regnum);
-      const features = filteredFeatures.filter(
+      const features = mapFeatures.filter(
         (feature) => feature.properties.regnum === regnum
       );
 
@@ -1636,7 +1661,7 @@ function rebuildLocationsLayers(map) {
       type: "geojson",
       data: {
         type: "FeatureCollection",
-        features: filteredFeatures
+        features: mapFeatures
       },
       cluster: true,
       ...CLUSTER_OPTIONS,
@@ -1785,8 +1810,12 @@ function dedupeFeaturesByCoordinates(features) {
   const seen = new Set();
 
   return features.filter((feature) => {
-    const [lng, lat] = feature.geometry.coordinates;
-    const key = `${lng},${lat}`;
+    const coordinates = getFeatureCoordinates(feature);
+    if (!coordinates) {
+      return false;
+    }
+
+    const key = `${coordinates[0]},${coordinates[1]}`;
     if (seen.has(key)) {
       return false;
     }
@@ -1852,38 +1881,47 @@ export function getUnclusteredFeatures(map, filters = {}, candidateFeatures = nu
     );
 
     gbifVisible = rawGbif.map(
-      (feature) => findGbifFeatureByKey(feature.properties?.gbif_key) ?? feature
+      (feature) => findGbifFeatureByKey(feature.properties?.gbif_key) ??
+        restoreOriginalCoordinates(feature)
     );
   }
 
   if (candidateFeatures?.length) {
     const visibleKeys = new Set(
-      [...localVisible, ...gbifVisible].map(
-        (feature) => `${feature.geometry.coordinates[0]},${feature.geometry.coordinates[1]}`
-      )
+      [...localVisible, ...gbifVisible].map((feature) => {
+        const coordinates = getFeatureCoordinates(feature);
+        return coordinates ? `${coordinates[0]},${coordinates[1]}` : "";
+      }).filter(Boolean)
     );
 
     return dedupeFeaturesByCoordinates(
       filterFeatures(candidateFeatures, filters).filter((feature) => {
-        const [lng, lat] = feature.geometry.coordinates;
-        return visibleKeys.has(`${lng},${lat}`);
+        const coordinates = getFeatureCoordinates(feature);
+        if (!coordinates) {
+          return false;
+        }
+
+        return visibleKeys.has(`${coordinates[0]},${coordinates[1]}`);
       })
     );
   }
 
   return dedupeFeaturesByCoordinates(
-    filterFeatures([...localVisible, ...gbifVisible], filters)
+    filterFeatures(
+      [...localVisible, ...gbifVisible].map(restoreOriginalCoordinates),
+      filters
+    )
   );
 }
 
 /** Возвращает координаты некластеризованных точек, видимых на карте. */
 export function getUnclusteredCenters(map, filters = {}, candidateFeatures = null) {
   return getUnclusteredFeatures(map, filters, candidateFeatures).map(
-    (feature) => feature.geometry.coordinates
-  );
+    (feature) => getFeatureCoordinates(feature)
+  ).filter(Boolean);
 }
 
-/** Проверяет, отображается ли точка как отдельный маркер, а не внутри кластера. */
+/** Проверяет, отображается ли точка как отдельный маркер, не внутри кластера. */
 export function isFeatureUnclusteredOnMap(map, feature) {
   if (!feature?.geometry?.coordinates) {
     return false;
@@ -1898,11 +1936,24 @@ export function isFeatureUnclusteredOnMap(map, feature) {
     return featureMatchesFilters(feature, currentFilters);
   }
 
-  const [lng, lat] = feature.geometry.coordinates;
+  const targetKey = getFeatureKey(feature);
+  const targetCoords = getFeatureCoordinates(feature);
+  const targetCoordKey = targetCoords
+    ? `${targetCoords[0]},${targetCoords[1]}`
+    : null;
 
-  return getUnclusteredCenters(map).some(
-    ([clusterLng, clusterLat]) => clusterLng === lng && clusterLat === lat
-  );
+  return queryUnclusteredSourceFeatures(map).some((item) => {
+    if (getFeatureKey(item) === targetKey) {
+      return true;
+    }
+
+    const itemCoords = getFeatureCoordinates(item);
+    return Boolean(
+      targetCoordKey &&
+        itemCoords &&
+        `${itemCoords[0]},${itemCoords[1]}` === targetCoordKey
+    );
+  });
 }
 
 export function featureMatchesFilters(feature, filters = {}) {
