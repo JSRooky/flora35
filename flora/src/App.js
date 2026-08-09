@@ -122,8 +122,10 @@ import {
   resolveToolPointsFilterModule
 } from "./components/getToolWithinFeature";
 import {
+  createDefaultToolPointsFilterState,
   loadToolPointsFilterState,
-  saveToolPointsFilterState
+  saveToolPointsFilterState,
+  TOOL_POINTS_FILTER_MODULES
 } from "./toolPointsFilterStorage";
 import {
   addAreaSelectionLayer,
@@ -1288,17 +1290,6 @@ export default function MapView() {
 
   const mapMarkersVisible = markersVisible || toolPointsFilterActive;
 
-  const ooptFilterPointsSummary = useMemo(() => {
-    if (!ooptWithinFeature || !mapReady) {
-      return null;
-    }
-
-    return getContainedPointsSummaryForWithinFeature(
-      ooptWithinFeature,
-      baseLocationFilters
-    );
-  }, [ooptWithinFeature, baseLocationFilters, mapReady]);
-
   const activeToolFilterPointsSummary = useMemo(() => {
     if (!activeToolWithinFeature || !mapReady) {
       return null;
@@ -2177,6 +2168,57 @@ export default function MapView() {
     expandPanel(PANEL_IDS.MAP);
   }, [expandPanel]);
 
+  const hasActiveMapFilters = useMemo(() => {
+    if (Object.keys(propertyFilters).length > 0) {
+      return true;
+    }
+
+    if (statusFilters.length > 0) {
+      return true;
+    }
+
+    if (yearFilterEnabled) {
+      return true;
+    }
+
+    if (TOOL_POINTS_FILTER_MODULES.some((moduleId) => toolPointsFilterEnabled[moduleId])) {
+      return true;
+    }
+
+    if (boundsSpeciesRegnumFilter != null) {
+      return true;
+    }
+
+    if (denseClustersHighlight || denseProcessingActive) {
+      return true;
+    }
+
+    return false;
+  }, [
+    propertyFilters,
+    statusFilters,
+    yearFilterEnabled,
+    toolPointsFilterEnabled,
+    boundsSpeciesRegnumFilter,
+    denseClustersHighlight,
+    denseProcessingActive
+  ]);
+
+  const handleMapFiltersReset = useCallback(() => {
+    setPropertyFilters({});
+    setStatusFilters([]);
+    setYearFilterEnabled(false);
+    setToolPointsFilterEnabled(createDefaultToolPointsFilterState());
+    setOoptFilterBoundsFeature(null);
+    setBoundsSpeciesRegnumFilter(null);
+    setDenseClustersHighlightState(false);
+    setDenseProcessingActive(false);
+    setSelectedDensePileKey(null);
+    setDensePileSpeciesListOpen(false);
+    densePileCameraBeforeRef.current = null;
+    expandPanel(PANEL_IDS.MAP);
+  }, [expandPanel]);
+
   const handleFeatureFiltersReset = useCallback(() => {
     setPropertyFilters({});
 
@@ -2902,25 +2944,6 @@ export default function MapView() {
     dataSourceMode === DATA_SOURCE_MODES.GBIF ||
     denseProcessingActive;
 
-  const ooptGlobalFilterTooltip = useMemo(() => {
-    if (!ooptFilterTarget) {
-      return "Только точки в выбранной ООПТ";
-    }
-
-    const heading = getBoundsFeatureHeadingParts(
-      ooptFilterTarget.definition?.id,
-      ooptFilterTarget.feature?.properties ?? {}
-    );
-    const title = [heading?.category, heading?.title].filter(Boolean).join(" — ");
-
-    if (!title) {
-      return "Только точки в выбранной ООПТ";
-    }
-
-    const count = ooptFilterPointsSummary?.count;
-    return count != null ? `${title} (${count} точ.)` : title;
-  }, [ooptFilterTarget, ooptFilterPointsSummary]);
-
   return (
     <>
       <ModuleMenu
@@ -3249,10 +3272,8 @@ export default function MapView() {
         onSpeciesSelect={handleDensePileSpeciesSelect}
       />
       <MapCornerControls
-        ooptFilterEnabled={ooptPointsFilterActive}
-        ooptFilterAvailable={Boolean(ooptWithinFeature)}
-        onOoptFilterToggle={handleToolPointsFilterToggle}
-        ooptFilterTooltip={ooptGlobalFilterTooltip}
+        filtersActive={hasActiveMapFilters}
+        onFiltersReset={handleMapFiltersReset}
       />
     </>
   );
