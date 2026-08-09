@@ -4,6 +4,66 @@ const GBIF_OCCURRENCE_SEARCH_URL = "https://api.gbif.org/v1/occurrence/search";
 export const GBIF_PAGE_SIZE = 300;
 /** Сколько страниц копить перед обновлением слоя карты. */
 export const GBIF_MAP_UPDATE_PAGES = 4;
+const FETCH_RETRY_COUNT = 2;
+const FETCH_RETRY_DELAY_MS = 700;
+
+/** Отмена запроса (в т.ч. когда браузер вместо AbortError отдаёт Failed to fetch). */
+export function isGbifAbortError(error, signal) {
+  if (signal?.aborted) {
+    return true;
+  }
+
+  return (
+    error?.name === "AbortError" ||
+    error?.code === 20 ||
+    (typeof DOMException !== "undefined" &&
+      error instanceof DOMException &&
+      error.name === "AbortError")
+  );
+}
+
+/** Понятное сообщение для сетевых сбоев fetch. */
+export function getGbifNetworkErrorMessage(error) {
+  const message = error?.message || "";
+  if (
+    error?.name === "TypeError" ||
+    /failed to fetch|networkerror|load failed|network request failed/i.test(message)
+  ) {
+    return "Не удалось связаться с GBIF. Проверьте интернет и попробуйте ещё раз.";
+  }
+
+  return message || "Не удалось загрузить данные GBIF";
+}
+
+function wait(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      const abortError = new Error("Aborted");
+      abortError.name = "AbortError";
+      reject(abortError);
+      return;
+    }
+
+    const timer = setTimeout(resolve, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      const abortError = new Error("Aborted");
+      abortError.name = "AbortError";
+      reject(abortError);
+    };
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function isRetryableNetworkError(error) {
+  return (
+    error?.name === "TypeError" ||
+    /failed to fetch|networkerror|load failed|network request failed/i.test(
+      error?.message || ""
+    )
+  );
+}
 
 /**
  * Строит WKT POLYGON из bbox [west, south, east, north].
@@ -47,16 +107,43 @@ export function buildOccurrenceSearchParams(region, extras = {}) {
   return params;
 }
 
-/** Запрашивает одну страницу occurrence/search. */
+/** Запрашивает одну страницу occurrence/search (с короткими повторами при сетевом сбое). */
 export async function fetchOccurrencePage(params, { signal } = {}) {
   const url = `${GBIF_OCCURRENCE_SEARCH_URL}?${params.toString()}`;
-  const response = await fetch(url, { signal });
+  let lastError = null;
 
-  if (!response.ok) {
-    throw new Error(`GBIF API error: ${response.status} ${response.statusText}`);
+  for (let attempt = 0; attempt <= FETCH_RETRY_COUNT; attempt += 1) {
+    if (signal?.aborted) {
+      const abortError = new Error("Aborted");
+      abortError.name = "AbortError";
+      throw abortError;
+    }
+
+    try {
+      const response = await fetch(url, { signal, mode: "cors", credentials: "omit" });
+
+      if (!response.ok) {
+        throw new Error(`GBIF API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (isGbifAbortError(error, signal)) {
+        const abortError = new Error("Aborted");
+        abortError.name = "AbortError";
+        throw abortError;
+      }
+
+      lastError = error;
+      if (!isRetryableNetworkError(error) || attempt >= FETCH_RETRY_COUNT) {
+        throw error;
+      }
+
+      await wait(FETCH_RETRY_DELAY_MS * (attempt + 1), signal);
+    }
   }
 
-  return response.json();
+  throw lastError ?? new Error("Failed to fetch");
 }
 
 /**

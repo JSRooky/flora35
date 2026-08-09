@@ -7,11 +7,21 @@ import {
 import { getFeatureCollection } from "../locations/loadPoints";
 import { findGbifFeatureByKey, getGbifFeatureCollection } from "../gbif/gbifStore";
 import {
-  GBIF_SOURCE_ID,
-  GBIF_UNCLUSTERED_LAYER_ID,
+  getGbifInteractiveLayerIds,
+  getGbifSourceIds,
   isGbifLayerVisible,
+  setGbifData,
   setGbifHiddenPointFeatureKeys
 } from "./addGbifLayer";
+import {
+  DEFAULT_CLUSTER_COLOR,
+  DEFAULT_POINT_COLOR,
+  REGNUM_COLORS,
+  getPointColorExpression,
+  getPointColorForRegnum
+} from "./pointColors";
+
+export { getPointColorForRegnum } from "./pointColors";
 
 const PUBLIC_URL = process.env.PUBLIC_URL || "";
 const PLANT_IMAGE = `${PUBLIC_URL}/images/plant.svg`;
@@ -31,12 +41,6 @@ const CLUSTER_OPTIONS = {
 /** Ключ фильтра GeoJSON-полигона в объекте filters для applyLocationsFilter. */
 export const WITHIN_FEATURE_FILTER_KEY = "__withinFeature";
 
-const REGNUM_COLORS = {
-  plantae: "#588f38",
-  animalia: "#c98263",
-  fungi: "#7a5d8f"
-};
-
 const SHARE_PIN_CENTER_COLORS = [
   REGNUM_COLORS.plantae,
   REGNUM_COLORS.animalia,
@@ -49,9 +53,6 @@ const SHARE_PIN_CENTER_COLORS = [
   "#db2777",
   "#059669"
 ];
-
-const DEFAULT_CLUSTER_COLOR = "#4a90e2";
-const DEFAULT_POINT_COLOR = "#4a90e2";
 
 const MARKER_RADIUS = 5;
 
@@ -794,23 +795,6 @@ function applyMarkersVisibility(map) {
   setClusterPieChartMarkersVisibility(markersVisible);
 }
 
-function getPointColorExpression() {
-  return [
-    "match",
-    ["get", "regnum"],
-    "plantae", REGNUM_COLORS.plantae,
-    "animalia", REGNUM_COLORS.animalia,
-    "fungi", REGNUM_COLORS.fungi,
-    DEFAULT_POINT_COLOR
-  ];
-}
-
-/** Цвет точки по regnum (растение/животное/гриб), с запасным цветом по умолчанию. */
-/** Цвет точки по regnum (растение/животное/гриб), с запасным цветом по умолчанию. */
-export function getPointColorForRegnum(regnum) {
-  return REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR;
-}
-
 function pickSharePinCenterColor() {
   return SHARE_PIN_CENTER_COLORS[
     Math.floor(Math.random() * SHARE_PIN_CENTER_COLORS.length)
@@ -1308,21 +1292,28 @@ function attachLocationsInteractions(map) {
 
   // Клик по карте вне маркеров — сброс выбранной точки.
   const mapClick = (event) => {
-    const locationLayerIds = [...clusterLayerIds, ...unclusteredLayerIds].filter((layerId) =>
-      map.getLayer(layerId)
-    );
-
-    if (locationLayerIds.length === 0) {
+    // defaultPrevented: клик уже обработан слоем точки (в т.ч. GBIF).
+    if (event.defaultPrevented) {
       return;
     }
 
-    const features = map.queryRenderedFeatures(event.point, {
-      layers: locationLayerIds
-    });
+    const locationLayerIds = [...clusterLayerIds, ...unclusteredLayerIds].filter((layerId) =>
+      map.getLayer(layerId)
+    );
+    const gbifLayerIds = getGbifInteractiveLayerIds(map);
+    const hitLayerIds = [...locationLayerIds, ...gbifLayerIds];
 
-    if (!features.length) {
-      onMapBackgroundClickCallback?.(event);
+    if (hitLayerIds.length > 0) {
+      const features = map.queryRenderedFeatures(event.point, {
+        layers: hitLayerIds
+      });
+
+      if (features.length > 0) {
+        return;
+      }
     }
+
+    onMapBackgroundClickCallback?.(event);
   };
 
   map.on("click", mapClick);
@@ -1852,15 +1843,13 @@ export function getUnclusteredFeatures(map, filters = {}, candidateFeatures = nu
 
   let gbifVisible = [];
 
-  if (
-    toolIncludeGbif &&
-    isGbifLayerVisible() &&
-    map?.getSource?.(GBIF_SOURCE_ID) &&
-    map.getLayer(GBIF_UNCLUSTERED_LAYER_ID)
-  ) {
-    const rawGbif = map.querySourceFeatures(GBIF_SOURCE_ID, {
-      filter: ["!", ["has", "point_count"]]
-    });
+  if (toolIncludeGbif && isGbifLayerVisible()) {
+    const gbifSourceIds = getGbifSourceIds().filter((sourceId) => map?.getSource?.(sourceId));
+    const rawGbif = gbifSourceIds.flatMap((sourceId) =>
+      map.querySourceFeatures(sourceId, {
+        filter: ["!", ["has", "point_count"]]
+      })
+    );
 
     gbifVisible = rawGbif.map(
       (feature) => findGbifFeatureByKey(feature.properties?.gbif_key) ?? feature
@@ -1920,6 +1909,21 @@ export function featureMatchesFilters(feature, filters = {}) {
   return filterFeatures([feature], filters).length > 0;
 }
 
+/**
+ * То же применение фильтров к слою GBIF: store остаётся полным,
+ * на карту уходит отфильтрованная выборка (как у локальных точек).
+ */
+export function applyGbifLocationsFilter(map, filters = currentFilters) {
+  if (!map) {
+    return;
+  }
+
+  setGbifData(map, {
+    type: "FeatureCollection",
+    features: filterFeatures(getGbifFeatureCollection().features ?? [], filters)
+  });
+}
+
 /** Применяет фильтры точек: пересобирает слои, кроме частного случая сдвига года. */
 export function applyLocationsFilter(map, filters = {}) {
   if (
@@ -1928,11 +1932,13 @@ export function applyLocationsFilter(map, filters = {}) {
     isTimelineYearMaxOnlyChange(currentFilters, filters)
   ) {
     applyTimelineYearChange(map, currentFilters, filters);
+    applyGbifLocationsFilter(map, filters);
     return;
   }
 
   if (map && locationsSourcesExist(map) && isFoundYearOnlyChange(currentFilters, filters)) {
     applyFoundYearFilterChange(map, filters);
+    applyGbifLocationsFilter(map, filters);
     return;
   }
 
@@ -1942,6 +1948,7 @@ export function applyLocationsFilter(map, filters = {}) {
 
   currentFilters = filters;
   rebuildLocationsLayers(map);
+  applyGbifLocationsFilter(map, filters);
 }
 
 /** Сбрасывает все фильтры точек. */

@@ -10,7 +10,6 @@ import {
   getPropertyLabel,
   sortPropertyEntries
 } from "./featurePropertyLabels";
-import { countGbifFeaturesByNameLatin } from "../gbif/gbifStore";
 import { buildSharePointUrl, copyTextToClipboard } from "./sharePointLink";
 import "../styles/FeaturePopup.css";
 
@@ -188,16 +187,11 @@ export default function FeaturePopup({
     : "Точка не выбрана";
 
   const properties = feature?.properties;
-  const speciesPointCount = feature
-    ? fromGbif
-      ? countGbifFeaturesByNameLatin(properties?.name_latin)
-      : getPointsForSpecies(feature).length
-    : 0;
+  const speciesPointCount = feature ? getPointsForSpecies(feature).length : 0;
   const images = properties ? getImages(properties) : [];
   const descriptionPath = properties?.description_md;
   const gbifUrl = properties?.gbif_url;
   // status выводится отдельно — у него свой фильтр через StatusFilterPanel.
-  // Для GBIF фильтры свойств не применяем: они действуют на локальный слой.
   const displayProperties = properties
     ? sortPropertyEntries(
         Object.entries(properties).filter(
@@ -267,9 +261,7 @@ export default function FeaturePopup({
                 )}
 
                 <div className="popup-item">
-                  <strong>
-                    {fromGbif ? "Точек вида в GBIF-слое:" : "Точек вида на карте:"}
-                  </strong>
+                  <strong>Точек вида на карте:</strong>
                   <span>{formatPointCount(speciesPointCount)}</span>
                 </div>
 
@@ -278,40 +270,33 @@ export default function FeaturePopup({
                     <hr />
                     <div className="popup-section-header">
                       <h4>Основное</h4>
-                      {!fromGbif && (
-                        <button
-                          type="button"
-                          className="popup-filters-reset"
-                          onClick={() => onFiltersReset?.()}
-                          disabled={!canResetFilters}
-                          aria-label="Сбросить все фильтры свойств"
-                          title="Сбросить все фильтры свойств"
-                        >
-                          Сброс
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="popup-filters-reset"
+                        onClick={() => onFiltersReset?.()}
+                        disabled={!canResetFilters}
+                        aria-label="Сбросить все фильтры свойств"
+                        title="Сбросить все фильтры свойств"
+                      >
+                        Сброс
+                      </button>
                     </div>
 
                     {displayProperties.map(([key, value]) => (
-                      <div
-                        key={key}
-                        className={`popup-item${fromGbif ? "" : " popup-item--filter"}`}
-                      >
+                      <div key={key} className="popup-item popup-item--filter">
                         <div className="popup-item-text">
                           <strong>{getPropertyLabel(key)}:</strong>
                           <span>{formatPropertyValue(key, value)}</span>
                         </div>
-                        {!fromGbif && (
-                          <label className="property-switch" title="Показать маркеры с этим свойством">
-                            <input
-                              type="checkbox"
-                              // Фильтр по точному совпадению пары ключ–значение.
-                              checked={activeFilters[key] === value}
-                              onChange={(e) => onFilterChange?.(key, value, e.target.checked)}
-                            />
-                            <span className="property-switch-slider" />
-                          </label>
-                        )}
+                        <label className="property-switch" title="Показать маркеры с этим свойством">
+                          <input
+                            type="checkbox"
+                            // Фильтр по точному совпадению пары ключ–значение.
+                            checked={activeFilters[key] === value}
+                            onChange={(e) => onFilterChange?.(key, value, e.target.checked)}
+                          />
+                          <span className="property-switch-slider" />
+                        </label>
                       </div>
                     ))}
 

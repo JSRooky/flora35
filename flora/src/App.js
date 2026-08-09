@@ -18,6 +18,7 @@ import {
   featureMatchesFilters,
   isFeatureUnclusteredOnMap,
   getContainedPointsSummaryForWithinFeature,
+  applyGbifLocationsFilter,
   reloadLocationsData,
   setClusterByRegnum,
   setClusteringEnabled,
@@ -147,7 +148,7 @@ import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
-import { addGbifLayer, setGbifVisibility } from "./components/addGbifLayer";
+import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum } from "./components/addGbifLayer";
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
 import GbifPanel from "./components/GbifPanel";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
@@ -251,7 +252,6 @@ export default function MapView() {
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
   const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.ALL);
   const gbifOnly = dataSourceMode === DATA_SOURCE_MODES.GBIF;
-  const markersVisibleBeforeGbifOnlyRef = useRef(DEFAULT_MARKERS_VISIBLE);
   const prevGbifOnlyRef = useRef(gbifOnly);
   const [panelCollapsed, setPanelCollapsed] = useState({});
   const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
@@ -1527,6 +1527,7 @@ export default function MapView() {
       return;
     }
 
+    applyGbifLocationsFilter(map.current, locationFilters);
     updateHeatmapData(map.current, locationFilters);
     refreshAreal();
   }, [mapReady, locationFilters, refreshAreal, syncYearBounds]);
@@ -1536,19 +1537,13 @@ export default function MapView() {
       return;
     }
 
-    if (gbifOnly) {
-      markersVisibleBeforeGbifOnlyRef.current = markersVisible;
-      setMarkersVisibleState(false);
-      if (map.current) {
-        setGbifVisibility(map.current, true);
-      }
-    } else {
-      setMarkersVisibleState(markersVisibleBeforeGbifOnlyRef.current);
+    if (gbifOnly && map.current) {
+      // Локальные маркеры скрываем на карте, но markersVisible в UI не трогаем —
+      // иначе «Группы точек» блокирует кластеризацию.
+      setGbifVisibility(map.current, true);
     }
 
     prevGbifOnlyRef.current = gbifOnly;
-    // markersVisible читаем только в момент входа в режим GBIF
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gbifOnly]);
 
   useEffect(() => {
@@ -1570,8 +1565,11 @@ export default function MapView() {
       return;
     }
 
-    // В режиме «GBIF» локальные маркеры всегда скрыты.
+    // В режиме GBIF локальные маркеры скрыты; «Скрыть точки» управляет слоем GBIF.
     setMarkersVisible(map.current, gbifOnly ? false : mapMarkersVisible);
+    if (gbifOnly) {
+      setGbifVisibility(map.current, mapMarkersVisible);
+    }
   }, [mapMarkersVisible, gbifOnly, mapReady]);
 
   useEffect(() => {
@@ -1580,7 +1578,9 @@ export default function MapView() {
     }
 
     setClusteringEnabled(map.current, clusteringEnabled);
-  }, [clusteringEnabled, mapReady]);
+    setGbifClusteringEnabled(map.current, clusteringEnabled);
+    applyGbifLocationsFilter(map.current, locationFilters);
+  }, [clusteringEnabled, mapReady, locationFilters]);
 
   useEffect(() => {
     if (!map.current || !mapReady || !clusteringEnabled) {
@@ -1588,7 +1588,9 @@ export default function MapView() {
     }
 
     setClusterByRegnum(map.current, clusterByRegnum);
-  }, [clusterByRegnum, clusteringEnabled, mapReady]);
+    setGbifClusterByRegnum(map.current, clusterByRegnum);
+    applyGbifLocationsFilter(map.current, locationFilters);
+  }, [clusterByRegnum, clusteringEnabled, mapReady, locationFilters]);
 
   useEffect(() => {
     if (!map.current || !mapReady || !clusteringEnabled) {
@@ -2193,6 +2195,12 @@ export default function MapView() {
   }, []);
 
   const clearPointSelection = useCallback(() => {
+    // Панель GBIF привязана к источнику «Точки», а не к модулю — сворачиваем
+    // даже если выбора точки нет (иначе клик мимо её не закрывал).
+    setPanelCollapsed((prev) =>
+      prev[PANEL_IDS.GBIF] ? prev : { ...prev, [PANEL_IDS.GBIF]: true }
+    );
+
     const state = pointSelectionStateRef.current;
 
     // Ранний выход, если ничего из связанного с выбором точки не активно —
@@ -2218,6 +2226,7 @@ export default function MapView() {
 
     if (map.current) {
       clearSharedPointPin(map.current);
+      clearSelectedPointHighlight(map.current);
       hideArealPointHint();
       clearArealLayer(map.current);
       clearBufferLayer(map.current);

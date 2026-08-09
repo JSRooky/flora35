@@ -1,20 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  clearGbifLayer,
-  setGbifData,
-  setGbifVisibility
-} from "./addGbifLayer";
+import { setGbifData, setGbifVisibility } from "./addGbifLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import {
   GBIF_MAP_UPDATE_PAGES,
   GBIF_PAGE_SIZE,
+  getGbifNetworkErrorMessage,
+  isGbifAbortError,
   loadOccurrencesForRegion,
   previewOccurrenceCount,
   withUpdateSinceExtras
 } from "../gbif/gbifClient";
 import {
-  appendGbifFeatures,
   getGbifFeatureCollection,
   getGbifFeatureCount,
   getGbifLoadedQuery,
@@ -24,10 +21,7 @@ import {
   setGbifSyncedAt,
   upsertGbifFeatures
 } from "../gbif/gbifStore";
-import {
-  clearGbifStoreAndPersistence,
-  persistGbifSnapshot
-} from "../gbif/gbifPersistence";
+import { persistGbifSnapshot } from "../gbif/gbifPersistence";
 import {
   DEFAULT_GBIF_REGION_ID,
   GBIF_REGIONS,
@@ -75,6 +69,40 @@ function buildQuerySnapshot({
     taxonQuery,
     taxonSelected
   };
+}
+
+/** Сравнивает ключевые поля запроса загрузки (без учёта текста, если выбран таксон/семейство). */
+function isSameGbifQuery(a, b) {
+  if (!a || !b) {
+    return false;
+  }
+
+  if (a.regionId !== b.regionId || a.kingdomId !== b.kingdomId) {
+    return false;
+  }
+
+  const aTaxonKey = a.taxonSelected?.taxonKey ?? null;
+  const bTaxonKey = b.taxonSelected?.taxonKey ?? null;
+  if (aTaxonKey !== bTaxonKey) {
+    return false;
+  }
+
+  const aFamilyKey = a.familySelected?.familyKey ?? null;
+  const bFamilyKey = b.familySelected?.familyKey ?? null;
+  if (aFamilyKey !== bFamilyKey) {
+    return false;
+  }
+
+  // Без выбранных ключей сравниваем введённый текст.
+  if (aTaxonKey == null && (a.taxonQuery || "").trim() !== (b.taxonQuery || "").trim()) {
+    return false;
+  }
+
+  if (aFamilyKey == null && (a.familyQuery || "").trim() !== (b.familyQuery || "").trim()) {
+    return false;
+  }
+
+  return true;
 }
 
 /** Грубая оценка размера снимка в IndexedDB (~400 байт на точку). */
@@ -128,6 +156,7 @@ export default function GbifPanel({
   const [updateAdded, setUpdateAdded] = useState(0);
   const [updateFetched, setUpdateFetched] = useState(0);
   const [syncedAt, setSyncedAtState] = useState(() => getGbifSyncedAt());
+  const [savedQuery, setSavedQuery] = useState(() => getGbifLoadedQuery());
   const [error, setError] = useState(null);
   const [layerVisible, setLayerVisibleState] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -141,7 +170,26 @@ export default function GbifPanel({
   const region = getGbifRegionById(regionId);
   const kingdom = getGbifKingdomById(kingdomId);
   const hasDataset = loaded > 0;
-  const filtersLocked = hasDataset;
+
+  const currentQuery = useMemo(
+    () =>
+      buildQuerySnapshot({
+        regionId,
+        kingdomId,
+        familyQuery,
+        familySelected,
+        taxonQuery,
+        taxonSelected
+      }),
+    [regionId, kingdomId, familyQuery, familySelected, taxonQuery, taxonSelected]
+  );
+
+  const sameAsLoadedQuery = useMemo(
+    () => isSameGbifQuery(currentQuery, savedQuery),
+    [currentQuery, savedQuery]
+  );
+
+  const incrementalUpdate = hasDataset && sameAsLoadedQuery && Boolean(syncedAt);
 
   const extras = useMemo(
     () =>
@@ -154,8 +202,8 @@ export default function GbifPanel({
   );
 
   const requestExtras = useMemo(
-    () => (hasDataset ? withUpdateSinceExtras(extras, syncedAt) : extras),
-    [hasDataset, extras, syncedAt]
+    () => (incrementalUpdate ? withUpdateSinceExtras(extras, syncedAt) : extras),
+    [incrementalUpdate, extras, syncedAt]
   );
 
   const canLoad = Boolean(map && region && kingdom && !loading);
@@ -185,29 +233,28 @@ export default function GbifPanel({
       });
     }
 
-    if (hasDataset) {
-      rows.push({
-        label: "Набор",
-        value: `${formatCount(loaded)} находок на этом компьютере`
-      });
-      rows.push({
-        label: "Обновления",
-        value:
-          previewCount != null
-            ? `≈ ${formatCount(previewCount)} записей с ${
-                syncedAt ? new Date(syncedAt).toLocaleDateString("ru-RU") : "последней синхронизации"
-              }${estimatedSizeLabel ? ` (${estimatedSizeLabel})` : ""}`
-            : "объём уточнится во время обновления"
-      });
-    } else {
-      rows.push({
-        label: "Объём",
-        value:
-          previewCount != null
-            ? `≈ ${formatCount(previewCount)} находок (~${formatCount(
+    rows.push({
+      label: "Объём",
+      value:
+        previewCount != null
+          ? incrementalUpdate
+            ? `≈ ${formatCount(previewCount)} обновлений${
+                estimatedSizeLabel ? ` (${estimatedSizeLabel})` : ""
+              }`
+            : `≈ ${formatCount(previewCount)} находок (~${formatCount(
                 Math.ceil(previewCount / GBIF_PAGE_SIZE)
               )} стр.)${estimatedSizeLabel ? `, ${estimatedSizeLabel}` : ""}`
+          : incrementalUpdate
+            ? "объём обновлений уточнится во время загрузки"
             : "объём уточнится во время загрузки"
+    });
+
+    if (hasDataset) {
+      rows.push({
+        label: "Уже на карте",
+        value: incrementalUpdate
+          ? `${formatCount(loaded)} находок (подтянутся только новые/изменённые)`
+          : `${formatCount(loaded)} находок (новые добавятся, дубликаты обновятся)`
       });
     }
 
@@ -225,7 +272,7 @@ export default function GbifPanel({
     estimatedSizeLabel,
     hasDataset,
     loaded,
-    syncedAt
+    incrementalUpdate
   ]);
 
   useEffect(() => {
@@ -299,7 +346,7 @@ export default function GbifPanel({
     return () => controller.abort();
   }, [debouncedTaxonQuery, taxonSelected, kingdom?.kingdomKey, kingdomId]);
 
-  // Оценка числа точек до загрузки / числа обновлений для текущего набора
+  // Оценка числа точек до загрузки по текущим фильтрам
   useEffect(() => {
     if (!region || !kingdom) {
       setPreviewCount(null);
@@ -319,7 +366,7 @@ export default function GbifPanel({
           }
         })
         .catch((err) => {
-          if (err?.name !== "AbortError") {
+          if (!isGbifAbortError(err, controller.signal)) {
             setPreviewCount(null);
           }
         })
@@ -360,7 +407,7 @@ export default function GbifPanel({
           return;
         }
       } catch (err) {
-        setError(err?.message || "Ошибка поиска таксона в GBIF");
+        setError(getGbifNetworkErrorMessage(err));
         setTaxonSelected(null);
         return;
       }
@@ -418,12 +465,6 @@ export default function GbifPanel({
       return;
     }
 
-    // Для уже сохранённого набора подтверждение не нужно — сразу обновляем.
-    if (hasDataset) {
-      handleLoad();
-      return;
-    }
-
     setConfirmOpen(true);
   };
 
@@ -436,34 +477,19 @@ export default function GbifPanel({
       return;
     }
 
-    const updating = hasDataset;
     setConfirmOpen(false);
 
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const querySnapshot = buildQuerySnapshot({
-      regionId,
-      kingdomId,
-      familyQuery,
-      familySelected,
-      taxonQuery,
-      taxonSelected
-    });
+    const querySnapshot = currentQuery;
 
     setError(null);
     setLoading(true);
     setTotal(previewCount);
     setUpdateAdded(0);
     setUpdateFetched(0);
-
-    if (!updating) {
-      setLoaded(0);
-      await clearGbifStoreAndPersistence();
-      clearGbifLayer(map);
-      notifyDataChange();
-    }
 
     let pagesSinceMapUpdate = 0;
     let addedTotal = 0;
@@ -477,21 +503,9 @@ export default function GbifPanel({
           fetchedTotal += features.length;
           setUpdateFetched(fetchedTotal);
 
-          if (updating) {
-            const { collection, added } = upsertGbifFeatures(features, region.id);
-            addedTotal += added;
-            setUpdateAdded(addedTotal);
-            setLoaded(collection.features.length);
-            pagesSinceMapUpdate += 1;
-
-            if (meta.endOfRecords || pagesSinceMapUpdate >= GBIF_MAP_UPDATE_PAGES) {
-              setGbifData(map, collection);
-              pagesSinceMapUpdate = 0;
-            }
-            return;
-          }
-
-          const collection = appendGbifFeatures(features, region.id);
+          const { collection, added } = upsertGbifFeatures(features, region.id);
+          addedTotal += added;
+          setUpdateAdded(addedTotal);
           setLoaded(collection.features.length);
           pagesSinceMapUpdate += 1;
 
@@ -509,14 +523,11 @@ export default function GbifPanel({
 
       setGbifData(map, getGbifFeatureCollection());
     } catch (err) {
-      if (err?.name === "AbortError") {
+      if (isGbifAbortError(err, controller.signal)) {
         setGbifData(map, getGbifFeatureCollection());
         setError(null);
       } else {
-        setError(
-          err?.message ||
-            (updating ? "Не удалось обновить данные GBIF" : "Не удалось загрузить данные GBIF")
-        );
+        setError(getGbifNetworkErrorMessage(err));
       }
     } finally {
       if (abortRef.current === controller) {
@@ -526,6 +537,7 @@ export default function GbifPanel({
       setLoading(false);
       setLoaded(getGbifFeatureCount());
       setGbifLoadedQuery(querySnapshot);
+      setSavedQuery(querySnapshot);
       setGbifSyncedAt(nextSyncedAt);
       setSyncedAtState(nextSyncedAt);
       await persistGbifSnapshot();
@@ -535,20 +547,6 @@ export default function GbifPanel({
 
   const handleCancel = () => {
     abortRef.current?.abort();
-  };
-
-  const handleClear = async () => {
-    abortRef.current?.abort();
-    await clearGbifStoreAndPersistence();
-    clearGbifLayer(map);
-    setLoaded(0);
-    setTotal(null);
-    setUpdateAdded(0);
-    setUpdateFetched(0);
-    setSyncedAtState(null);
-    setError(null);
-    setLoading(false);
-    notifyDataChange();
   };
 
   const handleVisibilityChange = (checked) => {
@@ -581,19 +579,18 @@ export default function GbifPanel({
       {collapsed ? (
         <p className="popup-collapsed-summary">
           {loading
-            ? hasDataset
-              ? `Обновление… +${formatCount(updateAdded)} · ${formatCount(loaded)}`
-              : `Загрузка… ${formatCount(loaded)}${total != null ? ` / ${formatCount(total)}` : ""}`
+            ? `Загрузка… +${formatCount(updateAdded)} · ${formatCount(loaded)}`
             : loaded > 0
-              ? `Набор: ${formatCount(loaded)}`
+              ? `На слое: ${formatCount(loaded)}`
               : "Слой пуст"}
         </p>
       ) : (
         <div className="gbif-panel-content">
           <p className="gbif-panel-hint">
-            {hasDataset
-              ? "Работаете с сохранённым набором GBIF. Фильтры зафиксированы — можно только подтянуть обновления или очистить набор и загрузить другой."
-              : "Внешние находки с GBIF на отдельном слое. Сначала выберите царство — это сильно уменьшает объём загрузки. Семейство и вид необязательны."}
+            Внешние находки с GBIF на отдельном слое карты. Выберите фильтры и нажмите
+            «Загрузить» — точки добавятся к уже сохранённым (дубликаты по GBIF ID
+            обновятся). Загруженные данные участвуют в инструментах так же, как локальные
+            точки.
           </p>
 
           <label className="gbif-panel-field" htmlFor="gbif-region-select">
@@ -602,7 +599,7 @@ export default function GbifPanel({
               id="gbif-region-select"
               className="gbif-panel-select"
               value={regionId}
-              disabled={loading || filtersLocked}
+              disabled={loading}
               onChange={(event) => setRegionId(event.target.value)}
             >
               {GBIF_REGIONS.map(({ id, label }) => (
@@ -619,7 +616,7 @@ export default function GbifPanel({
               id="gbif-kingdom-select"
               className="gbif-panel-select"
               value={kingdomId}
-              disabled={loading || filtersLocked}
+              disabled={loading}
               onChange={(event) => handleKingdomChange(event.target.value)}
             >
               {GBIF_KINGDOMS.map(({ id, label }) => (
@@ -641,7 +638,7 @@ export default function GbifPanel({
               autoComplete="off"
               placeholder="Например, Betulaceae"
               value={familyQuery}
-              disabled={loading || filtersLocked}
+              disabled={loading}
               onChange={(event) => handleFamilyInputChange(event.target.value)}
             />
             {familySuggestions.length > 0 && (
@@ -679,7 +676,7 @@ export default function GbifPanel({
               autoComplete="off"
               placeholder="Betula pendula или Берёза"
               value={taxonQuery}
-              disabled={loading || filtersLocked}
+              disabled={loading}
               onChange={(event) => handleTaxonInputChange(event.target.value)}
             />
             {taxonSuggestions.length > 0 && (
@@ -718,57 +715,50 @@ export default function GbifPanel({
           >
             <div className="gbif-panel-status-text">
               {loading ? (
-                hasDataset ? (
-                  <>
-                    Обновление: получено <strong>{formatCount(updateFetched)}</strong>
-                    {total != null ? (
-                      <>
-                        {" "}
-                        из <strong>{formatCount(total)}</strong>
-                      </>
-                    ) : null}
-                    {" · "}
-                    новых <strong>{formatCount(updateAdded)}</strong>
-                    {" · "}
-                    на карте <strong>{formatCount(loaded)}</strong>
-                  </>
-                ) : (
-                  <>
-                    Загрузка: <strong>{formatCount(loaded)}</strong>
-                    {total != null ? (
-                      <>
-                        {" "}
-                        из <strong>{formatCount(total)}</strong>
-                      </>
-                    ) : null}
-                  </>
-                )
-              ) : previewLoading ? (
-                hasDataset ? "Оценка обновлений…" : "Оценка числа находок…"
-              ) : hasDataset ? (
                 <>
-                  Набор: <strong>{formatCount(loaded)}</strong>
-                  {syncedAt ? (
+                  Загрузка: получено <strong>{formatCount(updateFetched)}</strong>
+                  {total != null ? (
                     <>
-                      {" · "}
-                      синхр. {new Date(syncedAt).toLocaleString("ru-RU")}
+                      {" "}
+                      из <strong>{formatCount(total)}</strong>
+                    </>
+                  ) : null}
+                  {" · "}
+                  новых <strong>{formatCount(updateAdded)}</strong>
+                  {" · "}
+                  на слое <strong>{formatCount(loaded)}</strong>
+                </>
+              ) : previewLoading ? (
+                incrementalUpdate ? "Оценка обновлений…" : "Оценка числа находок…"
+              ) : (
+                <>
+                  {hasDataset ? (
+                    <>
+                      На слое: <strong>{formatCount(loaded)}</strong>
+                      {syncedAt ? (
+                        <>
+                          {" · "}
+                          синхр. {new Date(syncedAt).toLocaleString("ru-RU")}
+                        </>
+                      ) : null}
+                      {previewCount != null ? " · " : null}
                     </>
                   ) : null}
                   {previewCount != null ? (
                     <>
-                      {" · "}
-                      обновлений ≈ <strong>{formatCount(previewCount)}</strong>
+                      {incrementalUpdate ? "обновлений" : "По фильтрам"} ≈{" "}
+                      <strong>{formatCount(previewCount)}</strong>
+                      {!incrementalUpdate ? (
+                        <>
+                          {" "}
+                          (~{formatCount(Math.ceil(previewCount / GBIF_PAGE_SIZE))} стр.)
+                        </>
+                      ) : null}
                     </>
-                  ) : null}
+                  ) : hasDataset ? null : (
+                    "Задайте фильтры, чтобы увидеть оценку"
+                  )}
                 </>
-              ) : previewCount != null ? (
-                <>
-                  По фильтрам ≈ <strong>{formatCount(previewCount)}</strong>
-                  {" "}
-                  (~{formatCount(Math.ceil(previewCount / GBIF_PAGE_SIZE))} стр.)
-                </>
-              ) : (
-                "Задайте фильтры, чтобы увидеть оценку"
               )}
             </div>
             <div
@@ -814,7 +804,7 @@ export default function GbifPanel({
               disabled={!canLoad}
               onClick={handleLoadClick}
             >
-              {hasDataset ? "Обновить" : "Загрузить"}
+              {incrementalUpdate ? "Обновить" : "Загрузить"}
             </button>
             <button
               type="button"
@@ -823,14 +813,6 @@ export default function GbifPanel({
               onClick={handleCancel}
             >
               Отменить
-            </button>
-            <button
-              type="button"
-              className="gbif-panel-btn gbif-panel-btn--danger"
-              disabled={loading || loaded === 0}
-              onClick={handleClear}
-            >
-              Очистить
             </button>
           </div>
 
@@ -859,12 +841,12 @@ export default function GbifPanel({
             onClick={(event) => event.stopPropagation()}
           >
             <h4 id="gbif-confirm-title" className="gbif-confirm-title">
-              {hasDataset ? "Подтверждение обновления" : "Подтверждение загрузки"}
+              {incrementalUpdate ? "Подтверждение обновления" : "Подтверждение загрузки"}
             </h4>
             <p className="gbif-confirm-text">
-              {hasDataset
-                ? "Подтянуть только обновления текущего набора GBIF на этот компьютер? Уже сохранённые точки останутся, новые и изменённые записи будут добавлены в локальное хранилище."
-                : "Загрузить выбранные данные GBIF на этот компьютер? Они будут сохранены в локальном хранилище браузера. После загрузки набор зафиксируется — дальше можно будет только обновлять его."}
+              {incrementalUpdate
+                ? "Подтянуть только новые и изменённые записи GBIF с момента последней синхронизации? Уже сохранённые точки останутся."
+                : "Загрузить выбранные данные GBIF на этот компьютер? Они сохранятся в локальном хранилище браузера и добавятся к уже загруженным точкам (совпадения по GBIF ID будут обновлены)."}
             </p>
             <dl className="gbif-confirm-details">
               {confirmDetails.map(({ label, value }) => (
@@ -883,7 +865,7 @@ export default function GbifPanel({
                 Отмена
               </button>
               <button type="button" className="gbif-panel-btn" onClick={handleLoad}>
-                {hasDataset ? "Обновить" : "Загрузить"}
+                {incrementalUpdate ? "Обновить" : "Загрузить"}
               </button>
             </div>
           </div>
