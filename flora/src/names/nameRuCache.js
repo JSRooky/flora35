@@ -7,6 +7,17 @@ const STORE_NAME = "entries";
 /** @type {Map<string, { nameRu: string|null, source: string|null, resolvedAt: string }>} */
 const memoryCache = new Map();
 let hydrated = false;
+/** Версия overlay — для инвалидации кэша обогащённой GBIF-коллекции. */
+let overlayVersion = 0;
+
+function bumpOverlayVersion() {
+  overlayVersion += 1;
+}
+
+/** Счётчик изменений overlay (hydrate / set / clear / seed). */
+export function getOverlayVersion() {
+  return overlayVersion;
+}
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -61,6 +72,7 @@ function cacheKey(nameLatin) {
 export async function hydrateNameRuOverlay() {
   memoryCache.clear();
   hydrated = false;
+  bumpOverlayVersion();
 
   if (typeof indexedDB === "undefined") {
     hydrated = true;
@@ -89,6 +101,7 @@ export async function hydrateNameRuOverlay() {
   }
 
   hydrated = true;
+  bumpOverlayVersion();
   return memoryCache.size;
 }
 
@@ -170,6 +183,7 @@ export async function setCachedRussianName(nameLatin, { nameRu, source = null } 
     console.warn("Failed to persist name-ru cache:", error);
   }
 
+  bumpOverlayVersion();
   return entry;
 }
 
@@ -194,6 +208,7 @@ export async function clearCachedRussianName(nameLatin) {
     console.warn("Failed to clear name-ru cache:", error);
   }
 
+  bumpOverlayVersion();
   return true;
 }
 
@@ -211,6 +226,7 @@ export function seedOverlayInMemory(nameLatin, { nameRu, source = null } = {}) {
   };
 
   memoryCache.set(key, entry);
+  bumpOverlayVersion();
   return entry;
 }
 

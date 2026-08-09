@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ReactComponent as MainLogo } from "../images/main_logo.svg";
 import { DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
 import UserAccountControl from "./UserAccountControl";
@@ -28,6 +28,8 @@ export const MODULE_IDS = {
   SUBMIT: "submit",
   // Модуль загрузки находок GBIF на отдельный слой карты.
   GBIF: "gbif",
+  // Клиентские фильтры загруженного слоя GBIF — раздел ## gbif-processing.
+  GBIF_PROCESSING: "gbif-processing",
   ABOUT: "about"
 };
 
@@ -41,14 +43,25 @@ const TIME_MODULE_ITEMS = [
   { id: MODULE_IDS.TIMELINE, label: "Таймлайн", timeAccent: true }
 ];
 
-const MAP_MODULE_ITEMS = [
-  { id: MODULE_IDS.MAP, label: "Группы точек", mapToolAccent: true },
+const MAP_DISPLAY_MODULE_ITEM = {
+  id: MODULE_IDS.MAP,
+  label: "Группы точек",
+  mapToolAccent: true
+};
+
+/** Инструменты карты в выпадающем меню «Инструменты». */
+const TOOL_MODULE_ITEMS = [
   { id: MODULE_IDS.AREAL, label: "Радиус", mapToolAccent: true },
   { id: MODULE_IDS.BUFFER, label: "Буфер", mapToolAccent: true },
   { id: MODULE_IDS.POLYGON, label: "Полигон", mapToolAccent: true },
   { id: MODULE_IDS.AREA, label: "Область", mapToolAccent: true },
   { id: MODULE_IDS.OOPT, label: "ООПТ", mapToolAccent: true }
 ];
+
+const TOOL_MODULE_IDS = new Set([
+  ...TOOL_MODULE_ITEMS.map((item) => item.id),
+  MODULE_IDS.OOPT_FEATURE
+]);
 
 const TEST_MODULE_ITEMS = [
   { id: MODULE_IDS.SUBMIT, label: "Новая находка" }
@@ -58,6 +71,10 @@ const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
 
 function isPointRequiredModule(id) {
   return id === MODULE_IDS.AREAL || id === MODULE_IDS.BUFFER;
+}
+
+function isToolModuleActive(activeModule) {
+  return TOOL_MODULE_IDS.has(activeModule);
 }
 
 const DISABLED_POINT_REQUIRED_TITLE = "Выберите точку";
@@ -98,6 +115,139 @@ function ModuleMenuButton({
   }
 
   return button;
+}
+
+function getToolItemDisabledState(id, { pointSelected, arealBlocked, bufferBlocked }) {
+  const pointRequired = isPointRequiredModule(id) && !pointSelected;
+  const blockedByOtherTool =
+    (id === MODULE_IDS.AREAL && arealBlocked) || (id === MODULE_IDS.BUFFER && bufferBlocked);
+  const disabled = pointRequired || blockedByOtherTool;
+  const disabledTitle = pointRequired
+    ? DISABLED_POINT_REQUIRED_TITLE
+    : id === MODULE_IDS.AREAL
+      ? DISABLED_AREAL_BY_BUFFER_TITLE
+      : DISABLED_BUFFER_BY_AREAL_TITLE;
+
+  return { disabled, disabledTitle };
+}
+
+function ToolsDropdown({
+  activeModule,
+  onModuleSelect,
+  pointSelected,
+  arealBlocked,
+  bufferBlocked
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const toolsActive = isToolModuleActive(activeModule);
+  const activeToolLabel =
+    TOOL_MODULE_ITEMS.find((item) => item.id === activeModule)?.label ||
+    (activeModule === MODULE_IDS.OOPT_FEATURE ? "ООПТ" : null);
+
+  const handleDocumentClick = useCallback(
+    (event) => {
+      if (!open) {
+        return;
+      }
+
+      if (!wrapRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    },
+    [open]
+  );
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    document.addEventListener("mousedown", handleDocumentClick);
+    return () => document.removeEventListener("mousedown", handleDocumentClick);
+  }, [handleDocumentClick, open]);
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
+
+  const handleSelect = (id) => {
+    onModuleSelect(id);
+    setOpen(false);
+  };
+
+  return (
+    <div className="module-menu-tools" ref={wrapRef}>
+      <button
+        type="button"
+        className={`module-menu-btn module-menu-btn--map-tool module-menu-tools-trigger${
+          toolsActive ? " module-menu-btn--active" : ""
+        }${open ? " module-menu-tools-trigger--open" : ""}`}
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={activeToolLabel ? `Инструменты · ${activeToolLabel}` : "Инструменты"}
+      >
+        <span>Инструменты</span>
+        <span className="module-menu-tools-chevron" aria-hidden="true">
+          ▾
+        </span>
+      </button>
+
+      {open ? (
+        <ul className="module-menu-tools-dropdown" role="menu" aria-label="Инструменты карты">
+          {TOOL_MODULE_ITEMS.map(({ id, label }) => {
+            const { disabled, disabledTitle } = getToolItemDisabledState(id, {
+              pointSelected,
+              arealBlocked,
+              bufferBlocked
+            });
+            const itemActive =
+              activeModule === id ||
+              (id === MODULE_IDS.OOPT && activeModule === MODULE_IDS.OOPT_FEATURE);
+
+            const itemButton = (
+              <button
+                type="button"
+                className={`module-menu-tools-item${
+                  itemActive ? " module-menu-tools-item--active" : ""
+                }${disabled ? " module-menu-tools-item--disabled" : ""}`}
+                role="menuitem"
+                disabled={disabled}
+                aria-current={itemActive ? "true" : undefined}
+                onClick={() => !disabled && handleSelect(id)}
+              >
+                {label}
+              </button>
+            );
+
+            return (
+              <li key={id} role="none">
+                {disabled ? (
+                  <span className="module-menu-btn-wrap" title={disabledTitle}>
+                    {itemButton}
+                  </span>
+                ) : (
+                  itemButton
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
+  );
 }
 
 /** Верхнее меню модулей приложения: выбор активного модуля и общие переключатели карты. */
@@ -158,7 +308,16 @@ export default function ModuleMenu({
           <li className="module-menu-separator" aria-hidden="true" />
           {TIME_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator" aria-hidden="true" />
-          {MAP_MODULE_ITEMS.map(renderModuleItem)}
+          {renderModuleItem(MAP_DISPLAY_MODULE_ITEM)}
+          <li>
+            <ToolsDropdown
+              activeModule={activeModule}
+              onModuleSelect={onModuleSelect}
+              pointSelected={pointSelected}
+              arealBlocked={arealBlocked}
+              bufferBlocked={bufferBlocked}
+            />
+          </li>
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />
           {TEST_MODULE_ITEMS.map(renderModuleItem)}
           <li className="module-menu-separator" aria-hidden="true" />

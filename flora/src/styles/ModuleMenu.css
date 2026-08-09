@@ -154,6 +154,92 @@
   background: var(--map-tool-accent-soft-hover);
 }
 
+.module-menu-tools {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.module-menu-tools-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.module-menu-tools-chevron {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.75;
+  transition: transform 0.15s ease;
+}
+
+.module-menu-tools-trigger--open .module-menu-tools-chevron {
+  transform: rotate(180deg);
+}
+
+.module-menu-tools-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  min-width: 148px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(42, 157, 143, 0.28);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.14),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.module-menu-tools-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.module-menu-tools-item:hover {
+  background: var(--map-tool-accent-soft);
+}
+
+.module-menu-tools-item--active {
+  color: var(--map-tool-accent);
+  font-weight: 600;
+  background: var(--map-tool-accent-soft);
+}
+
+.module-menu-tools-item--active:hover {
+  background: var(--map-tool-accent-soft-hover);
+}
+
+.module-menu-tools-item--disabled,
+.module-menu-tools-item:disabled {
+  color: rgba(29, 29, 31, 0.35);
+  cursor: not-allowed;
+}
+
+.module-menu-tools-item--disabled:hover,
+.module-menu-tools-item:disabled:hover {
+  background: transparent;
+}
+
 .module-menu-btn--disabled,
 .module-menu-btn:disabled {
   color: rgba(29, 29, 31, 0.35);

@@ -1,4 +1,4 @@
-import { getOverlayEntry } from "../names/nameRuCache";
+import { getOverlayEntry, getOverlayVersion } from "../names/nameRuCache";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -11,6 +11,15 @@ let loadedRegionId = null;
 let loadedQuery = null;
 /** ISO-время последней полной загрузки / обновления (для lastInterpreted). */
 let syncedAt = null;
+
+/** Кэш обогащённой коллекции: не пересчитывать enrich на каждый get. */
+let enrichedCollectionCache = null;
+let enrichedCollectionOverlayVersion = -1;
+
+function invalidateEnrichedCollectionCache() {
+  enrichedCollectionCache = null;
+  enrichedCollectionOverlayVersion = -1;
+}
 
 function resolveEffectiveNameRu(feature) {
   const nameLatin = feature?.properties?.name_latin;
@@ -52,6 +61,11 @@ function buildEnrichedCollection(collection = gbifCollection) {
   };
 }
 
+/** Сбрасывает кэш обогащённой коллекции (после записи store или overlay). */
+export function invalidateGbifEnrichmentCache() {
+  invalidateEnrichedCollectionCache();
+}
+
 /** Raw коллекция GBIF без overlay (для persist и внутренних записей). */
 export function getGbifFeatureCollectionRaw() {
   return gbifCollection;
@@ -59,7 +73,18 @@ export function getGbifFeatureCollectionRaw() {
 
 /** Коллекция GBIF с overlay русских названий (для UI, карты, инструментов). */
 export function getGbifFeatureCollection() {
-  return buildEnrichedCollection();
+  const overlayVersion = getOverlayVersion();
+
+  if (
+    enrichedCollectionCache &&
+    enrichedCollectionOverlayVersion === overlayVersion
+  ) {
+    return enrichedCollectionCache;
+  }
+
+  enrichedCollectionCache = buildEnrichedCollection();
+  enrichedCollectionOverlayVersion = overlayVersion;
+  return enrichedCollectionCache;
 }
 
 /** Id региона, для которого загружены данные (или null). */
@@ -130,6 +155,7 @@ export function setGbifFeatureCollection(collection, regionId = null) {
     ? collection
     : EMPTY_COLLECTION;
   loadedRegionId = regionId;
+  invalidateEnrichedCollectionCache();
   return gbifCollection;
 }
 
@@ -151,6 +177,7 @@ export function appendGbifFeatures(features, regionId = null) {
     loadedRegionId = regionId;
   }
 
+  invalidateEnrichedCollectionCache();
   return getGbifFeatureCollection();
 }
 
@@ -201,6 +228,7 @@ export function upsertGbifFeatures(features, regionId = null) {
     loadedRegionId = regionId;
   }
 
+  invalidateEnrichedCollectionCache();
   return { collection: getGbifFeatureCollection(), added, updated };
 }
 
@@ -210,5 +238,6 @@ export function clearGbifStore() {
   loadedRegionId = null;
   loadedQuery = null;
   syncedAt = null;
+  invalidateEnrichedCollectionCache();
   return gbifCollection;
 }

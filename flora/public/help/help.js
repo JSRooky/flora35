@@ -10,7 +10,9 @@ const HELP_SECTION_LABELS = {
   dense: "Обработка плотных групп",
   oopt: "ООПТ",
   "oopt-feature": "Сведения об ООПТ",
-  submit: "Ввод данных о находке"
+  submit: "Ввод данных о находке",
+  gbif: "Данные GBIF",
+  "gbif-processing": "Обработка данных GBIF"
 };
 
 const HELP_SECTION_IDS = Object.keys(HELP_SECTION_LABELS);

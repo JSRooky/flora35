@@ -7,6 +7,10 @@ import {
 import { getFeatureCollection } from "../locations/loadPoints";
 import { findGbifFeatureByKey, getGbifFeatureCollection } from "../gbif/gbifStore";
 import {
+  applyGbifProcessingFilters,
+  createDefaultGbifProcessingFilters
+} from "../gbif/gbifProcessingFilters";
+import {
   GBIF_SOURCE_ID,
   getGbifInteractiveLayerIds,
   getGbifSourceIds,
@@ -98,6 +102,15 @@ let clusterPieChartMarkersOnScreen = {};
 let clusterPieChartRenderHandler = null;
 let clusterPieChartMap = null;
 let currentFilters = {};
+/** Клиентские фильтры панели «Обработка данных GBIF» (не влияют на локальный слой). */
+let gbifProcessingFilters = createDefaultGbifProcessingFilters();
+/** Кэш видимых GBIF после processing + locationFilters. */
+let visibleGbifCache = {
+  locationFilters: null,
+  processingFilters: null,
+  enrichedRef: null,
+  features: null
+};
 let currentFilteredFeatures = [];
 let speciesPointCountsOnMap = new Map();
 let interactionHandlers = null;
@@ -1934,14 +1947,14 @@ export function getToolFeatures(filters = {}) {
   const features = [];
 
   if (toolIncludeLocal && locationsData?.features?.length) {
-    features.push(...locationsData.features);
+    features.push(...filterFeatures(locationsData.features, filters));
   }
 
   if (toolIncludeGbif && isGbifLayerVisible()) {
-    features.push(...(getGbifFeatureCollection().features ?? []));
+    features.push(...getVisibleGbifFeatures(filters));
   }
 
-  return filterFeatures(features, filters);
+  return features;
 }
 
 /** Сводка по точкам внутри GeoJSON-объекта с учётом фильтров (без within-фильтра в base). */
@@ -2117,6 +2130,45 @@ export function featureMatchesFilters(feature, filters = {}) {
   return filterFeatures([feature], filters).length > 0;
 }
 
+function invalidateVisibleGbifCache() {
+  visibleGbifCache = {
+    locationFilters: null,
+    processingFilters: null,
+    enrichedRef: null,
+    features: null
+  };
+}
+
+/**
+ * Видимые GBIF-точки: enrich (cached) → processing filters → locationFilters.
+ * Короткий кэш по ссылкам на фильтры и enriched collection.
+ */
+export function getVisibleGbifFeatures(locationFilters = currentFilters) {
+  const enriched = getGbifFeatureCollection();
+  const enrichedFeatures = enriched.features ?? [];
+
+  if (
+    visibleGbifCache.features &&
+    visibleGbifCache.locationFilters === locationFilters &&
+    visibleGbifCache.processingFilters === gbifProcessingFilters &&
+    visibleGbifCache.enrichedRef === enriched
+  ) {
+    return visibleGbifCache.features;
+  }
+
+  const processed = applyGbifProcessingFilters(enrichedFeatures, gbifProcessingFilters);
+  const features = filterFeatures(processed, locationFilters);
+
+  visibleGbifCache = {
+    locationFilters,
+    processingFilters: gbifProcessingFilters,
+    enrichedRef: enriched,
+    features
+  };
+
+  return features;
+}
+
 /**
  * То же применение фильтров к слою GBIF: store остаётся полным,
  * на карту уходит отфильтрованная выборка (как у локальных точек).
@@ -2128,8 +2180,25 @@ export function applyGbifLocationsFilter(map, filters = currentFilters) {
 
   setGbifData(map, {
     type: "FeatureCollection",
-    features: filterFeatures(getGbifFeatureCollection().features ?? [], filters)
+    features: getVisibleGbifFeatures(filters)
   });
+}
+
+/** Задаёт клиентские фильтры обработки GBIF и обновляет слой на карте. */
+export function setGbifProcessingFilters(map, nextFilters) {
+  gbifProcessingFilters = {
+    ...createDefaultGbifProcessingFilters(),
+    ...(nextFilters ?? {})
+  };
+  invalidateVisibleGbifCache();
+
+  if (map) {
+    applyGbifLocationsFilter(map, currentFilters);
+  }
+}
+
+export function getGbifProcessingFilters() {
+  return gbifProcessingFilters;
 }
 
 /** Применяет фильтры точек: пересобирает слои, кроме частного случая сдвига года. */

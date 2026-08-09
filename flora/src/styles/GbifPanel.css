@@ -131,6 +131,19 @@
   gap: 8px;
 }
 
+.gbif-panel-btn--processing {
+  width: 100%;
+  margin-top: 4px;
+  border-color: #0f766e;
+  background: #fff;
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.gbif-panel-btn--processing:hover:not(:disabled) {
+  background: rgba(13, 148, 136, 0.08);
+}
+
 .gbif-panel-btn {
   appearance: none;
   border: 1px solid #0d9488;

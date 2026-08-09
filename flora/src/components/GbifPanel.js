@@ -27,12 +27,6 @@ import {
   GBIF_REGIONS,
   getGbifRegionById
 } from "../gbif/regions";
-import { matchScientificName, suggestFamilies, suggestTaxa } from "../gbif/speciesLookup";
-import {
-  GBIF_KINGDOMS,
-  buildTaxonSearchExtras,
-  getGbifKingdomById
-} from "../gbif/taxonFilters";
 import "../styles/GbifPanel.css";
 
 function formatCount(value) {
@@ -42,63 +36,26 @@ function formatCount(value) {
   return new Intl.NumberFormat("ru-RU").format(value);
 }
 
-function useDebouncedValue(value, delayMs) {
-  const [debounced, setDebounced] = useState(value);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebounced(value), delayMs);
-    return () => window.clearTimeout(timer);
-  }, [value, delayMs]);
-
-  return debounced;
+function buildQuerySnapshot(regionId) {
+  return { regionId };
 }
 
-function buildQuerySnapshot({
-  regionId,
-  kingdomId,
-  familyQuery,
-  familySelected,
-  taxonQuery,
-  taxonSelected
-}) {
-  return {
-    regionId,
-    kingdomId,
-    familyQuery,
-    familySelected,
-    taxonQuery,
-    taxonSelected
-  };
-}
-
-/** Сравнивает ключевые поля запроса загрузки (без учёта текста, если выбран таксон/семейство). */
+/**
+ * Сравнивает запросы загрузки: только регион.
+ * Старые снимки с фильтрами таксонов не считаются совпадением — нужна полная загрузка.
+ */
 function isSameGbifQuery(a, b) {
-  if (!a || !b) {
+  if (!a || !b || a.regionId !== b.regionId) {
     return false;
   }
 
-  if (a.regionId !== b.regionId || a.kingdomId !== b.kingdomId) {
-    return false;
-  }
-
-  const aTaxonKey = a.taxonSelected?.taxonKey ?? null;
-  const bTaxonKey = b.taxonSelected?.taxonKey ?? null;
-  if (aTaxonKey !== bTaxonKey) {
-    return false;
-  }
-
-  const aFamilyKey = a.familySelected?.familyKey ?? null;
-  const bFamilyKey = b.familySelected?.familyKey ?? null;
-  if (aFamilyKey !== bFamilyKey) {
-    return false;
-  }
-
-  // Без выбранных ключей сравниваем введённый текст.
-  if (aTaxonKey == null && (a.taxonQuery || "").trim() !== (b.taxonQuery || "").trim()) {
-    return false;
-  }
-
-  if (aFamilyKey == null && (a.familyQuery || "").trim() !== (b.familyQuery || "").trim()) {
+  if (
+    b.kingdomId ||
+    b.familySelected ||
+    b.taxonSelected ||
+    (b.familyQuery || "").trim() ||
+    (b.taxonQuery || "").trim()
+  ) {
     return false;
   }
 
@@ -119,16 +76,9 @@ function formatEstimatedSize(count) {
   return `≈ ${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
-function getInitialPanelState() {
+function getInitialRegionId() {
   const savedQuery = getGbifLoadedQuery();
-  return {
-    regionId: getGbifLoadedRegionId() || savedQuery?.regionId || DEFAULT_GBIF_REGION_ID,
-    kingdomId: savedQuery?.kingdomId || "plantae",
-    familyQuery: savedQuery?.familyQuery || "",
-    familySelected: savedQuery?.familySelected || null,
-    taxonQuery: savedQuery?.taxonQuery || "",
-    taxonSelected: savedQuery?.taxonSelected || null
-  };
+  return getGbifLoadedRegionId() || savedQuery?.regionId || DEFAULT_GBIF_REGION_ID;
 }
 
 /** Панель загрузки находок GBIF на отдельный слой карты. */
@@ -136,20 +86,13 @@ export default function GbifPanel({
   map,
   collapsed = false,
   onCollapsedChange,
-  onDataChange
+  onDataChange,
+  onOpenProcessing
 }) {
-  const initial = useMemo(() => getInitialPanelState(), []);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [regionId, setRegionId] = useState(initial.regionId);
-  const [kingdomId, setKingdomId] = useState(initial.kingdomId);
-  const [familyQuery, setFamilyQuery] = useState(initial.familyQuery);
-  const [familySelected, setFamilySelected] = useState(initial.familySelected);
-  const [familySuggestions, setFamilySuggestions] = useState([]);
-  const [taxonQuery, setTaxonQuery] = useState(initial.taxonQuery);
-  const [taxonSelected, setTaxonSelected] = useState(initial.taxonSelected);
-  const [taxonSuggestions, setTaxonSuggestions] = useState([]);
+  const [regionId, setRegionId] = useState(getInitialRegionId);
   const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(getGbifFeatureCount());
+  const [loaded, setLoaded] = useState(getGbifFeatureCount);
   const [total, setTotal] = useState(null);
   const [previewCount, setPreviewCount] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -162,27 +105,11 @@ export default function GbifPanel({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const abortRef = useRef(null);
   const previewAbortRef = useRef(null);
-  const suggestAbortRef = useRef(null);
-
-  const debouncedFamilyQuery = useDebouncedValue(familyQuery, 300);
-  const debouncedTaxonQuery = useDebouncedValue(taxonQuery, 300);
 
   const region = getGbifRegionById(regionId);
-  const kingdom = getGbifKingdomById(kingdomId);
   const hasDataset = loaded > 0;
 
-  const currentQuery = useMemo(
-    () =>
-      buildQuerySnapshot({
-        regionId,
-        kingdomId,
-        familyQuery,
-        familySelected,
-        taxonQuery,
-        taxonSelected
-      }),
-    [regionId, kingdomId, familyQuery, familySelected, taxonQuery, taxonSelected]
-  );
+  const currentQuery = useMemo(() => buildQuerySnapshot(regionId), [regionId]);
 
   const sameAsLoadedQuery = useMemo(
     () => isSameGbifQuery(currentQuery, savedQuery),
@@ -191,47 +118,16 @@ export default function GbifPanel({
 
   const incrementalUpdate = hasDataset && sameAsLoadedQuery && Boolean(syncedAt);
 
-  const extras = useMemo(
-    () =>
-      buildTaxonSearchExtras({
-        kingdomId,
-        family: familySelected,
-        taxon: taxonSelected
-      }),
-    [kingdomId, familySelected, taxonSelected]
-  );
-
   const requestExtras = useMemo(
-    () => (incrementalUpdate ? withUpdateSinceExtras(extras, syncedAt) : extras),
-    [incrementalUpdate, extras, syncedAt]
+    () => (incrementalUpdate ? withUpdateSinceExtras({}, syncedAt) : {}),
+    [incrementalUpdate, syncedAt]
   );
 
-  const canLoad = Boolean(map && region && kingdom && !loading);
+  const canLoad = Boolean(map && region && !loading);
   const estimatedSizeLabel = formatEstimatedSize(previewCount);
 
   const confirmDetails = useMemo(() => {
-    const rows = [
-      { label: "Регион", value: region?.label ?? regionId },
-      { label: "Царство", value: kingdom?.label ?? kingdomId }
-    ];
-
-    if (familySelected?.family || familyQuery.trim()) {
-      rows.push({
-        label: "Семейство",
-        value: familySelected?.family || familyQuery.trim()
-      });
-    }
-
-    if (taxonSelected?.scientificName || taxonQuery.trim()) {
-      rows.push({
-        label: "Вид / род",
-        value: taxonSelected?.scientificName
-          ? taxonSelected.vernacularName
-            ? `${taxonSelected.scientificName} (${taxonSelected.vernacularName})`
-            : taxonSelected.scientificName
-          : taxonQuery.trim()
-      });
-    }
+    const rows = [{ label: "Регион", value: region?.label ?? regionId }];
 
     rows.push({
       label: "Объём",
@@ -262,12 +158,6 @@ export default function GbifPanel({
   }, [
     region,
     regionId,
-    kingdom,
-    kingdomId,
-    familySelected,
-    familyQuery,
-    taxonSelected,
-    taxonQuery,
     previewCount,
     estimatedSizeLabel,
     hasDataset,
@@ -279,76 +169,12 @@ export default function GbifPanel({
     return () => {
       abortRef.current?.abort();
       previewAbortRef.current?.abort();
-      suggestAbortRef.current?.abort();
     };
   }, []);
 
-  // Подсказки семейств
+  // Оценка числа точек до загрузки по выбранному региону.
   useEffect(() => {
-    if (familySelected && familySelected.family === debouncedFamilyQuery.trim()) {
-      setFamilySuggestions([]);
-      return undefined;
-    }
-
-    const q = debouncedFamilyQuery.trim();
-    if (q.length < 2) {
-      setFamilySuggestions([]);
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    suggestFamilies(q, {
-      kingdomKey: kingdom?.kingdomKey,
-      signal: controller.signal
-    })
-      .then(setFamilySuggestions)
-      .catch((err) => {
-        if (err?.name !== "AbortError") {
-          setFamilySuggestions([]);
-        }
-      });
-
-    return () => controller.abort();
-  }, [debouncedFamilyQuery, familySelected, kingdom?.kingdomKey]);
-
-  // Подсказки таксонов (латынь / русский)
-  useEffect(() => {
-    if (
-      taxonSelected &&
-      (taxonSelected.scientificName === debouncedTaxonQuery.trim() ||
-        taxonSelected.vernacularName === debouncedTaxonQuery.trim())
-    ) {
-      setTaxonSuggestions([]);
-      return undefined;
-    }
-
-    const q = debouncedTaxonQuery.trim();
-    if (q.length < 2) {
-      setTaxonSuggestions([]);
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    suggestAbortRef.current = controller;
-
-    suggestTaxa(q, {
-      kingdomKey: kingdom?.kingdomKey,
-      kingdomId,
-      signal: controller.signal
-    })
-      .then(setTaxonSuggestions)
-      .catch((err) => {
-        if (err?.name !== "AbortError") {
-          setTaxonSuggestions([]);
-        }
-      });
-
-    return () => controller.abort();
-  }, [debouncedTaxonQuery, taxonSelected, kingdom?.kingdomKey, kingdomId]);
-
-  // Оценка числа точек до загрузки по текущим фильтрам
-  useEffect(() => {
-    if (!region || !kingdom) {
+    if (!region) {
       setPreviewCount(null);
       return undefined;
     }
@@ -381,80 +207,9 @@ export default function GbifPanel({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [region, kingdom, requestExtras]);
+  }, [region, requestExtras]);
 
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
-
-  const applyTaxonSelection = async (item) => {
-    setTaxonSuggestions([]);
-    setTaxonQuery(item.scientificName);
-
-    let resolved = item;
-
-    if (item.needsMatch || String(item.taxonKey).startsWith("local:")) {
-      try {
-        const matched = await matchScientificName(item.scientificName, {
-          kingdomKey: kingdom?.kingdomKey
-        });
-        if (matched) {
-          resolved = {
-            ...matched,
-            vernacularName: item.vernacularName || matched.vernacularName
-          };
-        } else {
-          setError(`Не удалось найти «${item.scientificName}» в GBIF`);
-          setTaxonSelected(null);
-          return;
-        }
-      } catch (err) {
-        setError(getGbifNetworkErrorMessage(err));
-        setTaxonSelected(null);
-        return;
-      }
-    }
-
-    setError(null);
-    setTaxonSelected(resolved);
-
-    if (resolved.family && resolved.familyKey) {
-      setFamilySelected({
-        familyKey: resolved.familyKey,
-        family: resolved.family,
-        scientificName: resolved.family,
-        kingdom: resolved.kingdom,
-        kingdomKey: resolved.kingdomKey
-      });
-      setFamilyQuery(resolved.family);
-    }
-  };
-
-  const handleKingdomChange = (nextId) => {
-    setKingdomId(nextId);
-    setFamilySelected(null);
-    setFamilyQuery("");
-    setFamilySuggestions([]);
-    setTaxonSelected(null);
-    setTaxonQuery("");
-    setTaxonSuggestions([]);
-  };
-
-  const handleFamilyInputChange = (value) => {
-    setFamilyQuery(value);
-    if (familySelected && familySelected.family !== value.trim()) {
-      setFamilySelected(null);
-    }
-  };
-
-  const handleTaxonInputChange = (value) => {
-    setTaxonQuery(value);
-    if (
-      taxonSelected &&
-      taxonSelected.scientificName !== value.trim() &&
-      taxonSelected.vernacularName !== value.trim()
-    ) {
-      setTaxonSelected(null);
-    }
-  };
 
   const notifyDataChange = () => {
     onDataChange?.();
@@ -587,10 +342,10 @@ export default function GbifPanel({
       ) : (
         <div className="gbif-panel-content">
           <p className="gbif-panel-hint">
-            Внешние находки с GBIF на отдельном слое карты. Выберите фильтры и нажмите
-            «Загрузить» — точки добавятся к уже сохранённым (дубликаты по GBIF ID
-            обновятся). Загруженные данные участвуют в инструментах так же, как локальные
-            точки.
+            Внешние находки GBIF на отдельном слое карты. Выберите регион и нажмите
+            «Загрузить» — точки сохранятся локально и добавятся к уже загруженным
+            (дубликаты по GBIF ID обновятся). Фильтры по царству, семейству и латыни —
+            в панели «Обработка данных GBIF».
           </p>
 
           <label className="gbif-panel-field" htmlFor="gbif-region-select">
@@ -609,105 +364,6 @@ export default function GbifPanel({
               ))}
             </select>
           </label>
-
-          <label className="gbif-panel-field" htmlFor="gbif-kingdom-select">
-            <span className="gbif-panel-label">Царство</span>
-            <select
-              id="gbif-kingdom-select"
-              className="gbif-panel-select"
-              value={kingdomId}
-              disabled={loading}
-              onChange={(event) => handleKingdomChange(event.target.value)}
-            >
-              {GBIF_KINGDOMS.map(({ id, label }) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="gbif-panel-field gbif-panel-autocomplete">
-            <label className="gbif-panel-label" htmlFor="gbif-family-input">
-              Семейство
-            </label>
-            <input
-              id="gbif-family-input"
-              className="gbif-panel-input"
-              type="text"
-              autoComplete="off"
-              placeholder="Например, Betulaceae"
-              value={familyQuery}
-              disabled={loading}
-              onChange={(event) => handleFamilyInputChange(event.target.value)}
-            />
-            {familySuggestions.length > 0 && (
-              <ul className="gbif-suggest-list" role="listbox">
-                {familySuggestions.map((item) => (
-                  <li key={item.familyKey}>
-                    <button
-                      type="button"
-                      className="gbif-suggest-item"
-                      onClick={() => {
-                        setFamilySelected(item);
-                        setFamilyQuery(item.family);
-                        setFamilySuggestions([]);
-                      }}
-                    >
-                      <span className="gbif-suggest-primary">{item.family}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {familySelected && (
-              <p className="gbif-panel-selected">Выбрано: {familySelected.family}</p>
-            )}
-          </div>
-
-          <div className="gbif-panel-field gbif-panel-autocomplete">
-            <label className="gbif-panel-label" htmlFor="gbif-taxon-input">
-              Вид / род (латынь или русский)
-            </label>
-            <input
-              id="gbif-taxon-input"
-              className="gbif-panel-input"
-              type="text"
-              autoComplete="off"
-              placeholder="Betula pendula или Берёза"
-              value={taxonQuery}
-              disabled={loading}
-              onChange={(event) => handleTaxonInputChange(event.target.value)}
-            />
-            {taxonSuggestions.length > 0 && (
-              <ul className="gbif-suggest-list" role="listbox">
-                {taxonSuggestions.map((item) => (
-                  <li key={item.taxonKey}>
-                    <button
-                      type="button"
-                      className="gbif-suggest-item"
-                      onClick={() => {
-                        applyTaxonSelection(item);
-                      }}
-                    >
-                      <span className="gbif-suggest-primary">{item.scientificName}</span>
-                      <span className="gbif-suggest-meta">
-                        {[item.vernacularName, item.rank, item.family]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {taxonSelected && (
-              <p className="gbif-panel-selected">
-                Выбрано: {taxonSelected.scientificName}
-                {taxonSelected.vernacularName ? ` (${taxonSelected.vernacularName})` : ""}
-              </p>
-            )}
-          </div>
 
           <div
             className={`gbif-panel-status${loading ? " gbif-panel-status--loading" : ""}`}
@@ -746,7 +402,7 @@ export default function GbifPanel({
                   ) : null}
                   {previewCount != null ? (
                     <>
-                      {incrementalUpdate ? "обновлений" : "По фильтрам"} ≈{" "}
+                      {incrementalUpdate ? "обновлений" : "По региону"} ≈{" "}
                       <strong>{formatCount(previewCount)}</strong>
                       {!incrementalUpdate ? (
                         <>
@@ -756,7 +412,7 @@ export default function GbifPanel({
                       ) : null}
                     </>
                   ) : hasDataset ? null : (
-                    "Задайте фильтры, чтобы увидеть оценку"
+                    "Выберите регион, чтобы увидеть оценку"
                   )}
                 </>
               )}
@@ -826,6 +482,14 @@ export default function GbifPanel({
           </label>
 
           {error && <p className="gbif-panel-error">{error}</p>}
+
+          <button
+            type="button"
+            className="gbif-panel-btn gbif-panel-btn--processing"
+            onClick={() => onOpenProcessing?.()}
+          >
+            Обработка данных GBIF
+          </button>
         </div>
       )}
 
@@ -846,7 +510,7 @@ export default function GbifPanel({
             <p className="gbif-confirm-text">
               {incrementalUpdate
                 ? "Подтянуть только новые и изменённые записи GBIF с момента последней синхронизации? Уже сохранённые точки останутся."
-                : "Загрузить выбранные данные GBIF на этот компьютер? Они сохранятся в локальном хранилище браузера и добавятся к уже загруженным точкам (совпадения по GBIF ID будут обновлены)."}
+                : "Загрузить все находки GBIF по выбранному региону на этот компьютер? Они сохранятся в локальном хранилище браузера и добавятся к уже загруженным точкам (совпадения по GBIF ID будут обновлены)."}
             </p>
             <dl className="gbif-confirm-details">
               {confirmDetails.map(({ label, value }) => (

@@ -68,7 +68,13 @@ export function partitionFeaturesByDensePiles(
     const isExpanded = expandedPileKeys?.has(group.key);
 
     if (!isDense) {
-      otherFeatures.push(...group.members);
+      // Ключ мог быть раскрыт на другом источнике (локальные/GBIF) —
+      // тогда показываем и эти точки, даже если их < minSize.
+      if (isExpanded) {
+        expandedDenseFeatures.push(...group.members);
+      } else {
+        otherFeatures.push(...group.members);
+      }
       return;
     }
 
@@ -169,6 +175,62 @@ export function listDensePiles(features, { minSize = MIN_DENSE_PILE_SIZE } = {})
         key,
         coordinates,
         pointCount: members.length,
+        color: getPointColorForRegnum(dominantRegnum),
+        items
+      };
+    })
+    .sort((a, b) => b.pointCount - a.pointCount || a.key.localeCompare(b.key));
+}
+
+/**
+ * Объединяет списки плотных групп с разных источников (локальные / GBIF) по ключу координат.
+ * Важно: каждый входной список уже отфильтрован по minSize внутри своего источника —
+ * так в списке не появляются «фантомные» кучи из 5+5 точек, которых нет на карте.
+ */
+export function mergeDensePileLists(pileLists) {
+  const byKey = new Map();
+
+  (pileLists ?? []).forEach((piles) => {
+    (piles ?? []).forEach((pile) => {
+      if (!pile?.key) {
+        return;
+      }
+
+      const existing = byKey.get(pile.key);
+      if (!existing) {
+        byKey.set(pile.key, {
+          key: pile.key,
+          coordinates: pile.coordinates,
+          items: [...(pile.items ?? [])]
+        });
+        return;
+      }
+
+      existing.items.push(...(pile.items ?? []));
+    });
+  });
+
+  return [...byKey.values()]
+    .map(({ key, coordinates, items }) => {
+      const regnumCounts = new Map();
+      items.forEach((item) => {
+        const regnum = item?.feature?.properties?.regnum ?? null;
+        regnumCounts.set(regnum, (regnumCounts.get(regnum) ?? 0) + 1);
+      });
+
+      let dominantRegnum = null;
+      let dominantCount = -1;
+      regnumCounts.forEach((count, regnum) => {
+        if (count > dominantCount) {
+          dominantCount = count;
+          dominantRegnum = regnum;
+        }
+      });
+
+      return {
+        key,
+        coordinates,
+        pointCount: items.length,
         color: getPointColorForRegnum(dominantRegnum),
         items
       };

@@ -488,8 +488,12 @@ function addClusterGbifLayers(map, sourceId, layerIds, regnum = null) {
 
 function prepareMapGbifFeatures(features) {
   if (!gbifDenseClustersHighlightEnabled) {
+    // При обычной Mapbox-кластеризации совпадения схлопываются в кластер —
+    // spiral spread здесь лишний и дорогой.
     return {
-      mapFeatures: spreadCoincidentFeatures(features),
+      mapFeatures: isGbifMapboxClusteringActive()
+        ? features
+        : spreadCoincidentFeatures(features),
       denseClusterFeatures: []
     };
   }
