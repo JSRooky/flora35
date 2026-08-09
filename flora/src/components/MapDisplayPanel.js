@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/MapDisplayPanel.css";
 
 /** Краткое описание текущих настроек карты для свёрнутой панели. */
@@ -53,7 +54,8 @@ export default function MapDisplayPanel({
   onDenseClustersHighlightChange,
   onDenseProcessingOpen,
   collapsed: collapsedProp,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(true);
   const isControlled = collapsedProp !== undefined;
@@ -74,6 +76,7 @@ export default function MapDisplayPanel({
         <h3 className="map-display-panel-title">Группы точек</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="map-display-panel-toggle"

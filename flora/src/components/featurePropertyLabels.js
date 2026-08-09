@@ -106,7 +106,19 @@ export function buildSpeciesRegnumFamilyTree(species) {
       .map(([family, familyItems]) => ({
         family,
         label: getFamilyLabel(family),
-        species: [...familyItems].sort((left, right) => left.nameRu.localeCompare(right.nameRu, "ru"))
+        species: [...familyItems].sort((left, right) => {
+          const leftRu = String(left.nameRu || "").trim();
+          const rightRu = String(right.nameRu || "").trim();
+          const leftLabel =
+            leftRu && leftRu !== "Без названия"
+              ? leftRu
+              : String(left.nameLatin || "").trim();
+          const rightLabel =
+            rightRu && rightRu !== "Без названия"
+              ? rightRu
+              : String(right.nameLatin || "").trim();
+          return leftLabel.localeCompare(rightLabel, "ru");
+        })
       }));
 
     return {

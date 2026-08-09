@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/YearFilterPanel.css";
 
 function getRangeProgress(value, min, max) {
@@ -36,7 +37,8 @@ export default function YearFilterPanel({
   onRangeChange,
   lockedByPropertyFilter = false,
   collapsed: collapsedProp,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(true);
   const isControlled = collapsedProp !== undefined;
@@ -103,6 +105,7 @@ export default function YearFilterPanel({
         <h3 className="year-filter-panel-title">Год находки</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="year-filter-panel-toggle"

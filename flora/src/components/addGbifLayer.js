@@ -23,6 +23,7 @@ import {
   getSpreadPileFitBounds,
   spreadCoincidentFeatures
 } from "./spreadCoincidentPoints";
+import { safeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
 import "../styles/GbifPanel.css";
 
 export const GBIF_SOURCE_ID = "gbif-locations";
@@ -300,7 +301,7 @@ function attachInteractions(map) {
   );
 
   const clusterClick = (event) => {
-    const features = map.queryRenderedFeatures(event.point, {
+    const features = safeQueryRenderedFeatures(map, event.point, {
       layers: clusterLayerIds
     });
     const feature = features[0];

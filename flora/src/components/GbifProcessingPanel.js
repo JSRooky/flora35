@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import { GBIF_KINGDOMS } from "../gbif/taxonFilters";
 import { hasActiveGbifProcessingFilters } from "../gbif/gbifProcessingFilters";
 import "../styles/GbifProcessingPanel.css";
@@ -16,7 +17,8 @@ export default function GbifProcessingPanel({
   onFiltersChange,
   onFiltersReset,
   collapsed: collapsedProp,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
   const isControlled = collapsedProp !== undefined;
@@ -105,6 +107,7 @@ export default function GbifProcessingPanel({
             open={helpOpen}
             onClick={() => setHelpOpen((value) => !value)}
           />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="gbif-processing-panel-toggle"

@@ -194,9 +194,42 @@
   line-height: 1.4;
 }
 
-.gbif-panel-status-text strong {
+.gbif-panel-status-text {
+  margin: 0;
+}
+
+.gbif-panel-status-text strong,
+.gbif-panel-status-list strong {
   color: #0f766e;
   font-weight: 600;
+}
+
+.gbif-panel-status-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gbif-panel-status-row {
+  display: grid;
+  grid-template-columns: 108px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.gbif-panel-status-row dt {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+}
+
+.gbif-panel-status-row dd {
+  margin: 0;
+  font-size: 13px;
+  color: #222;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .gbif-panel-status-track {
@@ -248,15 +281,6 @@
   font-size: 12px;
   color: #666;
   line-height: 1.4;
-}
-
-.gbif-panel-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #222;
-  cursor: pointer;
 }
 
 .gbif-confirm-overlay {

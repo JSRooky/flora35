@@ -5,6 +5,7 @@ import {
 } from "../firebase/boundsCollectionFirestore";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/OoptPanel.css";
 
 function ListIcon({ className = "" }) {
@@ -227,7 +228,8 @@ export default function OoptPanel({
   markersVisible = true,
   onMarkersVisibleChange,
   collapsed: collapsedProp,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -255,6 +257,7 @@ export default function OoptPanel({
             open={helpOpen}
             onClick={() => setHelpOpen((value) => !value)}
           />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="popup-panel-toggle"

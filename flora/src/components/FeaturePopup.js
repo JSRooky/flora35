@@ -3,6 +3,7 @@ import { getPointsForSpecies } from "./addSpeciesPolygonLayer";
 import FeatureImagesPopup from "./FeatureImagesPopup";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import RussianNamePickerPopup from "./RussianNamePickerPopup";
 import SpeciesDescriptionPopup from "./SpeciesDescriptionPopup";
 import {
@@ -183,7 +184,8 @@ export default function FeaturePopup({
   bufferDisabledTitle,
   onLookupRussianName,
   onApplyRussianName,
-  onClearRussianName
+  onClearRussianName,
+  onMinimize
 }) {
   const [showImages, setShowImages] = useState(false);
   const [showSpeciesDescription, setShowSpeciesDescription] = useState(false);
@@ -398,6 +400,7 @@ export default function FeaturePopup({
           <h3 className="feature-popup-title">Сведения о точке данных</h3>
           <div className="popup-panel-header-actions">
             <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+            {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
             {onCollapsedChange && (
               <button
                 type="button"

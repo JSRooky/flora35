@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { getArealPointKey } from "./addArealLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/ArealPopup.css";
 const RADIUS_MIN = 0.5;
 const RADIUS_MAX = 15;
@@ -68,7 +69,8 @@ export default function ArealPopup({
   toolBlocked = false,
   toolBlockedTitle,
   collapsed = false,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize
 }) {
   // Радиус доступен, если включён для одной точки или для всех маркеров.
   const isActive = enabled || allMarkers;
@@ -83,6 +85,7 @@ export default function ArealPopup({
         <h3 className="areal-popup-title">Радиус</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="popup-panel-toggle"

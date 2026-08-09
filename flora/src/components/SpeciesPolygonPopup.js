@@ -4,6 +4,7 @@ import { getPointsForSpecies, POLYGON_BUILD_MODES } from "./addSpeciesPolygonLay
 import { formatPointCount } from "./featurePropertyLabels";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import PolygonModeIcon from "./PolygonModeIcon";
 import "../styles/SpeciesPolygonPopup.css";
 import "../styles/ArealPopup.css";
@@ -272,7 +273,8 @@ export default function SpeciesPolygonPopup({
   onIntersectionOnlyToggle,
   onIntersectionPointSelect,
   collapsed = false,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize
 }) {
   const hasSelectedPoint = Boolean(feature);
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
@@ -335,6 +337,7 @@ export default function SpeciesPolygonPopup({
         <h3 className="species-polygon-popup-title">Полигон</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="popup-panel-toggle"

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import { DEFAULT_POINT_COLOR } from "./pointColors";
 import "../styles/DenseClustersPanel.css";
 
@@ -107,7 +108,8 @@ export default function DenseClustersPanel({
   onToggleSpeciesList,
   onClose,
   collapsed: collapsedProp,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
   const isControlled = collapsedProp !== undefined;
@@ -168,6 +170,7 @@ export default function DenseClustersPanel({
             open={helpOpen}
             onClick={() => setHelpOpen((value) => !value)}
           />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="dense-clusters-panel-toggle"

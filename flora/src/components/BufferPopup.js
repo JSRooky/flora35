@@ -7,6 +7,7 @@ import {
 } from "./addBufferLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/BufferPopup.css";
 
 /** Процент заполнения слайдера для CSS-переменной --range-progress. */
@@ -73,7 +74,8 @@ export default function BufferPopup({
   toolBlocked = false,
   toolBlockedTitle,
   collapsed = false,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize
 }) {
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## buffer в docs/moduleHelp.md
@@ -96,6 +98,7 @@ export default function BufferPopup({
         <h3 className="buffer-popup-title">Буфер</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="popup-panel-toggle"

@@ -162,6 +162,8 @@ import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
+import PanelTaskbar from "./components/PanelTaskbar";
+import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
 import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum, setGbifClusterPieChartsEnabled, setGbifDenseClustersHighlightEnabled, expandGbifDensePileByKey, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
 import { findGbifFeatureByKey } from "./gbif/gbifStore";
@@ -279,6 +281,8 @@ export default function MapView() {
   const [yearBounds, setYearBounds] = useState(() => getYearBounds());
   const [yearRange, setYearRange] = useState(() => getYearBounds());
   const [timelineYear, setTimelineYear] = useState(() => getYearBounds().max);
+  /** Высота зоны таймлайна снизу — taskbar поднимается над ним. */
+  const [timelineBottomOccupyPx, setTimelineBottomOccupyPx] = useState(0);
   const yearBoundsRef = useRef(yearBounds);
   yearBoundsRef.current = yearBounds;
   const [arealDynamicsEnabled, setArealDynamicsEnabled] = useState(false);
@@ -321,8 +325,16 @@ export default function MapView() {
     createDefaultGbifProcessingFilters
   );
   const [panelCollapsed, setPanelCollapsed] = useState({});
+  /** Панели, убранные в нижнюю «панель задач» (модуль при этом остаётся активным). */
+  const [panelMinimized, setPanelMinimized] = useState({});
+  /** Порядок иконок в taskbar (открытая панель остаётся в ряду и подсвечивается). */
+  const [panelTaskbarOrder, setPanelTaskbarOrder] = useState([]);
+  /** Актуальный stashVisiblePanelsToTaskbar — вызывается из ранних колбэков. */
+  const stashVisiblePanelsToTaskbarRef = useRef(() => {});
   /** Какие peer-панели свернули из‑за разворота «Сведений о точке» (для восстановления). */
   const panelsCollapsedByFeatureRef = useRef(null);
+  /** Ключ выбранной ООПТ — чтобы не откатывать minimize при каждом рендере. */
+  const prevSelectedBoundsFeatureKeyRef = useRef(null);
   const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
   const [submissionLocationPicking, setSubmissionLocationPicking] = useState(false);
   const submissionMapPickHandlerRef = useRef(null);
@@ -336,6 +348,11 @@ export default function MapView() {
     [panelCollapsed]
   );
 
+  const isPanelMinimized = useCallback(
+    (panelId) => Boolean(panelMinimized[panelId]),
+    [panelMinimized]
+  );
+
   const handlePanelCollapsedChange = useCallback(
     (panelId) => (collapsed) => {
       setPanelCollapsed((prev) => ({ ...prev, [panelId]: collapsed }));
@@ -343,8 +360,140 @@ export default function MapView() {
     []
   );
 
+  const pinPanelsToTaskbar = useCallback((panelIds) => {
+    if (!panelIds?.length) {
+      return;
+    }
+
+    setPanelTaskbarOrder((prev) => {
+      const next = [...prev];
+      let changed = false;
+
+      panelIds.forEach((panelId) => {
+        if (!next.includes(panelId)) {
+          next.push(panelId);
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, []);
+
+  const unpinPanelsFromTaskbar = useCallback((panelIds) => {
+    if (!panelIds?.length) {
+      return;
+    }
+
+    const idSet = new Set(panelIds);
+
+    setPanelTaskbarOrder((prev) => {
+      const next = prev.filter((panelId) => !idSet.has(panelId));
+      return next.length === prev.length ? prev : next;
+    });
+    setPanelMinimized((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      panelIds.forEach((panelId) => {
+        if (next[panelId]) {
+          next[panelId] = false;
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, []);
+
+  const minimizePanel = useCallback(
+    (panelId) => {
+      setPanelMinimized((prev) => ({ ...prev, [panelId]: true }));
+      pinPanelsToTaskbar([panelId]);
+    },
+    [pinPanelsToTaskbar]
+  );
+
+  const restorePanel = useCallback((panelId) => {
+    // Текущие видимые панели уводим в taskbar, затем поднимаем выбранную.
+    stashVisiblePanelsToTaskbarRef.current(panelId);
+
+    setPanelMinimized((prev) => ({ ...prev, [panelId]: false }));
+    pinPanelsToTaskbar([panelId]);
+    setPanelCollapsed((prev) => {
+      if (!prev[panelId]) {
+        return prev;
+      }
+
+      return { ...prev, [panelId]: false };
+    });
+
+    // Вернуть контекст модуля/режима, иначе панель останется размонтированной
+    // (типичный случай: в taskbar несколько иконок от разных модулей).
+    switch (panelId) {
+      case TASKBAR_PANEL_IDS.DENSE:
+        setDenseProcessingActive(true);
+        setActiveModule(MODULE_IDS.MAP);
+        break;
+      case TASKBAR_PANEL_IDS.GBIF:
+        setDataSourceModeState(DATA_SOURCE_MODES.GBIF);
+        setActiveModule(null);
+        setPanelCollapsed((prev) => ({
+          ...prev,
+          [PANEL_IDS.GBIF]: false,
+          [PANEL_IDS.GBIF_PROCESSING]: true
+        }));
+        break;
+      case TASKBAR_PANEL_IDS.GBIF_PROCESSING:
+        setDataSourceModeState(DATA_SOURCE_MODES.GBIF);
+        setGbifProcessingActive(true);
+        setActiveModule(null);
+        setPanelCollapsed((prev) => ({
+          ...prev,
+          [PANEL_IDS.GBIF]: true,
+          [PANEL_IDS.GBIF_PROCESSING]: false
+        }));
+        break;
+      case TASKBAR_PANEL_IDS.OOPT_SPECIES:
+        setBoundsSpeciesListOpen(true);
+        setActiveModule(MODULE_IDS.OOPT);
+        break;
+      case TASKBAR_PANEL_IDS.DENSE_SPECIES:
+        setDenseProcessingActive(true);
+        setDensePileSpeciesListOpen(true);
+        setActiveModule(MODULE_IDS.MAP);
+        break;
+      case TASKBAR_PANEL_IDS.FEATURE:
+        setActiveModule(MODULE_IDS.FEATURE);
+        break;
+      case TASKBAR_PANEL_IDS.MAP:
+        setDenseProcessingActive(false);
+        setActiveModule(MODULE_IDS.MAP);
+        break;
+      default: {
+        const moduleId = PANEL_TASKBAR_MODULE_ID[panelId];
+        if (moduleId) {
+          setActiveModule(moduleId);
+        }
+        break;
+      }
+    }
+  }, [pinPanelsToTaskbar]);
+
+  const handleMinimizePanel = useCallback(
+    (panelId) => () => minimizePanel(panelId),
+    [minimizePanel]
+  );
+
   const expandPanel = useCallback((panelId) => {
     setPanelCollapsed((prev) => {
+      if (!prev[panelId]) {
+        return prev;
+      }
+
+      return { ...prev, [panelId]: false };
+    });
+    setPanelMinimized((prev) => {
       if (!prev[panelId]) {
         return prev;
       }
@@ -372,6 +521,13 @@ export default function MapView() {
 
   /** Разворачивает «Сведения о точке» и сворачивает остальные открытые панели. */
   const expandFeaturePanel = useCallback(() => {
+    setPanelMinimized((prev) => {
+      if (!prev[PANEL_IDS.FEATURE]) {
+        return prev;
+      }
+
+      return { ...prev, [PANEL_IDS.FEATURE]: false };
+    });
     setPanelCollapsed((prev) => {
       const next = { ...prev, [PANEL_IDS.FEATURE]: false };
 
@@ -407,6 +563,14 @@ export default function MapView() {
     const peerIds = panelsCollapsedByFeatureRef.current;
     panelsCollapsedByFeatureRef.current = null;
 
+    setPanelMinimized((prev) => {
+      if (!prev[PANEL_IDS.DENSE]) {
+        return prev;
+      }
+
+      return { ...prev, [PANEL_IDS.DENSE]: false };
+    });
+
     setPanelCollapsed((prev) => {
       const next = { ...prev, [PANEL_IDS.DENSE]: false };
 
@@ -439,6 +603,10 @@ export default function MapView() {
 
   // Данные GBIF развёрнуты — обработку сворачиваем (не закрываем).
   const expandGbifDataPanel = useCallback(() => {
+    setPanelMinimized((prev) => ({
+      ...prev,
+      [PANEL_IDS.GBIF]: false
+    }));
     setPanelCollapsed((prev) => ({
       ...prev,
       [PANEL_IDS.GBIF]: false,
@@ -449,6 +617,10 @@ export default function MapView() {
   // Обработка GBIF развёрнута — панель загрузки сворачиваем.
   const expandGbifProcessingPanel = useCallback(() => {
     setGbifProcessingActive(true);
+    setPanelMinimized((prev) => ({
+      ...prev,
+      [PANEL_IDS.GBIF_PROCESSING]: false
+    }));
     setPanelCollapsed((prev) => ({
       ...prev,
       [PANEL_IDS.GBIF]: true,
@@ -492,7 +664,10 @@ export default function MapView() {
         expandPanel(PANEL_IDS.STATUS);
         break;
       case MODULE_IDS.MAP:
-        expandPanel(PANEL_IDS.MAP);
+        // Dense exclusive: не вызываем expandPanel(MAP), иначе minimize сбрасывается.
+        if (!denseProcessingActive) {
+          expandPanel(PANEL_IDS.MAP);
+        }
         break;
       case MODULE_IDS.YEAR:
         expandPanel(PANEL_IDS.YEAR);
@@ -521,7 +696,13 @@ export default function MapView() {
       default:
         break;
     }
-  }, [activeModule, expandPanel, expandGbifDataPanel, expandFeaturePanel]);
+  }, [
+    activeModule,
+    denseProcessingActive,
+    expandPanel,
+    expandGbifDataPanel,
+    expandFeaturePanel
+  ]);
 
   // Docked радиус/буфер — только когда «Сведения» свёрнуты.
   useEffect(() => {
@@ -663,7 +844,7 @@ export default function MapView() {
   const isolateBoundsFeatureRef = useRef(handleIsolateBoundsFeature);
   isolateBoundsFeatureRef.current = handleIsolateBoundsFeature;
 
-  const handleBoundsFeatureSelect = useCallback((entry) => {
+  const handleBoundsFeatureSelect = useCallback((entry, { ensureVisible = true, flyTo = true } = {}) => {
     const geojson = getCachedBoundsLayerGeoJSON(entry.layerId);
     const definition = getBoundsLayerDefinition(entry.layerId);
 
@@ -677,15 +858,18 @@ export default function MapView() {
       return;
     }
 
-    setBoundsFeatureVisibility((prev) =>
-      prev[entry.key] ? prev : { ...prev, [entry.key]: true }
-    );
+    if (ensureVisible) {
+      setBoundsFeatureVisibility((prev) =>
+        prev[entry.key] ? prev : { ...prev, [entry.key]: true }
+      );
+    }
+
     setPopupData(null);
     updateSelectedPointHighlight(map.current, null);
     setSelectedBoundsFeature({ definition, feature });
     setActiveModule(MODULE_IDS.OOPT);
 
-    if (map.current) {
+    if (flyTo && map.current) {
       flyToBoundsFeature(map.current, feature, { definition, feature }, {
         onOpenDetails: handleOpenBoundsFeatureDetails,
         onIsolate: handleIsolateBoundsFeature,
@@ -711,7 +895,19 @@ export default function MapView() {
       }
 
       setBoundsSpeciesRegnumFilter(null);
-      handleBoundsFeatureSelect(entry);
+      // Без flyTo: иначе fitBounds + setFilter одновременно валят queryRenderedFeatures.
+      handleBoundsFeatureSelect(entry, { ensureVisible: false, flyTo: false });
+
+      // Сразу ограничиваем точки полигоном («Только эти»), чтобы список и карта
+      // показывали только виды/находки внутри выбранной ООПТ.
+      setToolPointsFilterEnabled((current) => ({
+        ...current,
+        [MODULE_IDS.OOPT]: true
+      }));
+      setPanelMinimized((prev) => ({
+        ...prev,
+        [TASKBAR_PANEL_IDS.OOPT_SPECIES]: false
+      }));
       setBoundsSpeciesListOpen(true);
     },
     [boundsSpeciesListOpen, handleBoundsFeatureSelect, selectedBoundsFeature]
@@ -734,6 +930,7 @@ export default function MapView() {
     const selectModule = (nextModuleId) => {
       setActiveModule((current) => {
         if (current !== nextModuleId) {
+          stashVisiblePanelsToTaskbarRef.current(nextModuleId);
           return nextModuleId;
         }
 
@@ -808,6 +1005,7 @@ export default function MapView() {
       setDataSourceModeState(mode);
 
       if (mode === DATA_SOURCE_MODES.GBIF) {
+        stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.GBIF);
         setArealDockedWithFeature(false);
         setBufferDockedWithFeature(false);
         setActiveModule(null);
@@ -1164,6 +1362,168 @@ export default function MapView() {
     [toolPointsFilterEnabled, ooptFilterTarget]
   );
 
+  /** Какие панели сейчас реально на экране (не в taskbar). */
+  const collectVisiblePanelIds = useCallback(() => {
+    const ids = [];
+    const isMin = (panelId) => Boolean(panelMinimized[panelId]);
+
+    if (denseProcessingActive) {
+      if (!isMin(PANEL_IDS.DENSE)) {
+        ids.push(PANEL_IDS.DENSE);
+      }
+
+      if (activeModule === MODULE_IDS.FEATURE && !isMin(PANEL_IDS.FEATURE)) {
+        ids.push(PANEL_IDS.FEATURE);
+      }
+
+      if (
+        densePileSpeciesListOpen &&
+        !isMin(TASKBAR_PANEL_IDS.DENSE_SPECIES)
+      ) {
+        ids.push(TASKBAR_PANEL_IDS.DENSE_SPECIES);
+      }
+
+      return ids;
+    }
+
+    if (activeModule === MODULE_IDS.FEATURE && !isMin(PANEL_IDS.FEATURE)) {
+      ids.push(PANEL_IDS.FEATURE);
+    }
+
+    if (
+      (activeModule === MODULE_IDS.AREAL ||
+        (activeModule === MODULE_IDS.FEATURE && arealDockedWithFeature)) &&
+      !isMin(PANEL_IDS.AREAL)
+    ) {
+      ids.push(PANEL_IDS.AREAL);
+    }
+
+    if (activeModule === MODULE_IDS.STATUS && !isMin(PANEL_IDS.STATUS)) {
+      ids.push(PANEL_IDS.STATUS);
+    }
+
+    if (activeModule === MODULE_IDS.MAP && !isMin(PANEL_IDS.MAP)) {
+      ids.push(PANEL_IDS.MAP);
+    }
+
+    if (activeModule === MODULE_IDS.YEAR && !isMin(PANEL_IDS.YEAR)) {
+      ids.push(PANEL_IDS.YEAR);
+    }
+
+    if (activeModule === MODULE_IDS.POLYGON && !isMin(PANEL_IDS.POLYGON)) {
+      ids.push(PANEL_IDS.POLYGON);
+    }
+
+    if (
+      (activeModule === MODULE_IDS.BUFFER ||
+        (activeModule === MODULE_IDS.FEATURE && bufferDockedWithFeature)) &&
+      !isMin(PANEL_IDS.BUFFER)
+    ) {
+      ids.push(PANEL_IDS.BUFFER);
+    }
+
+    if (activeModule === MODULE_IDS.AREA && !isMin(PANEL_IDS.AREA)) {
+      ids.push(PANEL_IDS.AREA);
+    }
+
+    if (activeModule === MODULE_IDS.OOPT && !isMin(PANEL_IDS.OOPT)) {
+      ids.push(PANEL_IDS.OOPT);
+    }
+
+    if (activeModule === MODULE_IDS.SUBMIT && !isMin(PANEL_IDS.SUBMIT)) {
+      ids.push(PANEL_IDS.SUBMIT);
+    }
+
+    if (
+      selectedBoundsFeature &&
+      (activeModule === MODULE_IDS.OOPT || ooptPointsFilterActive) &&
+      !isMin(PANEL_IDS.OOPT_FEATURE)
+    ) {
+      ids.push(PANEL_IDS.OOPT_FEATURE);
+    }
+
+    if (
+      boundsSpeciesListOpen &&
+      selectedBoundsFeature &&
+      (activeModule === MODULE_IDS.OOPT || ooptPointsFilterActive) &&
+      !isMin(TASKBAR_PANEL_IDS.OOPT_SPECIES)
+    ) {
+      ids.push(TASKBAR_PANEL_IDS.OOPT_SPECIES);
+    }
+
+    if (dataSourceMode === DATA_SOURCE_MODES.GBIF) {
+      if (!isMin(PANEL_IDS.GBIF)) {
+        ids.push(PANEL_IDS.GBIF);
+      }
+
+      if (gbifProcessingActive && !isMin(PANEL_IDS.GBIF_PROCESSING)) {
+        ids.push(PANEL_IDS.GBIF_PROCESSING);
+      }
+    }
+
+    return ids;
+  }, [
+    activeModule,
+    arealDockedWithFeature,
+    boundsSpeciesListOpen,
+    bufferDockedWithFeature,
+    dataSourceMode,
+    densePileSpeciesListOpen,
+    denseProcessingActive,
+    gbifProcessingActive,
+    ooptPointsFilterActive,
+    panelMinimized,
+    selectedBoundsFeature
+  ]);
+
+  /** Уводим все видимые панели в taskbar, кроме exceptPanelId. */
+  const stashVisiblePanelsToTaskbar = useCallback(
+    (exceptPanelId = null) => {
+      const visibleIds = collectVisiblePanelIds().filter(
+        (panelId) => panelId !== exceptPanelId
+      );
+
+      if (visibleIds.length === 0) {
+        return;
+      }
+
+      setPanelMinimized((prev) => {
+        const next = { ...prev };
+        let changed = false;
+
+        visibleIds.forEach((panelId) => {
+          if (!next[panelId]) {
+            next[panelId] = true;
+            changed = true;
+          }
+        });
+
+        return changed ? next : prev;
+      });
+      pinPanelsToTaskbar(visibleIds);
+    },
+    [collectVisiblePanelIds, pinPanelsToTaskbar]
+  );
+
+  stashVisiblePanelsToTaskbarRef.current = stashVisiblePanelsToTaskbar;
+
+  const activeTaskbarPanelIds = useMemo(() => {
+    const visibleIds = new Set(collectVisiblePanelIds());
+    return panelTaskbarOrder.filter((panelId) => visibleIds.has(panelId));
+  }, [collectVisiblePanelIds, panelTaskbarOrder]);
+
+  const handleTaskbarPanelClick = useCallback(
+    (panelId) => {
+      if (collectVisiblePanelIds().includes(panelId)) {
+        minimizePanel(panelId);
+        return;
+      }
+
+      restorePanel(panelId);
+    },
+    [collectVisiblePanelIds, minimizePanel, restorePanel]
+  );
+
   const effectiveWithinFeature = useMemo(() => {
     if (ooptPointsFilterActive && ooptWithinFeature) {
       return ooptWithinFeature;
@@ -1344,16 +1704,30 @@ export default function MapView() {
 
     if (selectedDensePileKeyRef.current !== pile.key) {
       handleDensePileSelect(pile);
+      setPanelMinimized((prev) => ({
+        ...prev,
+        [TASKBAR_PANEL_IDS.DENSE_SPECIES]: false
+      }));
       setDensePileSpeciesListOpen(true);
       return;
     }
 
-    setDensePileSpeciesListOpen((open) => !open);
+    setDensePileSpeciesListOpen((open) => {
+      if (!open) {
+        setPanelMinimized((prev) => ({
+          ...prev,
+          [TASKBAR_PANEL_IDS.DENSE_SPECIES]: false
+        }));
+      }
+
+      return !open;
+    });
   }, [handleDensePileSelect]);
 
   const handleDensePileSpeciesListClose = useCallback(() => {
     setDensePileSpeciesListOpen(false);
-  }, []);
+    unpinPanelsFromTaskbar([TASKBAR_PANEL_IDS.DENSE_SPECIES]);
+  }, [unpinPanelsFromTaskbar]);
 
   const handleDensePileSpeciesSelect = useCallback((feature) => {
     const mapInstance = map.current;
@@ -1383,12 +1757,26 @@ export default function MapView() {
       activeModule !== MODULE_IDS.MAP &&
       activeModule !== MODULE_IDS.FEATURE
     ) {
+      // Перед выключением exclusive-режима уводим панели в taskbar —
+      // иначе cleanup/размонтирование просто уничтожит их без иконки.
+      const denseTaskbarIds = [PANEL_IDS.DENSE];
+      if (densePileSpeciesListOpen) {
+        denseTaskbarIds.push(TASKBAR_PANEL_IDS.DENSE_SPECIES);
+      }
+      setPanelMinimized((prev) => ({
+        ...prev,
+        [PANEL_IDS.DENSE]: true,
+        ...(densePileSpeciesListOpen
+          ? { [TASKBAR_PANEL_IDS.DENSE_SPECIES]: true }
+          : {})
+      }));
+      pinPanelsToTaskbar(denseTaskbarIds);
       setDenseProcessingActive(false);
       setSelectedDensePileKey(null);
       setDensePileSpeciesListOpen(false);
       densePileCameraBeforeRef.current = null;
     }
-  }, [activeModule, denseProcessingActive]);
+  }, [activeModule, denseProcessingActive, densePileSpeciesListOpen, pinPanelsToTaskbar]);
 
   const handleLookupRussianName = useCallback(async (feature, { force = false } = {}) => {
     const nameLatin = feature?.properties?.name_latin;
@@ -1952,6 +2340,8 @@ export default function MapView() {
   }, []);
 
   const handleOpenGbifProcessing = useCallback(() => {
+    // Обработка открывается поверх панели загрузки — её уводим в taskbar.
+    stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.GBIF_PROCESSING);
     expandGbifProcessingPanel();
   }, [expandGbifProcessingPanel]);
 
@@ -2307,9 +2697,28 @@ export default function MapView() {
   }, [selectedBoundsFeature]);
 
   useEffect(() => {
-    if (selectedBoundsFeature) {
-      expandPanel(PANEL_IDS.OOPT_FEATURE);
+    if (!selectedBoundsFeature) {
+      prevSelectedBoundsFeatureKeyRef.current = null;
+      return;
     }
+
+    const layerId = selectedBoundsFeature.definition?.id;
+    if (!layerId) {
+      return;
+    }
+
+    const featureKey = getBoundsFeatureKey(
+      layerId,
+      selectedBoundsFeature.feature?.properties ?? {}
+    );
+
+    // Только при смене объекта ООПТ — иначе minimize в taskbar сразу откатывался.
+    if (featureKey === prevSelectedBoundsFeatureKeyRef.current) {
+      return;
+    }
+
+    prevSelectedBoundsFeatureKeyRef.current = featureKey;
+    expandPanel(PANEL_IDS.OOPT_FEATURE);
   }, [selectedBoundsFeature, expandPanel]);
 
   useEffect(() => {
@@ -2410,6 +2819,7 @@ export default function MapView() {
   };
 
   const handleDenseProcessingOpen = useCallback(() => {
+    stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DENSE);
     setMarkersVisibleState(true);
     setDenseClustersHighlightState(true);
     setDenseProcessingActive(true);
@@ -2422,8 +2832,9 @@ export default function MapView() {
     setSelectedDensePileKey(null);
     setDensePileSpeciesListOpen(false);
     densePileCameraBeforeRef.current = null;
+    unpinPanelsFromTaskbar([PANEL_IDS.DENSE, TASKBAR_PANEL_IDS.DENSE_SPECIES]);
     expandPanel(PANEL_IDS.MAP);
-  }, [expandPanel]);
+  }, [expandPanel, unpinPanelsFromTaskbar]);
 
   const activeMapFilters = useMemo(
     () =>
@@ -2848,6 +3259,11 @@ export default function MapView() {
     setBoundsSpeciesListOpen((open) => {
       if (open) {
         setBoundsSpeciesRegnumFilter(null);
+      } else {
+        setPanelMinimized((prev) => ({
+          ...prev,
+          [TASKBAR_PANEL_IDS.OOPT_SPECIES]: false
+        }));
       }
 
       return !open;
@@ -2857,7 +3273,8 @@ export default function MapView() {
   const handleBoundsSpeciesListClose = useCallback(() => {
     setBoundsSpeciesListOpen(false);
     setBoundsSpeciesRegnumFilter(null);
-  }, []);
+    unpinPanelsFromTaskbar([TASKBAR_PANEL_IDS.OOPT_SPECIES]);
+  }, [unpinPanelsFromTaskbar]);
 
   const handleBoundsSpeciesRegnumVisibilityChange = useCallback((enabledRegnums) => {
     setBoundsSpeciesRegnumFilter(enabledRegnums);
@@ -2866,10 +3283,13 @@ export default function MapView() {
   const handleBoundsSpeciesSelect = useCallback((feature) => {
     const mapInstance = map.current;
 
-    if (!mapInstance) {
+    if (!mapInstance || !feature?.geometry?.coordinates) {
       return;
     }
 
+    hideBoundsFeaturePopup();
+    setPopupData(feature);
+    updateSelectedPointHighlight(mapInstance, feature);
     panToArealPoint(mapInstance, feature);
   }, []);
 
@@ -3241,6 +3661,33 @@ export default function MapView() {
     };
   }, [clearPointSelection, syncYearBounds]);
 
+  useEffect(() => {
+    if (selectedBoundsFeature) {
+      return;
+    }
+
+    unpinPanelsFromTaskbar([
+      PANEL_IDS.OOPT_FEATURE,
+      TASKBAR_PANEL_IDS.OOPT_SPECIES
+    ]);
+  }, [selectedBoundsFeature, unpinPanelsFromTaskbar]);
+
+  useEffect(() => {
+    if (dataSourceMode === DATA_SOURCE_MODES.GBIF) {
+      return;
+    }
+
+    unpinPanelsFromTaskbar([PANEL_IDS.GBIF, PANEL_IDS.GBIF_PROCESSING]);
+  }, [dataSourceMode, unpinPanelsFromTaskbar]);
+
+  useEffect(() => {
+    if (gbifProcessingActive) {
+      return;
+    }
+
+    unpinPanelsFromTaskbar([PANEL_IDS.GBIF_PROCESSING]);
+  }, [gbifProcessingActive, unpinPanelsFromTaskbar]);
+
   const arealDisplayedContainedPoints = arealContainedPoints ?? activeToolFilterPointsSummary;
 
   const showOoptFeaturePanel =
@@ -3303,11 +3750,13 @@ export default function MapView() {
         <div className="module-panel-stack">
           {denseProcessingExclusive ? (
             <>
-              {activeModule === MODULE_IDS.FEATURE && (
+              {activeModule === MODULE_IDS.FEATURE &&
+                !isPanelMinimized(PANEL_IDS.FEATURE) && (
                 <FeaturePopup
                   feature={popupData}
                   collapsed={isPanelCollapsed(PANEL_IDS.FEATURE)}
                   onCollapsedChange={handleFeaturePanelCollapsedChange}
+                  onMinimize={handleMinimizePanel(PANEL_IDS.FEATURE)}
                   activeFilters={propertyFilters}
                   onFilterChange={handlePropertyFilterChange}
                   activeStatusFilters={statusFilters}
@@ -3326,6 +3775,7 @@ export default function MapView() {
                   onClearRussianName={handleClearRussianName}
                 />
               )}
+              {!isPanelMinimized(PANEL_IDS.DENSE) && (
               <DenseClustersPanel
                 pileCount={densePilesStats.pileCount}
                 pointCount={densePilesStats.pointCount}
@@ -3339,15 +3789,19 @@ export default function MapView() {
                 onClose={handleDenseProcessingClose}
                 collapsed={isPanelCollapsed(PANEL_IDS.DENSE)}
                 onCollapsedChange={handleDensePanelCollapsedChange}
+                onMinimize={handleMinimizePanel(PANEL_IDS.DENSE)}
               />
+              )}
             </>
           ) : (
             <>
-          {activeModule === MODULE_IDS.FEATURE && (
+          {activeModule === MODULE_IDS.FEATURE &&
+            !isPanelMinimized(PANEL_IDS.FEATURE) && (
             <FeaturePopup
               feature={popupData}
               collapsed={isPanelCollapsed(PANEL_IDS.FEATURE)}
               onCollapsedChange={handleFeaturePanelCollapsedChange}
+              onMinimize={handleMinimizePanel(PANEL_IDS.FEATURE)}
               activeFilters={propertyFilters}
               onFilterChange={handlePropertyFilterChange}
               activeStatusFilters={statusFilters}
@@ -3367,7 +3821,8 @@ export default function MapView() {
             />
           )}
           {(activeModule === MODULE_IDS.AREAL ||
-            (activeModule === MODULE_IDS.FEATURE && arealDockedWithFeature)) && (
+            (activeModule === MODULE_IDS.FEATURE && arealDockedWithFeature)) &&
+            !isPanelMinimized(PANEL_IDS.AREAL) && (
             <ArealPopup
               enabled={arealEnabled}
               allMarkers={arealAllMarkers}
@@ -3382,17 +3837,20 @@ export default function MapView() {
               onReset={handleArealReset}
               collapsed={isPanelCollapsed(PANEL_IDS.AREAL)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.AREAL)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.AREAL)}
             />
           )}
-          {activeModule === MODULE_IDS.STATUS && (
+          {activeModule === MODULE_IDS.STATUS &&
+            !isPanelMinimized(PANEL_IDS.STATUS) && (
             <StatusFilterPanel
               activeStatusFilters={statusFilters}
               onStatusFilterChange={handleStatusFilterChange}
               collapsed={isPanelCollapsed(PANEL_IDS.STATUS)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.STATUS)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.STATUS)}
             />
           )}
-          {activeModule === MODULE_IDS.MAP && (
+          {activeModule === MODULE_IDS.MAP && !isPanelMinimized(PANEL_IDS.MAP) && (
             <MapDisplayPanel
               markersVisible={markersVisible}
               onMarkersVisibleChange={setMarkersVisibleState}
@@ -3409,9 +3867,11 @@ export default function MapView() {
               onDenseProcessingOpen={handleDenseProcessingOpen}
               collapsed={isPanelCollapsed(PANEL_IDS.MAP)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.MAP)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.MAP)}
             />
           )}
-          {activeModule === MODULE_IDS.YEAR && (
+          {activeModule === MODULE_IDS.YEAR &&
+            !isPanelMinimized(PANEL_IDS.YEAR) && (
             <YearFilterPanel
               enabled={yearFilterEnabled}
               onEnabledChange={setYearFilterEnabled}
@@ -3421,9 +3881,11 @@ export default function MapView() {
               lockedByPropertyFilter={hasFoundYearPropertyFilter}
               collapsed={isPanelCollapsed(PANEL_IDS.YEAR)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.YEAR)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.YEAR)}
             />
           )}
-          {activeModule === MODULE_IDS.POLYGON && (
+          {activeModule === MODULE_IDS.POLYGON &&
+            !isPanelMinimized(PANEL_IDS.POLYGON) && (
             <SpeciesPolygonPopup
               feature={popupData}
               polygons={speciesPolygons}
@@ -3453,10 +3915,12 @@ export default function MapView() {
               onIntersectionPointSelect={handleAreaPointSelect}
               collapsed={isPanelCollapsed(PANEL_IDS.POLYGON)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.POLYGON)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.POLYGON)}
             />
           )}
-          {activeModule === MODULE_IDS.BUFFER ||
-          (activeModule === MODULE_IDS.FEATURE && bufferDockedWithFeature) ? (
+          {(activeModule === MODULE_IDS.BUFFER ||
+            (activeModule === MODULE_IDS.FEATURE && bufferDockedWithFeature)) &&
+          !isPanelMinimized(PANEL_IDS.BUFFER) ? (
             <BufferPopup
               feature={popupData}
               enabled={bufferEnabled}
@@ -3471,9 +3935,11 @@ export default function MapView() {
               toolBlockedTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
               collapsed={isPanelCollapsed(PANEL_IDS.BUFFER)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.BUFFER)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.BUFFER)}
             />
           ) : null}
-          {activeModule === MODULE_IDS.AREA && (
+          {activeModule === MODULE_IDS.AREA &&
+            !isPanelMinimized(PANEL_IDS.AREA) && (
             <AreaSelectionPopup
               drawTool={areaDrawTool}
               operationMode={areaOperationMode}
@@ -3486,9 +3952,11 @@ export default function MapView() {
               onReset={handleAreaReset}
               collapsed={isPanelCollapsed(PANEL_IDS.AREA)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.AREA)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.AREA)}
             />
           )}
-          {activeModule === MODULE_IDS.OOPT && (
+          {activeModule === MODULE_IDS.OOPT &&
+            !isPanelMinimized(PANEL_IDS.OOPT) && (
             <OoptPanel
               catalogByLayerId={boundsCatalogByLayerId}
               featureVisibility={boundsFeatureVisibility}
@@ -3506,9 +3974,10 @@ export default function MapView() {
               onMarkersVisibleChange={setMarkersVisibleState}
               collapsed={isPanelCollapsed(PANEL_IDS.OOPT)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.OOPT)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.OOPT)}
             />
           )}
-          {showOoptFeaturePanel ? (
+          {showOoptFeaturePanel && !isPanelMinimized(PANEL_IDS.OOPT_FEATURE) ? (
             <OoptFeaturePanel
               layerDefinition={selectedBoundsFeature.definition}
               feature={selectedBoundsFeature.feature}
@@ -3521,9 +3990,11 @@ export default function MapView() {
               speciesListOpen={boundsSpeciesListOpen}
               collapsed={isPanelCollapsed(PANEL_IDS.OOPT_FEATURE)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.OOPT_FEATURE)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.OOPT_FEATURE)}
             />
           ) : null}
-          {activeModule === MODULE_IDS.SUBMIT && (
+          {activeModule === MODULE_IDS.SUBMIT &&
+            !isPanelMinimized(PANEL_IDS.SUBMIT) && (
             <Suspense fallback={null}>
               <UserSubmissionPanel
                 coordinates={submissionCoordinates}
@@ -3532,6 +4003,7 @@ export default function MapView() {
                 submissionMapPickHandlerRef={submissionMapPickHandlerRef}
                 collapsed={isPanelCollapsed(PANEL_IDS.SUBMIT)}
                 onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.SUBMIT)}
+                onMinimize={handleMinimizePanel(PANEL_IDS.SUBMIT)}
                 onSaved={handleUserFindingSaved}
                 onReset={handleSubmissionCoordinatesReset}
                 onCoordinatesReset={handleSubmissionCoordinatesReset}
@@ -3540,20 +4012,25 @@ export default function MapView() {
           )}
           {dataSourceMode === DATA_SOURCE_MODES.GBIF && (
             <>
+              {!isPanelMinimized(PANEL_IDS.GBIF) && (
               <GbifPanel
                 map={map.current}
                 collapsed={isPanelCollapsed(PANEL_IDS.GBIF)}
                 onCollapsedChange={handleGbifPanelCollapsedChange}
+                onMinimize={handleMinimizePanel(PANEL_IDS.GBIF)}
                 onDataChange={handleGbifDataChange}
                 onOpenProcessing={handleOpenGbifProcessing}
               />
-              {gbifProcessingActive && (
+              )}
+              {gbifProcessingActive &&
+                !isPanelMinimized(PANEL_IDS.GBIF_PROCESSING) && (
                 <GbifProcessingPanel
                   filters={gbifProcessingFilters}
                   onFiltersChange={handleGbifProcessingFiltersChange}
                   onFiltersReset={handleGbifProcessingFiltersReset}
                   collapsed={isPanelCollapsed(PANEL_IDS.GBIF_PROCESSING)}
                   onCollapsedChange={handleGbifProcessingPanelCollapsedChange}
+                  onMinimize={handleMinimizePanel(PANEL_IDS.GBIF_PROCESSING)}
                 />
               )}
             </>
@@ -3567,6 +4044,7 @@ export default function MapView() {
         year={timelineYear}
         onYearChange={setTimelineYear}
         yearBounds={yearBounds}
+        onBottomOccupyChange={setTimelineBottomOccupyPx}
       >
         <ArealDynamicsPanel
           enabled={arealDynamicsEnabled}
@@ -3587,8 +4065,13 @@ export default function MapView() {
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
       <BoundsSpeciesListPopup
-        open={boundsSpeciesListOpen && showOoptFeaturePanel}
+        open={
+          boundsSpeciesListOpen &&
+          showOoptFeaturePanel &&
+          !isPanelMinimized(TASKBAR_PANEL_IDS.OOPT_SPECIES)
+        }
         onClose={handleBoundsSpeciesListClose}
+        onMinimize={handleMinimizePanel(TASKBAR_PANEL_IDS.OOPT_SPECIES)}
         territoryHeading={
           selectedBoundsFeature
             ? getBoundsFeatureHeadingParts(
@@ -3602,13 +4085,25 @@ export default function MapView() {
         onRegnumVisibilityChange={handleBoundsSpeciesRegnumVisibilityChange}
       />
       <BoundsSpeciesListPopup
-        open={densePileSpeciesListOpen && denseProcessingActive && Boolean(selectedDensePile)}
+        open={
+          densePileSpeciesListOpen &&
+          denseProcessingActive &&
+          Boolean(selectedDensePile) &&
+          !isPanelMinimized(TASKBAR_PANEL_IDS.DENSE_SPECIES)
+        }
         onClose={handleDensePileSpeciesListClose}
+        onMinimize={handleMinimizePanel(TASKBAR_PANEL_IDS.DENSE_SPECIES)}
         title="Виды в плотной группе"
         ariaLabel="Список видов плотной группы"
         territoryHeading={densePileSpeciesTerritoryHeading}
         speciesSummary={densePileSpeciesSummary}
         onSpeciesSelect={handleDensePileSpeciesSelect}
+      />
+      <PanelTaskbar
+        items={panelTaskbarOrder}
+        activeIds={activeTaskbarPanelIds}
+        onActivate={handleTaskbarPanelClick}
+        bottomOccupyPx={timelineBottomOccupyPx}
       />
       <MapCornerControls
         activeFilters={activeMapFilters}

@@ -33,7 +33,8 @@ export default function TimelineSlider({
   year,
   onYearChange,
   yearBounds,
-  children = null
+  children = null,
+  onBottomOccupyChange = null
 }) {
   const { min: minYear, max: maxYear } = yearBounds;
   const yearTicks = useMemo(
@@ -41,6 +42,7 @@ export default function TimelineSlider({
     [minYear, maxYear]
   );
   const wasVisibleRef = useRef(false);
+  const wrapRef = useRef(null);
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
 
@@ -71,6 +73,39 @@ export default function TimelineSlider({
     return () => window.clearTimeout(timer);
   }, [visible]);
 
+  useEffect(() => {
+    if (!mounted || !onBottomOccupyChange) {
+      return undefined;
+    }
+
+    const wrap = wrapRef.current;
+    if (!wrap) {
+      return undefined;
+    }
+
+    // Бейдж года торчит над панелью (absolute) и не входит в box wrap.
+    const YEAR_BADGE_CLEARANCE_PX = 26;
+    const GAP_PX = 12;
+
+    const publishOccupy = () => {
+      const rect = wrap.getBoundingClientRect();
+      const occupy = Math.ceil(window.innerHeight - rect.top + YEAR_BADGE_CLEARANCE_PX + GAP_PX);
+      onBottomOccupyChange(Math.max(0, occupy));
+    };
+
+    publishOccupy();
+
+    const observer = new ResizeObserver(publishOccupy);
+    observer.observe(wrap);
+    window.addEventListener("resize", publishOccupy);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", publishOccupy);
+      onBottomOccupyChange(0);
+    };
+  }, [mounted, onBottomOccupyChange]);
+
   if (!mounted) {
     return null;
   }
@@ -83,6 +118,7 @@ export default function TimelineSlider({
       aria-hidden={closing}
     >
       <div
+        ref={wrapRef}
         className="timeline-slider-wrap"
         style={{
           "--timeline-accent": timelineColors.accent,

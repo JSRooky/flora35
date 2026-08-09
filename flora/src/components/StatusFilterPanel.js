@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/StatusFilterPanel.css";
 
 /** Коды и подписи категорий МСОП (IUCN Red List). */
@@ -19,7 +20,8 @@ export default function StatusFilterPanel({
   activeStatusFilters = [],
   onStatusFilterChange,
   collapsed: collapsedProp,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(true);
   const isControlled = collapsedProp !== undefined;
@@ -36,6 +38,7 @@ export default function StatusFilterPanel({
         <h3 className="status-filter-panel-title">Статус (МСОП)</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="status-filter-panel-toggle"

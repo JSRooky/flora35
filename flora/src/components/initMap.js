@@ -1,5 +1,6 @@
 import mapboxgl from "mapbox-gl/dist/mapbox-gl-csp";
 import "mapbox-gl/dist/mapbox-gl.css";
+import { installSafeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
 
 // CRA must load the Mapbox worker via worker-loader; direct imports break in production.
 mapboxgl.workerClass = require("worker-loader!mapbox-gl/dist/mapbox-gl-csp-worker").default; // eslint-disable-line import/no-webpack-loader-syntax
@@ -20,10 +21,16 @@ export function initMap(container) {
     container.replaceChildren();
   }
 
-  return new mapboxgl.Map({
+  const map = new mapboxgl.Map({
     container,
     style: "mapbox://styles/epoxyde/cmrj0xcli00b501si30ge42bj",
     center: [40.65, 59.21],
     zoom: 6.2
   });
+
+  // Внутренние mousemove/click Mapbox тоже зовут queryRenderedFeatures —
+  // без патча падают с «feature index out of bounds» при обновлении тайлов.
+  installSafeQueryRenderedFeatures(map);
+
+  return map;
 }

@@ -3,6 +3,7 @@ import { AREA_DRAW_MODES, AREA_OPERATION_MODES } from "./addAreaSelectionLayer";
 import { formatPointCount, formatSpeciesCount } from "./featurePropertyLabels";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import { ReactComponent as DrawFreeIcon } from "../images/draw-free.svg";
 import { ReactComponent as DrawRectIcon } from "../images/draw-rect.svg";
 import { ReactComponent as DrawPolyIcon } from "../images/draw-poly.svg";
@@ -114,7 +115,8 @@ export default function AreaSelectionPopup({
   onPointSelect,
   onReset,
   collapsed = false,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize
 }) {
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false);
@@ -127,6 +129,7 @@ export default function AreaSelectionPopup({
         <h3 className="area-selection-popup-title">Область</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="popup-panel-toggle"

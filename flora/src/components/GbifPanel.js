@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { setGbifData, setGbifVisibility } from "./addGbifLayer";
+import { setGbifData } from "./addGbifLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import {
   GBIF_MAP_UPDATE_PAGES,
   GBIF_PAGE_SIZE,
@@ -86,6 +87,7 @@ export default function GbifPanel({
   map,
   collapsed = false,
   onCollapsedChange,
+  onMinimize,
   onDataChange,
   onOpenProcessing
 }) {
@@ -101,7 +103,6 @@ export default function GbifPanel({
   const [syncedAt, setSyncedAtState] = useState(() => getGbifSyncedAt());
   const [savedQuery, setSavedQuery] = useState(() => getGbifLoadedQuery());
   const [error, setError] = useState(null);
-  const [layerVisible, setLayerVisibleState] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const abortRef = useRef(null);
   const previewAbortRef = useRef(null);
@@ -304,18 +305,13 @@ export default function GbifPanel({
     abortRef.current?.abort();
   };
 
-  const handleVisibilityChange = (checked) => {
-    setLayerVisibleState(checked);
-    setGbifVisibility(map, checked);
-    notifyDataChange();
-  };
-
   return (
     <div className={`feature-popup gbif-panel ${collapsed ? "feature-popup--collapsed" : ""}`}>
       <div className="feature-popup-header">
         <h3 className="feature-popup-title">Данные GBIF</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           {onCollapsedChange && (
             <button
               type="button"
@@ -369,88 +365,101 @@ export default function GbifPanel({
             className={`gbif-panel-status${loading ? " gbif-panel-status--loading" : ""}`}
             aria-live="polite"
           >
-            <div className="gbif-panel-status-text">
-              {loading ? (
-                <>
-                  Загрузка: получено <strong>{formatCount(updateFetched)}</strong>
-                  {total != null ? (
-                    <>
-                      {" "}
-                      из <strong>{formatCount(total)}</strong>
-                    </>
-                  ) : null}
-                  {" · "}
-                  новых <strong>{formatCount(updateAdded)}</strong>
-                  {" · "}
-                  на слое <strong>{formatCount(loaded)}</strong>
-                </>
-              ) : previewLoading ? (
-                incrementalUpdate ? "Оценка обновлений…" : "Оценка числа находок…"
-              ) : (
-                <>
-                  {hasDataset ? (
-                    <>
-                      На слое: <strong>{formatCount(loaded)}</strong>
-                      {syncedAt ? (
-                        <>
-                          {" · "}
-                          синхр. {new Date(syncedAt).toLocaleString("ru-RU")}
-                        </>
-                      ) : null}
-                      {previewCount != null ? " · " : null}
-                    </>
-                  ) : null}
-                  {previewCount != null ? (
-                    <>
-                      {incrementalUpdate ? "обновлений" : "По региону"} ≈{" "}
-                      <strong>{formatCount(previewCount)}</strong>
+            {loading ? (
+              <dl className="gbif-panel-status-list">
+                <div className="gbif-panel-status-row">
+                  <dt>Получено</dt>
+                  <dd>
+                    <strong>{formatCount(updateFetched)}</strong>
+                    {total != null ? (
+                      <>
+                        {" "}
+                        из <strong>{formatCount(total)}</strong>
+                      </>
+                    ) : null}
+                  </dd>
+                </div>
+                <div className="gbif-panel-status-row">
+                  <dt>Новых</dt>
+                  <dd>
+                    <strong>{formatCount(updateAdded)}</strong>
+                  </dd>
+                </div>
+                <div className="gbif-panel-status-row">
+                  <dt>На слое</dt>
+                  <dd>
+                    <strong>{formatCount(loaded)}</strong>
+                  </dd>
+                </div>
+              </dl>
+            ) : previewLoading ? (
+              <p className="gbif-panel-status-text">
+                {incrementalUpdate ? "Оценка обновлений…" : "Оценка числа находок…"}
+              </p>
+            ) : hasDataset || previewCount != null ? (
+              <dl className="gbif-panel-status-list">
+                {hasDataset ? (
+                  <div className="gbif-panel-status-row">
+                    <dt>На слое</dt>
+                    <dd>
+                      <strong>{formatCount(loaded)}</strong>
+                    </dd>
+                  </div>
+                ) : null}
+                {hasDataset && syncedAt ? (
+                  <div className="gbif-panel-status-row">
+                    <dt>Синхронизация</dt>
+                    <dd>{new Date(syncedAt).toLocaleString("ru-RU")}</dd>
+                  </div>
+                ) : null}
+                {previewCount != null ? (
+                  <div className="gbif-panel-status-row">
+                    <dt>{incrementalUpdate ? "Обновлений" : "По региону"}</dt>
+                    <dd>
+                      ≈ <strong>{formatCount(previewCount)}</strong>
                       {!incrementalUpdate ? (
                         <>
                           {" "}
                           (~{formatCount(Math.ceil(previewCount / GBIF_PAGE_SIZE))} стр.)
                         </>
                       ) : null}
-                    </>
-                  ) : hasDataset ? null : (
-                    "Выберите регион, чтобы увидеть оценку"
-                  )}
-                </>
-              )}
-            </div>
-            <div
-              className={`gbif-panel-status-track${
-                loading && (total == null || total <= 0)
-                  ? " gbif-panel-status-track--indeterminate"
-                  : ""
-              }`}
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={
-                loading && total != null && total > 0
-                  ? Math.min(100, Math.round((loaded / total) * 100))
-                  : loading
-                    ? undefined
-                    : loaded > 0
-                      ? 100
-                      : 0
-              }
-              aria-label="Прогресс загрузки GBIF"
-            >
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            ) : (
+              <p className="gbif-panel-status-text">
+                Выберите регион, чтобы увидеть оценку
+              </p>
+            )}
+            {loading ? (
               <div
-                className="gbif-panel-status-bar"
-                style={{
-                  width:
-                    loading && total != null && total > 0
-                      ? `${Math.min(100, (loaded / total) * 100)}%`
-                      : loading
-                        ? "40%"
-                        : loaded > 0
-                          ? "100%"
-                          : "0%"
-                }}
-              />
-            </div>
+                className={`gbif-panel-status-track${
+                  total == null || total <= 0
+                    ? " gbif-panel-status-track--indeterminate"
+                    : ""
+                }`}
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={
+                  total != null && total > 0
+                    ? Math.min(100, Math.round((loaded / total) * 100))
+                    : undefined
+                }
+                aria-label="Прогресс загрузки GBIF"
+              >
+                <div
+                  className="gbif-panel-status-bar"
+                  style={{
+                    width:
+                      total != null && total > 0
+                        ? `${Math.min(100, (loaded / total) * 100)}%`
+                        : "40%"
+                  }}
+                />
+              </div>
+            ) : null}
           </div>
 
           <div className="gbif-panel-actions">
@@ -471,15 +480,6 @@ export default function GbifPanel({
               Отменить
             </button>
           </div>
-
-          <label className="gbif-panel-toggle">
-            <input
-              type="checkbox"
-              checked={layerVisible}
-              onChange={(event) => handleVisibilityChange(event.target.checked)}
-            />
-            Показывать слой GBIF
-          </label>
 
           {error && <p className="gbif-panel-error">{error}</p>}
 

@@ -26,6 +26,7 @@ import {
   getPointColorExpression,
   getPointColorForRegnum
 } from "./pointColors";
+import { safeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
 import {
   DENSE_PILES_CLUSTER_LAYER_ID,
   DENSE_PILES_COUNT_LAYER_ID,
@@ -1240,7 +1241,7 @@ function attachLocationsInteractions(map) {
   };
 
   const clusterClick = (event) => {
-    const features = map.queryRenderedFeatures(event.point, {
+    const features = safeQueryRenderedFeatures(map, event.point, {
       layers: clusterLayerIds
     });
     if (!features.length) {
@@ -1421,7 +1422,7 @@ function attachLocationsInteractions(map) {
     const hitLayerIds = [...locationLayerIds, ...gbifLayerIds];
 
     if (hitLayerIds.length > 0) {
-      const features = map.queryRenderedFeatures(event.point, {
+      const features = safeQueryRenderedFeatures(map, event.point, {
         layers: hitLayerIds
       });
 
@@ -2037,7 +2038,7 @@ export function getUnclusteredFeatures(map, filters = {}, candidateFeatures = nu
     localVisible =
       sourceFeatures.length > 0
         ? sourceFeatures
-        : map.queryRenderedFeatures({ layers: getUnclusteredLayerIds() });
+        : safeQueryRenderedFeatures(map, { layers: getUnclusteredLayerIds() });
   }
 
   let gbifVisible = [];

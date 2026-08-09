@@ -15,6 +15,7 @@ import {
 } from "./boundsPropertyLabels";
 import { loadBoundsLayerGeoJSONFromFirestore } from "../firebase/loadBoundsFromFirestore";
 import { applyMapCursor, getToolFeatures, getFirstLocationsLayerId } from "./addLocationsLayer";
+import { safeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -355,7 +356,7 @@ function findBoundsFeatureAtPoint(map, point) {
     return null;
   }
 
-  const features = map.queryRenderedFeatures(point, { layers: layerIds });
+  const features = safeQueryRenderedFeatures(map, point, { layers: layerIds });
   if (!features.length) {
     return null;
   }
@@ -673,6 +674,8 @@ export async function syncBoundsFeaturesVisibility(map, featureVisibility = {}) 
 /**
  * Считает уникальные виды (по name_latin, иначе name_ru) среди точек находок
  * из текущей выборки, попавших внутрь полигона ООПТ или заповедника.
+ * В список попадают только виды с русским или латинским названием
+ * (плейсхолдер «Без названия» не используется).
  */
 export function getBoundsContainedSpeciesSummary(boundsFeature, filters = {}) {
   if (!boundsFeature?.geometry) {
@@ -691,24 +694,30 @@ export function getBoundsContainedSpeciesSummary(boundsFeature, filters = {}) {
       return;
     }
 
-    const nameLatin = feature.properties?.name_latin;
-    const speciesKey = nameLatin || feature.properties?.name_ru;
+    const nameLatin = String(feature.properties?.name_latin ?? "").trim();
+    const nameRu = String(feature.properties?.name_ru ?? "").trim();
+    const speciesKey = nameLatin || nameRu;
+
     if (!speciesKey || speciesByKey.has(speciesKey)) {
       return;
     }
 
     speciesByKey.set(speciesKey, {
-      nameRu: feature.properties?.name_ru || "Без названия",
-      nameLatin: nameLatin || "",
+      nameRu,
+      nameLatin,
       regnum: feature.properties?.regnum || "",
       family: feature.properties?.family || "",
       point: feature
     });
   });
 
-  const species = [...speciesByKey.values()].sort((left, right) =>
-    left.nameRu.localeCompare(right.nameRu, "ru")
-  );
+  const species = [...speciesByKey.values()]
+    .filter((entry) => entry.nameRu || entry.nameLatin)
+    .sort((left, right) => {
+      const leftLabel = left.nameRu || left.nameLatin;
+      const rightLabel = right.nameRu || right.nameLatin;
+      return leftLabel.localeCompare(rightLabel, "ru");
+    });
 
   return {
     count: species.length,
