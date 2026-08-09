@@ -22,6 +22,8 @@ export const MODULE_IDS = {
   OOPT: "oopt",
   // Совпадает с заголовком ## oopt-feature в docs/moduleHelp.md.
   OOPT_FEATURE: "oopt-feature",
+  // Плотные группы — раздел справки ## dense (кнопка «Обработка» в «Группы точек»).
+  DENSE: "dense",
   // Модуль ввода пользовательских данных в Firestore.
   SUBMIT: "submit",
   // Модуль загрузки находок GBIF на отдельный слой карты.

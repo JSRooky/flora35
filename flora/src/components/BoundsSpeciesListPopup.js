@@ -8,7 +8,12 @@ import "../styles/ArealPopup.css";
 import "../styles/BoundsSpeciesListPopup.css";
 
 // Добавляем латинское название, если русское имя повторяется среди видов списка.
+// Если русского нет — показываем только латынь.
 function getSpeciesLabel(species, speciesList) {
+  if (!species.nameRu) {
+    return species.nameLatin || "Без названия";
+  }
+
   const hasDuplicateName = speciesList.filter((item) => item.nameRu === species.nameRu).length > 1;
 
   if (hasDuplicateName && species.nameLatin) {
@@ -176,6 +181,7 @@ function SpeciesRegnumFamilyTree({
               level="regnum"
               onToggle={() => onToggleNode(regnumKey)}
               visibilitySwitch={
+                onRegnumVisibilityChange ? (
                 <button
                   type="button"
                   className={`bounds-species-tree-eye-btn${
@@ -195,6 +201,7 @@ function SpeciesRegnumFamilyTree({
                 >
                   <EyeIcon hidden={!markersVisible} />
                 </button>
+                ) : null
               }
             />
 
@@ -247,14 +254,16 @@ function SpeciesRegnumFamilyTree({
   );
 }
 
-/** Плавающее окно со списком видов внутри полигона ООПТ или заповедника. */
+/** Плавающее окно со списком видов (ООПТ, плотная группа и т.п.). */
 export default function BoundsSpeciesListPopup({
   open = false,
   onClose,
+  title = "Виды внутри выбранной ООПТ",
+  ariaLabel = null,
   territoryHeading = null,
   speciesSummary = null,
   onSpeciesSelect,
-  onRegnumVisibilityChange
+  onRegnumVisibilityChange = null
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [groupByRegnumEnabled, setGroupByRegnumEnabled] = useState(true);
@@ -370,11 +379,11 @@ export default function BoundsSpeciesListPopup({
         className={`feature-popup bounds-species-list-popup${
           collapsed ? " feature-popup--collapsed bounds-species-list-popup--collapsed" : ""
         }`}
-        aria-label="Виды внутри выбранной ООПТ"
+        aria-label={ariaLabel || title}
         role="dialog"
       >
         <div className="feature-popup-header">
-          <h3 className="feature-popup-title">Виды внутри выбранной ООПТ</h3>
+          <h3 className="feature-popup-title">{title}</h3>
           <div className="popup-panel-header-actions">
             <button
               type="button"
@@ -447,7 +456,9 @@ export default function BoundsSpeciesListPopup({
                       expandedNodes={expandedNodes}
                       onToggleNode={handleToggleNode}
                       regnumVisibility={regnumVisibility}
-                      onRegnumVisibilityChange={handleRegnumVisibilityChange}
+                      onRegnumVisibilityChange={
+                        onRegnumVisibilityChange ? handleRegnumVisibilityChange : null
+                      }
                     />
                   </div>
                 ) : (

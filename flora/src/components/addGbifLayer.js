@@ -20,6 +20,7 @@ import {
 import {
   COORDINATES_ORIGINAL_PROP,
   getFeatureCoordinates,
+  getSpreadPileFitBounds,
   spreadCoincidentFeatures
 } from "./spreadCoincidentPoints";
 import "../styles/GbifPanel.css";
@@ -58,6 +59,8 @@ let gbifClusterByRegnum = true;
 let gbifClusterPieChartsEnabled = false;
 let gbifDenseClustersHighlightEnabled = false;
 let expandedGbifDensePileKeys = new Set();
+/** Колбэк после раскрытия плотной группы GBIF (карта или список). */
+let onGbifDensePileExpandedCallback = null;
 /** Последняя FeatureCollection, переданная в setGbifData (с учётом фильтров). */
 let lastGbifInputCollection = EMPTY_FEATURE_COLLECTION;
 /** Ключи точек, скрытых под булавкой выделения / share. */
@@ -308,11 +311,9 @@ function attachInteractions(map) {
         return;
       }
 
-      expandedGbifDensePileKeys.add(key);
-      setGbifData(map, lastGbifInputCollection);
-      map.easeTo({
-        center: feature.geometry.coordinates,
-        zoom: Math.max(map.getZoom(), 15)
+      expandGbifDensePileByKey(map, key, {
+        coordinates: feature.geometry?.coordinates,
+        pointCount: feature.properties?.point_count
       });
       return;
     }
@@ -811,6 +812,60 @@ export function setGbifDenseClustersHighlightEnabled(map, enabled) {
 
 export function isGbifDenseClustersHighlightEnabled() {
   return gbifDenseClustersHighlightEnabled;
+}
+
+/**
+ * Раскрывает плотную группу GBIF по ключу координат и зумирует к разведённым точкам.
+ */
+export function expandGbifDensePileByKey(
+  map,
+  key,
+  {
+    coordinates = null,
+    pointCount = null,
+    animateCamera = true,
+    notify = true
+  } = {}
+) {
+  if (!map?.getStyle?.() || !key || !gbifDenseClustersHighlightEnabled) {
+    return;
+  }
+
+  expandedGbifDensePileKeys.add(key);
+  setGbifData(map, lastGbifInputCollection);
+
+  const center =
+    Array.isArray(coordinates) && coordinates.length >= 2 ? coordinates : null;
+  const count = Number(pointCount) || 1;
+
+  if (animateCamera && center) {
+    const bounds = getSpreadPileFitBounds(center, count);
+    if (bounds && count > 1) {
+      map.fitBounds(bounds, {
+        padding: 56,
+        maxZoom: 18,
+        duration: 900
+      });
+    } else {
+      map.easeTo({
+        center,
+        zoom: Math.max(map.getZoom(), 15)
+      });
+    }
+  }
+
+  if (notify && typeof onGbifDensePileExpandedCallback === "function") {
+    onGbifDensePileExpandedCallback({
+      key,
+      coordinates: center,
+      pointCount: count
+    });
+  }
+}
+
+/** Регистрирует обработчик раскрытия плотной группы GBIF. */
+export function setGbifDensePileExpandedHandler(handler) {
+  onGbifDensePileExpandedCallback = handler ?? null;
 }
 
 /** Задаёт обработчик клика по точке GBIF (панель «Сведения о точке»). */

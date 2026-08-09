@@ -4,7 +4,7 @@ import { destination, point } from "@turf/turf";
 export const COORDINATES_ORIGINAL_PROP = "coordinates_original";
 
 /** Шаг спирали в метрах: радиус ≈ BASE * sqrt(index). */
-const SPREAD_BASE_METERS = 10;
+export const SPREAD_BASE_METERS = 10;
 
 /** Золотой угол — равномерная спираль без наложений. */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
@@ -128,4 +128,31 @@ export function spreadCoincidentFeatures(features) {
   });
 
   return result;
+}
+
+/**
+ * Границы [[west,south],[east,north]] для разведённой кучи,
+ * чтобы fitBounds показал все точки спирали.
+ */
+export function getSpreadPileFitBounds(coordinates, pointCount) {
+  if (!Array.isArray(coordinates) || coordinates.length < 2) {
+    return null;
+  }
+
+  const lng = Number(coordinates[0]);
+  const lat = Number(coordinates[1]);
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+    return null;
+  }
+
+  const count = Math.max(Number(pointCount) || 1, 1);
+  const radiusMeters = SPREAD_BASE_METERS * Math.sqrt(Math.max(count - 1, 0));
+  const paddingMeters = Math.max(radiusMeters * 1.35, 25);
+  const latPad = paddingMeters / 111320;
+  const lngPad = paddingMeters / (111320 * Math.max(Math.cos((lat * Math.PI) / 180), 0.2));
+
+  return [
+    [lng - lngPad, lat - latPad],
+    [lng + lngPad, lat + latPad]
+  ];
 }

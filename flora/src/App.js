@@ -24,6 +24,8 @@ import {
   setClusteringEnabled,
   setClusterPieChartsEnabled,
   setDenseClustersHighlightEnabled,
+  expandDensePileByKey,
+  setDensePileExpandedHandler,
   setMarkersVisible,
   setHoverTooltipsEnabled,
   setMapCursorOverride,
@@ -31,8 +33,12 @@ import {
   showSharedPointPin,
   showSharedPointPopup,
   updateSelectedPointHighlight,
+  filterFeatures,
+  getFilteredFeatures,
   WITHIN_FEATURE_FILTER_KEY
 } from "./components/addLocationsLayer";
+import { buildSpeciesSummaryFromDensePile, listDensePiles } from "./components/densePiles";
+import DenseClustersPanel from "./components/DenseClustersPanel";
 import {
   addHeatmapLayer,
   setHeatmapEnabled,
@@ -149,9 +155,9 @@ import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
-import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum, setGbifClusterPieChartsEnabled, setGbifDenseClustersHighlightEnabled } from "./components/addGbifLayer";
+import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum, setGbifClusterPieChartsEnabled, setGbifDenseClustersHighlightEnabled, expandGbifDensePileByKey, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
-import { findGbifFeatureByKey } from "./gbif/gbifStore";
+import { findGbifFeatureByKey, getGbifFeatureCollection } from "./gbif/gbifStore";
 import {
   clearRussianNameChoice,
   lookupRussianNameCandidates,
@@ -172,6 +178,7 @@ const PANEL_IDS = {
   AREAL: "areal",
   STATUS: "status",
   MAP: "map",
+  DENSE: "dense",
   YEAR: "year",
   POLYGON: "polygon",
   BUFFER: "buffer",
@@ -202,6 +209,12 @@ export default function MapView() {
   const [denseClustersHighlight, setDenseClustersHighlightState] = useState(
     DEFAULT_DENSE_CLUSTERS_HIGHLIGHT
   );
+  const [denseProcessingActive, setDenseProcessingActive] = useState(false);
+  const [selectedDensePileKey, setSelectedDensePileKey] = useState(null);
+  const [densePileSpeciesListOpen, setDensePileSpeciesListOpen] = useState(false);
+  const densePileCameraBeforeRef = useRef(null);
+  const selectedDensePileKeyRef = useRef(null);
+  selectedDensePileKeyRef.current = selectedDensePileKey;
   const [markersVisible, setMarkersVisibleState] = useState(DEFAULT_MARKERS_VISIBLE);
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
@@ -294,6 +307,31 @@ export default function MapView() {
       return { ...prev, [panelId]: false };
     });
   }, []);
+
+  // Разворачиваем обработку; если на экране «Сведения о точке» — сворачиваем её.
+  const expandDenseProcessingPanel = useCallback(() => {
+    setPanelCollapsed((prev) => {
+      const next = { ...prev, [PANEL_IDS.DENSE]: false };
+
+      if (activeModule === MODULE_IDS.FEATURE) {
+        next[PANEL_IDS.FEATURE] = true;
+      }
+
+      return next;
+    });
+  }, [activeModule]);
+
+  const handleDensePanelCollapsedChange = useCallback(
+    (collapsed) => {
+      if (collapsed) {
+        setPanelCollapsed((prev) => ({ ...prev, [PANEL_IDS.DENSE]: true }));
+        return;
+      }
+
+      expandDenseProcessingPanel();
+    },
+    [expandDenseProcessingPanel]
+  );
 
   useEffect(() => {
     switch (activeModule) {
@@ -962,6 +1000,172 @@ export default function MapView() {
 
     return filters;
   }, [baseLocationFilters, boundsSpeciesRegnumFilter, effectiveWithinFeature]);
+
+  const densePilesStats = useMemo(() => {
+    const localFeatures = getFilteredFeatures(locationFilters);
+    const gbifFeatures = filterFeatures(
+      getGbifFeatureCollection().features ?? [],
+      locationFilters
+    );
+    const piles = listDensePiles([...localFeatures, ...gbifFeatures]);
+    const pileCount = piles.length;
+    const pointCount = piles.reduce((sum, pile) => sum + pile.pointCount, 0);
+
+    return { piles, pileCount, pointCount };
+  }, [locationFilters]);
+
+  const selectedDensePile = useMemo(
+    () => densePilesStats.piles.find((pile) => pile.key === selectedDensePileKey) ?? null,
+    [densePilesStats.piles, selectedDensePileKey]
+  );
+
+  const densePileSpeciesSummary = useMemo(
+    () => buildSpeciesSummaryFromDensePile(selectedDensePile),
+    [selectedDensePile]
+  );
+
+  const densePileSpeciesTerritoryHeading = useMemo(() => {
+    const coordinates = selectedDensePile?.coordinates;
+    if (!Array.isArray(coordinates) || coordinates.length < 2) {
+      return null;
+    }
+
+    const [lng, lat] = coordinates;
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+      return null;
+    }
+
+    return {
+      category: "Координаты",
+      title: `${lat.toFixed(3)}, ${lng.toFixed(3)}`
+    };
+  }, [selectedDensePile]);
+
+  const handleDensePileExpanded = useCallback(({ key }) => {
+    if (!key || !map.current) {
+      return;
+    }
+
+    // Сохраняем камеру до первого зума к группе — кнопка лупы вернёт к ней.
+    if (!selectedDensePileKeyRef.current && !densePileCameraBeforeRef.current) {
+      const center = map.current.getCenter();
+      densePileCameraBeforeRef.current = {
+        center: [center.lng, center.lat],
+        zoom: map.current.getZoom(),
+        bearing: map.current.getBearing(),
+        pitch: map.current.getPitch()
+      };
+    }
+
+    setSelectedDensePileKey(key);
+
+    // Клик по плотной группе на карте открывает панель обработки, если она скрыта.
+    setMarkersVisibleState(true);
+    setDenseClustersHighlightState(true);
+    setDenseProcessingActive(true);
+    setActiveModule(MODULE_IDS.MAP);
+    expandDenseProcessingPanel();
+  }, [expandDenseProcessingPanel]);
+
+  useEffect(() => {
+    setDensePileExpandedHandler(handleDensePileExpanded);
+    setGbifDensePileExpandedHandler(handleDensePileExpanded);
+
+    return () => {
+      setDensePileExpandedHandler(null);
+      setGbifDensePileExpandedHandler(null);
+    };
+  }, [handleDensePileExpanded]);
+
+  const handleDensePileSelect = useCallback((pile) => {
+    if (!map.current || !pile?.key) {
+      return;
+    }
+
+    expandDensePileByKey(map.current, pile.key, {
+      coordinates: pile.coordinates,
+      pointCount: pile.pointCount,
+      animateCamera: true,
+      notify: true
+    });
+    expandGbifDensePileByKey(map.current, pile.key, {
+      coordinates: pile.coordinates,
+      pointCount: pile.pointCount,
+      animateCamera: false,
+      notify: false
+    });
+  }, []);
+
+  const handleDensePileZoomBack = useCallback(() => {
+    const previous = densePileCameraBeforeRef.current;
+    if (map.current && previous) {
+      map.current.easeTo({
+        ...previous,
+        duration: 900
+      });
+    }
+
+    densePileCameraBeforeRef.current = null;
+    setSelectedDensePileKey(null);
+    setDensePileSpeciesListOpen(false);
+  }, []);
+
+  const handleDensePileSpeciesListToggle = useCallback((pile) => {
+    if (!pile?.key) {
+      return;
+    }
+
+    if (selectedDensePileKeyRef.current !== pile.key) {
+      handleDensePileSelect(pile);
+      setDensePileSpeciesListOpen(true);
+      return;
+    }
+
+    setDensePileSpeciesListOpen((open) => !open);
+  }, [handleDensePileSelect]);
+
+  const handleDensePileSpeciesListClose = useCallback(() => {
+    setDensePileSpeciesListOpen(false);
+  }, []);
+
+  const handleDensePileSpeciesSelect = useCallback((feature) => {
+    const mapInstance = map.current;
+
+    if (!mapInstance || !feature) {
+      return;
+    }
+
+    panToArealPoint(mapInstance, feature);
+    setPopupData(feature);
+    setActiveModule(MODULE_IDS.FEATURE);
+    expandPanel(PANEL_IDS.FEATURE);
+    // Панель обработки оставляем на экране, но сворачиваем.
+    setPanelCollapsed((prev) =>
+      prev[PANEL_IDS.DENSE] ? prev : { ...prev, [PANEL_IDS.DENSE]: true }
+    );
+  }, [expandPanel]);
+
+  useEffect(() => {
+    if (!selectedDensePileKey) {
+      setDensePileSpeciesListOpen(false);
+    }
+  }, [selectedDensePileKey]);
+
+  useEffect(() => {
+    // MAP — обычный режим обработки; FEATURE — просмотр точки из списка видов.
+    // null (клик по карте) не закрывает обработку.
+    if (
+      denseProcessingActive &&
+      activeModule != null &&
+      activeModule !== MODULE_IDS.MAP &&
+      activeModule !== MODULE_IDS.FEATURE
+    ) {
+      setDenseProcessingActive(false);
+      setSelectedDensePileKey(null);
+      setDensePileSpeciesListOpen(false);
+      densePileCameraBeforeRef.current = null;
+    }
+  }, [activeModule, denseProcessingActive]);
 
   const handleLookupRussianName = useCallback(async (feature, { force = false } = {}) => {
     const nameLatin = feature?.properties?.name_latin;
@@ -1945,8 +2149,33 @@ export default function MapView() {
   };
 
   const handleDenseClustersHighlightChange = (enabled) => {
+    if (enabled) {
+      setMarkersVisibleState(true);
+    } else {
+      setDenseProcessingActive(false);
+      setSelectedDensePileKey(null);
+      setDensePileSpeciesListOpen(false);
+      densePileCameraBeforeRef.current = null;
+    }
+
     setDenseClustersHighlightState(enabled);
   };
+
+  const handleDenseProcessingOpen = useCallback(() => {
+    setMarkersVisibleState(true);
+    setDenseClustersHighlightState(true);
+    setDenseProcessingActive(true);
+    setActiveModule(MODULE_IDS.MAP);
+    expandDenseProcessingPanel();
+  }, [expandDenseProcessingPanel]);
+
+  const handleDenseProcessingClose = useCallback(() => {
+    setDenseProcessingActive(false);
+    setSelectedDensePileKey(null);
+    setDensePileSpeciesListOpen(false);
+    densePileCameraBeforeRef.current = null;
+    expandPanel(PANEL_IDS.MAP);
+  }, [expandPanel]);
 
   const handleFeatureFiltersReset = useCallback(() => {
     setPropertyFilters({});
@@ -2665,10 +2894,13 @@ export default function MapView() {
     Boolean(selectedBoundsFeature) &&
     (activeModule === MODULE_IDS.OOPT || ooptPointsFilterActive);
 
+  const denseProcessingExclusive = denseProcessingActive;
+
   const showModulePanelStack =
     (activeModule !== null && activeModule !== MODULE_IDS.TIMELINE) ||
     (showOoptFeaturePanel && activeModule !== MODULE_IDS.TIMELINE) ||
-    dataSourceMode === DATA_SOURCE_MODES.GBIF;
+    dataSourceMode === DATA_SOURCE_MODES.GBIF ||
+    denseProcessingActive;
 
   const ooptGlobalFilterTooltip = useMemo(() => {
     if (!ooptFilterTarget) {
@@ -2723,6 +2955,48 @@ export default function MapView() {
       <BasemapPicker basemapMode={basemapMode} onBasemapModeChange={setBasemapMode} />
       {showModulePanelStack && (
         <div className="module-panel-stack">
+          {denseProcessingExclusive ? (
+            <>
+              {activeModule === MODULE_IDS.FEATURE && (
+                <FeaturePopup
+                  feature={popupData}
+                  collapsed={isPanelCollapsed(PANEL_IDS.FEATURE)}
+                  onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.FEATURE)}
+                  activeFilters={propertyFilters}
+                  onFilterChange={handlePropertyFilterChange}
+                  activeStatusFilters={statusFilters}
+                  onStatusFilterChange={handleStatusFilterChange}
+                  onFiltersReset={handleFeatureFiltersReset}
+                  onOpenAreal={handleOpenArealFromFeature}
+                  arealDockedOpen={arealDockedWithFeature}
+                  arealDisabled={isBufferApplied}
+                  arealDisabledTitle={AREAL_BLOCKED_BY_BUFFER_TITLE}
+                  onOpenBuffer={handleOpenBufferFromFeature}
+                  bufferDockedOpen={bufferDockedWithFeature}
+                  bufferDisabled={isArealApplied}
+                  bufferDisabledTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
+                  onLookupRussianName={handleLookupRussianName}
+                  onApplyRussianName={handleApplyRussianName}
+                  onClearRussianName={handleClearRussianName}
+                />
+              )}
+              <DenseClustersPanel
+                pileCount={densePilesStats.pileCount}
+                pointCount={densePilesStats.pointCount}
+                piles={densePilesStats.piles}
+                selectedPileKey={selectedDensePileKey}
+                canZoomBack={Boolean(selectedDensePileKey)}
+                speciesListOpen={densePileSpeciesListOpen}
+                onSelectPile={handleDensePileSelect}
+                onZoomBack={handleDensePileZoomBack}
+                onToggleSpeciesList={handleDensePileSpeciesListToggle}
+                onClose={handleDenseProcessingClose}
+                collapsed={isPanelCollapsed(PANEL_IDS.DENSE)}
+                onCollapsedChange={handleDensePanelCollapsedChange}
+              />
+            </>
+          ) : (
+            <>
           {activeModule === MODULE_IDS.FEATURE && (
             <FeaturePopup
               feature={popupData}
@@ -2786,6 +3060,7 @@ export default function MapView() {
               onClusterPieChartsChange={handleClusterPieChartsChange}
               denseClustersHighlight={denseClustersHighlight}
               onDenseClustersHighlightChange={handleDenseClustersHighlightChange}
+              onDenseProcessingOpen={handleDenseProcessingOpen}
               collapsed={isPanelCollapsed(PANEL_IDS.MAP)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.MAP)}
             />
@@ -2921,6 +3196,8 @@ export default function MapView() {
               onDataChange={handleGbifDataChange}
             />
           )}
+            </>
+          )}
         </div>
       )}
       <TimelineSlider
@@ -2961,6 +3238,15 @@ export default function MapView() {
         speciesSummary={boundsContainedSpecies}
         onSpeciesSelect={handleBoundsSpeciesSelect}
         onRegnumVisibilityChange={handleBoundsSpeciesRegnumVisibilityChange}
+      />
+      <BoundsSpeciesListPopup
+        open={densePileSpeciesListOpen && denseProcessingActive && Boolean(selectedDensePile)}
+        onClose={handleDensePileSpeciesListClose}
+        title="Виды в плотной группе"
+        ariaLabel="Список видов плотной группы"
+        territoryHeading={densePileSpeciesTerritoryHeading}
+        speciesSummary={densePileSpeciesSummary}
+        onSpeciesSelect={handleDensePileSpeciesSelect}
       />
       <MapCornerControls
         ooptFilterEnabled={ooptPointsFilterActive}

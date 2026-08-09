@@ -33,6 +33,7 @@ import {
 } from "./densePiles";
 import {
   getFeatureCoordinates,
+  getSpreadPileFitBounds,
   restoreOriginalCoordinates,
   spreadCoincidentFeatures
 } from "./spreadCoincidentPoints";
@@ -103,6 +104,8 @@ let interactionHandlers = null;
 let onClusterExpandedCallback = null;
 let onPointClickCallback = null;
 let onMapBackgroundClickCallback = null;
+/** Колбэк после раскрытия плотной группы (карта или список). */
+let onDensePileExpandedCallback = null;
 let pointHoverPopup = null;
 let pointHoverPopupHideTimer = null;
 let clusterHoverRequestId = 0;
@@ -1217,16 +1220,10 @@ function attachLocationsInteractions(map) {
       return;
     }
 
-    const leaves = getDensePileMembers(clusterFeature);
-    expandedDensePileKeys.add(key);
-    updateLocationsSourceData(map, currentFilteredFeatures);
-
-    map.easeTo({
-      center: clusterFeature.geometry.coordinates,
-      zoom: Math.max(map.getZoom(), 15)
+    expandDensePileByKey(map, key, {
+      coordinates: clusterFeature.geometry?.coordinates,
+      pointCount: clusterFeature.properties?.point_count
     });
-
-    onClusterExpandedCallback?.(leaves.map(restoreOriginalCoordinates));
   };
 
   const clusterClick = (event) => {
@@ -2234,6 +2231,63 @@ export function setDenseClustersHighlightEnabled(map, enabled) {
 
 export function isDenseClustersHighlightEnabled() {
   return denseClustersHighlightEnabled;
+}
+
+/**
+ * Раскрывает плотную группу по ключу координат и зумирует так, чтобы были видны все точки.
+ */
+export function expandDensePileByKey(
+  map,
+  key,
+  { coordinates = null, pointCount = null, animateCamera = true, notify = true } = {}
+) {
+  if (!map?.getStyle?.() || !key || !denseClustersHighlightEnabled) {
+    return [];
+  }
+
+  expandedDensePileKeys.add(key);
+  updateLocationsSourceData(map, currentFilteredFeatures);
+
+  const leaves = locationsDensePileMembers.get(`dense-${key}`) ?? [];
+  const center =
+    (Array.isArray(coordinates) && coordinates.length >= 2
+      ? coordinates
+      : null) ??
+    (leaves[0] ? getFeatureCoordinates(leaves[0]) : null);
+  const count = Number(pointCount) || leaves.length || 1;
+
+  if (animateCamera && center) {
+    const bounds = getSpreadPileFitBounds(center, count);
+    if (bounds && count > 1) {
+      map.fitBounds(bounds, {
+        padding: 56,
+        maxZoom: 18,
+        duration: 900
+      });
+    } else {
+      map.easeTo({
+        center,
+        zoom: Math.max(map.getZoom(), 15)
+      });
+    }
+  }
+
+  onClusterExpandedCallback?.(leaves.map(restoreOriginalCoordinates));
+
+  if (notify) {
+    onDensePileExpandedCallback?.({
+      key,
+      coordinates: center,
+      pointCount: count
+    });
+  }
+
+  return leaves;
+}
+
+/** Регистрирует обработчик раскрытия плотной группы (для синхронизации со списком). */
+export function setDensePileExpandedHandler(handler) {
+  onDensePileExpandedCallback = handler ?? null;
 }
 
 /** Включает или отключает всплывающие подсказки при наведении на точки и кластеры. */

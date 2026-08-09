@@ -19,7 +19,7 @@ function getCollapsedSummary(
   }
 
   if (markersVisible && denseClustersHighlight) {
-    parts.push("сверхплотные кластеры");
+    parts.push("плотные группы");
   } else if (clusteringEnabled && markersVisible) {
     if (clusterPieCharts) {
       parts.push("кластеры-диаграммы");
@@ -51,6 +51,7 @@ export default function MapDisplayPanel({
   onClusterPieChartsChange,
   denseClustersHighlight = false,
   onDenseClustersHighlightChange,
+  onDenseProcessingOpen,
   collapsed: collapsedProp,
   onCollapsedChange
 }) {
@@ -107,7 +108,7 @@ export default function MapDisplayPanel({
               !markersVisible
                 ? "Доступно только при включённых маркерах"
                 : denseClustersHighlight
-                  ? "Недоступно в режиме сверхплотных кластеров"
+                  ? "Недоступно в режиме плотных групп"
                   : "Группировать близкие точки в кластеры"
             }
           >
@@ -129,7 +130,7 @@ export default function MapDisplayPanel({
               !markersVisible
                 ? "Доступно только при включённых маркерах"
                 : denseClustersHighlight
-                  ? "Недоступно в режиме сверхплотных кластеров"
+                  ? "Недоступно в режиме плотных групп"
                   : !clusteringEnabled
                     ? "Доступно только при включённой кластеризации"
                     : clusterPieCharts
@@ -155,7 +156,7 @@ export default function MapDisplayPanel({
               !markersVisible
                 ? "Доступно только при включённых маркерах"
                 : denseClustersHighlight
-                  ? "Недоступно в режиме сверхплотных кластеров"
+                  ? "Недоступно в режиме плотных групп"
                   : !clusteringEnabled
                     ? "Доступно только при включённой кластеризации"
                     : "Показывать состав кластера секторной диаграммой; отключает группировку по царству"
@@ -171,25 +172,40 @@ export default function MapDisplayPanel({
             <span className="map-display-switch-label">Кластеры-диаграммы</span>
           </label>
 
-          <label
-            className={`map-display-switch${
-              denseClustersHighlightDisabled ? " map-display-switch--disabled" : ""
+          <div
+            className={`map-display-dense-row${
+              denseClustersHighlightDisabled ? " map-display-dense-row--disabled" : ""
             }`}
-            title={
-              denseClustersHighlightDisabled
-                ? "Доступно только при включённых маркерах"
-                : "Отключить обычную кластеризацию и показать только кучи ≥10 точек с полностью одинаковыми координатами; остальные точки скрыть"
-            }
           >
-            <input
-              type="checkbox"
-              checked={denseClustersHighlight}
+            <label
+              className={`map-display-switch${
+                denseClustersHighlightDisabled ? " map-display-switch--disabled" : ""
+              }`}
+              title={
+                denseClustersHighlightDisabled
+                  ? "Доступно только при включённых маркерах"
+                  : "Отключить обычную кластеризацию и показать только группы ≥10 точек с полностью одинаковыми координатами; остальные точки скрыть"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={denseClustersHighlight}
+                disabled={denseClustersHighlightDisabled}
+                onChange={(e) => onDenseClustersHighlightChange?.(e.target.checked)}
+              />
+              <span className="map-display-switch-slider" />
+              <span className="map-display-switch-label">Плотные группы</span>
+            </label>
+            <button
+              type="button"
+              className="map-display-dense-process-btn"
               disabled={denseClustersHighlightDisabled}
-              onChange={(e) => onDenseClustersHighlightChange?.(e.target.checked)}
-            />
-            <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">Сверхплотные кластеры</span>
-          </label>
+              onClick={() => onDenseProcessingOpen?.()}
+              title="Открыть панель обработки плотных групп"
+            >
+              Обработка
+            </button>
+          </div>
 
           <hr />
 
@@ -215,7 +231,7 @@ export default function MapDisplayPanel({
         </div>
       )}
 
-      <ModuleHelpPanel moduleId={MODULE_IDS.MAP} open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.MAP} open={helpOpen} />
     </aside>
   );
 }

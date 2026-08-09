@@ -1,4 +1,5 @@
 import { getFeatureCoordinates } from "./spreadCoincidentPoints";
+import { getPointColorForRegnum } from "./pointColors";
 
 /** Минимум точек с полностью одинаковыми координатами для сверхплотного кластера. */
 export const MIN_DENSE_PILE_SIZE = 10;
@@ -101,6 +102,113 @@ export function partitionFeaturesByDensePiles(
     expandedDenseFeatures,
     denseClusterFeatures,
     densePileMembersById
+  };
+}
+
+/**
+ * Список всех плотных групп (≥ minSize точек с одинаковыми координатами),
+ * по убыванию числа точек. color — цвет точек группы на карте (по regnum).
+ */
+export function listDensePiles(features, { minSize = MIN_DENSE_PILE_SIZE } = {}) {
+  const groups = new Map();
+
+  (features ?? []).forEach((feature) => {
+    const coordinates = getFeatureCoordinates(feature);
+    if (!coordinates) {
+      return;
+    }
+
+    const key = exactCoordKey(coordinates[0], coordinates[1]);
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        coordinates: [coordinates[0], coordinates[1]],
+        members: []
+      });
+    }
+
+    groups.get(key).members.push(feature);
+  });
+
+  return [...groups.values()]
+    .filter((group) => group.members.length >= minSize)
+    .map(({ key, coordinates, members }) => {
+      const regnumCounts = new Map();
+      const items = members.map((feature, index) => {
+        const props = feature.properties ?? {};
+        const regnum = props.regnum ?? null;
+        regnumCounts.set(regnum, (regnumCounts.get(regnum) ?? 0) + 1);
+
+        const findingId = props.finding_id;
+        const gbifKey = props.gbif_key;
+        const id =
+          findingId != null
+            ? `finding-${findingId}`
+            : gbifKey != null
+              ? `gbif-${gbifKey}`
+              : `member-${key}-${index}`;
+
+        return {
+          id,
+          label: props.name_ru || props.name_latin || "Без названия",
+          color: getPointColorForRegnum(regnum),
+          feature
+        };
+      });
+
+      let dominantRegnum = null;
+      let dominantCount = -1;
+      regnumCounts.forEach((count, regnum) => {
+        if (count > dominantCount) {
+          dominantCount = count;
+          dominantRegnum = regnum;
+        }
+      });
+
+      return {
+        key,
+        coordinates,
+        pointCount: members.length,
+        color: getPointColorForRegnum(dominantRegnum),
+        items
+      };
+    })
+    .sort((a, b) => b.pointCount - a.pointCount || a.key.localeCompare(b.key));
+}
+
+/**
+ * Сводка уникальных видов по точкам плотной группы (формат как у ООПТ).
+ */
+export function buildSpeciesSummaryFromDensePile(pile) {
+  const speciesByKey = new Map();
+
+  (pile?.items ?? []).forEach((item) => {
+    const feature = item?.feature;
+    const props = feature?.properties ?? {};
+    const nameLatin = props.name_latin;
+    const speciesKey = nameLatin || props.name_ru;
+    if (!speciesKey || speciesByKey.has(speciesKey)) {
+      return;
+    }
+
+    speciesByKey.set(speciesKey, {
+      nameRu: props.name_ru || "",
+      nameLatin: nameLatin || "",
+      regnum: props.regnum || "",
+      family: props.family || "",
+      point: feature
+    });
+  });
+
+  const species = [...speciesByKey.values()].sort((left, right) => {
+    const leftLabel = left.nameRu || left.nameLatin;
+    const rightLabel = right.nameRu || right.nameLatin;
+    return leftLabel.localeCompare(rightLabel, "ru");
+  });
+
+  return {
+    count: species.length,
+    species
   };
 }
 

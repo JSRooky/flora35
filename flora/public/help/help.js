@@ -7,6 +7,7 @@ const HELP_SECTION_LABELS = {
   year: "Год находки",
   status: "Статус МСОП",
   map: "Группы точек",
+  dense: "Обработка плотных групп",
   oopt: "ООПТ",
   "oopt-feature": "Сведения об ООПТ",
   submit: "Ввод данных о находке"
