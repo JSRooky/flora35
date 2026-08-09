@@ -1,5 +1,5 @@
 import { area, difference, featureCollection } from "@turf/turf";
-import { getFeaturesByNameLatin } from "../locations/loadPoints";
+import { getToolFeatures } from "./addLocationsLayer";
 import {
   buildPolygonFromCoordinates,
   POLYGON_BUILD_MODES
@@ -14,7 +14,9 @@ function getSliceCacheKey(nameLatin, mode) {
 }
 
 function getSpeciesPoints(nameLatin) {
-  return getFeaturesByNameLatin(nameLatin);
+  return getToolFeatures({}).filter(
+    (feature) => feature.properties?.name_latin === nameLatin
+  );
 }
 
 function getSliceGeometry(currentHull, previousHull) {
@@ -86,6 +88,12 @@ export function buildArealDynamicsSlices(
     return [];
   }
 
+  const yearMin = years[0];
+  const yearMax = years[years.length - 1];
+  const globalBounds = getYearBounds();
+  const colorYearMin = Number.isFinite(globalBounds?.min) ? Math.min(globalBounds.min, yearMin) : yearMin;
+  const colorYearMax = Number.isFinite(globalBounds?.max) ? Math.max(globalBounds.max, yearMax) : yearMax;
+
   const cumulativeCoordinates = [];
   let previousHull = null;
   const slices = [];
@@ -106,7 +114,7 @@ export function buildArealDynamicsSlices(
       return;
     }
 
-    const colorRatio = getYearColorRatio(year, getYearBounds().min, getYearBounds().max);
+    const colorRatio = getYearColorRatio(year, colorYearMin, colorYearMax);
     const newPointCount = pointsByYear.get(year).length;
     const fillColor = getTimelineColorHex(colorRatio);
 

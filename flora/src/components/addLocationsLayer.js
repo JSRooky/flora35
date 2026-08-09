@@ -5,6 +5,13 @@ import {
   getPropertyLabel
 } from "./featurePropertyLabels";
 import { getFeatureCollection } from "../locations/loadPoints";
+import { findGbifFeatureByKey, getGbifFeatureCollection } from "../gbif/gbifStore";
+import {
+  GBIF_SOURCE_ID,
+  GBIF_UNCLUSTERED_LAYER_ID,
+  isGbifLayerVisible,
+  setGbifHiddenPointFeatureKeys
+} from "./addGbifLayer";
 
 const PUBLIC_URL = process.env.PUBLIC_URL || "";
 const PLANT_IMAGE = `${PUBLIC_URL}/images/plant.svg`;
@@ -87,6 +94,10 @@ let sharedPointPopupDetailsHandler = null;
 let selectedPointPinMarker = null;
 let selectedPointPinFeatureKey = null;
 let selectedPointPinObjectUrl = null;
+
+/** Источники точек для инструментов (радиус, область, heatmap…). */
+let toolIncludeLocal = true;
+let toolIncludeGbif = true;
 
 /** Поля, показываемые в компактном окне при открытии share-ссылки. */
 const SHARED_POINT_POPUP_FIELDS = ["regnum", "family", "found_year", "status"];
@@ -669,6 +680,23 @@ export function getUnclusteredLayerIds() {
   return [getLayerIds().unclustered];
 }
 
+function buildPinnedKeyExclusion(key) {
+  return [
+    "!",
+    [
+      "any",
+      ["==", ["to-string", ["id"]], key],
+      ["==", ["to-string", ["coalesce", ["get", "finding_id"], ""]], key],
+      ["==", ["to-string", ["coalesce", ["get", "gbif_key"], ""]], key],
+      [
+        "==",
+        ["concat", "gbif-", ["to-string", ["coalesce", ["get", "gbif_key"], ""]]],
+        key
+      ]
+    ]
+  ];
+}
+
 function buildUnclusteredLayerFilter() {
   const parts = [];
 
@@ -676,21 +704,14 @@ function buildUnclusteredLayerFilter() {
     parts.push(["!", ["has", "point_count"]]);
   }
 
-  // Точки, временно заменённые булавкой (map_pin.svg) — открытие по share-ссылке
-  // или выделение точки в «Сведения о точке» — не рисуем обычным маркером.
-  const pinnedFeatureKeys = [...new Set(
-    [sharedPointPinFeatureKey, selectedPointPinFeatureKey].filter(Boolean)
-  )];
+  // Точки, временно заменённые булавкой (map_pin.svg) — share-ссылка
+  // или выделение в «Сведения о точке» — не рисуем обычным маркером.
+  const pinnedFeatureKeys = [
+    ...new Set([sharedPointPinFeatureKey, selectedPointPinFeatureKey].filter(Boolean))
+  ];
 
   pinnedFeatureKeys.forEach((key) => {
-    parts.push([
-      "!",
-      [
-        "==",
-        ["to-string", ["coalesce", ["get", "finding_id"], ["id"]]],
-        key
-      ]
-    ]);
+    parts.push(buildPinnedKeyExclusion(key));
   });
 
   if (parts.length === 0) {
@@ -714,6 +735,12 @@ function applyUnclusteredLayerFilters(map) {
 
     map.setFilter(layerId, filter);
   });
+
+  // Тот же набор ключей — скрываем кружок на слое GBIF под булавкой.
+  setGbifHiddenPointFeatureKeys(map, [
+    sharedPointPinFeatureKey,
+    selectedPointPinFeatureKey
+  ]);
 }
 
 /** ID первого существующего на карте слоя точек — ориентир для вставки слоёв под маркерами. */
@@ -998,6 +1025,8 @@ export function updateSelectedPointHighlight(map, feature) {
     // в обоих случаях повторный запуск создания маркера привёл бы к утечке
     // (несколько наложенных друг на друга <img>, см. историю бага).
     selectedPointPinMarker?.setLngLat(coordinates);
+    // Слои могли пересобраться — заново скрываем кружок под булавкой.
+    applyUnclusteredLayerFilters(map);
     return;
   }
 
@@ -1440,6 +1469,20 @@ function filtersEqual(a, b) {
   return keysA.every((key) => filterValueEqual(a[key], b[key]));
 }
 
+/** Изменился только found_year (диапазон / появление / снятие фильтра по году). */
+function isFoundYearOnlyChange(prevFilters, nextFilters) {
+  if (filtersEqual(prevFilters, nextFilters)) {
+    return false;
+  }
+
+  const prevRest = { ...prevFilters };
+  const nextRest = { ...nextFilters };
+  delete prevRest.found_year;
+  delete nextRest.found_year;
+
+  return filtersEqual(prevRest, nextRest);
+}
+
 /** Изменился только верхний предел found_year (типичное движение слайдера таймлайна). */
 function isTimelineYearMaxOnlyChange(prevFilters, nextFilters) {
   const prevYear = prevFilters.found_year;
@@ -1460,19 +1503,7 @@ function isTimelineYearMaxOnlyChange(prevFilters, nextFilters) {
     return false;
   }
 
-  const prevRest = { ...prevFilters };
-  const nextRest = { ...nextFilters };
-  delete prevRest.found_year;
-  delete nextRest.found_year;
-
-  const prevKeys = Object.keys(prevRest).sort();
-  const nextKeys = Object.keys(nextRest).sort();
-
-  if (prevKeys.join("|") !== nextKeys.join("|")) {
-    return false;
-  }
-
-  return prevKeys.every((key) => filterValueEqual(prevRest[key], nextRest[key]));
+  return isFoundYearOnlyChange(prevFilters, nextFilters);
 }
 
 function locationsSourcesExist(map) {
@@ -1526,10 +1557,12 @@ function applyTimelineYearChange(map, prevFilters, nextFilters) {
 
   let newFilteredFeatures;
 
+  const yearMin = nextFilters.found_year.min;
+
   if (nextMax > prevMax) {
     const toAdd = filterFeatures(locationsData.features, {
       ...baseFilters,
-      found_year: { min: prevMax + 1, max: nextMax }
+      found_year: { min: Math.max(prevMax + 1, yearMin), max: nextMax }
     });
     const existingKeys = new Set(currentFilteredFeatures.map(getFeatureKey));
 
@@ -1540,13 +1573,26 @@ function applyTimelineYearChange(map, prevFilters, nextFilters) {
   } else {
     newFilteredFeatures = currentFilteredFeatures.filter((feature) => {
       const year = feature.properties?.found_year;
-      return typeof year === "number" && year <= nextMax;
+      return typeof year === "number" && year >= yearMin && year <= nextMax;
     });
   }
 
   setCurrentFilteredFeatures(newFilteredFeatures);
   currentFilters = nextFilters;
   updateLocationsSourceData(map, newFilteredFeatures);
+}
+
+/** Перефильтровывает точки при любом изменении found_year без пересборки слоёв. */
+function applyFoundYearFilterChange(map, nextFilters) {
+  if (!locationsData) {
+    currentFilters = nextFilters;
+    return;
+  }
+
+  const filteredFeatures = filterFeatures(locationsData.features, nextFilters);
+  setCurrentFilteredFeatures(filteredFeatures);
+  currentFilters = nextFilters;
+  updateLocationsSourceData(map, filteredFeatures);
 }
 
 /**
@@ -1639,6 +1685,11 @@ export function filterFeatures(features, filters = {}) {
             return true;
           }
 
+          // У GBIF нет статуса МСОП — фильтр статуса их не отсекает.
+          if (key === "status" && feature.properties?.source === "gbif") {
+            return true;
+          }
+
           return value.includes(feature.properties[key]);
         }
 
@@ -1683,10 +1734,47 @@ export function getFilteredFeatures(filters = {}) {
   return filterFeatures(locationsData.features, filters);
 }
 
+/** Является ли feature точкой GBIF. */
+export function isGbifFeature(feature) {
+  return feature?.properties?.source === "gbif";
+}
+
+/** Задаёт, какие источники участвуют в инструментах карты. */
+export function setToolFeaturesContext({ includeLocal, includeGbif } = {}) {
+  if (typeof includeLocal === "boolean") {
+    toolIncludeLocal = includeLocal;
+  }
+  if (typeof includeGbif === "boolean") {
+    toolIncludeGbif = includeGbif;
+  }
+}
+
+export function getToolFeaturesContext() {
+  return { includeLocal: toolIncludeLocal, includeGbif: toolIncludeGbif };
+}
+
+/**
+ * Точки для инструментов: локальные + GBIF с учётом контекста видимости и фильтров.
+ * Не меняет отображение слоя locations — только выборку для анализа.
+ */
+export function getToolFeatures(filters = {}) {
+  const features = [];
+
+  if (toolIncludeLocal && locationsData?.features?.length) {
+    features.push(...locationsData.features);
+  }
+
+  if (toolIncludeGbif && isGbifLayerVisible()) {
+    features.push(...(getGbifFeatureCollection().features ?? []));
+  }
+
+  return filterFeatures(features, filters);
+}
+
 /** Сводка по точкам внутри GeoJSON-объекта с учётом фильтров (без within-фильтра в base). */
 export function getContainedPointsSummaryForWithinFeature(withinFeature, filters = {}) {
   const { [WITHIN_FEATURE_FILTER_KEY]: _ignored, ...baseFilters } = filters;
-  const points = filterFeatures(getFilteredFeatures(baseFilters), {
+  const points = filterFeatures(getToolFeatures(baseFilters), {
     ...baseFilters,
     [WITHIN_FEATURE_FILTER_KEY]: withinFeature
   }).sort((a, b) => {
@@ -1752,20 +1840,36 @@ export function getUnclusteredFeatures(map, filters = {}, candidateFeatures = nu
       : map.getSource("locations")
     : map.getSource("locations");
 
-  if (!hasLocationsSource) {
-    return [];
+  let localVisible = [];
+
+  if (toolIncludeLocal && hasLocationsSource) {
+    const sourceFeatures = queryUnclusteredSourceFeatures(map);
+    localVisible =
+      sourceFeatures.length > 0
+        ? sourceFeatures
+        : map.queryRenderedFeatures({ layers: getUnclusteredLayerIds() });
   }
 
-  const sourceFeatures = queryUnclusteredSourceFeatures(map);
-  const visibleFeatures =
-    sourceFeatures.length > 0
-      ? sourceFeatures
-      // Запасной путь: если querySourceFeatures ещё пуст, берём отрисованные слои.
-      : map.queryRenderedFeatures({ layers: getUnclusteredLayerIds() });
+  let gbifVisible = [];
+
+  if (
+    toolIncludeGbif &&
+    isGbifLayerVisible() &&
+    map?.getSource?.(GBIF_SOURCE_ID) &&
+    map.getLayer(GBIF_UNCLUSTERED_LAYER_ID)
+  ) {
+    const rawGbif = map.querySourceFeatures(GBIF_SOURCE_ID, {
+      filter: ["!", ["has", "point_count"]]
+    });
+
+    gbifVisible = rawGbif.map(
+      (feature) => findGbifFeatureByKey(feature.properties?.gbif_key) ?? feature
+    );
+  }
 
   if (candidateFeatures?.length) {
     const visibleKeys = new Set(
-      visibleFeatures.map(
+      [...localVisible, ...gbifVisible].map(
         (feature) => `${feature.geometry.coordinates[0]},${feature.geometry.coordinates[1]}`
       )
     );
@@ -1778,7 +1882,9 @@ export function getUnclusteredFeatures(map, filters = {}, candidateFeatures = nu
     );
   }
 
-  return dedupeFeaturesByCoordinates(filterFeatures(visibleFeatures, filters));
+  return dedupeFeaturesByCoordinates(
+    filterFeatures([...localVisible, ...gbifVisible], filters)
+  );
 }
 
 /** Возвращает координаты некластеризованных точек, видимых на карте. */
@@ -1792,6 +1898,11 @@ export function getUnclusteredCenters(map, filters = {}, candidateFeatures = nul
 export function isFeatureUnclusteredOnMap(map, feature) {
   if (!feature?.geometry?.coordinates) {
     return false;
+  }
+
+  // GBIF: после клика точка уже выбрана; кластеры раскрываются отдельно.
+  if (isGbifFeature(feature)) {
+    return featureMatchesFilters(feature, currentFilters);
   }
 
   if (!clusteringEnabled) {
@@ -1809,8 +1920,7 @@ export function featureMatchesFilters(feature, filters = {}) {
   return filterFeatures([feature], filters).length > 0;
 }
 
-/** Применяет фильтры точек: пересобирает слои или, для движения таймлайна, только обновляет данные. */
-/** Применяет фильтры точек: пересобирает слои, кроме частного случая сдвига года таймлайна. */
+/** Применяет фильтры точек: пересобирает слои, кроме частного случая сдвига года. */
 export function applyLocationsFilter(map, filters = {}) {
   if (
     map &&
@@ -1818,6 +1928,11 @@ export function applyLocationsFilter(map, filters = {}) {
     isTimelineYearMaxOnlyChange(currentFilters, filters)
   ) {
     applyTimelineYearChange(map, currentFilters, filters);
+    return;
+  }
+
+  if (map && locationsSourcesExist(map) && isFoundYearOnlyChange(currentFilters, filters)) {
+    applyFoundYearFilterChange(map, filters);
     return;
   }
 

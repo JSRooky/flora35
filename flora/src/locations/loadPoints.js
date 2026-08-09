@@ -2,11 +2,14 @@ import { isFirebaseConfigured } from "../firebase/config";
 import { loadLocationsFromFirestore } from "../firebase/loadLocationsFromFirestore";
 import { expandFindingsToFeatures } from "./expandFindings";
 import { mergeSpeciesCollections } from "./mergeSpeciesCollections";
+import localPointsCollection from "./points.json";
+import localUserpointsCollection from "./userpoints.json";
 
 export const DATA_SOURCE_MODES = {
   ALL: "all",
   POINTS: "points",
-  USERPOINTS: "userpoints"
+  USERPOINTS: "userpoints",
+  GBIF: "gbif"
 };
 
 export const DATA_SOURCE_OPTIONS = [
@@ -24,6 +27,11 @@ export const DATA_SOURCE_OPTIONS = [
     value: DATA_SOURCE_MODES.USERPOINTS,
     label: "Пользовательские",
     title: "Только пользовательские данные"
+  },
+  {
+    value: DATA_SOURCE_MODES.GBIF,
+    label: "GBIF",
+    title: "Только данные GBIF"
   }
 ];
 
@@ -82,6 +90,13 @@ function applyFirestoreCollections({ points, userpoints }) {
   invalidateFeatureCaches();
 }
 
+/** Локальные JSON — запасной источник, если Firebase не настроен. */
+function applyLocalJsonCollections() {
+  pointsCollection = localPointsCollection;
+  userpointsCollection = localUserpointsCollection;
+  invalidateFeatureCaches();
+}
+
 /** Задаёт, какие источники данных показывать на карте. */
 export function setDataSourceFilter(mode) {
   if (dataSourceFilter === mode) {
@@ -102,11 +117,16 @@ export function getDataSourceFilter() {
 
 /**
  * Загружает проверенные точки (findings) и пользовательские (user_submissions) из Firestore.
+ * Без Firebase — подставляет локальные points.json / userpoints.json.
  * @returns {Promise<boolean>}
  */
 export function initLocationsFromFirestore() {
   if (!isFirebaseConfigured()) {
-    console.warn("Firebase is not configured — location data will be empty.");
+    console.warn(
+      "Firebase is not configured — using local points.json / userpoints.json. " +
+        "Add REACT_APP_FIREBASE_* to flora/.env.local to load from Firestore."
+    );
+    applyLocalJsonCollections();
     return Promise.resolve(false);
   }
 
@@ -119,6 +139,8 @@ export function initLocationsFromFirestore() {
       .catch((error) => {
         locationsInitPromise = null;
         console.warn("Failed to load locations from Firestore:", error);
+        console.warn("Falling back to local points.json / userpoints.json.");
+        applyLocalJsonCollections();
         return false;
       });
   }
@@ -129,6 +151,7 @@ export function initLocationsFromFirestore() {
 /** Повторно загружает коллекции из Firestore (например, после новой отправки). */
 export function refreshLocationsFromFirestore() {
   if (!isFirebaseConfigured()) {
+    applyLocalJsonCollections();
     return Promise.resolve(false);
   }
 
@@ -155,6 +178,8 @@ export function getSpeciesCollection() {
       return pointsCollection;
     case DATA_SOURCE_MODES.USERPOINTS:
       return userpointsCollection;
+    case DATA_SOURCE_MODES.GBIF:
+      return EMPTY_SPECIES_COLLECTION;
     default:
       return getAllSpeciesCollection();
   }
@@ -229,6 +254,8 @@ export function isFindingInDataSource(findingId, mode) {
     case DATA_SOURCE_MODES.USERPOINTS:
       collection = userpointsCollection;
       break;
+    case DATA_SOURCE_MODES.GBIF:
+      return false;
     default:
       collection = getAllSpeciesCollection();
       break;

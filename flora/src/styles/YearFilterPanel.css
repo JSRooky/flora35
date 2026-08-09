@@ -180,7 +180,7 @@
 .year-filter-dual-slider {
   position: relative;
   height: 24px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .year-filter-dual-slider::before {

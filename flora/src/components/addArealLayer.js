@@ -1,7 +1,7 @@
 import mapboxgl from "mapbox-gl";
 import { circle } from "@turf/turf";
 import {
-  getFilteredFeatures,
+  getToolFeatures,
   getPointColorForRegnum,
   getUnclusteredFeatures,
   featureMatchesFilters,
@@ -84,7 +84,7 @@ function resolveCenterFeature(centerFeature, filters = {}) {
     return null;
   }
 
-  const candidates = getFilteredFeatures(filters);
+  const candidates = getToolFeatures(filters);
   const matchedByIdentity = candidates.filter((candidate) =>
     isCenterPoint(candidate, centerFeature)
   );
@@ -153,7 +153,7 @@ export function getPointsWithinAreal(centerFeature, radiusKm, filters = {}) {
     return [];
   }
 
-  return getFilteredFeatures(filters).filter((feature) => {
+  return getToolFeatures(filters).filter((feature) => {
     const coordinates = feature.geometry?.coordinates;
     if (!coordinates) {
       return false;

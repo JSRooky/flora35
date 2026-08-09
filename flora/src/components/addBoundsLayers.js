@@ -14,7 +14,7 @@ import {
   getBoundsFeatureFillColor
 } from "./boundsPropertyLabels";
 import { loadBoundsLayerGeoJSONFromFirestore } from "../firebase/loadBoundsFromFirestore";
-import { applyMapCursor, getFilteredFeatures, getFirstLocationsLayerId } from "./addLocationsLayer";
+import { applyMapCursor, getToolFeatures, getFirstLocationsLayerId } from "./addLocationsLayer";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -681,7 +681,7 @@ export function getBoundsContainedSpeciesSummary(boundsFeature, filters = {}) {
 
   const speciesByKey = new Map();
 
-  getFilteredFeatures(filters).forEach((feature) => {
+  getToolFeatures(filters).forEach((feature) => {
     const coordinates = feature.geometry?.coordinates;
     if (!coordinates) {
       return;
@@ -722,7 +722,7 @@ export function getBoundsContainedPointsSummary(boundsFeature, filters = {}) {
     return { count: 0, points: [] };
   }
 
-  const points = getFilteredFeatures(filters)
+  const points = getToolFeatures(filters)
     .filter((feature) => {
       const coordinates = feature.geometry?.coordinates;
       if (!coordinates) {

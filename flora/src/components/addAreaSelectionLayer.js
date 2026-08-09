@@ -7,7 +7,7 @@ import {
   polygon,
   union
 } from "@turf/turf";
-import { getFilteredFeatures } from "./addLocationsLayer";
+import { getToolFeatures } from "./addLocationsLayer";
 
 const SOURCE_ID = "area-selection";
 const PREVIEW_SOURCE_ID = "area-selection-preview";
@@ -287,7 +287,8 @@ export function getPointsWithinArea(areaGeometry, filters = {}) {
 
   const areaFeature = geometryToFeature(areaGeometry);
 
-  return getFilteredFeatures(filters).filter((feature) => {
+  // Точки инструментов: локальные + GBIF.
+  return getToolFeatures(filters).filter((feature) => {
     const coordinates = feature.geometry?.coordinates;
     if (!coordinates) {
       return false;

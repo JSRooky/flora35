@@ -73,6 +73,36 @@ export async function previewOccurrenceCount(region, { signal, extras = {} } = {
   return typeof page.count === "number" ? page.count : null;
 }
 
+/** yyyy-MM-dd для параметров дат GBIF. */
+export function toGbifDateParam(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Добавляет фильтр lastInterpreted=день,* для подгрузки только обновлений
+ * с момента последней синхронизации (день включительно, дубликаты отсекаются по ключу).
+ */
+export function withUpdateSinceExtras(extras = {}, syncedAt) {
+  const day = toGbifDateParam(syncedAt);
+  if (!day) {
+    return extras;
+  }
+
+  return {
+    ...extras,
+    lastInterpreted: `${day},*`
+  };
+}
+
 /**
  * Постранично загружает находки для региона.
  * onPage(features) — инкрементально; onProgress({ loaded, total, endOfRecords }).

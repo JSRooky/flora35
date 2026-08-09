@@ -17,8 +17,7 @@ import {
   rewind,
   truncate
 } from "@turf/turf";
-import { getFilteredFeatures, getPointColorForRegnum } from "./addLocationsLayer";
-import { getFeaturesByNameLatin } from "../locations/loadPoints";
+import { getToolFeatures, getPointColorForRegnum } from "./addLocationsLayer";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -59,9 +58,16 @@ export function getSpeciesKey(feature) {
   return feature?.properties?.name_latin ?? "";
 }
 
-/** Все точки набора данных, относящиеся к тому же виду. */
+/** Все точки набора данных (локальные + GBIF), относящиеся к тому же виду. */
 export function getPointsForSpecies(feature) {
-  return getFeaturesByNameLatin(getSpeciesKey(feature));
+  const nameLatin = getSpeciesKey(feature);
+  if (!nameLatin) {
+    return [];
+  }
+
+  return getToolFeatures({}).filter(
+    (candidate) => candidate.properties?.name_latin === nameLatin
+  );
 }
 
 /** Убирает повторяющиеся координаты (с точностью до 6 знаков после запятой). */
@@ -331,7 +337,7 @@ export function getRepresentativeFeatureForSpecies(nameLatin) {
     return null;
   }
 
-  return getFilteredFeatures().find(
+  return getToolFeatures().find(
     (candidate) => candidate.properties?.name_latin === nameLatin
   ) ?? null;
 }
@@ -458,7 +464,7 @@ export function getPointsWithinSpeciesPolygon(polygonFeature, excludeSpeciesLati
     return [];
   }
 
-  return getFilteredFeatures(filters).filter((feature) => {
+  return getToolFeatures(filters).filter((feature) => {
     const coordinates = feature.geometry?.coordinates;
     if (!coordinates) {
       return false;
@@ -651,7 +657,7 @@ export function getPointsWithinPolygonFeature(polygonFeature, filters = {}) {
     return [];
   }
 
-  return getFilteredFeatures(filters).filter((feature) => {
+  return getToolFeatures(filters).filter((feature) => {
     const coordinates = feature.geometry?.coordinates;
     if (!coordinates) {
       return false;

@@ -1,4 +1,7 @@
-import { findGbifFeatureByKey, getGbifFeatureCollection } from "../gbif/gbifStore";
+import {
+  findGbifFeatureByKey,
+  getGbifFeatureCollection
+} from "../gbif/gbifStore";
 import "../styles/GbifPanel.css";
 
 export const GBIF_SOURCE_ID = "gbif-locations";
@@ -24,6 +27,54 @@ const EMPTY_FEATURE_COLLECTION = {
 let interactionHandlers = null;
 let onPointClickCallback = null;
 let layerVisible = true;
+/** Ключи точек, скрытых под булавкой выделения / share. */
+let hiddenPointFeatureKeys = [];
+
+/** Выражение Mapbox: скрыть feature, совпадающий с ключом булавки. */
+function buildPinnedKeyExclusion(key) {
+  return [
+    "!",
+    [
+      "any",
+      ["==", ["to-string", ["id"]], key],
+      ["==", ["to-string", ["coalesce", ["get", "finding_id"], ""]], key],
+      ["==", ["to-string", ["coalesce", ["get", "gbif_key"], ""]], key],
+      [
+        "==",
+        ["concat", "gbif-", ["to-string", ["coalesce", ["get", "gbif_key"], ""]]],
+        key
+      ]
+    ]
+  ];
+}
+
+function applyGbifUnclusteredFilter(map) {
+  if (!map?.getLayer(GBIF_UNCLUSTERED_LAYER_ID)) {
+    return;
+  }
+
+  const parts = [["!", ["has", "point_count"]]];
+
+  hiddenPointFeatureKeys.forEach((key) => {
+    parts.push(buildPinnedKeyExclusion(key));
+  });
+
+  map.setFilter(
+    GBIF_UNCLUSTERED_LAYER_ID,
+    parts.length === 1 ? parts[0] : ["all", ...parts]
+  );
+}
+
+/**
+ * Скрывает обычные маркеры GBIF для точек, показанных булавкой
+ * (выделение в «Сведения о точке» или share-ссылка).
+ */
+export function setGbifHiddenPointFeatureKeys(map, keys) {
+  hiddenPointFeatureKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
+  if (map) {
+    applyGbifUnclusteredFilter(map);
+  }
+}
 
 function resolveClickedFeature(rawFeature) {
   const gbifKey = rawFeature?.properties?.gbif_key;
@@ -185,6 +236,7 @@ export function addGbifLayer(map, { onPointClick } = {}) {
       attachInteractions(map);
     }
     applyVisibility(map);
+    applyGbifUnclusteredFilter(map);
     return;
   }
 
@@ -237,6 +289,7 @@ export function addGbifLayer(map, { onPointClick } = {}) {
 
   attachInteractions(map);
   applyVisibility(map);
+  applyGbifUnclusteredFilter(map);
 }
 
 /** Обновляет GeoJSON источника gbif-locations. */
@@ -256,6 +309,7 @@ export function setGbifData(map, collection) {
   }
 
   source.setData(data);
+  applyGbifUnclusteredFilter(map);
 }
 
 /** Очищает точки GBIF на карте (источник остаётся). */

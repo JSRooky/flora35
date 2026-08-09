@@ -1,5 +1,4 @@
-import { getFeatureCollection } from "../locations/loadPoints";
-import { filterFeatures, getFirstLocationsLayerId } from "./addLocationsLayer";
+import { getToolFeatures, getFirstLocationsLayerId } from "./addLocationsLayer";
 
 const SOURCE_ID = "heatmap";
 const LAYER_ID = "heatmap";
@@ -13,7 +12,7 @@ const EMPTY_COLLECTION = {
 function buildHeatmapData(filters = {}) {
   return {
     type: "FeatureCollection",
-    features: filterFeatures(getFeatureCollection().features, filters)
+    features: getToolFeatures(filters)
   };
 }
 

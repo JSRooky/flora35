@@ -25,6 +25,7 @@ import {
   setMarkersVisible,
   setHoverTooltipsEnabled,
   setMapCursorOverride,
+  setToolFeaturesContext,
   showSharedPointPin,
   showSharedPointPopup,
   updateSelectedPointHighlight,
@@ -146,7 +147,8 @@ import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
-import { addGbifLayer } from "./components/addGbifLayer";
+import { addGbifLayer, setGbifVisibility } from "./components/addGbifLayer";
+import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
 import GbifPanel from "./components/GbifPanel";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
@@ -213,6 +215,8 @@ export default function MapView() {
   const [yearBounds, setYearBounds] = useState(() => getYearBounds());
   const [yearRange, setYearRange] = useState(() => getYearBounds());
   const [timelineYear, setTimelineYear] = useState(() => getYearBounds().max);
+  const yearBoundsRef = useRef(yearBounds);
+  yearBoundsRef.current = yearBounds;
   const [arealDynamicsEnabled, setArealDynamicsEnabled] = useState(false);
   const [arealDynamicsFeature, setArealDynamicsFeature] = useState(null);
   const [arealDynamicsSlices, setArealDynamicsSlices] = useState([]);
@@ -246,9 +250,9 @@ export default function MapView() {
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
   const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.ALL);
-  const [gbifOnly, setGbifOnly] = useState(false);
+  const gbifOnly = dataSourceMode === DATA_SOURCE_MODES.GBIF;
   const markersVisibleBeforeGbifOnlyRef = useRef(DEFAULT_MARKERS_VISIBLE);
-  const heatmapEnabledBeforeGbifOnlyRef = useRef(false);
+  const prevGbifOnlyRef = useRef(gbifOnly);
   const [panelCollapsed, setPanelCollapsed] = useState({});
   const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
   const [submissionLocationPicking, setSubmissionLocationPicking] = useState(false);
@@ -557,11 +561,38 @@ export default function MapView() {
     );
   }, []);
 
+  const handleDataSourceModeChange = useCallback(
+    (mode) => {
+      setDataSourceModeState(mode);
+
+      if (mode === DATA_SOURCE_MODES.GBIF) {
+        setArealDockedWithFeature(false);
+        setBufferDockedWithFeature(false);
+        setActiveModule(null);
+        expandPanel(PANEL_IDS.GBIF);
+      }
+    },
+    [expandPanel]
+  );
+
   const syncYearBounds = useCallback(() => {
     const bounds = getYearBounds();
+    const prevBounds = yearBoundsRef.current;
+
     setYearBounds(bounds);
-    setYearRange(bounds);
-    setTimelineYear(bounds.max);
+    setYearRange((prevRange) => {
+      const wasFull =
+        prevRange.min === prevBounds.min && prevRange.max === prevBounds.max;
+      const wasDegenerate = prevRange.min >= prevRange.max;
+      if (wasFull || wasDegenerate) {
+        return bounds;
+      }
+
+      const min = Math.min(Math.max(prevRange.min, bounds.min), bounds.max);
+      const max = Math.max(Math.min(prevRange.max, bounds.max), bounds.min);
+      return min <= max ? { min, max } : bounds;
+    });
+    setTimelineYear((prev) => Math.min(bounds.max, Math.max(bounds.min, prev)));
   }, []);
 
   const hasFoundYearPropertyFilter = Object.prototype.hasOwnProperty.call(
@@ -1488,29 +1519,58 @@ export default function MapView() {
     }
   }, [popupData, mapReady]);
 
-  const handleGbifOnlyChange = useCallback(
-    (enabled) => {
-      if (enabled) {
-        markersVisibleBeforeGbifOnlyRef.current = markersVisible;
-        heatmapEnabledBeforeGbifOnlyRef.current = heatmapEnabled;
-        setMarkersVisibleState(false);
-        setHeatmapEnabledState(false);
-      } else {
-        setMarkersVisibleState(markersVisibleBeforeGbifOnlyRef.current);
-        setHeatmapEnabledState(heatmapEnabledBeforeGbifOnlyRef.current);
-      }
+  const handleGbifDataChange = useCallback(() => {
+    clearArealDynamicsSliceCache();
+    syncYearBounds();
 
-      setGbifOnly(enabled);
-    },
-    [markersVisible, heatmapEnabled]
-  );
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    updateHeatmapData(map.current, locationFilters);
+    refreshAreal();
+  }, [mapReady, locationFilters, refreshAreal, syncYearBounds]);
+
+  useEffect(() => {
+    if (gbifOnly === prevGbifOnlyRef.current) {
+      return;
+    }
+
+    if (gbifOnly) {
+      markersVisibleBeforeGbifOnlyRef.current = markersVisible;
+      setMarkersVisibleState(false);
+      if (map.current) {
+        setGbifVisibility(map.current, true);
+      }
+    } else {
+      setMarkersVisibleState(markersVisibleBeforeGbifOnlyRef.current);
+    }
+
+    prevGbifOnlyRef.current = gbifOnly;
+    // markersVisible читаем только в момент входа в режим GBIF
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gbifOnly]);
+
+  useEffect(() => {
+    setToolFeaturesContext({
+      includeLocal: !gbifOnly,
+      includeGbif: true
+    });
+
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    updateHeatmapData(map.current, locationFilters);
+    refreshAreal();
+  }, [gbifOnly, mapReady, locationFilters, refreshAreal]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
       return;
     }
 
-    // В режиме «Только GBIF» локальные маркеры всегда скрыты.
+    // В режиме «GBIF» локальные маркеры всегда скрыты.
     setMarkersVisible(map.current, gbifOnly ? false : mapMarkersVisible);
   }, [mapMarkersVisible, gbifOnly, mapReady]);
 
@@ -1543,9 +1603,9 @@ export default function MapView() {
       return;
     }
 
-    // В режиме «Только GBIF» теплокарту по локальным точкам гасим.
-    setHeatmapEnabled(map.current, gbifOnly ? false : heatmapEnabled, locationFilters);
-  }, [heatmapEnabled, gbifOnly, locationFilters]);
+    // Heatmap строится по getToolFeatures (локальные + GBIF).
+    setHeatmapEnabled(map.current, heatmapEnabled, locationFilters);
+  }, [heatmapEnabled, locationFilters]);
 
   useEffect(() => {
     if (!mapReady || !map.current || !isFirebaseConfigured()) {
@@ -2226,7 +2286,7 @@ export default function MapView() {
 
     if (!isFindingInDataSource(findingId, dataSourceMode)) {
       if (dataSourceMode !== DATA_SOURCE_MODES.ALL) {
-        setDataSourceModeState(DATA_SOURCE_MODES.ALL);
+        handleDataSourceModeChange(DATA_SOURCE_MODES.ALL);
       } else {
         pendingSharePointRef.current = null;
       }
@@ -2251,7 +2311,7 @@ export default function MapView() {
         updateSelectedPointHighlight(map.current, sharedFeature);
       }
     });
-  }, [mapReady, dataSourceMode]);
+  }, [mapReady, dataSourceMode, handleDataSourceModeChange]);
 
   // Инициализация карты Mapbox и всех слоёв/обработчиков — выполняется один раз при монтировании.
   useEffect(() => {
@@ -2260,6 +2320,7 @@ export default function MapView() {
 
       map.current.on("load", async () => {
         await initLocationsFromFirestore();
+        await hydrateGbifStoreFromPersistence();
         syncYearBounds();
 
         addOsmBasemapLayer(map.current);
@@ -2416,11 +2477,65 @@ export default function MapView() {
               return;
             }
 
+            dismissArealPointHintOnPointClick(feature);
             clearSharedPointPin(map.current);
+            if (!pointSelectionStateRef.current.ooptPointsFilterEnabled) {
+              setSelectedBoundsFeature(null);
+            }
             clearSelectedPointHighlight(map.current);
             setPopupData(feature);
-            // GBIF больше не показывает Mapbox-popup — сразу открываем «Сведения о точке».
-            setActiveModule(MODULE_IDS.FEATURE);
+
+            const {
+              bufferSelectionMode: selectionMode,
+              activeModule: currentModule,
+              bufferDockedWithFeature: bufferDocked
+            } = bufferStateRef.current;
+            const bufferPanelOpen =
+              currentModule === MODULE_IDS.BUFFER ||
+              (currentModule === MODULE_IDS.FEATURE && bufferDocked);
+
+            if (bufferPanelOpen) {
+              if (selectionMode) {
+                setBufferSelectedPoints((points) => {
+                  const key = getArealPointKey(feature);
+                  const existingIndex = points.findIndex(
+                    (point) => getArealPointKey(point) === key
+                  );
+
+                  if (existingIndex >= 0) {
+                    return points.filter((_, index) => index !== existingIndex);
+                  }
+
+                  return [...points, feature];
+                });
+              } else {
+                setBufferSelectedPoints([]);
+              }
+            }
+
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+              polygonStateRef.current;
+
+            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+              const nameLatin = feature.properties?.name_latin;
+
+              setSpeciesPolygons((prev) =>
+                upsertSpeciesPolygon(prev, feature, POLYGON_BUILD_MODES.CONVEX)
+              );
+
+              if (nameLatin) {
+                setActivePolygonId(nameLatin);
+              }
+
+              setPolygonAddMode(false);
+            }
+
+            setActiveModule((current) => {
+              if (current === MODULE_IDS.BUFFER || current === MODULE_IDS.POLYGON) {
+                return current;
+              }
+              return MODULE_IDS.FEATURE;
+            });
           }
         });
         setMapReady(true);
@@ -2446,7 +2561,8 @@ export default function MapView() {
 
   const showModulePanelStack =
     (activeModule !== null && activeModule !== MODULE_IDS.TIMELINE) ||
-    (showOoptFeaturePanel && activeModule !== MODULE_IDS.TIMELINE);
+    (showOoptFeaturePanel && activeModule !== MODULE_IDS.TIMELINE) ||
+    dataSourceMode === DATA_SOURCE_MODES.GBIF;
 
   const ooptGlobalFilterTooltip = useMemo(() => {
     if (!ooptFilterTarget) {
@@ -2478,7 +2594,7 @@ export default function MapView() {
         hoverTooltipsDisabled={hoverTooltipsDisabled}
         onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
         dataSourceMode={dataSourceMode}
-        onDataSourceModeChange={setDataSourceModeState}
+        onDataSourceModeChange={handleDataSourceModeChange}
       />
       <div
         ref={ref}
@@ -2686,13 +2802,12 @@ export default function MapView() {
               />
             </Suspense>
           )}
-          {activeModule === MODULE_IDS.GBIF && (
+          {dataSourceMode === DATA_SOURCE_MODES.GBIF && (
             <GbifPanel
               map={map.current}
               collapsed={isPanelCollapsed(PANEL_IDS.GBIF)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.GBIF)}
-              gbifOnly={gbifOnly}
-              onGbifOnlyChange={handleGbifOnlyChange}
+              onDataChange={handleGbifDataChange}
             />
           )}
         </div>
