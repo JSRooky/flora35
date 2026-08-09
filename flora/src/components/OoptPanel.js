@@ -7,6 +7,24 @@ import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/OoptPanel.css";
 
+function ListIcon({ className = "" }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <line x1="8" y1="6" x2="21" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <line x1="8" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <line x1="8" y1="18" x2="21" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="4" cy="6" r="1" fill="currentColor" />
+      <circle cx="4" cy="12" r="1" fill="currentColor" />
+      <circle cx="4" cy="18" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
 function getAllCatalogEntries(catalogByLayerId) {
   return BOUNDS_LAYER_DEFINITIONS.flatMap(({ id }) => catalogByLayerId[id] ?? []);
 }
@@ -63,7 +81,9 @@ function BoundsGroupSection({
   onCollapsedChange,
   onFeatureVisibilityChange,
   onGroupVisibilityChange,
-  onFeatureSelect
+  onFeatureSelect,
+  onFeatureSpeciesListOpen,
+  speciesListFeatureKey = null
 }) {
   const filteredEntries = useMemo(
     () => catalog.filter((entry) => matchesSearch(entry, searchQuery)),
@@ -138,6 +158,7 @@ function BoundsGroupSection({
             <ul className="oopt-panel-object-list">
               {filteredEntries.map((entry) => {
                 const checked = Boolean(featureVisibility[entry.key]);
+                const speciesListActive = speciesListFeatureKey === entry.key;
 
                 return (
                   <li key={entry.key} className="oopt-panel-object-item">
@@ -159,6 +180,27 @@ function BoundsGroupSection({
                     >
                       <span className="oopt-panel-object-title">{entry.title}</span>
                     </button>
+
+                    <button
+                      type="button"
+                      className={`oopt-panel-species-btn${
+                        speciesListActive ? " oopt-panel-species-btn--active" : ""
+                      }`}
+                      onClick={() => onFeatureSpeciesListOpen?.(entry)}
+                      aria-pressed={speciesListActive}
+                      aria-label={
+                        speciesListActive
+                          ? "Скрыть список видов"
+                          : "Показать виды внутри ООПТ"
+                      }
+                      title={
+                        speciesListActive
+                          ? "Скрыть список видов"
+                          : "Показать виды внутри ООПТ"
+                      }
+                    >
+                      <ListIcon className="oopt-panel-species-btn-icon" />
+                    </button>
                   </li>
                 );
               })}
@@ -177,6 +219,8 @@ export default function OoptPanel({
   onFeatureVisibilityChange,
   onGroupVisibilityChange,
   onFeatureSelect,
+  onFeatureSpeciesListOpen,
+  speciesListFeatureKey = null,
   loadingById = {},
   errorsById = {},
   firebaseConfigured = false,
@@ -293,6 +337,8 @@ export default function OoptPanel({
               onFeatureVisibilityChange={onFeatureVisibilityChange}
               onGroupVisibilityChange={onGroupVisibilityChange}
               onFeatureSelect={onFeatureSelect}
+              onFeatureSpeciesListOpen={onFeatureSpeciesListOpen}
+              speciesListFeatureKey={speciesListFeatureKey}
             />
           ))}
         </div>

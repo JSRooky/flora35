@@ -129,9 +129,9 @@ import {
 import {
   createDefaultToolPointsFilterState,
   loadToolPointsFilterState,
-  saveToolPointsFilterState,
-  TOOL_POINTS_FILTER_MODULES
+  saveToolPointsFilterState
 } from "./toolPointsFilterStorage";
+import { collectActiveMapFilters, MAP_FILTER_IDS } from "./mapActiveFilters";
 import {
   addAreaSelectionLayer,
   applyAreaGeometryOperation,
@@ -166,8 +166,7 @@ import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClust
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
 import { findGbifFeatureByKey } from "./gbif/gbifStore";
 import {
-  createDefaultGbifProcessingFilters,
-  hasActiveGbifProcessingFilters
+  createDefaultGbifProcessingFilters
 } from "./gbif/gbifProcessingFilters";
 import {
   clearRussianNameChoice,
@@ -695,6 +694,28 @@ export default function MapView() {
       });
     }
   }, [handleOpenBoundsFeatureDetails, handleIsolateBoundsFeature, isBoundsFeatureIsolated]);
+
+  const handleBoundsFeatureSpeciesListOpen = useCallback(
+    (entry) => {
+      const selectedKey = selectedBoundsFeature
+        ? getBoundsFeatureKey(
+            selectedBoundsFeature.definition?.id,
+            selectedBoundsFeature.feature?.properties ?? {}
+          )
+        : null;
+
+      if (boundsSpeciesListOpen && selectedKey === entry.key) {
+        setBoundsSpeciesListOpen(false);
+        setBoundsSpeciesRegnumFilter(null);
+        return;
+      }
+
+      setBoundsSpeciesRegnumFilter(null);
+      handleBoundsFeatureSelect(entry);
+      setBoundsSpeciesListOpen(true);
+    },
+    [boundsSpeciesListOpen, handleBoundsFeatureSelect, selectedBoundsFeature]
+  );
 
   const handleModuleSelect = useCallback((moduleId) => {
     if (moduleId === MODULE_IDS.ABOUT) {
@@ -2404,46 +2425,29 @@ export default function MapView() {
     expandPanel(PANEL_IDS.MAP);
   }, [expandPanel]);
 
-  const hasActiveMapFilters = useMemo(() => {
-    if (Object.keys(propertyFilters).length > 0) {
-      return true;
-    }
-
-    if (statusFilters.length > 0) {
-      return true;
-    }
-
-    if (yearFilterEnabled) {
-      return true;
-    }
-
-    if (TOOL_POINTS_FILTER_MODULES.some((moduleId) => toolPointsFilterEnabled[moduleId])) {
-      return true;
-    }
-
-    if (boundsSpeciesRegnumFilter != null) {
-      return true;
-    }
-
-    if (denseClustersHighlight || denseProcessingActive) {
-      return true;
-    }
-
-    if (hasActiveGbifProcessingFilters(gbifProcessingFilters)) {
-      return true;
-    }
-
-    return false;
-  }, [
-    propertyFilters,
-    statusFilters,
-    yearFilterEnabled,
-    toolPointsFilterEnabled,
-    boundsSpeciesRegnumFilter,
-    denseClustersHighlight,
-    denseProcessingActive,
-    gbifProcessingFilters
-  ]);
+  const activeMapFilters = useMemo(
+    () =>
+      collectActiveMapFilters({
+        propertyFilters,
+        statusFilters,
+        yearFilterEnabled,
+        toolPointsFilterEnabled,
+        boundsSpeciesRegnumFilter,
+        denseClustersHighlight,
+        denseProcessingActive,
+        gbifProcessingFilters
+      }),
+    [
+      propertyFilters,
+      statusFilters,
+      yearFilterEnabled,
+      toolPointsFilterEnabled,
+      boundsSpeciesRegnumFilter,
+      denseClustersHighlight,
+      denseProcessingActive,
+      gbifProcessingFilters
+    ]
+  );
 
   const handleMapFiltersReset = useCallback(() => {
     setPropertyFilters({});
@@ -2460,6 +2464,71 @@ export default function MapView() {
     setGbifProcessingFiltersState(createDefaultGbifProcessingFilters());
     expandPanel(PANEL_IDS.MAP);
   }, [expandPanel]);
+
+  const handleMapFilterClear = useCallback(
+    (filterId) => {
+      if (filterId === MAP_FILTER_IDS.FEATURE) {
+        setPropertyFilters({});
+        return;
+      }
+
+      if (filterId === MAP_FILTER_IDS.STATUS) {
+        setStatusFilters([]);
+        return;
+      }
+
+      if (filterId === MAP_FILTER_IDS.YEAR) {
+        setYearFilterEnabled(false);
+        return;
+      }
+
+      if (filterId === MAP_FILTER_IDS.OOPT_FEATURE) {
+        setToolPointsFilterEnabled((current) => ({
+          ...current,
+          [MODULE_IDS.OOPT]: false
+        }));
+        setOoptFilterBoundsFeature(null);
+        return;
+      }
+
+      if (filterId === MAP_FILTER_IDS.OOPT_SPECIES) {
+        setBoundsSpeciesRegnumFilter(null);
+        return;
+      }
+
+      if (filterId === MAP_FILTER_IDS.MAP_GROUPS) {
+        setDenseClustersHighlightState(false);
+        setToolPointsFilterEnabled((current) => ({
+          ...current,
+          [MODULE_IDS.MAP]: false
+        }));
+        return;
+      }
+
+      if (filterId === MAP_FILTER_IDS.DENSE) {
+        setDenseProcessingActive(false);
+        setSelectedDensePileKey(null);
+        setDensePileSpeciesListOpen(false);
+        densePileCameraBeforeRef.current = null;
+        expandPanel(PANEL_IDS.MAP);
+        return;
+      }
+
+      if (filterId === MAP_FILTER_IDS.GBIF_PROCESSING) {
+        setGbifProcessingFiltersState(createDefaultGbifProcessingFilters());
+        return;
+      }
+
+      if (typeof filterId === "string" && filterId.startsWith("tool:")) {
+        const moduleId = filterId.slice("tool:".length);
+        setToolPointsFilterEnabled((current) => ({
+          ...current,
+          [moduleId]: false
+        }));
+      }
+    },
+    [expandPanel]
+  );
 
   const handleFeatureFiltersReset = useCallback(() => {
     setPropertyFilters({});
@@ -3178,6 +3247,18 @@ export default function MapView() {
     Boolean(selectedBoundsFeature) &&
     (activeModule === MODULE_IDS.OOPT || ooptPointsFilterActive);
 
+  // Ключ выбранной ООПТ — для подсветки кнопки списка видов в каталоге.
+  const selectedBoundsFeatureKey = useMemo(() => {
+    if (!selectedBoundsFeature?.definition?.id) {
+      return null;
+    }
+
+    return getBoundsFeatureKey(
+      selectedBoundsFeature.definition.id,
+      selectedBoundsFeature.feature?.properties ?? {}
+    );
+  }, [selectedBoundsFeature]);
+
   const denseProcessingExclusive = denseProcessingActive;
 
   const showModulePanelStack =
@@ -3414,6 +3495,10 @@ export default function MapView() {
               onFeatureVisibilityChange={handleBoundsFeatureVisibilityChange}
               onGroupVisibilityChange={handleBoundsGroupVisibilityChange}
               onFeatureSelect={handleBoundsFeatureSelect}
+              onFeatureSpeciesListOpen={handleBoundsFeatureSpeciesListOpen}
+              speciesListFeatureKey={
+                boundsSpeciesListOpen ? selectedBoundsFeatureKey : null
+              }
               loadingById={boundsLayerLoading}
               errorsById={boundsLayerErrors}
               firebaseConfigured={isFirebaseConfigured()}
@@ -3526,8 +3611,9 @@ export default function MapView() {
         onSpeciesSelect={handleDensePileSpeciesSelect}
       />
       <MapCornerControls
-        filtersActive={hasActiveMapFilters}
+        activeFilters={activeMapFilters}
         onFiltersReset={handleMapFiltersReset}
+        onFilterClear={handleMapFilterClear}
       />
     </>
   );
