@@ -9,6 +9,15 @@ import {
   getPointColorForRegnum
 } from "./pointColors";
 import {
+  GBIF_DENSE_PILES_CLUSTER_LAYER_ID,
+  GBIF_DENSE_PILES_COUNT_LAYER_ID,
+  GBIF_DENSE_PILES_SOURCE_ID,
+  ensureDensePilesLayers,
+  partitionFeaturesByDensePiles,
+  removeDensePilesLayers,
+  setDensePilesData
+} from "./densePiles";
+import {
   COORDINATES_ORIGINAL_PROP,
   getFeatureCoordinates,
   spreadCoincidentFeatures
@@ -47,8 +56,16 @@ let layerVisible = true;
 let gbifClusteringEnabled = true;
 let gbifClusterByRegnum = true;
 let gbifClusterPieChartsEnabled = false;
+let gbifDenseClustersHighlightEnabled = false;
+let expandedGbifDensePileKeys = new Set();
+/** Последняя FeatureCollection, переданная в setGbifData (с учётом фильтров). */
+let lastGbifInputCollection = EMPTY_FEATURE_COLLECTION;
 /** Ключи точек, скрытых под булавкой выделения / share. */
 let hiddenPointFeatureKeys = [];
+
+function isGbifMapboxClusteringActive() {
+  return gbifClusteringEnabled && !gbifDenseClustersHighlightEnabled;
+}
 
 function getGbifSourceId(regnum = null) {
   return regnum ? `${GBIF_SOURCE_ID}-${regnum}` : GBIF_SOURCE_ID;
@@ -65,7 +82,7 @@ function getGbifLayerIds(regnum = null) {
 
 /** Все id источников GBIF в текущем режиме. */
 export function getGbifSourceIds() {
-  if (!gbifClusteringEnabled) {
+  if (!isGbifMapboxClusteringActive()) {
     return [GBIF_SOURCE_ID];
   }
 
@@ -77,19 +94,26 @@ export function getGbifSourceIds() {
 }
 
 function getAllGbifClusterLayerIds() {
-  if (!gbifClusteringEnabled) {
-    return [];
+  const dense = gbifDenseClustersHighlightEnabled
+    ? [GBIF_DENSE_PILES_CLUSTER_LAYER_ID]
+    : [];
+
+  if (!isGbifMapboxClusteringActive()) {
+    return dense;
   }
 
   if (gbifClusterByRegnum) {
-    return REGNUM_KEYS.map((regnum) => getGbifLayerIds(regnum).clusters);
+    return [
+      ...REGNUM_KEYS.map((regnum) => getGbifLayerIds(regnum).clusters),
+      ...dense
+    ];
   }
 
-  return [GBIF_CLUSTER_LAYER_ID];
+  return [GBIF_CLUSTER_LAYER_ID, ...dense];
 }
 
 function getAllGbifUnclusteredLayerIds() {
-  if (!gbifClusteringEnabled) {
+  if (!isGbifMapboxClusteringActive()) {
     return [GBIF_UNCLUSTERED_LAYER_ID];
   }
 
@@ -101,22 +125,34 @@ function getAllGbifUnclusteredLayerIds() {
 }
 
 function getAllGbifLayerIds() {
-  if (!gbifClusteringEnabled) {
-    return [GBIF_UNCLUSTERED_LAYER_ID];
+  const dense = gbifDenseClustersHighlightEnabled
+    ? [GBIF_DENSE_PILES_CLUSTER_LAYER_ID, GBIF_DENSE_PILES_COUNT_LAYER_ID]
+    : [];
+
+  if (!isGbifMapboxClusteringActive()) {
+    return [GBIF_UNCLUSTERED_LAYER_ID, ...dense];
   }
 
   if (gbifClusterByRegnum) {
-    return REGNUM_KEYS.flatMap((regnum) => {
-      const ids = getGbifLayerIds(regnum);
-      return [ids.clusters, ids.clusterCount, ids.unclustered];
-    });
+    return [
+      ...REGNUM_KEYS.flatMap((regnum) => {
+        const ids = getGbifLayerIds(regnum);
+        return [ids.clusters, ids.clusterCount, ids.unclustered];
+      }),
+      ...dense
+    ];
   }
 
   if (gbifClusterPieChartsEnabled) {
-    return [GBIF_CLUSTER_LAYER_ID, GBIF_UNCLUSTERED_LAYER_ID];
+    return [GBIF_CLUSTER_LAYER_ID, GBIF_UNCLUSTERED_LAYER_ID, ...dense];
   }
 
-  return [GBIF_CLUSTER_LAYER_ID, GBIF_CLUSTER_COUNT_LAYER_ID, GBIF_UNCLUSTERED_LAYER_ID];
+  return [
+    GBIF_CLUSTER_LAYER_ID,
+    GBIF_CLUSTER_COUNT_LAYER_ID,
+    GBIF_UNCLUSTERED_LAYER_ID,
+    ...dense
+  ];
 }
 
 /** Слои GBIF, по которым клик считается попаданием в точку/кластер. */
@@ -153,7 +189,7 @@ function applyGbifUnclusteredFilter(map) {
 
     const parts = [];
 
-    if (gbifClusteringEnabled) {
+    if (isGbifMapboxClusteringActive()) {
       parts.push(["!", ["has", "point_count"]]);
     }
 
@@ -265,6 +301,22 @@ function attachInteractions(map) {
       layers: clusterLayerIds
     });
     const feature = features[0];
+
+    if (feature?.properties?.dense_pile) {
+      const key = feature.properties.dense_pile_key;
+      if (!key) {
+        return;
+      }
+
+      expandedGbifDensePileKeys.add(key);
+      setGbifData(map, lastGbifInputCollection);
+      map.easeTo({
+        center: feature.geometry.coordinates,
+        zoom: Math.max(map.getZoom(), 15)
+      });
+      return;
+    }
+
     const clusterId = feature?.properties?.cluster_id;
     const sourceId = feature?.source;
     const source = sourceId ? map.getSource(sourceId) : null;
@@ -357,6 +409,12 @@ function removeGbifFromMap(map) {
     return;
   }
 
+  removeDensePilesLayers(map, {
+    sourceId: GBIF_DENSE_PILES_SOURCE_ID,
+    clusterLayerId: GBIF_DENSE_PILES_CLUSTER_LAYER_ID,
+    countLayerId: GBIF_DENSE_PILES_COUNT_LAYER_ID
+  });
+
   const sourceIds = new Set([
     GBIF_SOURCE_ID,
     ...REGNUM_KEYS.map((regnum) => getGbifSourceId(regnum))
@@ -383,7 +441,9 @@ function addUnclusteredGbifLayer(map, sourceId, layerId, regnum = null) {
     id: layerId,
     type: "circle",
     source: sourceId,
-    ...(gbifClusteringEnabled ? { filter: ["!", ["has", "point_count"]] } : {}),
+    ...(isGbifMapboxClusteringActive()
+      ? { filter: ["!", ["has", "point_count"]] }
+      : {}),
     paint: {
       "circle-color": regnum
         ? getPointColorForRegnum(regnum)
@@ -396,9 +456,6 @@ function addUnclusteredGbifLayer(map, sourceId, layerId, regnum = null) {
 }
 
 function addClusterGbifLayers(map, sourceId, layerIds, regnum = null) {
-  const clusterColor = regnum
-    ? REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR
-    : DEFAULT_CLUSTER_COLOR;
   const usePieCharts = gbifClusterPieChartsEnabled && !regnum;
 
   map.addLayer({
@@ -406,17 +463,7 @@ function addClusterGbifLayers(map, sourceId, layerIds, regnum = null) {
     type: "circle",
     source: sourceId,
     filter: ["has", "point_count"],
-    paint: {
-      "circle-color": clusterColor,
-      // В режиме диаграмм круг невидим, но остаётся hit-target под SVG-маркером.
-      "circle-radius": usePieCharts
-        ? ["step", ["get", "point_count"], 18, 10, 24, 30, 32]
-        : ["step", ["get", "point_count"], 16, 50, 20, 200, 26],
-      "circle-stroke-width": usePieCharts ? 0 : 1.5,
-      "circle-stroke-color": "#ffffff",
-      "circle-opacity": usePieCharts ? 0 : 1,
-      "circle-stroke-opacity": usePieCharts ? 0 : 1
-    }
+    paint: getGbifClusterPaint(regnum)
   });
 
   if (!usePieCharts) {
@@ -438,8 +485,85 @@ function addClusterGbifLayers(map, sourceId, layerIds, regnum = null) {
   addUnclusteredGbifLayer(map, sourceId, layerIds.unclustered, regnum);
 }
 
-function toMapGbifFeatures(features) {
-  return spreadCoincidentFeatures(features);
+function prepareMapGbifFeatures(features) {
+  if (!gbifDenseClustersHighlightEnabled) {
+    return {
+      mapFeatures: spreadCoincidentFeatures(features),
+      denseClusterFeatures: []
+    };
+  }
+
+  const { expandedDenseFeatures, denseClusterFeatures } = partitionFeaturesByDensePiles(
+    features,
+    {
+      expandedPileKeys: expandedGbifDensePileKeys
+    }
+  );
+
+  return {
+    // Точки вне сверхплотных куч не показываем; раскрытые кучи — отдельными маркерами.
+    mapFeatures: spreadCoincidentFeatures(expandedDenseFeatures),
+    denseClusterFeatures
+  };
+}
+
+function getGbifClusterPaint(regnum = null) {
+  const clusterColor = regnum
+    ? REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR
+    : DEFAULT_CLUSTER_COLOR;
+  const usePieCharts = gbifClusterPieChartsEnabled && !regnum;
+
+  if (usePieCharts) {
+    return {
+      "circle-color": "#000000",
+      "circle-radius": ["step", ["get", "point_count"], 18, 10, 24, 30, 32],
+      "circle-stroke-width": 0,
+      "circle-opacity": 0,
+      "circle-stroke-opacity": 0
+    };
+  }
+
+  return {
+    "circle-color": clusterColor,
+    "circle-radius": ["step", ["get", "point_count"], 16, 50, 20, 200, 26],
+    "circle-stroke-width": 1.5,
+    "circle-stroke-color": "#ffffff",
+    "circle-opacity": 1,
+    "circle-stroke-opacity": 1
+  };
+}
+
+function syncGbifDensePilesLayers(map, denseClusterFeatures) {
+  if (!gbifDenseClustersHighlightEnabled) {
+    removeDensePilesLayers(map, {
+      sourceId: GBIF_DENSE_PILES_SOURCE_ID,
+      clusterLayerId: GBIF_DENSE_PILES_CLUSTER_LAYER_ID,
+      countLayerId: GBIF_DENSE_PILES_COUNT_LAYER_ID
+    });
+    return;
+  }
+
+  const visibility = layerVisible ? "visible" : "none";
+
+  if (!map.getSource(GBIF_DENSE_PILES_SOURCE_ID)) {
+    ensureDensePilesLayers(map, {
+      sourceId: GBIF_DENSE_PILES_SOURCE_ID,
+      clusterLayerId: GBIF_DENSE_PILES_CLUSTER_LAYER_ID,
+      countLayerId: GBIF_DENSE_PILES_COUNT_LAYER_ID,
+      features: denseClusterFeatures,
+      visibility
+    });
+    return;
+  }
+
+  setDensePilesData(map, GBIF_DENSE_PILES_SOURCE_ID, denseClusterFeatures);
+  [GBIF_DENSE_PILES_CLUSTER_LAYER_ID, GBIF_DENSE_PILES_COUNT_LAYER_ID].forEach(
+    (layerId) => {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, "visibility", visibility);
+      }
+    }
+  );
 }
 
 function rebuildGbifLayers(map) {
@@ -448,10 +572,12 @@ function rebuildGbifLayers(map) {
   }
 
   const collection = getGbifFeatureCollection();
-  const mapFeatures = toMapGbifFeatures(collection.features ?? []);
+  const { mapFeatures, denseClusterFeatures } = prepareMapGbifFeatures(
+    collection.features ?? []
+  );
   removeGbifFromMap(map);
 
-  if (!gbifClusteringEnabled) {
+  if (!isGbifMapboxClusteringActive()) {
     map.addSource(GBIF_SOURCE_ID, {
       type: "geojson",
       data: { type: "FeatureCollection", features: mapFeatures }
@@ -497,7 +623,9 @@ function rebuildGbifLayers(map) {
       data: { type: "FeatureCollection", features: mapFeatures },
       cluster: true,
       ...CLUSTER_OPTIONS,
-      ...(gbifClusterPieChartsEnabled ? { clusterProperties: CLUSTER_REGNUM_PROPERTIES } : {})
+      clusterProperties: {
+        ...(gbifClusterPieChartsEnabled ? CLUSTER_REGNUM_PROPERTIES : {})
+      }
     });
     addClusterGbifLayers(map, GBIF_SOURCE_ID, {
       clusters: GBIF_CLUSTER_LAYER_ID,
@@ -506,6 +634,7 @@ function rebuildGbifLayers(map) {
     });
   }
 
+  syncGbifDensePilesLayers(map, denseClusterFeatures);
   attachInteractions(map);
   applyVisibility(map);
   applyGbifUnclusteredFilter(map);
@@ -547,7 +676,8 @@ export function setGbifData(map, collection) {
   }
 
   const data = collection?.type === "FeatureCollection" ? collection : EMPTY_FEATURE_COLLECTION;
-  const mapFeatures = toMapGbifFeatures(data.features ?? []);
+  lastGbifInputCollection = data;
+  const { mapFeatures, denseClusterFeatures } = prepareMapGbifFeatures(data.features ?? []);
   const hasSource = getGbifSourceIds().some((sourceId) => map.getSource(sourceId))
     || map.getSource(GBIF_SOURCE_ID);
 
@@ -555,7 +685,7 @@ export function setGbifData(map, collection) {
     addGbifLayer(map);
   }
 
-  if (!gbifClusteringEnabled) {
+  if (!isGbifMapboxClusteringActive()) {
     map.getSource(GBIF_SOURCE_ID)?.setData({
       type: "FeatureCollection",
       features: mapFeatures
@@ -591,6 +721,7 @@ export function setGbifData(map, collection) {
     });
   }
 
+  syncGbifDensePilesLayers(map, denseClusterFeatures);
   applyGbifUnclusteredFilter(map);
 }
 
@@ -634,7 +765,7 @@ export function setGbifClusterByRegnum(map, enabled) {
   }
 
   gbifClusterByRegnum = next;
-  if (map && gbifClusteringEnabled) {
+  if (map && isGbifMapboxClusteringActive()) {
     rebuildGbifLayers(map);
   }
 }
@@ -647,7 +778,7 @@ export function setGbifClusterPieChartsEnabled(map, enabled) {
   }
 
   gbifClusterPieChartsEnabled = next;
-  if (map && gbifClusteringEnabled) {
+  if (map && isGbifMapboxClusteringActive()) {
     rebuildGbifLayers(map);
   }
 }
@@ -662,6 +793,24 @@ export function isGbifClusterByRegnumEnabled() {
 
 export function isGbifClusterPieChartsEnabled() {
   return gbifClusterPieChartsEnabled;
+}
+
+/** Сверхплотные кластеры GBIF: без обычной кластеризации, только кучи ≥10. */
+export function setGbifDenseClustersHighlightEnabled(map, enabled) {
+  const next = Boolean(enabled);
+  if (gbifDenseClustersHighlightEnabled === next) {
+    return;
+  }
+
+  gbifDenseClustersHighlightEnabled = next;
+  expandedGbifDensePileKeys = new Set();
+  if (map) {
+    rebuildGbifLayers(map);
+  }
+}
+
+export function isGbifDenseClustersHighlightEnabled() {
+  return gbifDenseClustersHighlightEnabled;
 }
 
 /** Задаёт обработчик клика по точке GBIF (панель «Сведения о точке»). */

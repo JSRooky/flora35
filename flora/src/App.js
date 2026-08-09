@@ -23,6 +23,7 @@ import {
   setClusterByRegnum,
   setClusteringEnabled,
   setClusterPieChartsEnabled,
+  setDenseClustersHighlightEnabled,
   setMarkersVisible,
   setHoverTooltipsEnabled,
   setMapCursorOverride,
@@ -148,7 +149,7 @@ import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
-import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum, setGbifClusterPieChartsEnabled } from "./components/addGbifLayer";
+import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum, setGbifClusterPieChartsEnabled, setGbifDenseClustersHighlightEnabled } from "./components/addGbifLayer";
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
 import { findGbifFeatureByKey } from "./gbif/gbifStore";
 import {
@@ -184,6 +185,7 @@ const PANEL_IDS = {
 const DEFAULT_CLUSTERING_ENABLED = true;
 const DEFAULT_CLUSTER_BY_REGNUM = true;
 const DEFAULT_CLUSTER_PIE_CHARTS = false;
+const DEFAULT_DENSE_CLUSTERS_HIGHLIGHT = false;
 const DEFAULT_MARKERS_VISIBLE = true;
 
 /** Корневой компонент карты: состояние всех инструментов/фильтров/слоёв и инициализация Mapbox. */
@@ -197,6 +199,9 @@ export default function MapView() {
   const [clusterByRegnum, setClusterByRegnumState] = useState(DEFAULT_CLUSTER_BY_REGNUM);
   const [clusteringEnabled, setClusteringEnabledState] = useState(DEFAULT_CLUSTERING_ENABLED);
   const [clusterPieCharts, setClusterPieChartsState] = useState(DEFAULT_CLUSTER_PIE_CHARTS);
+  const [denseClustersHighlight, setDenseClustersHighlightState] = useState(
+    DEFAULT_DENSE_CLUSTERS_HIGHLIGHT
+  );
   const [markersVisible, setMarkersVisibleState] = useState(DEFAULT_MARKERS_VISIBLE);
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
@@ -1679,6 +1684,16 @@ export default function MapView() {
   }, [clusterPieCharts, clusteringEnabled, mapReady]);
 
   useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    setDenseClustersHighlightEnabled(map.current, denseClustersHighlight);
+    setGbifDenseClustersHighlightEnabled(map.current, denseClustersHighlight);
+    applyGbifLocationsFilter(map.current, locationFilters);
+  }, [denseClustersHighlight, mapReady, locationFilters]);
+
+  useEffect(() => {
     if (!map.current) {
       return;
     }
@@ -1927,6 +1942,10 @@ export default function MapView() {
     }
 
     setClusterPieChartsState(enabled);
+  };
+
+  const handleDenseClustersHighlightChange = (enabled) => {
+    setDenseClustersHighlightState(enabled);
   };
 
   const handleFeatureFiltersReset = useCallback(() => {
@@ -2765,6 +2784,8 @@ export default function MapView() {
               onClusterByRegnumChange={handleClusterByRegnumChange}
               clusterPieCharts={clusterPieCharts}
               onClusterPieChartsChange={handleClusterPieChartsChange}
+              denseClustersHighlight={denseClustersHighlight}
+              onDenseClustersHighlightChange={handleDenseClustersHighlightChange}
               collapsed={isPanelCollapsed(PANEL_IDS.MAP)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.MAP)}
             />

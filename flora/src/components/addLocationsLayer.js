@@ -23,6 +23,15 @@ import {
   getPointColorForRegnum
 } from "./pointColors";
 import {
+  DENSE_PILES_CLUSTER_LAYER_ID,
+  DENSE_PILES_COUNT_LAYER_ID,
+  DENSE_PILES_SOURCE_ID,
+  ensureDensePilesLayers,
+  partitionFeaturesByDensePiles,
+  removeDensePilesLayers,
+  setDensePilesData
+} from "./densePiles";
+import {
   getFeatureCoordinates,
   restoreOriginalCoordinates,
   spreadCoincidentFeatures
@@ -77,6 +86,12 @@ let locationsData = null;
 let clusterByRegnum = true;
 let clusteringEnabled = true;
 let clusterPieChartsEnabled = false;
+/** Режим сверхплотных куч: без Mapbox-кластеризации, только кастомные кластеры ≥10. */
+let denseClustersHighlightEnabled = false;
+/** Раскрытые сверхплотные кучи (показывают отдельные точки). */
+let expandedDensePileKeys = new Set();
+/** Члены сверхплотных кластеров: id → features[]. */
+let locationsDensePileMembers = new Map();
 let markersVisible = true;
 let clusterPieChartMarkersOnScreen = {};
 let clusterPieChartRenderHandler = null;
@@ -333,8 +348,34 @@ function buildClusterTooltipHtml(leaves) {
   `;
 }
 
+/** Mapbox Supercluster активен только если включена обычная кластеризация и не режим сверхплотных. */
+function isMapboxClusteringActive() {
+  return clusteringEnabled && !denseClustersHighlightEnabled;
+}
+
+function getDensePileLayerIds() {
+  if (!denseClustersHighlightEnabled) {
+    return [];
+  }
+
+  return [DENSE_PILES_CLUSTER_LAYER_ID, DENSE_PILES_COUNT_LAYER_ID];
+}
+
+function getDensePileMembers(feature) {
+  const key = feature?.properties?.dense_pile_key;
+  if (!key) {
+    return [];
+  }
+
+  return locationsDensePileMembers.get(`dense-${key}`) ?? [];
+}
+
 function getClusterHoverLayerIds() {
-  return [...getClusterLayerIds(), ...getClusterCountLayerIds()];
+  return [
+    ...getClusterLayerIds(),
+    ...getClusterCountLayerIds(),
+    ...getDensePileLayerIds()
+  ];
 }
 
 function getClusterPieChartDimensions(total) {
@@ -494,7 +535,7 @@ function updateClusterPieChartMarkers(map) {
 
   if (
     !clusterPieChartsEnabled ||
-    !clusteringEnabled ||
+    !isMapboxClusteringActive() ||
     clusterByRegnum ||
     (!showLocations && !showGbif)
   ) {
@@ -554,7 +595,7 @@ function updateClusterPieChartMarkers(map) {
 function attachClusterPieChartMarkers(map) {
   detachClusterPieChartMarkers(map);
 
-  if (!clusterPieChartsEnabled || !clusteringEnabled || clusterByRegnum) {
+  if (!clusterPieChartsEnabled || !isMapboxClusteringActive() || clusterByRegnum) {
     return;
   }
 
@@ -686,7 +727,7 @@ function getLayerIds(regnum = null) {
 /** ID слоёв с одиночными точками — зависит от кластеризации и группировки по regnum. */
 /** ID слоёв с одиночными (не кластеризованными) точками — зависят от кластеризации и группировки по regnum. */
 export function getUnclusteredLayerIds() {
-  if (!clusteringEnabled) {
+  if (!isMapboxClusteringActive()) {
     return [getLayerIds().unclustered];
   }
 
@@ -717,7 +758,7 @@ function buildPinnedKeyExclusion(key) {
 function buildUnclusteredLayerFilter() {
   const parts = [];
 
-  if (clusteringEnabled) {
+  if (isMapboxClusteringActive()) {
     parts.push(["!", ["has", "point_count"]]);
   }
 
@@ -768,7 +809,7 @@ export function getFirstLocationsLayerId(map) {
 }
 
 function getClusterLayerIds() {
-  if (!clusteringEnabled) {
+  if (!isMapboxClusteringActive()) {
     return [];
   }
 
@@ -780,7 +821,7 @@ function getClusterLayerIds() {
 }
 
 function getClusterCountLayerIds() {
-  if (!clusteringEnabled) {
+  if (!isMapboxClusteringActive()) {
     return [];
   }
 
@@ -795,7 +836,8 @@ function getAllLocationsLayerIds() {
   return [
     ...getClusterLayerIds(),
     ...getClusterCountLayerIds(),
-    ...getUnclusteredLayerIds()
+    ...getUnclusteredLayerIds(),
+    ...getDensePileLayerIds()
   ];
 }
 
@@ -1095,6 +1137,12 @@ function removeLocationsFromMap(map) {
     return;
   }
 
+  removeDensePilesLayers(map, {
+    sourceId: DENSE_PILES_SOURCE_ID,
+    clusterLayerId: DENSE_PILES_CLUSTER_LAYER_ID,
+    countLayerId: DENSE_PILES_COUNT_LAYER_ID
+  });
+
   const locationSourceIds = getLocationSourceIds(map);
   const layerIdsToRemove = style.layers
     .filter((layer) => locationSourceIds.includes(layer.source))
@@ -1154,9 +1202,32 @@ function detachLocationsInteractions(map) {
 function attachLocationsInteractions(map) {
   detachLocationsInteractions(map);
 
-  const clusterLayerIds = getClusterLayerIds();
-  const clusterHoverLayerIds = getClusterHoverLayerIds();
+  const clusterLayerIds = [
+    ...getClusterLayerIds(),
+    ...(map.getLayer(DENSE_PILES_CLUSTER_LAYER_ID) ? [DENSE_PILES_CLUSTER_LAYER_ID] : [])
+  ];
+  const clusterHoverLayerIds = getClusterHoverLayerIds().filter((layerId) =>
+    map.getLayer(layerId)
+  );
   const unclusteredLayerIds = getUnclusteredLayerIds();
+
+  const expandDensePileCluster = (clusterFeature) => {
+    const key = clusterFeature.properties?.dense_pile_key;
+    if (!key) {
+      return;
+    }
+
+    const leaves = getDensePileMembers(clusterFeature);
+    expandedDensePileKeys.add(key);
+    updateLocationsSourceData(map, currentFilteredFeatures);
+
+    map.easeTo({
+      center: clusterFeature.geometry.coordinates,
+      zoom: Math.max(map.getZoom(), 15)
+    });
+
+    onClusterExpandedCallback?.(leaves.map(restoreOriginalCoordinates));
+  };
 
   const clusterClick = (event) => {
     const features = map.queryRenderedFeatures(event.point, {
@@ -1167,6 +1238,12 @@ function attachLocationsInteractions(map) {
     }
 
     const clusterFeature = features[0];
+
+    if (clusterFeature.properties?.dense_pile) {
+      expandDensePileCluster(clusterFeature);
+      return;
+    }
+
     const sourceId = clusterFeature.source;
     const clusterId = clusterFeature.properties.cluster_id;
     const source = map.getSource(sourceId);
@@ -1221,9 +1298,18 @@ function attachLocationsInteractions(map) {
     }
 
     const clusterFeature = event.features?.[0];
+    const coordinates = clusterFeature?.geometry?.coordinates;
+
+    if (clusterFeature?.properties?.dense_pile) {
+      const leaves = getDensePileMembers(clusterFeature);
+      if (leaves.length && coordinates) {
+        showPointHoverPopup(map, coordinates, buildClusterTooltipHtml(leaves));
+      }
+      return;
+    }
+
     const clusterId = clusterFeature?.properties?.cluster_id;
     const sourceId = clusterFeature?.source;
-    const coordinates = clusterFeature?.geometry?.coordinates;
     const source = sourceId ? map.getSource(sourceId) : null;
 
     if (!source || clusterId === undefined || !coordinates) {
@@ -1316,9 +1402,11 @@ function attachLocationsInteractions(map) {
       return;
     }
 
-    const locationLayerIds = [...clusterLayerIds, ...unclusteredLayerIds].filter((layerId) =>
-      map.getLayer(layerId)
-    );
+    const locationLayerIds = [
+      ...clusterLayerIds,
+      ...unclusteredLayerIds,
+      ...getDensePileLayerIds()
+    ].filter((layerId) => map.getLayer(layerId));
     const gbifLayerIds = getGbifInteractiveLayerIds(map);
     const hitLayerIds = [...locationLayerIds, ...gbifLayerIds];
 
@@ -1368,7 +1456,7 @@ function addUnclusteredLayer(map, sourceId, regnum = null) {
     }
   };
 
-  if (clusteringEnabled) {
+  if (isMapboxClusteringActive()) {
     // Исключаем агрегированные точки кластера — показываем только «листья».
     layer.filter = ["!", ["has", "point_count"]];
   }
@@ -1378,7 +1466,6 @@ function addUnclusteredLayer(map, sourceId, regnum = null) {
 
 function addClusterLayers(map, sourceId, regnum = null) {
   const layerIds = getLayerIds(regnum);
-  const clusterColor = regnum ? REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR : DEFAULT_CLUSTER_COLOR;
   const usePieCharts = clusterPieChartsEnabled && !regnum;
 
   map.addLayer({
@@ -1386,20 +1473,7 @@ function addClusterLayers(map, sourceId, regnum = null) {
     type: "circle",
     source: sourceId,
     filter: ["has", "point_count"],
-    paint: {
-      "circle-color": clusterColor,
-      "circle-radius": [
-        "step",
-        ["get", "point_count"],
-        18, 10,
-        24, 30,
-        32
-      ],
-      "circle-stroke-width": usePieCharts ? 0 : 2,
-      "circle-stroke-color": "#ffffff",
-      "circle-opacity": usePieCharts ? 0 : 1,
-      "circle-stroke-opacity": usePieCharts ? 0 : 1
-    }
+    paint: getLocationsClusterPaint(regnum)
   });
 
   if (!usePieCharts) {
@@ -1517,7 +1591,7 @@ function isTimelineYearMaxOnlyChange(prevFilters, nextFilters) {
 }
 
 function locationsSourcesExist(map) {
-  if (!clusteringEnabled) {
+  if (!isMapboxClusteringActive()) {
     return Boolean(map.getSource("locations"));
   }
 
@@ -1528,19 +1602,100 @@ function locationsSourcesExist(map) {
   return Boolean(map.getSource("locations"));
 }
 
-function toMapFeatures(features) {
-  return spreadCoincidentFeatures(features);
+/**
+ * Готовит точки к отрисовке: в режиме сверхплотных — только кучи ≥10 (остальные скрыты);
+ * иначе обычный spread совпадающих координат.
+ */
+function prepareMapFeatures(features) {
+  if (!denseClustersHighlightEnabled) {
+    locationsDensePileMembers = new Map();
+    return {
+      mapFeatures: spreadCoincidentFeatures(features),
+      denseClusterFeatures: []
+    };
+  }
+
+  const { expandedDenseFeatures, denseClusterFeatures, densePileMembersById } =
+    partitionFeaturesByDensePiles(features, {
+      expandedPileKeys: expandedDensePileKeys
+    });
+
+  locationsDensePileMembers = densePileMembersById;
+
+  return {
+    // Точки вне сверхплотных куч не показываем; раскрытые кучи — отдельными маркерами.
+    mapFeatures: spreadCoincidentFeatures(expandedDenseFeatures),
+    denseClusterFeatures
+  };
+}
+
+function getLocationsClusterPaint(regnum = null) {
+  const clusterColor = regnum
+    ? REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR
+    : DEFAULT_CLUSTER_COLOR;
+  const usePieCharts = clusterPieChartsEnabled && !regnum;
+
+  if (usePieCharts) {
+    return {
+      "circle-color": "#000000",
+      "circle-radius": ["step", ["get", "point_count"], 18, 10, 24, 30, 32],
+      "circle-stroke-width": 0,
+      "circle-opacity": 0,
+      "circle-stroke-opacity": 0
+    };
+  }
+
+  return {
+    "circle-color": clusterColor,
+    "circle-radius": ["step", ["get", "point_count"], 18, 10, 24, 30, 32],
+    "circle-stroke-width": 2,
+    "circle-stroke-color": "#ffffff",
+    "circle-opacity": 1,
+    "circle-stroke-opacity": 1
+  };
+}
+
+function syncDensePilesLayers(map, denseClusterFeatures) {
+  if (!denseClustersHighlightEnabled) {
+    removeDensePilesLayers(map, {
+      sourceId: DENSE_PILES_SOURCE_ID,
+      clusterLayerId: DENSE_PILES_CLUSTER_LAYER_ID,
+      countLayerId: DENSE_PILES_COUNT_LAYER_ID
+    });
+    return;
+  }
+
+  const visibility = markersVisible ? "visible" : "none";
+
+  if (!map.getSource(DENSE_PILES_SOURCE_ID)) {
+    ensureDensePilesLayers(map, {
+      sourceId: DENSE_PILES_SOURCE_ID,
+      clusterLayerId: DENSE_PILES_CLUSTER_LAYER_ID,
+      countLayerId: DENSE_PILES_COUNT_LAYER_ID,
+      features: denseClusterFeatures,
+      visibility
+    });
+    return;
+  }
+
+  setDensePilesData(map, DENSE_PILES_SOURCE_ID, denseClusterFeatures);
+  [DENSE_PILES_CLUSTER_LAYER_ID, DENSE_PILES_COUNT_LAYER_ID].forEach((layerId) => {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", visibility);
+    }
+  });
 }
 
 function updateLocationsSourceData(map, filteredFeatures) {
-  const mapFeatures = toMapFeatures(filteredFeatures);
+  const { mapFeatures, denseClusterFeatures } = prepareMapFeatures(filteredFeatures);
   const collection = {
     type: "FeatureCollection",
     features: mapFeatures
   };
 
-  if (!clusteringEnabled) {
+  if (!isMapboxClusteringActive()) {
     map.getSource("locations")?.setData(collection);
+    syncDensePilesLayers(map, denseClusterFeatures);
     return;
   }
 
@@ -1556,10 +1711,12 @@ function updateLocationsSourceData(map, filteredFeatures) {
         features: mapFeatures.filter((feature) => feature.properties.regnum === regnum)
       });
     });
+    syncDensePilesLayers(map, denseClusterFeatures);
     return;
   }
 
   map.getSource("locations")?.setData(collection);
+  syncDensePilesLayers(map, denseClusterFeatures);
 }
 
 /** Добавляет или убирает точки при изменении года таймлайна без пересборки слоёв. */
@@ -1624,9 +1781,9 @@ function rebuildLocationsLayers(map) {
 
   const filteredFeatures = filterFeatures(locationsData.features, currentFilters);
   setCurrentFilteredFeatures(filteredFeatures);
-  const mapFeatures = toMapFeatures(filteredFeatures);
+  const { mapFeatures, denseClusterFeatures } = prepareMapFeatures(filteredFeatures);
 
-  if (!clusteringEnabled) {
+  if (!isMapboxClusteringActive()) {
     map.addSource("locations", {
       type: "geojson",
       data: {
@@ -1665,12 +1822,15 @@ function rebuildLocationsLayers(map) {
       },
       cluster: true,
       ...CLUSTER_OPTIONS,
-      ...(clusterPieChartsEnabled ? { clusterProperties: CLUSTER_REGNUM_PROPERTIES } : {})
+      clusterProperties: {
+        ...(clusterPieChartsEnabled ? CLUSTER_REGNUM_PROPERTIES : {})
+      }
     });
 
     addClusterLayers(map, "locations");
   }
 
+  syncDensePilesLayers(map, denseClusterFeatures);
   attachLocationsInteractions(map);
   applyMarkersVisibility(map);
   applyUnclusteredLayerFilters(map);
@@ -1998,6 +2158,7 @@ export function applyLocationsFilter(map, filters = {}) {
   }
 
   currentFilters = filters;
+  expandedDensePileKeys = new Set();
   rebuildLocationsLayers(map);
   applyGbifLocationsFilter(map, filters);
 }
@@ -2055,6 +2216,24 @@ export function setClusterPieChartsEnabled(map, enabled) {
 /** Включены ли круговые диаграммы regnum в кластерах. */
 export function isClusterPieChartsEnabled() {
   return clusterPieChartsEnabled;
+}
+
+/** Сверхплотные кластеры: без обычной кластеризации, только кучи ≥10 с одинаковыми координатами. */
+export function setDenseClustersHighlightEnabled(map, enabled) {
+  const next = Boolean(enabled);
+  if (denseClustersHighlightEnabled === next) {
+    return;
+  }
+
+  denseClustersHighlightEnabled = next;
+  expandedDensePileKeys = new Set();
+  if (map) {
+    rebuildLocationsLayers(map);
+  }
+}
+
+export function isDenseClustersHighlightEnabled() {
+  return denseClustersHighlightEnabled;
 }
 
 /** Включает или отключает всплывающие подсказки при наведении на точки и кластеры. */

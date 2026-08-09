@@ -25,7 +25,8 @@ const INTERNAL_PROPERTIES = new Set([
   "source",
   "gbif_url",
   "species_key",
-  "coordinates_original"
+  "coordinates_original",
+  "dense_pile_size"
 ]);
 
 /** Поля GBIF, которые уводим в раскрывающийся блок «Информация из GBIF». */

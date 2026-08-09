@@ -9,7 +9,8 @@ function getCollapsedSummary(
   heatmapEnabled,
   clusteringEnabled,
   clusterByRegnum,
-  clusterPieCharts
+  clusterPieCharts,
+  denseClustersHighlight
 ) {
   const parts = [];
 
@@ -17,7 +18,9 @@ function getCollapsedSummary(
     parts.push("маркеры скрыты");
   }
 
-  if (clusteringEnabled && markersVisible) {
+  if (markersVisible && denseClustersHighlight) {
+    parts.push("сверхплотные кластеры");
+  } else if (clusteringEnabled && markersVisible) {
     if (clusterPieCharts) {
       parts.push("кластеры-диаграммы");
     } else {
@@ -46,6 +49,8 @@ export default function MapDisplayPanel({
   onClusterByRegnumChange,
   clusterPieCharts = false,
   onClusterPieChartsChange,
+  denseClustersHighlight = false,
+  onDenseClustersHighlightChange,
   collapsed: collapsedProp,
   onCollapsedChange
 }) {
@@ -56,10 +61,11 @@ export default function MapDisplayPanel({
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## map в docs/moduleHelp.md
   // Кластеризация имеет смысл только когда маркеры видны.
-  const clusteringDisabled = !markersVisible;
+  const clusteringDisabled = !markersVisible || denseClustersHighlight;
   const clusterPieChartsDisabled = clusteringDisabled || !clusteringEnabled;
   const clusterByRegnumDisabled =
     clusteringDisabled || !clusteringEnabled || clusterPieCharts;
+  const denseClustersHighlightDisabled = !markersVisible;
 
   return (
     <aside className={`map-display-panel ${collapsed ? "map-display-panel--collapsed" : ""}`}>
@@ -87,7 +93,8 @@ export default function MapDisplayPanel({
             heatmapEnabled,
             clusteringEnabled,
             clusterByRegnum,
-            clusterPieCharts
+            clusterPieCharts,
+            denseClustersHighlight
           )}
         </p>
       ) : (
@@ -97,14 +104,16 @@ export default function MapDisplayPanel({
           <label
             className={`map-display-switch${clusteringDisabled ? " map-display-switch--disabled" : ""}`}
             title={
-              clusteringDisabled
+              !markersVisible
                 ? "Доступно только при включённых маркерах"
-                : "Группировать близкие точки в кластеры"
+                : denseClustersHighlight
+                  ? "Недоступно в режиме сверхплотных кластеров"
+                  : "Группировать близкие точки в кластеры"
             }
           >
             <input
               type="checkbox"
-              checked={clusteringEnabled}
+              checked={clusteringEnabled && !denseClustersHighlight}
               disabled={clusteringDisabled}
               onChange={(e) => onClusteringEnabledChange?.(e.target.checked)}
             />
@@ -117,13 +126,15 @@ export default function MapDisplayPanel({
               clusterByRegnumDisabled ? " map-display-switch--disabled" : ""
             }`}
             title={
-              clusteringDisabled
+              !markersVisible
                 ? "Доступно только при включённых маркерах"
-                : !clusteringEnabled
-                  ? "Доступно только при включённой кластеризации"
-                  : clusterPieCharts
-                    ? "Недоступно при включённых кластерах-диаграммах"
-                    : "Группировать в кластеры только точки с одинаковым regnum"
+                : denseClustersHighlight
+                  ? "Недоступно в режиме сверхплотных кластеров"
+                  : !clusteringEnabled
+                    ? "Доступно только при включённой кластеризации"
+                    : clusterPieCharts
+                      ? "Недоступно при включённых кластерах-диаграммах"
+                      : "Группировать в кластеры только точки с одинаковым regnum"
             }
           >
             <input
@@ -141,11 +152,13 @@ export default function MapDisplayPanel({
               clusterPieChartsDisabled ? " map-display-switch--disabled" : ""
             }`}
             title={
-              clusteringDisabled
+              !markersVisible
                 ? "Доступно только при включённых маркерах"
-                : !clusteringEnabled
-                  ? "Доступно только при включённой кластеризации"
-                  : "Показывать состав кластера секторной диаграммой; отключает группировку по царству"
+                : denseClustersHighlight
+                  ? "Недоступно в режиме сверхплотных кластеров"
+                  : !clusteringEnabled
+                    ? "Доступно только при включённой кластеризации"
+                    : "Показывать состав кластера секторной диаграммой; отключает группировку по царству"
             }
           >
             <input
@@ -156,6 +169,26 @@ export default function MapDisplayPanel({
             />
             <span className="map-display-switch-slider" />
             <span className="map-display-switch-label">Кластеры-диаграммы</span>
+          </label>
+
+          <label
+            className={`map-display-switch${
+              denseClustersHighlightDisabled ? " map-display-switch--disabled" : ""
+            }`}
+            title={
+              denseClustersHighlightDisabled
+                ? "Доступно только при включённых маркерах"
+                : "Отключить обычную кластеризацию и показать только кучи ≥10 точек с полностью одинаковыми координатами; остальные точки скрыть"
+            }
+          >
+            <input
+              type="checkbox"
+              checked={denseClustersHighlight}
+              disabled={denseClustersHighlightDisabled}
+              onChange={(e) => onDenseClustersHighlightChange?.(e.target.checked)}
+            />
+            <span className="map-display-switch-slider" />
+            <span className="map-display-switch-label">Сверхплотные кластеры</span>
           </label>
 
           <hr />
@@ -181,7 +214,8 @@ export default function MapDisplayPanel({
           </label>
         </div>
       )}
-      <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.MAP} open={helpOpen} />
+
+      <ModuleHelpPanel moduleId={MODULE_IDS.MAP} open={helpOpen} onClose={() => setHelpOpen(false)} />
     </aside>
   );
 }
