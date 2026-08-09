@@ -1,6 +1,6 @@
 import {
   clearGbifStore,
-  getGbifFeatureCollection,
+  getGbifFeatureCollectionRaw,
   getGbifLoadedRegionId,
   getGbifLoadedQuery,
   getGbifSyncedAt,
@@ -8,6 +8,8 @@ import {
   setGbifLoadedQuery,
   setGbifSyncedAt
 } from "./gbifStore";
+import { migrateGbifNameRuToOverlay } from "./migrateGbifNameRuToOverlay";
+import { hydrateNameRuOverlay } from "../names/nameRuCache";
 
 const DB_NAME = "flora35-gbif";
 const DB_VERSION = 1;
@@ -73,9 +75,9 @@ function normalizeSnapshot(snapshot) {
   };
 }
 
-/** Сохраняет текущий GBIF store (коллекция + фильтры загрузки) в IndexedDB. */
+/** Сохраняет raw GBIF store (без overlay) в IndexedDB. */
 export async function persistGbifSnapshot() {
-  const collection = getGbifFeatureCollection();
+  const collection = getGbifFeatureCollectionRaw();
   if (!isValidCollection(collection) || collection.features.length === 0) {
     await clearPersistedGbifSnapshot();
     return null;
@@ -142,15 +144,29 @@ export async function clearPersistedGbifSnapshot() {
  * @returns {Promise<object|null>} снимок или null
  */
 export async function hydrateGbifStoreFromPersistence() {
+  await hydrateNameRuOverlay();
+
   const snapshot = await readPersistedGbifSnapshot();
   if (!snapshot || snapshot.collection.features.length === 0) {
     return null;
   }
 
-  setGbifFeatureCollection(snapshot.collection, snapshot.regionId ?? null);
+  const { collection, migrated, stripped } = await migrateGbifNameRuToOverlay(
+    snapshot.collection
+  );
+
+  setGbifFeatureCollection(collection, snapshot.regionId ?? null);
   setGbifLoadedQuery(snapshot.query ?? null);
   setGbifSyncedAt(snapshot.syncedAt ?? null);
-  return snapshot;
+
+  if (migrated > 0 || stripped > 0) {
+    await persistGbifSnapshot();
+  }
+
+  return {
+    ...snapshot,
+    collection
+  };
 }
 
 /** Очищает store в памяти и снимок в IndexedDB. */

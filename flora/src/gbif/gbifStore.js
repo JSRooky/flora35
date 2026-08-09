@@ -1,3 +1,5 @@
+import { getOverlayEntry } from "../names/nameRuCache";
+
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
   features: []
@@ -10,9 +12,54 @@ let loadedQuery = null;
 /** ISO-время последней полной загрузки / обновления (для lastInterpreted). */
 let syncedAt = null;
 
-/** Текущая коллекция точек GBIF в памяти. */
-export function getGbifFeatureCollection() {
+function resolveEffectiveNameRu(feature) {
+  const nameLatin = feature?.properties?.name_latin;
+  const overlayEntry = nameLatin ? getOverlayEntry(nameLatin) : undefined;
+
+  if (overlayEntry?.nameRu) {
+    return overlayEntry.nameRu;
+  }
+
+  return feature?.properties?.name_ru ?? null;
+}
+
+/** Накладывает overlay русских названий на копию GBIF feature. */
+export function enrichGbifFeature(feature) {
+  if (!feature?.properties || feature.properties.source !== "gbif") {
+    return feature;
+  }
+
+  const effectiveNameRu = resolveEffectiveNameRu(feature);
+  const currentNameRu = feature.properties.name_ru ?? null;
+
+  if (effectiveNameRu === currentNameRu) {
+    return feature;
+  }
+
+  return {
+    ...feature,
+    properties: {
+      ...feature.properties,
+      name_ru: effectiveNameRu
+    }
+  };
+}
+
+function buildEnrichedCollection(collection = gbifCollection) {
+  return {
+    type: "FeatureCollection",
+    features: (collection.features ?? []).map(enrichGbifFeature)
+  };
+}
+
+/** Raw коллекция GBIF без overlay (для persist и внутренних записей). */
+export function getGbifFeatureCollectionRaw() {
   return gbifCollection;
+}
+
+/** Коллекция GBIF с overlay русских названий (для UI, карты, инструментов). */
+export function getGbifFeatureCollection() {
+  return buildEnrichedCollection();
 }
 
 /** Id региона, для которого загружены данные (или null). */
@@ -51,18 +98,19 @@ export function hasGbifDataset() {
   return gbifCollection.features.length > 0;
 }
 
-/** Ищет feature в store по gbif_key (после клика Mapbox свойства могут быть урезанными). */
+/** Ищет обогащённый feature в store по gbif_key. */
 export function findGbifFeatureByKey(gbifKey) {
   if (gbifKey == null || gbifKey === "") {
     return null;
   }
 
   const normalized = String(gbifKey);
-  return (
+  const feature =
     gbifCollection.features.find(
-      (feature) => String(feature.properties?.gbif_key) === normalized
-    ) ?? null
-  );
+      (item) => String(item.properties?.gbif_key) === normalized
+    ) ?? null;
+
+  return feature ? enrichGbifFeature(feature) : null;
 }
 
 /** Число загруженных GBIF-точек с тем же латинским именем. */
@@ -76,7 +124,7 @@ export function countGbifFeaturesByNameLatin(nameLatin) {
   ).length;
 }
 
-/** Полностью заменяет коллекцию. */
+/** Полностью заменяет raw коллекцию. */
 export function setGbifFeatureCollection(collection, regionId = null) {
   gbifCollection = collection?.type === "FeatureCollection"
     ? collection
@@ -85,13 +133,13 @@ export function setGbifFeatureCollection(collection, regionId = null) {
   return gbifCollection;
 }
 
-/** Добавляет features к текущей коллекции (полная первичная загрузка). */
+/** Добавляет features к текущей raw коллекции. */
 export function appendGbifFeatures(features, regionId = null) {
   if (!Array.isArray(features) || features.length === 0) {
     if (regionId != null) {
       loadedRegionId = regionId;
     }
-    return gbifCollection;
+    return getGbifFeatureCollection();
   }
 
   gbifCollection = {
@@ -103,7 +151,7 @@ export function appendGbifFeatures(features, regionId = null) {
     loadedRegionId = regionId;
   }
 
-  return gbifCollection;
+  return getGbifFeatureCollection();
 }
 
 /**
@@ -115,7 +163,7 @@ export function upsertGbifFeatures(features, regionId = null) {
     if (regionId != null) {
       loadedRegionId = regionId;
     }
-    return { collection: gbifCollection, added: 0, updated: 0 };
+    return { collection: getGbifFeatureCollection(), added: 0, updated: 0 };
   }
 
   const byKey = new Map();
@@ -153,7 +201,7 @@ export function upsertGbifFeatures(features, regionId = null) {
     loadedRegionId = regionId;
   }
 
-  return { collection: gbifCollection, added, updated };
+  return { collection: getGbifFeatureCollection(), added, updated };
 }
 
 /** Очищает коллекцию GBIF в памяти. */

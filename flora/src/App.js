@@ -148,8 +148,13 @@ import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
-import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum } from "./components/addGbifLayer";
+import { addGbifLayer, setGbifData, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum } from "./components/addGbifLayer";
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
+import {
+  findGbifFeatureByKey,
+  getGbifFeatureCollection
+} from "./gbif/gbifStore";
+import { resolveRussianName } from "./names/russianNameResolver";
 import GbifPanel from "./components/GbifPanel";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
@@ -554,6 +559,32 @@ export default function MapView() {
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature((open) => !open);
   }, [isArealApplied]);
+
+  const handleResolveRussianName = useCallback(async (feature) => {
+    const nameLatin = feature?.properties?.name_latin;
+    const gbifKey = feature?.properties?.gbif_key;
+    if (!nameLatin) {
+      return { nameRu: null, source: null };
+    }
+
+    const result = await resolveRussianName({
+      nameLatin,
+      speciesKey: feature?.properties?.species_key ?? null
+    });
+
+    if (result.nameRu) {
+      if (map.current) {
+        setGbifData(map.current, getGbifFeatureCollection());
+      }
+
+      const nextFeature =
+        (gbifKey != null ? findGbifFeatureByKey(gbifKey) : null) ?? feature;
+
+      setPopupData(nextFeature);
+    }
+
+    return result;
+  }, []);
 
   const handleYearRangeChange = useCallback((nextRange) => {
     setYearRange((prev) =>
@@ -2644,6 +2675,7 @@ export default function MapView() {
               bufferDockedOpen={bufferDockedWithFeature}
               bufferDisabled={isArealApplied}
               bufferDisabledTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
+              onResolveRussianName={handleResolveRussianName}
             />
           )}
           {(activeModule === MODULE_IDS.AREAL ||

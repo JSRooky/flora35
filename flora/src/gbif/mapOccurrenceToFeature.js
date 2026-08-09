@@ -1,8 +1,19 @@
+import { isRussianVernacular } from "../names/vernacularUtils";
+
 const KINGDOM_TO_REGNUM = {
   Plantae: "plantae",
   Animalia: "animalia",
   Fungi: "fungi"
 };
+
+function resolveOccurrenceNameRu(occurrence) {
+  const vernacularName = occurrence?.vernacularName;
+  if (!vernacularName) {
+    return null;
+  }
+
+  return isRussianVernacular(vernacularName, occurrence?.language) ? vernacularName : null;
+}
 
 /**
  * Преобразует запись occurrence GBIF в GeoJSON Feature.
@@ -30,6 +41,8 @@ export function mapOccurrenceToFeature(occurrence) {
   const regnum = KINGDOM_TO_REGNUM[kingdom] ?? null;
   const nameLatin =
     occurrence.species || occurrence.scientificName || occurrence.acceptedScientificName || null;
+  const speciesKey =
+    occurrence.speciesKey ?? occurrence.acceptedTaxonKey ?? occurrence.taxonKey ?? null;
 
   return {
     type: "Feature",
@@ -42,7 +55,8 @@ export function mapOccurrenceToFeature(occurrence) {
       source: "gbif",
       gbif_key: key,
       name_latin: nameLatin,
-      name_ru: occurrence.vernacularName ?? null,
+      name_ru: resolveOccurrenceNameRu(occurrence),
+      species_key: speciesKey,
       regnum,
       kingdom: kingdom ?? null,
       family: occurrence.family ?? null,

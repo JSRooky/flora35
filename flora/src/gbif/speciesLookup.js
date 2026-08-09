@@ -1,5 +1,6 @@
 import { getAllSpeciesCollection } from "../locations/loadPoints";
 import { getGbifKingdomById } from "./taxonFilters";
+import { pickRussianVernacular } from "../names/vernacularUtils";
 
 const SPECIES_SUGGEST_URL = "https://api.gbif.org/v1/species/suggest";
 const SPECIES_SEARCH_URL = "https://api.gbif.org/v1/species/search";
@@ -28,30 +29,12 @@ function normalizeQuery(query) {
   return String(query ?? "").trim();
 }
 
-function containsCyrillic(text) {
-  return /[а-яё]/i.test(text);
-}
-
 async function fetchJson(url, { signal } = {}) {
   const response = await fetch(url, { signal });
   if (!response.ok) {
     throw new Error(`GBIF Species API error: ${response.status} ${response.statusText}`);
   }
   return response.json();
-}
-
-function pickRussianVernacular(vernacularNames) {
-  if (!Array.isArray(vernacularNames)) {
-    return null;
-  }
-
-  const russian = vernacularNames.find(
-    (item) =>
-      item?.vernacularName &&
-      (item.language === "rus" || item.language === "ru" || containsCyrillic(item.vernacularName))
-  );
-
-  return russian?.vernacularName ?? null;
 }
 
 function toSuggestion(raw, source) {

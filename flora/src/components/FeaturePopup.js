@@ -11,6 +11,7 @@ import {
   sortPropertyEntries
 } from "./featurePropertyLabels";
 import { buildSharePointUrl, copyTextToClipboard } from "./sharePointLink";
+import { getOverlayEntry } from "../names/nameRuCache";
 import "../styles/FeaturePopup.css";
 
 // Служебные поля, добавленные слоем карты; не показываем в списке свойств.
@@ -21,7 +22,8 @@ const INTERNAL_PROPERTIES = new Set([
   "finding_id",
   "description_md",
   "source",
-  "gbif_url"
+  "gbif_url",
+  "species_key"
 ]);
 
 /** Поля GBIF, которые уводим в раскрывающийся блок «Информация из GBIF». */
@@ -127,7 +129,8 @@ export default function FeaturePopup({
   onOpenBuffer,
   bufferDockedOpen = false,
   bufferDisabled = false,
-  bufferDisabledTitle
+  bufferDisabledTitle,
+  onResolveRussianName
 }) {
   const [showImages, setShowImages] = useState(false);
   const [showSpeciesDescription, setShowSpeciesDescription] = useState(false);
@@ -135,6 +138,8 @@ export default function FeaturePopup({
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [gbifInfoOpen, setGbifInfoOpen] = useState(false);
+  const [nameRuLookupState, setNameRuLookupState] = useState("idle");
+  const [nameRuLookupResult, setNameRuLookupResult] = useState(null);
 
   const shareUrl = useMemo(() => {
     if (isGbifFeature(feature)) {
@@ -149,7 +154,17 @@ export default function FeaturePopup({
     setSharePanelOpen(false);
     setShareCopied(false);
     setGbifInfoOpen(false);
-  }, [feature?.id, feature?.properties?.finding_id, feature?.properties?.gbif_key]);
+    setNameRuLookupState("idle");
+    setNameRuLookupResult(null);
+
+    const props = feature?.properties;
+    if (props?.source === "gbif" && props?.name_latin && !props?.name_ru) {
+      const entry = getOverlayEntry(props.name_latin);
+      if (entry && !entry.nameRu) {
+        setNameRuLookupState("not_found");
+      }
+    }
+  }, [feature?.id, feature?.properties]);
 
   useEffect(() => {
     if (!shareCopied) {
@@ -187,6 +202,9 @@ export default function FeaturePopup({
     : "Точка не выбрана";
 
   const properties = feature?.properties;
+  const nameLatin = properties?.name_latin;
+  const nameRu = properties?.name_ru;
+  const showGbifNameLookup = fromGbif && Boolean(nameLatin) && !nameRu;
   const speciesPointCount = feature ? getPointsForSpecies(feature).length : 0;
   const images = properties ? getImages(properties) : [];
   const descriptionPath = properties?.description_md;
@@ -199,6 +217,7 @@ export default function FeaturePopup({
             !INTERNAL_PROPERTIES.has(key) &&
             !GBIF_META_PROPERTIES.has(key) &&
             key !== "status" &&
+            !(fromGbif && key === "name_ru") &&
             hasDisplayValue(value) &&
             // kingdom дублирует regnum, если оба есть.
             !(key === "kingdom" && properties.regnum)
@@ -220,6 +239,47 @@ export default function FeaturePopup({
   const hasStatusFilter =
     Boolean(properties?.status) && activeStatusFilters.includes(properties.status);
   const canResetFilters = hasPropertyFilters || hasStatusFilter;
+
+  const handleFindRussianName = async () => {
+    if (!onResolveRussianName || !feature || nameRuLookupState === "loading") {
+      return;
+    }
+
+    setNameRuLookupState("loading");
+    setNameRuLookupResult(null);
+
+    try {
+      const result = await onResolveRussianName(feature);
+      if (result?.nameRu) {
+        setNameRuLookupResult(result.nameRu);
+        setNameRuLookupState("found");
+        return;
+      }
+
+      setNameRuLookupState("not_found");
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        setNameRuLookupState("idle");
+        return;
+      }
+
+      setNameRuLookupState("not_found");
+    }
+  };
+
+  const nameRuButtonLabel =
+    nameRuLookupState === "loading"
+      ? "Ищем…"
+      : nameRuLookupState === "found"
+        ? nameRuLookupResult || "Найдено"
+        : nameRuLookupState === "not_found"
+          ? "Не найдено"
+          : "Найти";
+
+  const nameRuButtonDisabled =
+    nameRuLookupState === "loading" ||
+    nameRuLookupState === "found" ||
+    nameRuLookupState === "not_found";
 
   return (
     <>
@@ -265,7 +325,7 @@ export default function FeaturePopup({
                   <span>{formatPointCount(speciesPointCount)}</span>
                 </div>
 
-                {displayProperties.length > 0 && (
+                {(displayProperties.length > 0 || showGbifNameLookup || (fromGbif && nameRu)) && (
                   <>
                     <hr />
                     <div className="popup-section-header">
@@ -281,6 +341,43 @@ export default function FeaturePopup({
                         Сброс
                       </button>
                     </div>
+
+                    {(showGbifNameLookup || (fromGbif && nameRu)) && (
+                      <div className="popup-item popup-item--filter">
+                        <div className="popup-item-text">
+                          <strong>{getPropertyLabel("name_ru")}:</strong>
+                          {nameRu ? (
+                            <span>{formatPropertyValue("name_ru", nameRu)}</span>
+                          ) : (
+                            <button
+                              type="button"
+                              className={`popup-item-value-btn${
+                                nameRuLookupState === "found"
+                                  ? " popup-item-value-btn--success"
+                                  : nameRuLookupState === "not_found"
+                                    ? " popup-item-value-btn--failure"
+                                    : ""
+                              }`}
+                              onClick={handleFindRussianName}
+                              disabled={nameRuButtonDisabled}
+                              aria-busy={nameRuLookupState === "loading"}
+                            >
+                              {nameRuButtonLabel}
+                            </button>
+                          )}
+                        </div>
+                        {nameRu && (
+                          <label className="property-switch" title="Показать маркеры с этим свойством">
+                            <input
+                              type="checkbox"
+                              checked={activeFilters.name_ru === nameRu}
+                              onChange={(e) => onFilterChange?.("name_ru", nameRu, e.target.checked)}
+                            />
+                            <span className="property-switch-slider" />
+                          </label>
+                        )}
+                      </div>
+                    )}
 
                     {displayProperties.map(([key, value]) => (
                       <div key={key} className="popup-item popup-item--filter">
