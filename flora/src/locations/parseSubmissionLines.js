@@ -6,7 +6,8 @@ const DELIMITER_CANDIDATES = [";", "|", "\t", ":", "/", "#", "~"];
 const REGNUM_ALIASES = {
   plantae: ["plantae", "растения"],
   animalia: ["animalia", "животные"],
-  fungi: ["fungi", "грибы"]
+  fungi: ["fungi", "грибы"],
+  protozoa: ["protozoa", "простейшие"]
 };
 
 const STATUS_CODES = new Set(["EX", "EW", "CR", "EN", "VU", "NT", "LC"]);
@@ -62,7 +63,7 @@ function parseRegnum(value) {
   );
 
   if (!match) {
-    return { error: "Некорректное царство (plantae, animalia, fungi)." };
+    return { error: "Некорректное царство (plantae, animalia, fungi, protozoa)." };
   }
 
   return { regnum: match[0] };

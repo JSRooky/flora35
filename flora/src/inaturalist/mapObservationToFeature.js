@@ -1,8 +1,10 @@
 import { isRussianVernacular } from "../names/vernacularUtils";
+import { mapKingdomNameToRegnum } from "../gbif/taxonFilters";
 
 const ICONIC_TO_REGNUM = {
   Plantae: "plantae",
-  Fungi: "fungi"
+  Fungi: "fungi",
+  Protozoa: "protozoa"
 };
 
 const ANIMALIA_ICONIC = new Set([
@@ -30,7 +32,7 @@ function mapIconicTaxonToRegnum(iconicTaxonName) {
     return "animalia";
   }
 
-  return null;
+  return mapKingdomNameToRegnum(iconicTaxonName);
 }
 
 function getTaxonAncestors(observation) {
@@ -103,15 +105,9 @@ export function mapObservationToFeature(observation) {
   const taxon = resolveCommunityTaxon(observation);
   const ancestors = getTaxonAncestors(observation);
   const iconicTaxonName = taxon?.iconic_taxon_name ?? observation?.iconic_taxon_name ?? null;
-  const kingdom =
-    getAncestorName(ancestors, "kingdom") ??
-    (iconicTaxonName === "Plantae"
-      ? "Plantae"
-      : iconicTaxonName === "Fungi"
-        ? "Fungi"
-        : iconicTaxonName
-          ? "Animalia"
-          : null);
+  const ancestorKingdom = getAncestorName(ancestors, "kingdom");
+  const regnum =
+    mapIconicTaxonToRegnum(iconicTaxonName) ?? mapKingdomNameToRegnum(ancestorKingdom);
 
   return {
     type: "Feature",
@@ -126,8 +122,7 @@ export function mapObservationToFeature(observation) {
       name_latin: taxon?.name ?? null,
       name_ru: resolveObservationNameRu(observation),
       taxon_id: observation?.community_taxon_id ?? taxon?.id ?? null,
-      regnum: mapIconicTaxonToRegnum(iconicTaxonName),
-      kingdom,
+      regnum,
       family: getAncestorName(ancestors, "family"),
       found_year: observation?.observed_on_details?.year ?? null,
       found_by: observation?.user?.login ?? observation?.user?.name ?? null,

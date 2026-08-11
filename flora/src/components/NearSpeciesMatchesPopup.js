@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  findNearSpeciesMatches,
+  findNearSpeciesMatchesAsync,
   formatDistanceMeters,
   formatMatchCoordinates
 } from "../dataWork/findNearSpeciesMatches";
@@ -58,6 +58,9 @@ function ShowPairIcon() {
 const THRESHOLD_MIN = 0;
 const THRESHOLD_MAX = 500;
 const THRESHOLD_DEFAULT = 100;
+
+const PAGE_SIZE_OPTIONS = [25, 50, 100];
+const PAGE_SIZE_DEFAULT = 100;
 
 const SORT_COLUMNS = [
   { key: "leftSource", label: "Источник" },
@@ -131,38 +134,6 @@ function clampThreshold(value) {
   return Math.min(THRESHOLD_MAX, Math.max(THRESHOLD_MIN, Math.round(numeric)));
 }
 
-function runNearSpeciesSearch(thresholdMeters) {
-  const threshold = clampThreshold(thresholdMeters);
-  const gbifFeatures = getVisibleGbifFeatures();
-  const inatFeatures = getVisibleInatFeatures();
-
-  if (gbifFeatures.length === 0 || inatFeatures.length === 0) {
-    return {
-      threshold,
-      matches: [],
-      statusMessage:
-        "Загрузите слои GBIF и iNaturalist (оба нужны для поиска совпадений)."
-    };
-  }
-
-  const matches = findNearSpeciesMatches({
-    leftFeatures: gbifFeatures,
-    rightFeatures: inatFeatures,
-    thresholdMeters: threshold,
-    leftSourceId: MATCH_SOURCE_IDS.GBIF,
-    rightSourceId: MATCH_SOURCE_IDS.INATURALIST
-  });
-
-  return {
-    threshold,
-    matches,
-    statusMessage:
-      matches.length === 0
-        ? `Совпадений не найдено в радиусе ${threshold} м.`
-        : null
-  };
-}
-
 /**
  * Диалог «Близкие точки»: таблица пар GBIF ↔ iNaturalist
  * с одинаковым латинским названием в заданном радиусе.
@@ -177,20 +148,83 @@ export default function NearSpeciesMatchesPopup({
   const [matches, setMatches] = useState([]);
   const [statusMessage, setStatusMessage] = useState(null);
   const [searched, setSearched] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [sortKey, setSortKey] = useState(null);
   const [sortDirection, setSortDirection] = useState("asc");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_DEFAULT);
   const [mapPreviewHidden, setMapPreviewHidden] = useState(false);
+  const searchGenerationRef = useRef(0);
 
-  const applySearch = useCallback((thresholdValue) => {
-    const result = runNearSpeciesSearch(thresholdValue);
-    setThresholdMeters(result.threshold);
-    setMatches(result.matches);
-    setStatusMessage(result.statusMessage);
+  const cancelActiveSearch = useCallback(() => {
+    searchGenerationRef.current += 1;
+    setSearching(false);
+  }, []);
+
+  const applySearch = useCallback(async (thresholdValue) => {
+    const threshold = clampThreshold(thresholdValue);
+    const generation = searchGenerationRef.current + 1;
+    searchGenerationRef.current = generation;
+    const signal = {
+      get aborted() {
+        return searchGenerationRef.current !== generation;
+      }
+    };
+
+    setThresholdMeters(threshold);
+    setSearching(true);
+    setStatusMessage("Ищем…");
     setSearched(true);
+    setPage(1);
+
+    // Даём UI отрисовать состояние «Ищем…» до тяжёлой работы.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (signal.aborted) {
+      return;
+    }
+
+    const gbifFeatures = getVisibleGbifFeatures();
+    const inatFeatures = getVisibleInatFeatures();
+
+    if (gbifFeatures.length === 0 || inatFeatures.length === 0) {
+      if (signal.aborted) {
+        return;
+      }
+      setMatches([]);
+      setStatusMessage(
+        "Загрузите слои GBIF и iNaturalist (оба нужны для поиска совпадений)."
+      );
+      setSearching(false);
+      return;
+    }
+
+    const nextMatches = await findNearSpeciesMatchesAsync(
+      {
+        leftFeatures: gbifFeatures,
+        rightFeatures: inatFeatures,
+        thresholdMeters: threshold,
+        leftSourceId: MATCH_SOURCE_IDS.GBIF,
+        rightSourceId: MATCH_SOURCE_IDS.INATURALIST
+      },
+      { signal }
+    );
+
+    if (signal.aborted) {
+      return;
+    }
+
+    setMatches(nextMatches);
+    setStatusMessage(
+      nextMatches.length === 0
+        ? `Совпадений не найдено в радиусе ${threshold} м.`
+        : null
+    );
+    setSearching(false);
   }, []);
 
   useEffect(() => {
     if (!open) {
+      cancelActiveSearch();
       return;
     }
 
@@ -198,27 +232,35 @@ export default function NearSpeciesMatchesPopup({
     setMatches([]);
     setStatusMessage(null);
     setSearched(false);
+    setSearching(false);
     setSortKey(null);
     setSortDirection("asc");
+    setPage(1);
+    setPageSize(PAGE_SIZE_DEFAULT);
     setMapPreviewHidden(false);
-  }, [open]);
+  }, [open, cancelActiveSearch]);
 
   const handleClose = useCallback(() => {
+    cancelActiveSearch();
     if (mapPreviewHidden) {
       onPreviewEnd?.();
     }
     onClose?.();
-  }, [mapPreviewHidden, onClose, onPreviewEnd]);
+  }, [cancelActiveSearch, mapPreviewHidden, onClose, onPreviewEnd]);
 
   const handleThresholdInput = (event) => {
     setThresholdMeters(clampThreshold(event.target.value));
   };
 
   const handleFind = () => {
+    if (searching) {
+      return;
+    }
     applySearch(thresholdMeters);
   };
 
   const handleSort = useCallback((columnKey) => {
+    setPage(1);
     setSortKey((currentKey) => {
       if (currentKey === columnKey) {
         setSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
@@ -228,6 +270,14 @@ export default function NearSpeciesMatchesPopup({
       setSortDirection("asc");
       return columnKey;
     });
+  }, []);
+
+  const handlePageSizeChange = useCallback((event) => {
+    const nextSize = Number(event.target.value);
+    setPageSize(
+      PAGE_SIZE_OPTIONS.includes(nextSize) ? nextSize : PAGE_SIZE_DEFAULT
+    );
+    setPage(1);
   }, []);
 
   const handleShowPair = useCallback(
@@ -254,6 +304,24 @@ export default function NearSpeciesMatchesPopup({
     );
   }, [matches, sortDirection, sortKey]);
 
+  const matchCount = sortedMatches.length;
+  const totalPages = Math.max(1, Math.ceil(matchCount / pageSize) || 1);
+  const currentPage = Math.min(page, totalPages);
+
+  const pageMatches = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedMatches.slice(start, start + pageSize);
+  }, [currentPage, pageSize, sortedMatches]);
+
+  const pageStartIndex = matchCount === 0 ? 0 : (currentPage - 1) * pageSize;
+  const pageEndIndex = Math.min(pageStartIndex + pageMatches.length, matchCount);
+
+  useEffect(() => {
+    if (page !== currentPage) {
+      setPage(currentPage);
+    }
+  }, [currentPage, page]);
+
   if (!open) {
     return null;
   }
@@ -273,7 +341,7 @@ export default function NearSpeciesMatchesPopup({
     );
   }
 
-  const matchCount = matches.length;
+  const canPaginate = matchCount > 0;
 
   return (
     <div className="near-species-matches-overlay" onClick={handleClose}>
@@ -315,6 +383,7 @@ export default function NearSpeciesMatchesPopup({
             step={1}
             value={thresholdMeters}
             onChange={handleThresholdInput}
+            disabled={searching}
             aria-label="Порог близости в метрах"
           />
           <input
@@ -326,15 +395,17 @@ export default function NearSpeciesMatchesPopup({
             step={1}
             value={thresholdMeters}
             onChange={handleThresholdInput}
+            disabled={searching}
           />
           <button
             type="button"
             className="near-species-matches-find-button"
             onClick={handleFind}
+            disabled={searching}
           >
-            Найти
+            {searching ? "Ищем…" : "Найти"}
           </button>
-          {searched ? (
+          {searched && !searching ? (
             <span className="near-species-matches-count" aria-live="polite">
               Найдено: {matchCount}
             </span>
@@ -351,6 +422,9 @@ export default function NearSpeciesMatchesPopup({
           <table className="near-species-matches-table">
             <thead>
               <tr>
+                <th scope="col" className="near-species-matches-rownum-col">
+                  <span className="near-species-matches-rownum-heading">№</span>
+                </th>
                 {SORT_COLUMNS.map((column) => {
                   const isActive = sortKey === column.key;
                   const ariaSort = isActive
@@ -372,6 +446,7 @@ export default function NearSpeciesMatchesPopup({
                           isActive ? " near-species-matches-sort-button--active" : ""
                         }`}
                         onClick={() => handleSort(column.key)}
+                        disabled={searching}
                       >
                         {column.label}
                         <span className="near-species-matches-sort-indicator" aria-hidden="true">
@@ -387,51 +462,111 @@ export default function NearSpeciesMatchesPopup({
               </tr>
             </thead>
             <tbody>
-              {sortedMatches.length === 0 ? (
+              {pageMatches.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="near-species-matches-table-empty">
-                    {searched ? "Нет строк для отображения." : "—"}
+                  <td colSpan={9} className="near-species-matches-table-empty">
+                    {searching
+                      ? "Ищем совпадения…"
+                      : searched
+                        ? "Нет строк для отображения."
+                        : "—"}
                   </td>
                 </tr>
               ) : (
-                sortedMatches.map((match, index) => (
-                  <tr
-                    key={`${match.left.coordinates.join(",")}|${match.right.coordinates.join(",")}|${match.nameLatin}|${index}`}
-                  >
-                    <td>{getMatchSourceLabel(match.left.source)}</td>
-                    <td className="near-species-matches-table-name">
-                      {match.left.nameLatin}
-                    </td>
-                    <td className="near-species-matches-table-coords">
-                      {formatMatchCoordinates(match.left.coordinates)}
-                    </td>
-                    <td>{getMatchSourceLabel(match.right.source)}</td>
-                    <td className="near-species-matches-table-name">
-                      {match.right.nameLatin}
-                    </td>
-                    <td className="near-species-matches-table-coords">
-                      {formatMatchCoordinates(match.right.coordinates)}
-                    </td>
-                    <td className="near-species-matches-table-distance">
-                      {formatDistanceMeters(match.distanceMeters)}
-                    </td>
-                    <td className="near-species-matches-row-action">
-                      <button
-                        type="button"
-                        className="near-species-matches-show-button"
-                        onClick={() => handleShowPair(match)}
-                        title="Показать"
-                        aria-label="Показать"
-                      >
-                        <ShowPairIcon />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                pageMatches.map((match, index) => {
+                  const rowNumber = pageStartIndex + index + 1;
+                  return (
+                    <tr
+                      key={`${match.left.coordinates.join(",")}|${match.right.coordinates.join(",")}|${match.nameLatin}|${rowNumber}`}
+                    >
+                      <td className="near-species-matches-table-rownum">{rowNumber}</td>
+                      <td>{getMatchSourceLabel(match.left.source)}</td>
+                      <td className="near-species-matches-table-name">
+                        {match.left.nameLatin}
+                      </td>
+                      <td className="near-species-matches-table-coords">
+                        {formatMatchCoordinates(match.left.coordinates)}
+                      </td>
+                      <td>{getMatchSourceLabel(match.right.source)}</td>
+                      <td className="near-species-matches-table-name">
+                        {match.right.nameLatin}
+                      </td>
+                      <td className="near-species-matches-table-coords">
+                        {formatMatchCoordinates(match.right.coordinates)}
+                      </td>
+                      <td className="near-species-matches-table-distance">
+                        {formatDistanceMeters(match.distanceMeters)}
+                      </td>
+                      <td className="near-species-matches-row-action">
+                        <button
+                          type="button"
+                          className="near-species-matches-show-button"
+                          onClick={() => handleShowPair(match)}
+                          title="Показать"
+                          aria-label="Показать"
+                        >
+                          <ShowPairIcon />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
+
+        {canPaginate ? (
+          <div className="near-species-matches-pagination" aria-label="Страницы таблицы">
+            <label
+              className="near-species-matches-page-size-label"
+              htmlFor="near-species-matches-page-size"
+            >
+              На странице
+            </label>
+            <select
+              id="near-species-matches-page-size"
+              className="near-species-matches-page-size"
+              value={pageSize}
+              onChange={handlePageSizeChange}
+              disabled={searching}
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+
+            <span className="near-species-matches-page-range" aria-live="polite">
+              {pageStartIndex + 1}–{pageEndIndex} из {matchCount}
+            </span>
+
+            <div className="near-species-matches-page-nav">
+              <button
+                type="button"
+                className="near-species-matches-page-button"
+                onClick={() => setPage(currentPage - 1)}
+                disabled={searching || currentPage <= 1}
+                aria-label="Предыдущая страница"
+              >
+                ‹
+              </button>
+              <span className="near-species-matches-page-indicator">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                className="near-species-matches-page-button"
+                onClick={() => setPage(currentPage + 1)}
+                disabled={searching || currentPage >= totalPages}
+                aria-label="Следующая страница"
+              >
+                ›
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

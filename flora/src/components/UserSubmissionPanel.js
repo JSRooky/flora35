@@ -23,7 +23,8 @@ import "../styles/UserSubmissionPanel.css";
 const REGNUM_OPTIONS = [
   { value: "plantae", label: "Растения" },
   { value: "animalia", label: "Животные" },
-  { value: "fungi", label: "Грибы" }
+  { value: "fungi", label: "Грибы" },
+  { value: "protozoa", label: "Простейшие" }
 ];
 
 const EMPTY_FORM = {

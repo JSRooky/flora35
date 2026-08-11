@@ -1,4 +1,5 @@
 import { getOverlayEntry, getOverlayVersion } from "../names/nameRuCache";
+import { resolveFeatureRegnum } from "./taxonFilters";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -32,7 +33,7 @@ function resolveEffectiveNameRu(feature) {
   return feature?.properties?.name_ru ?? null;
 }
 
-/** Накладывает overlay русских названий на копию GBIF feature. */
+/** Накладывает overlay русских названий и единый regnum на копию GBIF feature. */
 export function enrichGbifFeature(feature) {
   if (!feature?.properties || feature.properties.source !== "gbif") {
     return feature;
@@ -40,17 +41,28 @@ export function enrichGbifFeature(feature) {
 
   const effectiveNameRu = resolveEffectiveNameRu(feature);
   const currentNameRu = feature.properties.name_ru ?? null;
+  const resolvedRegnum = resolveFeatureRegnum(feature.properties);
+  const currentRegnum = feature.properties.regnum ?? null;
+  const hasKingdom = feature.properties.kingdom != null && feature.properties.kingdom !== "";
 
-  if (effectiveNameRu === currentNameRu) {
+  if (
+    effectiveNameRu === currentNameRu &&
+    resolvedRegnum === currentRegnum &&
+    !hasKingdom
+  ) {
     return feature;
   }
 
+  const nextProperties = {
+    ...feature.properties,
+    name_ru: effectiveNameRu,
+    ...(resolvedRegnum ? { regnum: resolvedRegnum } : {})
+  };
+  delete nextProperties.kingdom;
+
   return {
     ...feature,
-    properties: {
-      ...feature.properties,
-      name_ru: effectiveNameRu
-    }
+    properties: nextProperties
   };
 }
 

@@ -15,7 +15,17 @@ import { normalizeLatinName } from "./normalizeLatinName";
  *   right: MatchPoint,
  *   distanceMeters: number
  * }} NearSpeciesMatch
+ * @typedef {{
+ *   key: string,
+ *   nameLatin: string,
+ *   coordinates: [number, number],
+ *   source: string,
+ *   feature: object
+ * }} IndexedPoint
  */
+
+/** Примерно метров на градус широты. */
+const METERS_PER_DEG_LAT = 111320;
 
 function isValidCoordinates(coordinates) {
   return (
@@ -29,7 +39,7 @@ function isValidCoordinates(coordinates) {
 /**
  * @param {object} feature
  * @param {string} sourceId
- * @returns {{ key: string, nameLatin: string, coordinates: [number, number], source: string, feature: object }|null}
+ * @returns {IndexedPoint|null}
  */
 function toIndexedPoint(feature, sourceId) {
   const nameLatinRaw = feature?.properties?.name_latin;
@@ -55,7 +65,7 @@ function toIndexedPoint(feature, sourceId) {
 /**
  * @param {object[]} features
  * @param {string} sourceId
- * @returns {Map<string, ReturnType<typeof toIndexedPoint>[]>}
+ * @returns {Map<string, IndexedPoint[]>}
  */
 function groupByLatinName(features, sourceId) {
   const groups = new Map();
@@ -79,6 +89,150 @@ function groupByLatinName(features, sourceId) {
   }
 
   return groups;
+}
+
+/**
+ * @param {IndexedPoint} point
+ * @returns {MatchPoint}
+ */
+function toMatchPoint(point) {
+  return {
+    source: point.source,
+    nameLatin: point.nameLatin,
+    coordinates: point.coordinates,
+    feature: point.feature
+  };
+}
+
+/**
+ * Нижняя граница индекса в массиве, отсортированном по lat: lat >= minLat.
+ * @param {IndexedPoint[]} sortedByLat
+ * @param {number} minLat
+ * @returns {number}
+ */
+function lowerBoundByLat(sortedByLat, minLat) {
+  let lo = 0;
+  let hi = sortedByLat.length;
+
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sortedByLat[mid].coordinates[1] < minLat) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+
+  return lo;
+}
+
+/**
+ * Верхняя граница индекса: lat <= maxLat (первый индекс с lat > maxLat).
+ * @param {IndexedPoint[]} sortedByLat
+ * @param {number} maxLat
+ * @returns {number}
+ */
+function upperBoundByLat(sortedByLat, maxLat) {
+  let lo = 0;
+  let hi = sortedByLat.length;
+
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sortedByLat[mid].coordinates[1] <= maxLat) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+
+  return lo;
+}
+
+/**
+ * Грубая bbox-проверка в метрах до Haversine.
+ * @param {[number, number]} leftCoords
+ * @param {[number, number]} rightCoords
+ * @param {number} thresholdMeters
+ * @param {number} latDeltaDeg
+ * @returns {boolean}
+ */
+function passesBboxPrefilter(leftCoords, rightCoords, thresholdMeters, latDeltaDeg) {
+  const dLat = Math.abs(leftCoords[1] - rightCoords[1]);
+  if (dLat > latDeltaDeg) {
+    return false;
+  }
+
+  if (dLat * METERS_PER_DEG_LAT > thresholdMeters) {
+    return false;
+  }
+
+  const cosLat = Math.cos((leftCoords[1] * Math.PI) / 180);
+  const metersPerDegLng = METERS_PER_DEG_LAT * Math.max(0.01, Math.abs(cosLat));
+  const dLng = Math.abs(leftCoords[0] - rightCoords[0]);
+
+  return dLng * metersPerDegLng <= thresholdMeters;
+}
+
+/**
+ * Сопоставляет две группы одного вида: сортировка по lat + bbox, затем Haversine.
+ * @param {IndexedPoint[]} leftPoints
+ * @param {IndexedPoint[]} rightPoints
+ * @param {number} thresholdMeters
+ * @param {NearSpeciesMatch[]} matches
+ */
+function collectMatchesForSpecies(leftPoints, rightPoints, thresholdMeters, matches) {
+  const latDeltaDeg = thresholdMeters / METERS_PER_DEG_LAT;
+  const sortedRight = [...rightPoints].sort(
+    (a, b) => a.coordinates[1] - b.coordinates[1]
+  );
+
+  for (const left of leftPoints) {
+    const leftLat = left.coordinates[1];
+    const start = lowerBoundByLat(sortedRight, leftLat - latDeltaDeg);
+    const end = upperBoundByLat(sortedRight, leftLat + latDeltaDeg);
+
+    for (let index = start; index < end; index += 1) {
+      const right = sortedRight[index];
+
+      if (
+        !passesBboxPrefilter(
+          left.coordinates,
+          right.coordinates,
+          thresholdMeters,
+          latDeltaDeg
+        )
+      ) {
+        continue;
+      }
+
+      const distanceMeters =
+        getHaversineDistanceKm(left.coordinates, right.coordinates) * 1000;
+
+      if (distanceMeters > thresholdMeters) {
+        continue;
+      }
+
+      matches.push({
+        nameLatin: left.nameLatin,
+        left: toMatchPoint(left),
+        right: toMatchPoint(right),
+        distanceMeters
+      });
+    }
+  }
+}
+
+/**
+ * @param {NearSpeciesMatch[]} matches
+ */
+function sortMatches(matches) {
+  matches.sort((a, b) => {
+    const nameCmp = a.nameLatin.localeCompare(b.nameLatin, "en", { sensitivity: "base" });
+    if (nameCmp !== 0) {
+      return nameCmp;
+    }
+    return a.distanceMeters - b.distanceMeters;
+  });
 }
 
 /**
@@ -117,43 +271,81 @@ export function findNearSpeciesMatches({
       continue;
     }
 
-    for (const left of leftPoints) {
-      for (const right of rightPoints) {
-        const distanceKm = getHaversineDistanceKm(left.coordinates, right.coordinates);
-        const distanceMeters = distanceKm * 1000;
+    collectMatchesForSpecies(leftPoints, rightPoints, threshold, matches);
+  }
 
-        if (distanceMeters > threshold) {
-          continue;
-        }
+  sortMatches(matches);
+  return matches;
+}
 
-        matches.push({
-          nameLatin: left.nameLatin,
-          left: {
-            source: left.source,
-            nameLatin: left.nameLatin,
-            coordinates: left.coordinates,
-            feature: left.feature
-          },
-          right: {
-            source: right.source,
-            nameLatin: right.nameLatin,
-            coordinates: right.coordinates,
-            feature: right.feature
-          },
-          distanceMeters
-        });
-      }
+/**
+ * Тот же поиск, но с паузами между пачками видов — UI не зависает.
+ *
+ * @param {{
+ *   leftFeatures: object[],
+ *   rightFeatures: object[],
+ *   thresholdMeters: number,
+ *   leftSourceId?: string,
+ *   rightSourceId?: string
+ * }} options
+ * @param {{
+ *   signal?: { aborted?: boolean },
+ *   speciesPerChunk?: number
+ * }} [asyncOptions]
+ * @returns {Promise<NearSpeciesMatch[]>}
+ */
+export async function findNearSpeciesMatchesAsync(
+  options,
+  { signal = null, speciesPerChunk = 8 } = {}
+) {
+  const threshold = Number(options?.thresholdMeters);
+  if (!Number.isFinite(threshold) || threshold < 0) {
+    return [];
+  }
+
+  const leftGroups = groupByLatinName(options.leftFeatures, options.leftSourceId ?? "gbif");
+  const rightGroups = groupByLatinName(
+    options.rightFeatures,
+    options.rightSourceId ?? "inaturalist"
+  );
+  /** @type {NearSpeciesMatch[]} */
+  const matches = [];
+
+  const sharedKeys = [];
+  for (const key of leftGroups.keys()) {
+    const rightPoints = rightGroups.get(key);
+    if (rightPoints && rightPoints.length > 0) {
+      sharedKeys.push(key);
     }
   }
 
-  matches.sort((a, b) => {
-    const nameCmp = a.nameLatin.localeCompare(b.nameLatin, "en", { sensitivity: "base" });
-    if (nameCmp !== 0) {
-      return nameCmp;
-    }
-    return a.distanceMeters - b.distanceMeters;
-  });
+  const chunkSize = Math.max(1, Number(speciesPerChunk) || 8);
 
+  for (let offset = 0; offset < sharedKeys.length; offset += chunkSize) {
+    if (signal?.aborted) {
+      return [];
+    }
+
+    const slice = sharedKeys.slice(offset, offset + chunkSize);
+    for (const key of slice) {
+      collectMatchesForSpecies(
+        leftGroups.get(key),
+        rightGroups.get(key),
+        threshold,
+        matches
+      );
+    }
+
+    if (offset + chunkSize < sharedKeys.length) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
+  if (signal?.aborted) {
+    return [];
+  }
+
+  sortMatches(matches);
   return matches;
 }
 

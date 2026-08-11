@@ -13,6 +13,7 @@ import {
   getPropertyLabel,
   sortPropertyEntries
 } from "./featurePropertyLabels";
+import { resolveFeatureRegnum } from "../gbif/taxonFilters";
 import { buildSharePointUrl, copyTextToClipboard } from "./sharePointLink";
 import { getOverlayEntry, getOverlayRussianName } from "../names/nameRuCache";
 import "../styles/FeaturePopup.css";
@@ -29,7 +30,9 @@ const INTERNAL_PROPERTIES = new Set([
   "inat_url",
   "species_key",
   "coordinates_original",
-  "dense_pile_size"
+  "dense_pile_size",
+  // Дублирует regnum; единая категория «Царство» — только regnum.
+  "kingdom"
 ]);
 
 /** Поля GBIF, которые уводим в раскрывающийся блок «Информация из GBIF». */
@@ -321,18 +324,21 @@ export default function FeaturePopup({
   const gbifUrl = properties?.gbif_url;
   const inatUrl = properties?.inat_url;
   // status выводится отдельно — у него свой фильтр через StatusFilterPanel.
+  // Для старых снимков GBIF/iNat: kingdom → regnum, чтобы в UI было одно «Царство».
+  const resolvedRegnum = resolveFeatureRegnum(properties);
   const displayProperties = properties
     ? sortPropertyEntries(
-        Object.entries(properties).filter(
+        Object.entries({
+          ...properties,
+          ...(resolvedRegnum ? { regnum: resolvedRegnum } : {})
+        }).filter(
           ([key, value]) =>
             !INTERNAL_PROPERTIES.has(key) &&
             !GBIF_META_PROPERTIES.has(key) &&
             !INAT_META_PROPERTIES.has(key) &&
             key !== "status" &&
             !(fromExternal && key === "name_ru") &&
-            hasDisplayValue(value) &&
-            // kingdom дублирует regnum, если оба есть.
-            !(key === "kingdom" && properties.regnum)
+            hasDisplayValue(value)
         )
       )
     : [];

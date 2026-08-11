@@ -17,11 +17,57 @@ export const GBIF_KINGDOMS = [
     label: "Грибы",
     kingdomKey: 5,
     kingdomName: "Fungi"
+  },
+  {
+    id: "protozoa",
+    label: "Простейшие",
+    kingdomKey: 7,
+    kingdomName: "Protozoa"
   }
 ];
 
 export function getGbifKingdomById(id) {
   return GBIF_KINGDOMS.find((item) => item.id === id) ?? null;
+}
+
+/** Латинское имя царства GBIF/iNat → id regnum проекта (plantae, …). */
+export function mapKingdomNameToRegnum(kingdomName) {
+  if (!kingdomName) {
+    return null;
+  }
+
+  const raw = String(kingdomName).trim();
+  if (!raw) {
+    return null;
+  }
+
+  const byName = GBIF_KINGDOMS.find((item) => item.kingdomName === raw);
+  if (byName) {
+    return byName.id;
+  }
+
+  const lower = raw.toLowerCase();
+  const byId = GBIF_KINGDOMS.find((item) => item.id === lower);
+  if (byId) {
+    return byId.id;
+  }
+
+  return lower;
+}
+
+/**
+ * Единое царство точки: regnum, иначе kingdom (для старых снимков GBIF/iNat).
+ */
+export function resolveFeatureRegnum(properties = {}) {
+  if (properties.regnum) {
+    return mapKingdomNameToRegnum(properties.regnum);
+  }
+
+  if (properties.kingdom) {
+    return mapKingdomNameToRegnum(properties.kingdom);
+  }
+
+  return null;
 }
 
 /**

@@ -227,7 +227,10 @@ function TableStatusCell({ editing, status, index, disabled, invalid = false, on
 
 function RegnumMarker({ regnum }) {
   const markerClass =
-    regnum === "plantae" || regnum === "animalia" || regnum === "fungi"
+    regnum === "plantae" ||
+    regnum === "animalia" ||
+    regnum === "fungi" ||
+    regnum === "protozoa"
       ? `multi-species-regnum-marker--${regnum}`
       : "multi-species-regnum-marker--empty";
 

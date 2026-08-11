@@ -1,10 +1,5 @@
 import { isRussianVernacular } from "../names/vernacularUtils";
-
-const KINGDOM_TO_REGNUM = {
-  Plantae: "plantae",
-  Animalia: "animalia",
-  Fungi: "fungi"
-};
+import { mapKingdomNameToRegnum } from "./taxonFilters";
 
 function resolveOccurrenceNameRu(occurrence) {
   const vernacularName = occurrence?.vernacularName;
@@ -37,8 +32,6 @@ export function mapOccurrenceToFeature(occurrence) {
     return null;
   }
 
-  const kingdom = occurrence.kingdom;
-  const regnum = KINGDOM_TO_REGNUM[kingdom] ?? null;
   const nameLatin =
     occurrence.species || occurrence.scientificName || occurrence.acceptedScientificName || null;
   const speciesKey =
@@ -57,8 +50,7 @@ export function mapOccurrenceToFeature(occurrence) {
       name_latin: nameLatin,
       name_ru: resolveOccurrenceNameRu(occurrence),
       species_key: speciesKey,
-      regnum,
-      kingdom: kingdom ?? null,
+      regnum: mapKingdomNameToRegnum(occurrence.kingdom),
       family: occurrence.family ?? null,
       found_year: occurrence.year ?? null,
       found_by: occurrence.recordedBy ?? null,

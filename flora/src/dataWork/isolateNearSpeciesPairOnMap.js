@@ -1,4 +1,4 @@
-﻿import { setGbifData } from "../components/addGbifLayer";
+import { setGbifData } from "../components/addGbifLayer";
 import { setInatData } from "../components/addInatLayer";
 import { setHeatmapFeatures, updateHeatmapData } from "../components/addHeatmapLayer";
 import {

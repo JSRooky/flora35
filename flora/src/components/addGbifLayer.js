@@ -40,13 +40,21 @@ const CLUSTER_OPTIONS = {
 };
 
 const MARKER_RADIUS = 5;
-const REGNUM_KEYS = ["plantae", "animalia", "fungi"];
+const REGNUM_KEYS = ["plantae", "animalia", "fungi", "protozoa"];
 
 /** Агрегаты царств для «Кластеры-диаграммы» (тот же инструмент, что у локальных точек). */
 const CLUSTER_REGNUM_PROPERTIES = Object.fromEntries(
   REGNUM_KEYS.map((regnum) => [
     regnum,
-    ["+", ["case", ["==", ["get", "regnum"], regnum], 1, 0]]
+    [
+      "+",
+      [
+        "case",
+        ["==", ["downcase", ["coalesce", ["get", "regnum"], ""]], regnum],
+        1,
+        0
+      ]
+    ]
   ])
 );
 
@@ -623,7 +631,8 @@ function rebuildGbifLayers(map) {
     REGNUM_KEYS.forEach((regnum) => {
       const sourceId = getGbifSourceId(regnum);
       const features = mapFeatures.filter(
-        (feature) => feature.properties?.regnum === regnum
+        (feature) =>
+          String(feature.properties?.regnum || "").toLowerCase() === regnum
       );
 
       map.addSource(sourceId, {
@@ -638,7 +647,8 @@ function rebuildGbifLayers(map) {
 
     // Точки без regnum — в общий независящий от царства источник.
     const otherFeatures = mapFeatures.filter(
-      (feature) => !REGNUM_KEYS.includes(feature.properties?.regnum)
+      (feature) =>
+        !REGNUM_KEYS.includes(String(feature.properties?.regnum || "").toLowerCase())
     );
     if (otherFeatures.length > 0) {
       map.addSource(GBIF_SOURCE_ID, {
@@ -741,7 +751,8 @@ export function setGbifData(map, collection, options = {}) {
       source.setData({
         type: "FeatureCollection",
         features: mapFeatures.filter(
-          (feature) => feature.properties?.regnum === regnum
+          (feature) =>
+          String(feature.properties?.regnum || "").toLowerCase() === regnum
         )
       });
     });
@@ -751,7 +762,8 @@ export function setGbifData(map, collection, options = {}) {
       otherSource.setData({
         type: "FeatureCollection",
         features: mapFeatures.filter(
-          (feature) => !REGNUM_KEYS.includes(feature.properties?.regnum)
+          (feature) =>
+        !REGNUM_KEYS.includes(String(feature.properties?.regnum || "").toLowerCase())
         )
       });
     }

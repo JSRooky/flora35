@@ -83,6 +83,7 @@ const SHARE_PIN_CENTER_COLORS = [
   REGNUM_COLORS.plantae,
   REGNUM_COLORS.animalia,
   REGNUM_COLORS.fungi,
+  REGNUM_COLORS.protozoa,
   MAP_PIN_CENTER_FILL,
   "#2563eb",
   "#ca8a04",
@@ -94,12 +95,20 @@ const SHARE_PIN_CENTER_COLORS = [
 
 const MARKER_RADIUS = 5;
 
-const CLUSTER_REGNUM_KEYS = ["plantae", "animalia", "fungi"];
+const CLUSTER_REGNUM_KEYS = ["plantae", "animalia", "fungi", "protozoa"];
 
 const CLUSTER_REGNUM_PROPERTIES = Object.fromEntries(
   CLUSTER_REGNUM_KEYS.map((regnum) => [
     regnum,
-    ["+", ["case", ["==", ["get", "regnum"], regnum], 1, 0]]
+    [
+      "+",
+      [
+        "case",
+        ["==", ["downcase", ["coalesce", ["get", "regnum"], ""]], regnum],
+        1,
+        0
+      ]
+    ]
   ])
 );
 
@@ -462,7 +471,7 @@ function getClusterPieChartSignature(props) {
   return CLUSTER_REGNUM_KEYS.map((key) => Number(props[key]) || 0).join(":");
 }
 
-/** SVG-пончик: доли plantae / animalia / fungi и общее число точек в центре. */
+/** SVG-пончик: доли plantae / animalia / fungi / protozoa и общее число точек в центре. */
 function createClusterPieChartElement(props) {
   const counts = CLUSTER_REGNUM_KEYS.map((key) => Number(props[key]) || 0);
   const total = Number(props.point_count) || counts.reduce((sum, count) => sum + count, 0);

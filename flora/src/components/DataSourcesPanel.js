@@ -68,7 +68,8 @@ function formatCount(value) {
 const KINGDOM_TO_INAT_ICONIC = {
   plantae: "Plantae",
   animalia: "Animalia",
-  fungi: "Fungi"
+  fungi: "Fungi",
+  protozoa: "Protozoa"
 };
 
 const KINGDOM_LOAD_OPTIONS = [
@@ -806,13 +807,6 @@ export default function DataSourcesPanel({
         </p>
       ) : (
         <div className="gbif-panel-content">
-          <p className="gbif-panel-hint">
-            Загрузка находок из GBIF и iNaturalist на отдельные слои карты. После
-            загрузки карта, фильтры и popup работают только с локальной копией в
-            браузере (IndexedDB). Параметры загрузки (регион, царство, качество)
-            задаются во всплывающем окне по кнопке «Загрузить».
-          </p>
-
           <section className="data-sources-section" aria-label="GBIF">
             <h4 className="data-sources-section-title">GBIF</h4>
             <div

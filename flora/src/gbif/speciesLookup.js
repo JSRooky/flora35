@@ -22,7 +22,8 @@ const RANK_PRIORITY = {
 const KINGDOM_KEY_TO_NAME = {
   1: "Animalia",
   5: "Fungi",
-  6: "Plantae"
+  6: "Plantae",
+  7: "Protozoa"
 };
 
 function normalizeQuery(query) {

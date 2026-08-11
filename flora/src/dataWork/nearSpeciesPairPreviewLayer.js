@@ -1,4 +1,4 @@
-﻿import mapboxgl from "mapbox-gl";
+import mapboxgl from "mapbox-gl";
 import { getFeatureCoordinates } from "../components/spreadCoincidentPoints";
 import pairPinUrl from "../images/pair_pin.svg";
 

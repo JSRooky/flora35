@@ -564,6 +564,10 @@
   background: #b04bdf;
 }
 
+.multi-species-regnum-marker--protozoa {
+  background: #2aa8b8;
+}
+
 .multi-species-regnum-marker--empty {
   background: #d4d4d4;
 }
@@ -711,6 +715,12 @@
   --row-tone-color: #b04bdf;
   --row-tone-soft: rgba(176, 75, 223, 0.1);
   --row-tone-border: rgba(176, 75, 223, 0.35);
+}
+
+.multi-species-dialog--table-entry .multi-species-table--entry tbody tr[data-regnum="protozoa"] {
+  --row-tone-color: #2aa8b8;
+  --row-tone-soft: rgba(42, 168, 184, 0.1);
+  --row-tone-border: rgba(42, 168, 184, 0.35);
 }
 
 .multi-species-dialog--table-entry .multi-species-table-coords--tone {

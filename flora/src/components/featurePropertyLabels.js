@@ -8,7 +8,6 @@ export const PROPERTY_LABELS = {
   identified_by: "Определил",
   found_year: "Год находки",
   status: "Статус",
-  kingdom: "Царство (GBIF)",
   basisOfRecord: "Тип записи",
   datasetKey: "Набор данных",
   gbif_key: "GBIF ID",
@@ -28,7 +27,6 @@ export const PROPERTY_DISPLAY_ORDER = [
   "name_ru",
   "name_latin",
   "regnum",
-  "kingdom",
   "family",
   "found_year",
   "found_by",
@@ -41,11 +39,12 @@ export const PROPERTY_DISPLAY_ORDER = [
 const REGNUM_LABELS = {
   plantae: "Растения",
   animalia: "Животные",
-  fungi: "Грибы"
+  fungi: "Грибы",
+  protozoa: "Простейшие"
 };
 
 /** Порядок отображения царств в списках и деревьях видов. */
-export const REGNUM_ORDER = ["plantae", "animalia", "fungi"];
+export const REGNUM_ORDER = ["plantae", "animalia", "fungi", "protozoa"];
 
 /** Подпись царства для UI; для неизвестных значений возвращает исходное значение. */
 export function getRegnumLabel(value) {
@@ -53,7 +52,8 @@ export function getRegnumLabel(value) {
     return "Без царства";
   }
 
-  return REGNUM_LABELS[value] ?? String(value);
+  const key = String(value).toLowerCase();
+  return REGNUM_LABELS[key] ?? String(value);
 }
 
 /** Подпись семейства для UI (используется как есть, без словаря). */
@@ -70,7 +70,9 @@ export function groupByRegnum(items, getRegnum = (item) => item.regnum) {
   const groups = new Map();
 
   items.forEach((item) => {
-    const key = getRegnum(item) || "";
+    const raw = getRegnum(item) || "";
+    const normalized = String(raw).toLowerCase();
+    const key = REGNUM_LABELS[normalized] ? normalized : raw;
     if (!groups.has(key)) {
       groups.set(key, []);
     }
@@ -145,7 +147,7 @@ export function getPropertyLabel(key) {
 /** Человекочитаемое значение поля свойства точки. */
 export function formatPropertyValue(key, value) {
   if (key === "regnum") {
-    return REGNUM_LABELS[value] ?? String(value);
+    return getRegnumLabel(value);
   }
 
   return String(value);
