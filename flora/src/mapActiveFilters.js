@@ -1,5 +1,5 @@
 import { MODULE_IDS } from "./components/ModuleMenu";
-import { hasActiveGbifProcessingFilters } from "./gbif/gbifProcessingFilters";
+import { hasActiveExternalProcessingFilters } from "./externalSources/externalProcessingFilters";
 import { TOOL_POINTS_FILTER_MODULES } from "./toolPointsFilterStorage";
 
 /** Идентификаторы источников фильтра карты (по панелям). */
@@ -11,7 +11,9 @@ export const MAP_FILTER_IDS = {
   OOPT_SPECIES: "oopt-species",
   MAP_GROUPS: "map-groups",
   DENSE: "dense",
-  GBIF_PROCESSING: "gbif-processing"
+  EXTERNAL_PROCESSING: "external-processing",
+  /** @deprecated */
+  GBIF_PROCESSING: "external-processing"
 };
 
 const TOOL_FILTER_PANEL_LABELS = {
@@ -106,10 +108,10 @@ export function collectActiveMapFilters({
     });
   }
 
-  if (hasActiveGbifProcessingFilters(gbifProcessingFilters)) {
+  if (hasActiveExternalProcessingFilters(gbifProcessingFilters)) {
     entries.push({
-      id: MAP_FILTER_IDS.GBIF_PROCESSING,
-      label: "Обработка данных GBIF"
+      id: MAP_FILTER_IDS.EXTERNAL_PROCESSING,
+      label: "Обработка внешних данных"
     });
   }
 

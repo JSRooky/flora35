@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ReactComponent as MainLogo } from "../images/main_logo.svg";
-import { DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
+import { DATA_SOURCE_OPTIONS, VISIBLE_DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
 import UserAccountControl from "./UserAccountControl";
 import "../styles/ModuleMenu.css";
 
@@ -28,8 +28,12 @@ export const MODULE_IDS = {
   SUBMIT: "submit",
   // Модуль загрузки находок GBIF на отдельный слой карты.
   GBIF: "gbif",
-  // Клиентские фильтры загруженного слоя GBIF — раздел ## gbif-processing.
-  GBIF_PROCESSING: "gbif-processing",
+  /** @deprecated Используйте DATA_SOURCES */
+  GBIF_LEGACY: "gbif",
+  DATA_SOURCES: "data-sources",
+  EXTERNAL_PROCESSING: "external-processing",
+  /** @deprecated Используйте EXTERNAL_PROCESSING */
+  GBIF_PROCESSING: "external-processing",
   ABOUT: "about"
 };
 
@@ -333,7 +337,7 @@ export default function ModuleMenu({
                 }
                 onChange={(event) => onDataSourceModeChange?.(event.target.value)}
               >
-                {DATA_SOURCE_OPTIONS.map(({ value, label }) => (
+                {VISIBLE_DATA_SOURCE_OPTIONS.map(({ value, label }) => (
                   <option key={value} value={value}>
                     {label}
                   </option>

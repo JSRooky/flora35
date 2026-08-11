@@ -13,6 +13,13 @@ export const PROPERTY_LABELS = {
   datasetKey: "Набор данных",
   gbif_key: "GBIF ID",
   gbif_url: "Ссылка GBIF",
+  inat_id: "iNaturalist ID",
+  inat_url: "Ссылка iNaturalist",
+  quality_grade: "Качество наблюдения",
+  place_guess: "Место (текст)",
+  license_code: "Лицензия",
+  obscured: "Координаты скрыты",
+  taxon_id: "Taxon ID",
   source: "Источник"
 };
 

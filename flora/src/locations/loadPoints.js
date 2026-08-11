@@ -1,6 +1,7 @@
 import { isFirebaseConfigured } from "../firebase/config";
 import { loadLocationsFromFirestore } from "../firebase/loadLocationsFromFirestore";
 import { findGbifFeatureByKey } from "../gbif/gbifStore";
+import { findInatFeatureById } from "../inaturalist/inatStore";
 import { expandFindingsToFeatures } from "./expandFindings";
 import { mergeSpeciesCollections } from "./mergeSpeciesCollections";
 import localPointsCollection from "./points.json";
@@ -10,7 +11,9 @@ export const DATA_SOURCE_MODES = {
   ALL: "all",
   POINTS: "points",
   USERPOINTS: "userpoints",
-  GBIF: "gbif"
+  EXTERNAL: "external",
+  /** @deprecated Используйте EXTERNAL */
+  GBIF: "external"
 };
 
 export const DATA_SOURCE_OPTIONS = [
@@ -22,7 +25,8 @@ export const DATA_SOURCE_OPTIONS = [
   {
     value: DATA_SOURCE_MODES.POINTS,
     label: "Проверенные",
-    title: "Только проверенные данные"
+    title: "Только проверенные данные",
+    hidden: true
   },
   {
     value: DATA_SOURCE_MODES.USERPOINTS,
@@ -30,11 +34,16 @@ export const DATA_SOURCE_OPTIONS = [
     title: "Только пользовательские данные"
   },
   {
-    value: DATA_SOURCE_MODES.GBIF,
-    label: "GBIF",
-    title: "Только данные GBIF"
+    value: DATA_SOURCE_MODES.EXTERNAL,
+    label: "Внешние источники",
+    title: "Данные GBIF и iNaturalist"
   }
 ];
+
+/** Опции для селектора «Точки» в меню (скрытые режимы не показываются). */
+export const VISIBLE_DATA_SOURCE_OPTIONS = DATA_SOURCE_OPTIONS.filter(
+  (option) => !option.hidden
+);
 
 const EMPTY_SPECIES_COLLECTION = {
   type: "SpeciesCollection",
@@ -179,6 +188,7 @@ export function getSpeciesCollection() {
       return pointsCollection;
     case DATA_SOURCE_MODES.USERPOINTS:
       return userpointsCollection;
+    case DATA_SOURCE_MODES.EXTERNAL:
     case DATA_SOURCE_MODES.GBIF:
       return EMPTY_SPECIES_COLLECTION;
     default:
@@ -235,6 +245,14 @@ function resolveGbifKeyFromFindingId(findingId) {
   return normalizedId;
 }
 
+function resolveInatIdFromFindingId(findingId) {
+  const normalizedId = String(findingId);
+  if (normalizedId.startsWith("inat-")) {
+    return normalizedId.slice("inat-".length);
+  }
+  return normalizedId;
+}
+
 /** Ищет точку по идентификатору находки во всех источниках данных. */
 export function findFeatureByFindingId(findingId) {
   if (findingId == null || findingId === "") {
@@ -250,6 +268,11 @@ export function findFeatureByFindingId(findingId) {
     return localFeature;
   }
 
+  const normalizedId = String(findingId);
+  if (normalizedId.startsWith("inat-")) {
+    return findInatFeatureById(resolveInatIdFromFindingId(findingId));
+  }
+
   return findGbifFeatureByKey(resolveGbifKeyFromFindingId(findingId));
 }
 
@@ -260,6 +283,7 @@ export function isFindingInDataSource(findingId, mode) {
   }
 
   const gbifFeature = findGbifFeatureByKey(resolveGbifKeyFromFindingId(findingId));
+  const inatFeature = findInatFeatureById(resolveInatIdFromFindingId(findingId));
 
   switch (mode) {
     case DATA_SOURCE_MODES.POINTS:
@@ -270,13 +294,16 @@ export function isFindingInDataSource(findingId, mode) {
       return expandFindingsToFeatures(userpointsCollection).features.some((feature) =>
         featureMatchesFindingId(feature, findingId)
       );
+    case DATA_SOURCE_MODES.EXTERNAL:
     case DATA_SOURCE_MODES.GBIF:
-      return Boolean(gbifFeature);
+      return Boolean(gbifFeature || inatFeature);
     default:
       return (
         expandFindingsToFeatures(getAllSpeciesCollection()).features.some((feature) =>
           featureMatchesFindingId(feature, findingId)
-        ) || Boolean(gbifFeature)
+        ) ||
+        Boolean(gbifFeature) ||
+        Boolean(inatFeature)
       );
   }
 }

@@ -1,3 +1,4 @@
+import { toGbifSpatialRegion } from "../externalSources/regions";
 import { mapOccurrencesToFeatures } from "./mapOccurrenceToFeature";
 
 const GBIF_OCCURRENCE_SEARCH_URL = "https://api.gbif.org/v1/occurrence/search";
@@ -79,7 +80,8 @@ export function bboxToWktPolygon(bbox) {
  * Приоритет: gadmGid → geometry → bbox.
  */
 export function buildOccurrenceSearchParams(region, extras = {}) {
-  if (!region) {
+  const spatial = toGbifSpatialRegion(region);
+  if (!spatial) {
     throw new Error("GBIF region is required");
   }
 
@@ -87,14 +89,14 @@ export function buildOccurrenceSearchParams(region, extras = {}) {
   params.set("hasCoordinate", "true");
   params.set("hasGeospatialIssue", "false");
 
-  if (region.gadmGid) {
-    params.set("gadmGid", region.gadmGid);
-  } else if (region.geometry) {
-    params.set("geometry", region.geometry);
-  } else if (region.bbox) {
-    params.set("geometry", bboxToWktPolygon(region.bbox));
+  if (spatial.gadmGid) {
+    params.set("gadmGid", spatial.gadmGid);
+  } else if (spatial.geometry) {
+    params.set("geometry", spatial.geometry);
+  } else if (spatial.bbox) {
+    params.set("geometry", bboxToWktPolygon(spatial.bbox));
   } else {
-    throw new Error(`Region "${region.id}" has no spatial filter (gadmGid, geometry, or bbox)`);
+    throw new Error(`Region "${spatial.id ?? region?.id}" has no spatial filter (gadmGid, geometry, or bbox)`);
   }
 
   Object.entries(extras).forEach(([key, value]) => {

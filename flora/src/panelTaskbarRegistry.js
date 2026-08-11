@@ -14,6 +14,8 @@ export const TASKBAR_PANEL_IDS = {
   SUBMIT: "submit",
   GBIF: "gbif",
   GBIF_PROCESSING: "gbif-processing",
+  DATA_SOURCES: "data-sources",
+  EXTERNAL_PROCESSING: "external-processing",
   OOPT_SPECIES: "oopt-species",
   DENSE_SPECIES: "dense-species"
 };
@@ -32,8 +34,16 @@ export const PANEL_TASKBAR_META = {
   [TASKBAR_PANEL_IDS.OOPT]: { title: "ООПТ", icon: "oopt" },
   [TASKBAR_PANEL_IDS.OOPT_FEATURE]: { title: "Сведения об ООПТ", icon: "ooptFeature" },
   [TASKBAR_PANEL_IDS.SUBMIT]: { title: "Новая находка", icon: "submit" },
-  [TASKBAR_PANEL_IDS.GBIF]: { title: "Данные GBIF", icon: "gbif" },
-  [TASKBAR_PANEL_IDS.GBIF_PROCESSING]: { title: "Обработка данных GBIF", icon: "gbifProcessing" },
+  [TASKBAR_PANEL_IDS.GBIF]: { title: "Источники данных", icon: "gbif" },
+  [TASKBAR_PANEL_IDS.GBIF_PROCESSING]: {
+    title: "Обработка внешних данных",
+    icon: "gbifProcessing"
+  },
+  [TASKBAR_PANEL_IDS.DATA_SOURCES]: { title: "Источники данных", icon: "gbif" },
+  [TASKBAR_PANEL_IDS.EXTERNAL_PROCESSING]: {
+    title: "Обработка внешних данных",
+    icon: "gbifProcessing"
+  },
   [TASKBAR_PANEL_IDS.OOPT_SPECIES]: { title: "Виды внутри выбранной ООПТ", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.DENSE_SPECIES]: { title: "Виды в плотной группе", icon: "speciesList" }
 };
@@ -57,6 +67,8 @@ export const PANEL_TASKBAR_MODULE_ID = {
   [TASKBAR_PANEL_IDS.DENSE]: null,
   [TASKBAR_PANEL_IDS.GBIF]: null,
   [TASKBAR_PANEL_IDS.GBIF_PROCESSING]: null,
+  [TASKBAR_PANEL_IDS.DATA_SOURCES]: null,
+  [TASKBAR_PANEL_IDS.EXTERNAL_PROCESSING]: null,
   [TASKBAR_PANEL_IDS.OOPT_SPECIES]: null,
   [TASKBAR_PANEL_IDS.DENSE_SPECIES]: null
 };

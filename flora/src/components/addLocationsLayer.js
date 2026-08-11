@@ -10,6 +10,11 @@ import {
   applyGbifProcessingFilters,
   createDefaultGbifProcessingFilters
 } from "../gbif/gbifProcessingFilters";
+import { findInatFeatureById, getInatFeatureCollection } from "../inaturalist/inatStore";
+import {
+  applyInatProcessingFilters,
+  createDefaultInatProcessingFilters
+} from "../inaturalist/inatProcessingFilters";
 import {
   GBIF_SOURCE_ID,
   getGbifInteractiveLayerIds,
@@ -19,6 +24,15 @@ import {
   setGbifData,
   setGbifHiddenPointFeatureKeys
 } from "./addGbifLayer";
+import {
+  INAT_SOURCE_ID,
+  getInatInteractiveLayerIds,
+  getInatSourceIds,
+  isInatClusterPieChartsEnabled,
+  isInatLayerVisible,
+  setInatData,
+  setInatHiddenPointFeatureKeys
+} from "./addInatLayer";
 import {
   DEFAULT_CLUSTER_COLOR,
   DEFAULT_POINT_COLOR,
@@ -103,10 +117,18 @@ let clusterPieChartMarkersOnScreen = {};
 let clusterPieChartRenderHandler = null;
 let clusterPieChartMap = null;
 let currentFilters = {};
-/** Клиентские фильтры панели «Обработка данных GBIF» (не влияют на локальный слой). */
+/** Клиентские фильтры панели «Обработка внешних данных» (не влияют на локальный слой). */
 let gbifProcessingFilters = createDefaultGbifProcessingFilters();
+let inatProcessingFilters = createDefaultInatProcessingFilters();
 /** Кэш видимых GBIF после processing + locationFilters. */
 let visibleGbifCache = {
+  locationFilters: null,
+  processingFilters: null,
+  enrichedRef: null,
+  features: null
+};
+/** Кэш видимых iNaturalist после processing + locationFilters. */
+let visibleInatCache = {
   locationFilters: null,
   processingFilters: null,
   enrichedRef: null,
@@ -138,6 +160,7 @@ let selectedPointPinObjectUrl = null;
 /** Источники точек для инструментов (радиус, область, heatmap…). */
 let toolIncludeLocal = true;
 let toolIncludeGbif = true;
+let toolIncludeInat = true;
 
 /** Поля, показываемые в компактном окне при открытии share-ссылки. */
 const SHARED_POINT_POPUP_FIELDS = ["regnum", "family", "found_year", "status"];
@@ -538,9 +561,13 @@ function getVisibleClusterFeatures(map) {
     collectFromSource("locations", "locations");
   }
 
-  // Тот же инструмент «Кластеры-диаграммы» — и для видимого слоя GBIF.
+  // Тот же инструмент «Кластеры-диаграммы» — и для видимых слоёв GBIF и iNaturalist.
   if (isGbifLayerVisible() && isGbifClusterPieChartsEnabled()) {
     collectFromSource(GBIF_SOURCE_ID, "gbif");
+  }
+
+  if (isInatLayerVisible() && isInatClusterPieChartsEnabled()) {
+    collectFromSource(INAT_SOURCE_ID, "inat");
   }
 
   return clustersById;
@@ -549,12 +576,13 @@ function getVisibleClusterFeatures(map) {
 function updateClusterPieChartMarkers(map) {
   const showLocations = markersVisible;
   const showGbif = isGbifLayerVisible() && isGbifClusterPieChartsEnabled();
+  const showInat = isInatLayerVisible() && isInatClusterPieChartsEnabled();
 
   if (
     !clusterPieChartsEnabled ||
     !isMapboxClusteringActive() ||
     clusterByRegnum ||
-    (!showLocations && !showGbif)
+    (!showLocations && !showGbif && !showInat)
   ) {
     removeAllClusterPieChartMarkers();
     removeOrphanedClusterPieChartMarkers(map);
@@ -767,6 +795,12 @@ function buildPinnedKeyExclusion(key) {
         "==",
         ["concat", "gbif-", ["to-string", ["coalesce", ["get", "gbif_key"], ""]]],
         key
+      ],
+      ["==", ["to-string", ["coalesce", ["get", "inat_id"], ""]], key],
+      [
+        "==",
+        ["concat", "inat-", ["to-string", ["coalesce", ["get", "inat_id"], ""]]],
+        key
       ]
     ]
   ];
@@ -811,8 +845,12 @@ function applyUnclusteredLayerFilters(map) {
     map.setFilter(layerId, filter);
   });
 
-  // Тот же набор ключей — скрываем кружок на слое GBIF под булавкой.
+  // Тот же набор ключей — скрываем кружок на слоях GBIF и iNaturalist под булавкой.
   setGbifHiddenPointFeatureKeys(map, [
+    sharedPointPinFeatureKey,
+    selectedPointPinFeatureKey
+  ]);
+  setInatHiddenPointFeatureKeys(map, [
     sharedPointPinFeatureKey,
     selectedPointPinFeatureKey
   ]);
@@ -1419,7 +1457,8 @@ function attachLocationsInteractions(map) {
       ...getDensePileLayerIds()
     ].filter((layerId) => map.getLayer(layerId));
     const gbifLayerIds = getGbifInteractiveLayerIds(map);
-    const hitLayerIds = [...locationLayerIds, ...gbifLayerIds];
+    const inatLayerIds = getInatInteractiveLayerIds(map);
+    const hitLayerIds = [...locationLayerIds, ...gbifLayerIds, ...inatLayerIds];
 
     if (hitLayerIds.length > 0) {
       const features = safeQueryRenderedFeatures(map, event.point, {
@@ -1872,8 +1911,12 @@ export function filterFeatures(features, filters = {}) {
             return true;
           }
 
-          // У GBIF нет статуса МСОП — фильтр статуса их не отсекает.
-          if (key === "status" && feature.properties?.source === "gbif") {
+          // У внешних источников нет статуса МСОП — фильтр статуса их не отсекает.
+          if (
+            key === "status" &&
+            (feature.properties?.source === "gbif" ||
+              feature.properties?.source === "inaturalist")
+          ) {
             return true;
           }
 
@@ -1926,22 +1969,34 @@ export function isGbifFeature(feature) {
   return feature?.properties?.source === "gbif";
 }
 
+/** Является ли feature точкой iNaturalist. */
+export function isInatFeature(feature) {
+  return feature?.properties?.source === "inaturalist";
+}
+
 /** Задаёт, какие источники участвуют в инструментах карты. */
-export function setToolFeaturesContext({ includeLocal, includeGbif } = {}) {
+export function setToolFeaturesContext({ includeLocal, includeGbif, includeInat } = {}) {
   if (typeof includeLocal === "boolean") {
     toolIncludeLocal = includeLocal;
   }
   if (typeof includeGbif === "boolean") {
     toolIncludeGbif = includeGbif;
   }
+  if (typeof includeInat === "boolean") {
+    toolIncludeInat = includeInat;
+  }
 }
 
 export function getToolFeaturesContext() {
-  return { includeLocal: toolIncludeLocal, includeGbif: toolIncludeGbif };
+  return {
+    includeLocal: toolIncludeLocal,
+    includeGbif: toolIncludeGbif,
+    includeInat: toolIncludeInat
+  };
 }
 
 /**
- * Точки для инструментов: локальные + GBIF с учётом контекста видимости и фильтров.
+ * Точки для инструментов: локальные + внешние источники с учётом контекста видимости и фильтров.
  * Не меняет отображение слоя locations — только выборку для анализа.
  */
 export function getToolFeatures(filters = {}) {
@@ -1953,6 +2008,10 @@ export function getToolFeatures(filters = {}) {
 
   if (toolIncludeGbif && isGbifLayerVisible()) {
     features.push(...getVisibleGbifFeatures(filters));
+  }
+
+  if (toolIncludeInat && isInatLayerVisible()) {
+    features.push(...getVisibleInatFeatures(filters));
   }
 
   return features;
@@ -2057,9 +2116,25 @@ export function getUnclusteredFeatures(map, filters = {}, candidateFeatures = nu
     );
   }
 
+  let inatVisible = [];
+
+  if (toolIncludeInat && isInatLayerVisible()) {
+    const inatSourceIds = getInatSourceIds().filter((sourceId) => map?.getSource?.(sourceId));
+    const rawInat = inatSourceIds.flatMap((sourceId) =>
+      map.querySourceFeatures(sourceId, {
+        filter: ["!", ["has", "point_count"]]
+      })
+    );
+
+    inatVisible = rawInat.map(
+      (feature) => findInatFeatureById(feature.properties?.inat_id) ??
+        restoreOriginalCoordinates(feature)
+    );
+  }
+
   if (candidateFeatures?.length) {
     const visibleKeys = new Set(
-      [...localVisible, ...gbifVisible].map((feature) => {
+      [...localVisible, ...gbifVisible, ...inatVisible].map((feature) => {
         const coordinates = getFeatureCoordinates(feature);
         return coordinates ? `${coordinates[0]},${coordinates[1]}` : "";
       }).filter(Boolean)
@@ -2079,7 +2154,7 @@ export function getUnclusteredFeatures(map, filters = {}, candidateFeatures = nu
 
   return dedupeFeaturesByCoordinates(
     filterFeatures(
-      [...localVisible, ...gbifVisible].map(restoreOriginalCoordinates),
+      [...localVisible, ...gbifVisible, ...inatVisible].map(restoreOriginalCoordinates),
       filters
     )
   );
@@ -2098,8 +2173,8 @@ export function isFeatureUnclusteredOnMap(map, feature) {
     return false;
   }
 
-  // GBIF: после клика точка уже выбрана; кластеры раскрываются отдельно.
-  if (isGbifFeature(feature)) {
+  // GBIF / iNaturalist: после клика точка уже выбрана; кластеры раскрываются отдельно.
+  if (isGbifFeature(feature) || isInatFeature(feature)) {
     return featureMatchesFilters(feature, currentFilters);
   }
 
@@ -2202,6 +2277,68 @@ export function getGbifProcessingFilters() {
   return gbifProcessingFilters;
 }
 
+function invalidateVisibleInatCache() {
+  visibleInatCache = {
+    locationFilters: null,
+    processingFilters: null,
+    enrichedRef: null,
+    features: null
+  };
+}
+
+export function getVisibleInatFeatures(locationFilters = currentFilters) {
+  const enriched = getInatFeatureCollection();
+  const enrichedFeatures = enriched.features ?? [];
+
+  if (
+    visibleInatCache.features &&
+    visibleInatCache.locationFilters === locationFilters &&
+    visibleInatCache.processingFilters === inatProcessingFilters &&
+    visibleInatCache.enrichedRef === enriched
+  ) {
+    return visibleInatCache.features;
+  }
+
+  const processed = applyInatProcessingFilters(enrichedFeatures, inatProcessingFilters);
+  const features = filterFeatures(processed, locationFilters);
+
+  visibleInatCache = {
+    locationFilters,
+    processingFilters: inatProcessingFilters,
+    enrichedRef: enriched,
+    features
+  };
+
+  return features;
+}
+
+export function applyInatLocationsFilter(map, filters = currentFilters) {
+  if (!map) {
+    return;
+  }
+
+  setInatData(map, {
+    type: "FeatureCollection",
+    features: getVisibleInatFeatures(filters)
+  });
+}
+
+export function setInatProcessingFilters(map, nextFilters) {
+  inatProcessingFilters = {
+    ...createDefaultInatProcessingFilters(),
+    ...(nextFilters ?? {})
+  };
+  invalidateVisibleInatCache();
+
+  if (map) {
+    applyInatLocationsFilter(map, currentFilters);
+  }
+}
+
+export function getInatProcessingFilters() {
+  return inatProcessingFilters;
+}
+
 /** Применяет фильтры точек: пересобирает слои, кроме частного случая сдвига года. */
 export function applyLocationsFilter(map, filters = {}) {
   if (
@@ -2211,12 +2348,14 @@ export function applyLocationsFilter(map, filters = {}) {
   ) {
     applyTimelineYearChange(map, currentFilters, filters);
     applyGbifLocationsFilter(map, filters);
+    applyInatLocationsFilter(map, filters);
     return;
   }
 
   if (map && locationsSourcesExist(map) && isFoundYearOnlyChange(currentFilters, filters)) {
     applyFoundYearFilterChange(map, filters);
     applyGbifLocationsFilter(map, filters);
+    applyInatLocationsFilter(map, filters);
     return;
   }
 
@@ -2228,6 +2367,7 @@ export function applyLocationsFilter(map, filters = {}) {
   expandedDensePileKeys = new Set();
   rebuildLocationsLayers(map);
   applyGbifLocationsFilter(map, filters);
+  applyInatLocationsFilter(map, filters);
 }
 
 /** Сбрасывает все фильтры точек. */

@@ -19,6 +19,7 @@ import {
   isFeatureUnclusteredOnMap,
   getContainedPointsSummaryForWithinFeature,
   applyGbifLocationsFilter,
+  applyInatLocationsFilter,
   reloadLocationsData,
   setClusterByRegnum,
   setClusteringEnabled,
@@ -35,7 +36,9 @@ import {
   updateSelectedPointHighlight,
   getFilteredFeatures,
   getVisibleGbifFeatures,
+  getVisibleInatFeatures,
   setGbifProcessingFilters,
+  setInatProcessingFilters,
   WITHIN_FEATURE_FILTER_KEY
 } from "./components/addLocationsLayer";
 import {
@@ -165,18 +168,23 @@ import MapCornerControls from "./components/MapCornerControls";
 import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
 import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum, setGbifClusterPieChartsEnabled, setGbifDenseClustersHighlightEnabled, expandGbifDensePileByKey, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
+import { addInatLayer, setInatVisibility, setInatClusteringEnabled, setInatClusterByRegnum, setInatClusterPieChartsEnabled, setInatDenseClustersHighlightEnabled, expandInatDensePileByKey, setInatDensePileExpandedHandler } from "./components/addInatLayer";
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
+import { hydrateInatStoreFromPersistence } from "./inaturalist/inatPersistence";
 import { findGbifFeatureByKey } from "./gbif/gbifStore";
+import { findInatFeatureById } from "./inaturalist/inatStore";
 import {
-  createDefaultGbifProcessingFilters
-} from "./gbif/gbifProcessingFilters";
+  createDefaultExternalProcessingFilters,
+  toGbifProcessingFiltersFromExternal,
+  toInatProcessingFiltersFromExternal
+} from "./externalSources/externalProcessingFilters";
 import {
   clearRussianNameChoice,
   lookupRussianNameCandidates,
   saveRussianNameChoice
 } from "./names/russianNameResolver";
-import GbifPanel from "./components/GbifPanel";
-import GbifProcessingPanel from "./components/GbifProcessingPanel";
+import DataSourcesPanel from "./components/DataSourcesPanel";
+import ExternalProcessingPanel from "./components/ExternalProcessingPanel";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
@@ -199,8 +207,11 @@ const PANEL_IDS = {
   OOPT: "oopt",
   OOPT_FEATURE: "oopt-feature",
   SUBMIT: "submit",
-  GBIF: "gbif",
-  GBIF_PROCESSING: "gbif-processing"
+  DATA_SOURCES: "data-sources",
+  EXTERNAL_PROCESSING: "external-processing",
+  /** @deprecated алиасы для taskbar */
+  GBIF: "data-sources",
+  GBIF_PROCESSING: "external-processing"
 };
 
 const DEFAULT_CLUSTERING_ENABLED = true;
@@ -222,8 +233,8 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.OOPT,
   PANEL_IDS.OOPT_FEATURE,
   PANEL_IDS.SUBMIT,
-  PANEL_IDS.GBIF,
-  PANEL_IDS.GBIF_PROCESSING
+  PANEL_IDS.DATA_SOURCES,
+  PANEL_IDS.EXTERNAL_PROCESSING
 ];
 
 function isPanelExpandedInState(collapsedState, panelId) {
@@ -318,11 +329,11 @@ export default function MapView() {
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
   const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.ALL);
-  const gbifOnly = dataSourceMode === DATA_SOURCE_MODES.GBIF;
-  const prevGbifOnlyRef = useRef(gbifOnly);
-  const [gbifProcessingActive, setGbifProcessingActive] = useState(false);
-  const [gbifProcessingFilters, setGbifProcessingFiltersState] = useState(
-    createDefaultGbifProcessingFilters
+  const externalOnly = dataSourceMode === DATA_SOURCE_MODES.EXTERNAL;
+  const prevExternalOnlyRef = useRef(externalOnly);
+  const [externalProcessingActive, setExternalProcessingActive] = useState(false);
+  const [externalProcessingFilters, setExternalProcessingFiltersState] = useState(
+    createDefaultExternalProcessingFilters
   );
   const [panelCollapsed, setPanelCollapsed] = useState({});
   /** Панели, убранные в нижнюю «панель задач» (модуль при этом остаётся активным). */
@@ -436,7 +447,7 @@ export default function MapView() {
         setActiveModule(MODULE_IDS.MAP);
         break;
       case TASKBAR_PANEL_IDS.GBIF:
-        setDataSourceModeState(DATA_SOURCE_MODES.GBIF);
+        setDataSourceModeState(DATA_SOURCE_MODES.EXTERNAL);
         setActiveModule(null);
         setPanelCollapsed((prev) => ({
           ...prev,
@@ -445,8 +456,8 @@ export default function MapView() {
         }));
         break;
       case TASKBAR_PANEL_IDS.GBIF_PROCESSING:
-        setDataSourceModeState(DATA_SOURCE_MODES.GBIF);
-        setGbifProcessingActive(true);
+        setDataSourceModeState(DATA_SOURCE_MODES.EXTERNAL);
+        setExternalProcessingActive(true);
         setActiveModule(null);
         setPanelCollapsed((prev) => ({
           ...prev,
@@ -616,7 +627,7 @@ export default function MapView() {
 
   // Обработка GBIF развёрнута — панель загрузки сворачиваем.
   const expandGbifProcessingPanel = useCallback(() => {
-    setGbifProcessingActive(true);
+    setExternalProcessingActive(true);
     setPanelMinimized((prev) => ({
       ...prev,
       [PANEL_IDS.GBIF_PROCESSING]: false
@@ -1004,14 +1015,14 @@ export default function MapView() {
     (mode) => {
       setDataSourceModeState(mode);
 
-      if (mode === DATA_SOURCE_MODES.GBIF) {
-        stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.GBIF);
+      if (mode === DATA_SOURCE_MODES.EXTERNAL) {
+        stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DATA_SOURCES);
         setArealDockedWithFeature(false);
         setBufferDockedWithFeature(false);
         setActiveModule(null);
         expandGbifDataPanel();
       } else {
-        setGbifProcessingActive(false);
+        setExternalProcessingActive(false);
       }
     },
     [expandGbifDataPanel]
@@ -1451,13 +1462,13 @@ export default function MapView() {
       ids.push(TASKBAR_PANEL_IDS.OOPT_SPECIES);
     }
 
-    if (dataSourceMode === DATA_SOURCE_MODES.GBIF) {
-      if (!isMin(PANEL_IDS.GBIF)) {
-        ids.push(PANEL_IDS.GBIF);
+    if (dataSourceMode === DATA_SOURCE_MODES.EXTERNAL) {
+      if (!isMin(PANEL_IDS.DATA_SOURCES)) {
+        ids.push(PANEL_IDS.DATA_SOURCES);
       }
 
-      if (gbifProcessingActive && !isMin(PANEL_IDS.GBIF_PROCESSING)) {
-        ids.push(PANEL_IDS.GBIF_PROCESSING);
+      if (externalProcessingActive && !isMin(PANEL_IDS.EXTERNAL_PROCESSING)) {
+        ids.push(PANEL_IDS.EXTERNAL_PROCESSING);
       }
     }
 
@@ -1470,7 +1481,7 @@ export default function MapView() {
     dataSourceMode,
     densePileSpeciesListOpen,
     denseProcessingActive,
-    gbifProcessingActive,
+    externalProcessingActive,
     ooptPointsFilterActive,
     panelMinimized,
     selectedBoundsFeature
@@ -1563,21 +1574,21 @@ export default function MapView() {
 
     // Читаем revision и processing-фильтры: getVisibleGbifFeatures берёт их из module-store.
     void pointsDataRevision;
-    void gbifProcessingFilters;
+    void externalProcessingFilters;
 
     const localFeatures = getFilteredFeatures(locationFilters);
     const gbifFeatures = getVisibleGbifFeatures(locationFilters);
-    // Считаем кучи отдельно по источникам, затем сливаем по координатам —
-    // иначе 5 локальных + 5 GBIF дадут «группу из 10», которой нет на карте.
+    const inatFeatures = getVisibleInatFeatures(locationFilters);
     const piles = mergeDensePileLists([
       listDensePiles(localFeatures),
-      listDensePiles(gbifFeatures)
+      listDensePiles(gbifFeatures),
+      listDensePiles(inatFeatures)
     ]);
     const pileCount = piles.length;
     const pointCount = piles.reduce((sum, pile) => sum + pile.pointCount, 0);
 
     return { piles, pileCount, pointCount };
-  }, [locationFilters, pointsDataRevision, mapReady, gbifProcessingFilters]);
+  }, [locationFilters, pointsDataRevision, mapReady, externalProcessingFilters]);
 
   const selectedDensePile = useMemo(
     () => densePilesStats.piles.find((pile) => pile.key === selectedDensePileKey) ?? null,
@@ -1643,6 +1654,12 @@ export default function MapView() {
       animateCamera: false,
       notify: false
     });
+    expandInatDensePileByKey(map.current, key, {
+      coordinates,
+      pointCount,
+      animateCamera: false,
+      notify: false
+    });
 
     setSelectedDensePileKey(key);
 
@@ -1657,10 +1674,12 @@ export default function MapView() {
   useEffect(() => {
     setDensePileExpandedHandler(handleDensePileExpanded);
     setGbifDensePileExpandedHandler(handleDensePileExpanded);
+    setInatDensePileExpandedHandler(handleDensePileExpanded);
 
     return () => {
       setDensePileExpandedHandler(null);
       setGbifDensePileExpandedHandler(null);
+      setInatDensePileExpandedHandler(null);
     };
   }, [handleDensePileExpanded]);
 
@@ -1676,6 +1695,12 @@ export default function MapView() {
       notify: true
     });
     expandGbifDensePileByKey(map.current, pile.key, {
+      coordinates: pile.coordinates,
+      pointCount: pile.pointCount,
+      animateCamera: false,
+      notify: false
+    });
+    expandInatDensePileByKey(map.current, pile.key, {
       coordinates: pile.coordinates,
       pointCount: pile.pointCount,
       animateCamera: false,
@@ -1805,12 +1830,18 @@ export default function MapView() {
 
     if (map.current) {
       applyGbifLocationsFilter(map.current, locationFilters);
+      applyInatLocationsFilter(map.current, locationFilters);
     }
 
     bumpPointsDataRevision();
 
+    const inatId = feature?.properties?.inat_id;
     const fromStore =
-      gbifKey != null ? findGbifFeatureByKey(gbifKey) : null;
+      gbifKey != null
+        ? findGbifFeatureByKey(gbifKey)
+        : inatId != null
+          ? findInatFeatureById(inatId)
+          : null;
     const baseFeature = fromStore ?? feature;
 
     // Всегда новый объект с выбранным name_ru — иначе React может не перерисовать
@@ -1835,12 +1866,18 @@ export default function MapView() {
 
     if (map.current) {
       applyGbifLocationsFilter(map.current, locationFilters);
+      applyInatLocationsFilter(map.current, locationFilters);
     }
 
     bumpPointsDataRevision();
 
+    const inatId = feature?.properties?.inat_id;
     const fromStore =
-      gbifKey != null ? findGbifFeatureByKey(gbifKey) : null;
+      gbifKey != null
+        ? findGbifFeatureByKey(gbifKey)
+        : inatId != null
+          ? findInatFeatureById(inatId)
+          : null;
     const baseFeature = fromStore ?? feature;
 
     setPopupData({
@@ -2321,22 +2358,29 @@ export default function MapView() {
 
     // Только смена processing-фильтров. locationFilters уже обновляет GBIF
     // через applyLocationsFilter — без второго applyGbifLocationsFilter.
-    setGbifProcessingFilters(map.current, gbifProcessingFilters);
+    setGbifProcessingFilters(
+      map.current,
+      toGbifProcessingFiltersFromExternal(externalProcessingFilters)
+    );
+    setInatProcessingFilters(
+      map.current,
+      toInatProcessingFiltersFromExternal(externalProcessingFilters)
+    );
     updateHeatmapData(map.current, locationFilters);
     refreshAreal();
     // locationFilters читаем для heatmap/areal; не ставим в deps — иначе двойной apply GBIF.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- см. комментарий выше
-  }, [gbifProcessingFilters, mapReady, refreshAreal]);
+  }, [externalProcessingFilters, mapReady, refreshAreal]);
 
-  const handleGbifProcessingFiltersChange = useCallback((nextFilters) => {
-    setGbifProcessingFiltersState({
-      ...createDefaultGbifProcessingFilters(),
+  const handleExternalProcessingFiltersChange = useCallback((nextFilters) => {
+    setExternalProcessingFiltersState({
+      ...createDefaultExternalProcessingFilters(),
       ...nextFilters
     });
   }, []);
 
-  const handleGbifProcessingFiltersReset = useCallback(() => {
-    setGbifProcessingFiltersState(createDefaultGbifProcessingFilters());
+  const handleExternalProcessingFiltersReset = useCallback(() => {
+    setExternalProcessingFiltersState(createDefaultExternalProcessingFilters());
   }, []);
 
   const handleOpenGbifProcessing = useCallback(() => {
@@ -2441,7 +2485,7 @@ export default function MapView() {
     }
   }, [popupData, mapReady]);
 
-  const handleGbifDataChange = useCallback(() => {
+  const handleExternalDataChange = useCallback(() => {
     clearArealDynamicsSliceCache();
     syncYearBounds();
     bumpPointsDataRevision();
@@ -2451,28 +2495,29 @@ export default function MapView() {
     }
 
     applyGbifLocationsFilter(map.current, locationFilters);
+    applyInatLocationsFilter(map.current, locationFilters);
     updateHeatmapData(map.current, locationFilters);
     refreshAreal();
   }, [mapReady, locationFilters, refreshAreal, syncYearBounds, bumpPointsDataRevision]);
 
   useEffect(() => {
-    if (gbifOnly === prevGbifOnlyRef.current) {
+    if (externalOnly === prevExternalOnlyRef.current) {
       return;
     }
 
-    if (gbifOnly && map.current) {
-      // Локальные маркеры скрываем на карте, но markersVisible в UI не трогаем —
-      // иначе «Группы точек» блокирует кластеризацию.
+    if (externalOnly && map.current) {
       setGbifVisibility(map.current, true);
+      setInatVisibility(map.current, true);
     }
 
-    prevGbifOnlyRef.current = gbifOnly;
-  }, [gbifOnly]);
+    prevExternalOnlyRef.current = externalOnly;
+  }, [externalOnly]);
 
   useEffect(() => {
     setToolFeaturesContext({
-      includeLocal: !gbifOnly,
-      includeGbif: true
+      includeLocal: !externalOnly,
+      includeGbif: true,
+      includeInat: true
     });
 
     if (!map.current || !mapReady) {
@@ -2481,7 +2526,7 @@ export default function MapView() {
 
     updateHeatmapData(map.current, locationFilters);
     refreshAreal();
-  }, [gbifOnly, mapReady, locationFilters, refreshAreal]);
+  }, [externalOnly, mapReady, locationFilters, refreshAreal]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -2489,11 +2534,12 @@ export default function MapView() {
     }
 
     // В режиме GBIF локальные маркеры скрыты; «Скрыть точки» управляет слоем GBIF.
-    setMarkersVisible(map.current, gbifOnly ? false : mapMarkersVisible);
-    if (gbifOnly) {
+    setMarkersVisible(map.current, externalOnly ? false : mapMarkersVisible);
+    if (externalOnly) {
       setGbifVisibility(map.current, mapMarkersVisible);
+      setInatVisibility(map.current, mapMarkersVisible);
     }
-  }, [mapMarkersVisible, gbifOnly, mapReady]);
+  }, [mapMarkersVisible, externalOnly, mapReady]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -2502,7 +2548,9 @@ export default function MapView() {
 
     setClusteringEnabled(map.current, clusteringEnabled);
     setGbifClusteringEnabled(map.current, clusteringEnabled);
+    setInatClusteringEnabled(map.current, clusteringEnabled);
     applyGbifLocationsFilter(map.current, locationFilters);
+    applyInatLocationsFilter(map.current, locationFilters);
   }, [clusteringEnabled, mapReady, locationFilters]);
 
   useEffect(() => {
@@ -2512,7 +2560,9 @@ export default function MapView() {
 
     setClusterByRegnum(map.current, clusterByRegnum);
     setGbifClusterByRegnum(map.current, clusterByRegnum);
+    setInatClusterByRegnum(map.current, clusterByRegnum);
     applyGbifLocationsFilter(map.current, locationFilters);
+    applyInatLocationsFilter(map.current, locationFilters);
   }, [clusterByRegnum, clusteringEnabled, mapReady, locationFilters]);
 
   useEffect(() => {
@@ -2520,8 +2570,8 @@ export default function MapView() {
       return;
     }
 
-    // Один переключатель «Кластеры-диаграммы» — и для локальных точек, и для GBIF.
     setGbifClusterPieChartsEnabled(map.current, clusterPieCharts);
+    setInatClusterPieChartsEnabled(map.current, clusterPieCharts);
     setClusterPieChartsEnabled(map.current, clusterPieCharts);
   }, [clusterPieCharts, clusteringEnabled, mapReady]);
 
@@ -2532,7 +2582,9 @@ export default function MapView() {
 
     setDenseClustersHighlightEnabled(map.current, denseClustersHighlight);
     setGbifDenseClustersHighlightEnabled(map.current, denseClustersHighlight);
+    setInatDenseClustersHighlightEnabled(map.current, denseClustersHighlight);
     applyGbifLocationsFilter(map.current, locationFilters);
+    applyInatLocationsFilter(map.current, locationFilters);
   }, [denseClustersHighlight, mapReady, locationFilters]);
 
   useEffect(() => {
@@ -2846,7 +2898,7 @@ export default function MapView() {
         boundsSpeciesRegnumFilter,
         denseClustersHighlight,
         denseProcessingActive,
-        gbifProcessingFilters
+        externalProcessingFilters
       }),
     [
       propertyFilters,
@@ -2856,7 +2908,7 @@ export default function MapView() {
       boundsSpeciesRegnumFilter,
       denseClustersHighlight,
       denseProcessingActive,
-      gbifProcessingFilters
+      externalProcessingFilters
     ]
   );
 
@@ -2872,7 +2924,7 @@ export default function MapView() {
     setSelectedDensePileKey(null);
     setDensePileSpeciesListOpen(false);
     densePileCameraBeforeRef.current = null;
-    setGbifProcessingFiltersState(createDefaultGbifProcessingFilters());
+    setExternalProcessingFiltersState(createDefaultExternalProcessingFilters());
     expandPanel(PANEL_IDS.MAP);
   }, [expandPanel]);
 
@@ -2925,8 +2977,8 @@ export default function MapView() {
         return;
       }
 
-      if (filterId === MAP_FILTER_IDS.GBIF_PROCESSING) {
-        setGbifProcessingFiltersState(createDefaultGbifProcessingFilters());
+      if (filterId === MAP_FILTER_IDS.EXTERNAL_PROCESSING) {
+        setExternalProcessingFiltersState(createDefaultExternalProcessingFilters());
         return;
       }
 
@@ -3429,6 +3481,7 @@ export default function MapView() {
       map.current.on("load", async () => {
         await initLocationsFromFirestore();
         await hydrateGbifStoreFromPersistence();
+        await hydrateInatStoreFromPersistence();
         syncYearBounds();
 
         addOsmBasemapLayer(map.current);
@@ -3646,6 +3699,84 @@ export default function MapView() {
             });
           }
         });
+        addInatLayer(map.current, {
+          onPointClick: (feature) => {
+            if (isAreaDrawingActive()) {
+              return;
+            }
+
+            if (
+              submissionStateRef.current.active &&
+              submissionStateRef.current.pickingLocation
+            ) {
+              const coords = feature?.geometry?.coordinates;
+              if (coords) {
+                submissionStateRef.current.setCoordinates(coords);
+              }
+              return;
+            }
+
+            dismissArealPointHintOnPointClick(feature);
+            clearSharedPointPin(map.current);
+            if (!pointSelectionStateRef.current.ooptPointsFilterEnabled) {
+              setSelectedBoundsFeature(null);
+            }
+            clearSelectedPointHighlight(map.current);
+            setPopupData(feature);
+
+            const {
+              bufferSelectionMode: selectionMode,
+              activeModule: currentModule,
+              bufferDockedWithFeature: bufferDocked
+            } = bufferStateRef.current;
+            const bufferPanelOpen =
+              currentModule === MODULE_IDS.BUFFER ||
+              (currentModule === MODULE_IDS.FEATURE && bufferDocked);
+
+            if (bufferPanelOpen) {
+              if (selectionMode) {
+                setBufferSelectedPoints((points) => {
+                  const key = getArealPointKey(feature);
+                  const existingIndex = points.findIndex(
+                    (point) => getArealPointKey(point) === key
+                  );
+
+                  if (existingIndex >= 0) {
+                    return points.filter((_, index) => index !== existingIndex);
+                  }
+
+                  return [...points, feature];
+                });
+              } else {
+                setBufferSelectedPoints([]);
+              }
+            }
+
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+              polygonStateRef.current;
+
+            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+              const nameLatin = feature.properties?.name_latin;
+
+              setSpeciesPolygons((prev) =>
+                upsertSpeciesPolygon(prev, feature, POLYGON_BUILD_MODES.CONVEX)
+              );
+
+              if (nameLatin) {
+                setActivePolygonId(nameLatin);
+              }
+
+              setPolygonAddMode(false);
+            }
+
+            setActiveModule((current) => {
+              if (current === MODULE_IDS.BUFFER || current === MODULE_IDS.POLYGON) {
+                return current;
+              }
+              return MODULE_IDS.FEATURE;
+            });
+          }
+        });
         setMapReady(true);
       });
     }
@@ -3673,7 +3804,7 @@ export default function MapView() {
   }, [selectedBoundsFeature, unpinPanelsFromTaskbar]);
 
   useEffect(() => {
-    if (dataSourceMode === DATA_SOURCE_MODES.GBIF) {
+    if (dataSourceMode === DATA_SOURCE_MODES.EXTERNAL) {
       return;
     }
 
@@ -3681,12 +3812,12 @@ export default function MapView() {
   }, [dataSourceMode, unpinPanelsFromTaskbar]);
 
   useEffect(() => {
-    if (gbifProcessingActive) {
+    if (externalProcessingActive) {
       return;
     }
 
     unpinPanelsFromTaskbar([PANEL_IDS.GBIF_PROCESSING]);
-  }, [gbifProcessingActive, unpinPanelsFromTaskbar]);
+  }, [externalProcessingActive, unpinPanelsFromTaskbar]);
 
   const arealDisplayedContainedPoints = arealContainedPoints ?? activeToolFilterPointsSummary;
 
@@ -3711,7 +3842,7 @@ export default function MapView() {
   const showModulePanelStack =
     (activeModule !== null && activeModule !== MODULE_IDS.TIMELINE) ||
     (showOoptFeaturePanel && activeModule !== MODULE_IDS.TIMELINE) ||
-    dataSourceMode === DATA_SOURCE_MODES.GBIF ||
+    dataSourceMode === DATA_SOURCE_MODES.EXTERNAL ||
     denseProcessingActive;
 
   return (
@@ -4010,27 +4141,27 @@ export default function MapView() {
               />
             </Suspense>
           )}
-          {dataSourceMode === DATA_SOURCE_MODES.GBIF && (
+          {dataSourceMode === DATA_SOURCE_MODES.EXTERNAL && (
             <>
-              {!isPanelMinimized(PANEL_IDS.GBIF) && (
-              <GbifPanel
+              {!isPanelMinimized(PANEL_IDS.DATA_SOURCES) && (
+              <DataSourcesPanel
                 map={map.current}
-                collapsed={isPanelCollapsed(PANEL_IDS.GBIF)}
+                collapsed={isPanelCollapsed(PANEL_IDS.DATA_SOURCES)}
                 onCollapsedChange={handleGbifPanelCollapsedChange}
-                onMinimize={handleMinimizePanel(PANEL_IDS.GBIF)}
-                onDataChange={handleGbifDataChange}
+                onMinimize={handleMinimizePanel(PANEL_IDS.DATA_SOURCES)}
+                onDataChange={handleExternalDataChange}
                 onOpenProcessing={handleOpenGbifProcessing}
               />
               )}
-              {gbifProcessingActive &&
-                !isPanelMinimized(PANEL_IDS.GBIF_PROCESSING) && (
-                <GbifProcessingPanel
-                  filters={gbifProcessingFilters}
-                  onFiltersChange={handleGbifProcessingFiltersChange}
-                  onFiltersReset={handleGbifProcessingFiltersReset}
-                  collapsed={isPanelCollapsed(PANEL_IDS.GBIF_PROCESSING)}
+              {externalProcessingActive &&
+                !isPanelMinimized(PANEL_IDS.EXTERNAL_PROCESSING) && (
+                <ExternalProcessingPanel
+                  filters={externalProcessingFilters}
+                  onFiltersChange={handleExternalProcessingFiltersChange}
+                  onFiltersReset={handleExternalProcessingFiltersReset}
+                  collapsed={isPanelCollapsed(PANEL_IDS.EXTERNAL_PROCESSING)}
                   onCollapsedChange={handleGbifProcessingPanelCollapsedChange}
-                  onMinimize={handleMinimizePanel(PANEL_IDS.GBIF_PROCESSING)}
+                  onMinimize={handleMinimizePanel(PANEL_IDS.EXTERNAL_PROCESSING)}
                 />
               )}
             </>

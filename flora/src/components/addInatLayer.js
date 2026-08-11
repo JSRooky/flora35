@@ -1,0 +1,880 @@
+import {
+  findInatFeatureById,
+  getInatFeatureCollection
+} from "../inaturalist/inatStore";
+import {
+  DEFAULT_CLUSTER_COLOR,
+  REGNUM_COLORS,
+  getPointColorExpression,
+  getPointColorForRegnum
+} from "./pointColors";
+import {
+  INAT_DENSE_PILES_CLUSTER_LAYER_ID,
+  INAT_DENSE_PILES_COUNT_LAYER_ID,
+  INAT_DENSE_PILES_SOURCE_ID,
+  ensureDensePilesLayers,
+  partitionFeaturesByDensePiles,
+  removeDensePilesLayers,
+  setDensePilesData
+} from "./densePiles";
+import {
+  COORDINATES_ORIGINAL_PROP,
+  getFeatureCoordinates,
+  getSpreadPileFitBounds,
+  spreadCoincidentFeatures
+} from "./spreadCoincidentPoints";
+import { safeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
+import "../styles/GbifPanel.css";
+
+export const INAT_SOURCE_ID = "inat-locations";
+export const INAT_CLUSTER_LAYER_ID = "inat-clusters";
+export const INAT_CLUSTER_COUNT_LAYER_ID = "inat-cluster-count";
+export const INAT_UNCLUSTERED_LAYER_ID = "inat-unclustered";
+
+const CLUSTER_OPTIONS = {
+  clusterMaxZoom: 14,
+  clusterRadius: 50
+};
+
+const MARKER_RADIUS = 5;
+const REGNUM_KEYS = ["plantae", "animalia", "fungi"];
+
+/** Агрегаты царств для «Кластеры-диаграммы» (тот же инструмент, что у локальных точек). */
+const CLUSTER_REGNUM_PROPERTIES = Object.fromEntries(
+  REGNUM_KEYS.map((regnum) => [
+    regnum,
+    ["+", ["case", ["==", ["get", "regnum"], regnum], 1, 0]]
+  ])
+);
+
+const EMPTY_FEATURE_COLLECTION = {
+  type: "FeatureCollection",
+  features: []
+};
+
+let interactionHandlers = null;
+let onPointClickCallback = null;
+let layerVisible = true;
+let inatClusteringEnabled = true;
+let inatClusterByRegnum = true;
+let inatClusterPieChartsEnabled = false;
+let inatDenseClustersHighlightEnabled = false;
+let expandedInatDensePileKeys = new Set();
+/** Колбэк после раскрытия плотной группы iNat (карта или список). */
+let onInatDensePileExpandedCallback = null;
+/** Последняя FeatureCollection, переданная в setInatData (с учётом фильтров). */
+let lastInatInputCollection = EMPTY_FEATURE_COLLECTION;
+/** Ключи точек, скрытых под булавкой выделения / share. */
+let hiddenPointFeatureKeys = [];
+
+function isInatMapboxClusteringActive() {
+  return inatClusteringEnabled && !inatDenseClustersHighlightEnabled;
+}
+
+function getInatSourceId(regnum = null) {
+  return regnum ? `${INAT_SOURCE_ID}-${regnum}` : INAT_SOURCE_ID;
+}
+
+function getInatLayerIds(regnum = null) {
+  const suffix = regnum ? `-${regnum}` : "";
+  return {
+    clusters: `${INAT_CLUSTER_LAYER_ID}${suffix}`,
+    clusterCount: `${INAT_CLUSTER_COUNT_LAYER_ID}${suffix}`,
+    unclustered: `${INAT_UNCLUSTERED_LAYER_ID}${suffix}`
+  };
+}
+
+/** Все id источников iNat в текущем режиме. */
+export function getInatSourceIds() {
+  if (!isInatMapboxClusteringActive()) {
+    return [INAT_SOURCE_ID];
+  }
+
+  if (inatClusterByRegnum) {
+    return REGNUM_KEYS.map((regnum) => getInatSourceId(regnum));
+  }
+
+  return [INAT_SOURCE_ID];
+}
+
+function getAllInatClusterLayerIds() {
+  const dense = inatDenseClustersHighlightEnabled
+    ? [INAT_DENSE_PILES_CLUSTER_LAYER_ID]
+    : [];
+
+  if (!isInatMapboxClusteringActive()) {
+    return dense;
+  }
+
+  if (inatClusterByRegnum) {
+    return [
+      ...REGNUM_KEYS.map((regnum) => getInatLayerIds(regnum).clusters),
+      ...dense
+    ];
+  }
+
+  return [INAT_CLUSTER_LAYER_ID, ...dense];
+}
+
+function getAllInatUnclusteredLayerIds() {
+  if (!isInatMapboxClusteringActive()) {
+    return [INAT_UNCLUSTERED_LAYER_ID];
+  }
+
+  if (inatClusterByRegnum) {
+    return REGNUM_KEYS.map((regnum) => getInatLayerIds(regnum).unclustered);
+  }
+
+  return [INAT_UNCLUSTERED_LAYER_ID];
+}
+
+function getAllInatLayerIds() {
+  const dense = inatDenseClustersHighlightEnabled
+    ? [INAT_DENSE_PILES_CLUSTER_LAYER_ID, INAT_DENSE_PILES_COUNT_LAYER_ID]
+    : [];
+
+  if (!isInatMapboxClusteringActive()) {
+    return [INAT_UNCLUSTERED_LAYER_ID, ...dense];
+  }
+
+  if (inatClusterByRegnum) {
+    return [
+      ...REGNUM_KEYS.flatMap((regnum) => {
+        const ids = getInatLayerIds(regnum);
+        return [ids.clusters, ids.clusterCount, ids.unclustered];
+      }),
+      ...dense
+    ];
+  }
+
+  if (inatClusterPieChartsEnabled) {
+    return [INAT_CLUSTER_LAYER_ID, INAT_UNCLUSTERED_LAYER_ID, ...dense];
+  }
+
+  return [
+    INAT_CLUSTER_LAYER_ID,
+    INAT_CLUSTER_COUNT_LAYER_ID,
+    INAT_UNCLUSTERED_LAYER_ID,
+    ...dense
+  ];
+}
+
+/** Слои iNat, по которым клик считается попаданием в точку/кластер. */
+export function getInatInteractiveLayerIds(map) {
+  return [
+    ...getAllInatClusterLayerIds(),
+    ...getAllInatUnclusteredLayerIds()
+  ].filter((layerId) => map?.getLayer(layerId));
+}
+
+/** Выражение Mapbox: скрыть feature, совпадающий с ключом булавки. */
+function buildInatPinnedKeyExclusion(key) {
+  return [
+    "!",
+    [
+      "any",
+      ["==", ["to-string", ["id"]], key],
+      ["==", ["to-string", ["coalesce", ["get", "finding_id"], ""]], key],
+      ["==", ["to-string", ["coalesce", ["get", "inat_id"], ""]], key],
+      [
+        "==",
+        ["concat", "inat-", ["to-string", ["coalesce", ["get", "inat_id"], ""]]],
+        key
+      ]
+    ]
+  ];
+}
+
+function applyInatUnclusteredFilter(map) {
+  getAllInatUnclusteredLayerIds().forEach((layerId) => {
+    if (!map?.getLayer(layerId)) {
+      return;
+    }
+
+    const parts = [];
+
+    if (isInatMapboxClusteringActive()) {
+      parts.push(["!", ["has", "point_count"]]);
+    }
+
+    hiddenPointFeatureKeys.forEach((key) => {
+      parts.push(buildInatPinnedKeyExclusion(key));
+    });
+
+    if (parts.length === 0) {
+      map.setFilter(layerId, null);
+      return;
+    }
+
+    map.setFilter(layerId, parts.length === 1 ? parts[0] : ["all", ...parts]);
+  });
+}
+
+/**
+ * Скрывает обычные маркеры iNat для точек, показанных булавкой
+ * (выделение в «Сведения о точке» или share-ссылка).
+ */
+export function setInatHiddenPointFeatureKeys(map, keys) {
+  hiddenPointFeatureKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
+  if (map) {
+    applyInatUnclusteredFilter(map);
+  }
+}
+
+function resolveClickedFeature(rawFeature) {
+  const inatKey = rawFeature?.properties?.inat_id;
+  const fromStore = findInatFeatureById(inatKey);
+
+  const base = fromStore ?? {
+    type: "Feature",
+    id: rawFeature.id ?? (inatKey != null ? `inat-${inatKey}` : undefined),
+    geometry: rawFeature.geometry,
+    properties: {
+      ...rawFeature.properties,
+      source: rawFeature.properties?.source ?? "inat"
+    }
+  };
+
+  const original =
+    getFeatureCoordinates(rawFeature) ??
+    getFeatureCoordinates(base) ??
+    base.geometry?.coordinates;
+
+  // Булавка/клик — на видимой (возможно разведённой) позиции;
+  // в properties храним исходные координаты для share/инструментов.
+  return {
+    ...base,
+    geometry: rawFeature.geometry ?? base.geometry,
+    properties: {
+      ...base.properties,
+      ...(Array.isArray(original)
+        ? { [COORDINATES_ORIGINAL_PROP]: original }
+        : {})
+    }
+  };
+}
+
+function detachInteractions(map) {
+  if (!interactionHandlers || !map) {
+    interactionHandlers = null;
+    return;
+  }
+
+  const {
+    clusterClick,
+    clusterEnter,
+    clusterLeave,
+    pointClick,
+    pointEnter,
+    pointLeave,
+    clusterLayerIds,
+    unclusteredLayerIds
+  } = interactionHandlers;
+
+  (clusterLayerIds ?? []).forEach((layerId) => {
+    if (!map.getLayer(layerId)) {
+      return;
+    }
+    map.off("click", layerId, clusterClick);
+    map.off("mouseenter", layerId, clusterEnter);
+    map.off("mouseleave", layerId, clusterLeave);
+  });
+
+  (unclusteredLayerIds ?? []).forEach((layerId) => {
+    if (!map.getLayer(layerId)) {
+      return;
+    }
+    map.off("click", layerId, pointClick);
+    map.off("mouseenter", layerId, pointEnter);
+    map.off("mouseleave", layerId, pointLeave);
+  });
+
+  interactionHandlers = null;
+}
+
+function attachInteractions(map) {
+  detachInteractions(map);
+
+  const clusterLayerIds = getAllInatClusterLayerIds().filter((id) => map.getLayer(id));
+  const unclusteredLayerIds = getAllInatUnclusteredLayerIds().filter((id) =>
+    map.getLayer(id)
+  );
+
+  const clusterClick = (event) => {
+    const features = safeQueryRenderedFeatures(map, event.point, {
+      layers: clusterLayerIds
+    });
+    const feature = features[0];
+
+    if (feature?.properties?.dense_pile) {
+      const key = feature.properties.dense_pile_key;
+      if (!key) {
+        return;
+      }
+
+      expandInatDensePileByKey(map, key, {
+        coordinates: feature.geometry?.coordinates,
+        pointCount: feature.properties?.point_count
+      });
+      return;
+    }
+
+    const clusterId = feature?.properties?.cluster_id;
+    const sourceId = feature?.source;
+    const source = sourceId ? map.getSource(sourceId) : null;
+
+    if (clusterId == null || !source?.getClusterExpansionZoom) {
+      return;
+    }
+
+    source.getClusterExpansionZoom(clusterId, (error, zoom) => {
+      if (error) {
+        return;
+      }
+
+      map.easeTo({
+        center: feature.geometry.coordinates,
+        zoom
+      });
+    });
+  };
+
+  const clusterEnter = () => {
+    map.getCanvas().style.cursor = "pointer";
+  };
+
+  const clusterLeave = () => {
+    map.getCanvas().style.cursor = "";
+  };
+
+  const pointClick = (event) => {
+    const rawFeature = event.features?.[0];
+    if (!rawFeature) {
+      return;
+    }
+
+    // Не даём клику «провалиться» в map-background clear (локальный mapClick).
+    event.preventDefault?.();
+    event.originalEvent?.stopPropagation?.();
+
+    const feature = resolveClickedFeature(rawFeature);
+    onPointClickCallback?.(feature);
+  };
+
+  const pointEnter = () => {
+    map.getCanvas().style.cursor = "pointer";
+  };
+
+  const pointLeave = () => {
+    map.getCanvas().style.cursor = "";
+  };
+
+  clusterLayerIds.forEach((layerId) => {
+    map.on("click", layerId, clusterClick);
+    map.on("mouseenter", layerId, clusterEnter);
+    map.on("mouseleave", layerId, clusterLeave);
+  });
+
+  unclusteredLayerIds.forEach((layerId) => {
+    map.on("click", layerId, pointClick);
+    map.on("mouseenter", layerId, pointEnter);
+    map.on("mouseleave", layerId, pointLeave);
+  });
+
+  interactionHandlers = {
+    clusterClick,
+    clusterEnter,
+    clusterLeave,
+    pointClick,
+    pointEnter,
+    pointLeave,
+    clusterLayerIds,
+    unclusteredLayerIds
+  };
+}
+
+function applyVisibility(map) {
+  const visibility = layerVisible ? "visible" : "none";
+
+  getAllInatLayerIds().forEach((layerId) => {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", visibility);
+    }
+  });
+}
+
+function removeInatFromMap(map) {
+  detachInteractions(map);
+
+  const style = map.getStyle();
+  if (!style?.layers) {
+    return;
+  }
+
+  removeDensePilesLayers(map, {
+    sourceId: INAT_DENSE_PILES_SOURCE_ID,
+    clusterLayerId: INAT_DENSE_PILES_CLUSTER_LAYER_ID,
+    countLayerId: INAT_DENSE_PILES_COUNT_LAYER_ID
+  });
+
+  const sourceIds = new Set([
+    INAT_SOURCE_ID,
+    ...REGNUM_KEYS.map((regnum) => getInatSourceId(regnum))
+  ]);
+
+  style.layers
+    .filter((layer) => sourceIds.has(layer.source))
+    .map((layer) => layer.id)
+    .forEach((layerId) => {
+      if (map.getLayer(layerId)) {
+        map.removeLayer(layerId);
+      }
+    });
+
+  sourceIds.forEach((sourceId) => {
+    if (map.getSource(sourceId)) {
+      map.removeSource(sourceId);
+    }
+  });
+}
+
+function addUnclusteredInatLayer(map, sourceId, layerId, regnum = null) {
+  map.addLayer({
+    id: layerId,
+    type: "circle",
+    source: sourceId,
+    ...(isInatMapboxClusteringActive()
+      ? { filter: ["!", ["has", "point_count"]] }
+      : {}),
+    paint: {
+      "circle-color": regnum
+        ? getPointColorForRegnum(regnum)
+        : getPointColorExpression(),
+      "circle-radius": MARKER_RADIUS,
+      "circle-stroke-width": 1,
+      "circle-stroke-color": "#ffffff"
+    }
+  });
+}
+
+function addClusterInatLayers(map, sourceId, layerIds, regnum = null) {
+  const usePieCharts = inatClusterPieChartsEnabled && !regnum;
+
+  map.addLayer({
+    id: layerIds.clusters,
+    type: "circle",
+    source: sourceId,
+    filter: ["has", "point_count"],
+    paint: getInatClusterPaint(regnum)
+  });
+
+  if (!usePieCharts) {
+    map.addLayer({
+      id: layerIds.clusterCount,
+      type: "symbol",
+      source: sourceId,
+      filter: ["has", "point_count"],
+      layout: {
+        "text-field": ["get", "point_count_abbreviated"],
+        "text-size": 12
+      },
+      paint: {
+        "text-color": "#ffffff"
+      }
+    });
+  }
+
+  addUnclusteredInatLayer(map, sourceId, layerIds.unclustered, regnum);
+}
+
+function prepareMapInatFeatures(features) {
+  if (!inatDenseClustersHighlightEnabled) {
+    // При обычной Mapbox-кластеризации совпадения схлопываются в кластер —
+    // spiral spread здесь лишний и дорогой.
+    return {
+      mapFeatures: isInatMapboxClusteringActive()
+        ? features
+        : spreadCoincidentFeatures(features),
+      denseClusterFeatures: []
+    };
+  }
+
+  const { expandedDenseFeatures, denseClusterFeatures } = partitionFeaturesByDensePiles(
+    features,
+    {
+      expandedPileKeys: expandedInatDensePileKeys
+    }
+  );
+
+  return {
+    // Точки вне сверхплотных куч не показываем; раскрытые кучи — отдельными маркерами.
+    mapFeatures: spreadCoincidentFeatures(expandedDenseFeatures),
+    denseClusterFeatures
+  };
+}
+
+function getInatClusterPaint(regnum = null) {
+  const clusterColor = regnum
+    ? REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR
+    : DEFAULT_CLUSTER_COLOR;
+  const usePieCharts = inatClusterPieChartsEnabled && !regnum;
+
+  if (usePieCharts) {
+    return {
+      "circle-color": "#000000",
+      "circle-radius": ["step", ["get", "point_count"], 18, 10, 24, 30, 32],
+      "circle-stroke-width": 0,
+      "circle-opacity": 0,
+      "circle-stroke-opacity": 0
+    };
+  }
+
+  return {
+    "circle-color": clusterColor,
+    "circle-radius": ["step", ["get", "point_count"], 16, 50, 20, 200, 26],
+    "circle-stroke-width": 1.5,
+    "circle-stroke-color": "#ffffff",
+    "circle-opacity": 1,
+    "circle-stroke-opacity": 1
+  };
+}
+
+function syncInatDensePilesLayers(map, denseClusterFeatures) {
+  if (!inatDenseClustersHighlightEnabled) {
+    removeDensePilesLayers(map, {
+      sourceId: INAT_DENSE_PILES_SOURCE_ID,
+      clusterLayerId: INAT_DENSE_PILES_CLUSTER_LAYER_ID,
+      countLayerId: INAT_DENSE_PILES_COUNT_LAYER_ID
+    });
+    return;
+  }
+
+  const visibility = layerVisible ? "visible" : "none";
+
+  if (!map.getSource(INAT_DENSE_PILES_SOURCE_ID)) {
+    ensureDensePilesLayers(map, {
+      sourceId: INAT_DENSE_PILES_SOURCE_ID,
+      clusterLayerId: INAT_DENSE_PILES_CLUSTER_LAYER_ID,
+      countLayerId: INAT_DENSE_PILES_COUNT_LAYER_ID,
+      features: denseClusterFeatures,
+      visibility
+    });
+    return;
+  }
+
+  setDensePilesData(map, INAT_DENSE_PILES_SOURCE_ID, denseClusterFeatures);
+  [INAT_DENSE_PILES_CLUSTER_LAYER_ID, INAT_DENSE_PILES_COUNT_LAYER_ID].forEach(
+    (layerId) => {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, "visibility", visibility);
+      }
+    }
+  );
+}
+
+function rebuildInatLayers(map) {
+  if (!map?.getStyle()) {
+    return;
+  }
+
+  const collection = getInatFeatureCollection();
+  const { mapFeatures, denseClusterFeatures } = prepareMapInatFeatures(
+    collection.features ?? []
+  );
+  removeInatFromMap(map);
+
+  if (!isInatMapboxClusteringActive()) {
+    map.addSource(INAT_SOURCE_ID, {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: mapFeatures }
+    });
+    addUnclusteredInatLayer(map, INAT_SOURCE_ID, INAT_UNCLUSTERED_LAYER_ID);
+  } else if (inatClusterByRegnum) {
+    REGNUM_KEYS.forEach((regnum) => {
+      const sourceId = getInatSourceId(regnum);
+      const features = mapFeatures.filter(
+        (feature) => feature.properties?.regnum === regnum
+      );
+
+      map.addSource(sourceId, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features },
+        cluster: true,
+        ...CLUSTER_OPTIONS
+      });
+
+      addClusterInatLayers(map, sourceId, getInatLayerIds(regnum), regnum);
+    });
+
+    // Точки без regnum — в общий независящий от царства источник.
+    const otherFeatures = mapFeatures.filter(
+      (feature) => !REGNUM_KEYS.includes(feature.properties?.regnum)
+    );
+    if (otherFeatures.length > 0) {
+      map.addSource(INAT_SOURCE_ID, {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: otherFeatures },
+        cluster: true,
+        ...CLUSTER_OPTIONS
+      });
+      addClusterInatLayers(map, INAT_SOURCE_ID, {
+        clusters: INAT_CLUSTER_LAYER_ID,
+        clusterCount: INAT_CLUSTER_COUNT_LAYER_ID,
+        unclustered: INAT_UNCLUSTERED_LAYER_ID
+      });
+    }
+  } else {
+    map.addSource(INAT_SOURCE_ID, {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: mapFeatures },
+      cluster: true,
+      ...CLUSTER_OPTIONS,
+      clusterProperties: {
+        ...(inatClusterPieChartsEnabled ? CLUSTER_REGNUM_PROPERTIES : {})
+      }
+    });
+    addClusterInatLayers(map, INAT_SOURCE_ID, {
+      clusters: INAT_CLUSTER_LAYER_ID,
+      clusterCount: INAT_CLUSTER_COUNT_LAYER_ID,
+      unclustered: INAT_UNCLUSTERED_LAYER_ID
+    });
+  }
+
+  syncInatDensePilesLayers(map, denseClusterFeatures);
+  attachInteractions(map);
+  applyVisibility(map);
+  applyInatUnclusteredFilter(map);
+}
+
+/**
+ * Создаёт отдельный слой точек iNat (кластеризация; цвета как у локальных точек).
+ * Данные берутся из inatStore; повторный вызов безопасен.
+ */
+export function addInatLayer(map, { onPointClick } = {}) {
+  if (!map) {
+    return;
+  }
+
+  if (onPointClick) {
+    onPointClickCallback = onPointClick;
+  }
+
+  const hasAnySource = getInatSourceIds().some((sourceId) => map.getSource(sourceId))
+    || map.getSource(INAT_SOURCE_ID);
+
+  if (hasAnySource) {
+    setInatData(map, getInatFeatureCollection());
+    if (!interactionHandlers) {
+      attachInteractions(map);
+    }
+    applyVisibility(map);
+    applyInatUnclusteredFilter(map);
+    return;
+  }
+
+  rebuildInatLayers(map);
+}
+
+/** Обновляет GeoJSON источников iNat. */
+export function setInatData(map, collection) {
+  if (!map) {
+    return;
+  }
+
+  const data = collection?.type === "FeatureCollection" ? collection : EMPTY_FEATURE_COLLECTION;
+  lastInatInputCollection = data;
+  const { mapFeatures, denseClusterFeatures } = prepareMapInatFeatures(data.features ?? []);
+  const hasSource = getInatSourceIds().some((sourceId) => map.getSource(sourceId))
+    || map.getSource(INAT_SOURCE_ID);
+
+  if (!hasSource) {
+    addInatLayer(map);
+  }
+
+  if (!isInatMapboxClusteringActive()) {
+    map.getSource(INAT_SOURCE_ID)?.setData({
+      type: "FeatureCollection",
+      features: mapFeatures
+    });
+  } else if (inatClusterByRegnum) {
+    REGNUM_KEYS.forEach((regnum) => {
+      const source = map.getSource(getInatSourceId(regnum));
+      if (!source) {
+        return;
+      }
+
+      source.setData({
+        type: "FeatureCollection",
+        features: mapFeatures.filter(
+          (feature) => feature.properties?.regnum === regnum
+        )
+      });
+    });
+
+    const otherSource = map.getSource(INAT_SOURCE_ID);
+    if (otherSource) {
+      otherSource.setData({
+        type: "FeatureCollection",
+        features: mapFeatures.filter(
+          (feature) => !REGNUM_KEYS.includes(feature.properties?.regnum)
+        )
+      });
+    }
+  } else {
+    map.getSource(INAT_SOURCE_ID)?.setData({
+      type: "FeatureCollection",
+      features: mapFeatures
+    });
+  }
+
+  syncInatDensePilesLayers(map, denseClusterFeatures);
+  applyInatUnclusteredFilter(map);
+}
+
+/** Очищает точки iNat на карте (источник остаётся). */
+export function clearInatLayer(map) {
+  setInatData(map, EMPTY_FEATURE_COLLECTION);
+}
+
+/** Показывает или скрывает слой iNat. */
+export function setInatVisibility(map, visible) {
+  layerVisible = Boolean(visible);
+  if (map) {
+    applyVisibility(map);
+    // Чтобы «Кластеры-диаграммы» сразу убрали/вернули SVG по слою iNat.
+    map.triggerRepaint?.();
+  }
+}
+
+export function isInatLayerVisible() {
+  return layerVisible;
+}
+
+/** Включает/выключает кластеризацию слоя iNat. */
+export function setInatClusteringEnabled(map, enabled) {
+  const next = Boolean(enabled);
+  if (inatClusteringEnabled === next) {
+    return;
+  }
+
+  inatClusteringEnabled = next;
+  if (map) {
+    rebuildInatLayers(map);
+  }
+}
+
+/** Группировка кластеров iNat по царству (отдельные источники). */
+export function setInatClusterByRegnum(map, enabled) {
+  const next = Boolean(enabled);
+  if (inatClusterByRegnum === next) {
+    return;
+  }
+
+  inatClusterByRegnum = next;
+  if (map && isInatMapboxClusteringActive()) {
+    rebuildInatLayers(map);
+  }
+}
+
+/** Включает/выключает «Кластеры-диаграммы» для слоя iNat (тот же режим, что у локальных точек). */
+export function setInatClusterPieChartsEnabled(map, enabled) {
+  const next = Boolean(enabled);
+  if (inatClusterPieChartsEnabled === next) {
+    return;
+  }
+
+  inatClusterPieChartsEnabled = next;
+  if (map && isInatMapboxClusteringActive()) {
+    rebuildInatLayers(map);
+  }
+}
+
+export function isInatClusteringEnabled() {
+  return inatClusteringEnabled;
+}
+
+export function isInatClusterByRegnumEnabled() {
+  return inatClusterByRegnum;
+}
+
+export function isInatClusterPieChartsEnabled() {
+  return inatClusterPieChartsEnabled;
+}
+
+/** Сверхплотные кластеры iNat: без обычной кластеризации, только кучи ≥10. */
+export function setInatDenseClustersHighlightEnabled(map, enabled) {
+  const next = Boolean(enabled);
+  if (inatDenseClustersHighlightEnabled === next) {
+    return;
+  }
+
+  inatDenseClustersHighlightEnabled = next;
+  expandedInatDensePileKeys = new Set();
+  if (map) {
+    rebuildInatLayers(map);
+  }
+}
+
+export function isInatDenseClustersHighlightEnabled() {
+  return inatDenseClustersHighlightEnabled;
+}
+
+/**
+ * Раскрывает плотную группу iNat по ключу координат и зумирует к разведённым точкам.
+ */
+export function expandInatDensePileByKey(
+  map,
+  key,
+  {
+    coordinates = null,
+    pointCount = null,
+    animateCamera = true,
+    notify = true
+  } = {}
+) {
+  if (!map?.getStyle?.() || !key || !inatDenseClustersHighlightEnabled) {
+    return;
+  }
+
+  expandedInatDensePileKeys.add(key);
+  setInatData(map, lastInatInputCollection);
+
+  const center =
+    Array.isArray(coordinates) && coordinates.length >= 2 ? coordinates : null;
+  const count = Number(pointCount) || 1;
+
+  if (animateCamera && center) {
+    const bounds = getSpreadPileFitBounds(center, count);
+    if (bounds && count > 1) {
+      map.fitBounds(bounds, {
+        padding: 56,
+        maxZoom: 18,
+        duration: 900
+      });
+    } else {
+      map.easeTo({
+        center,
+        zoom: Math.max(map.getZoom(), 15)
+      });
+    }
+  }
+
+  if (notify && typeof onInatDensePileExpandedCallback === "function") {
+    onInatDensePileExpandedCallback({
+      key,
+      coordinates: center,
+      pointCount: count
+    });
+  }
+}
+
+/** Регистрирует обработчик раскрытия плотной группы iNat. */
+export function setInatDensePileExpandedHandler(handler) {
+  onInatDensePileExpandedCallback = handler ?? null;
+}
+
+/** Задаёт обработчик клика по точке iNat (панель «Сведения о точке»). */
+export function setInatPointClickHandler(handler) {
+  onPointClickCallback = handler ?? null;
+}
+

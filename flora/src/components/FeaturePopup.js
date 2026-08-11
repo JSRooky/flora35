@@ -25,6 +25,7 @@ const INTERNAL_PROPERTIES = new Set([
   "description_md",
   "source",
   "gbif_url",
+  "inat_url",
   "species_key",
   "coordinates_original",
   "dense_pile_size"
@@ -43,6 +44,41 @@ function hasDisplayValue(value) {
   return value != null && value !== "";
 }
 
+/** Поля iNaturalist для раскрывающегося блока. */
+const INAT_META_PROPERTIES = new Set([
+  "quality_grade",
+  "inat_id",
+  "place_guess",
+  "license_code",
+  "obscured"
+]);
+
+const INAT_META_DISPLAY_ORDER = [
+  "quality_grade",
+  "place_guess",
+  "license_code",
+  "obscured",
+  "inat_id"
+];
+
+function isInatFeature(feature) {
+  return feature?.properties?.source === "inaturalist";
+}
+
+function sortInatMetaEntries(entries) {
+  const order = new Map(INAT_META_DISPLAY_ORDER.map((key, index) => [key, index]));
+
+  return [...entries].sort(([keyA], [keyB]) => {
+    const orderA = order.has(keyA) ? order.get(keyA) : Number.MAX_SAFE_INTEGER;
+    const orderB = order.has(keyB) ? order.get(keyB) : Number.MAX_SAFE_INTEGER;
+
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+
+    return keyA.localeCompare(keyB);
+  });
+}
 function sortGbifMetaEntries(entries) {
   const order = new Map(GBIF_META_DISPLAY_ORDER.map((key, index) => [key, index]));
 
@@ -193,6 +229,7 @@ export default function FeaturePopup({
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [gbifInfoOpen, setGbifInfoOpen] = useState(false);
+  const [inatInfoOpen, setInatInfoOpen] = useState(false);
   const [nameRuLookupState, setNameRuLookupState] = useState("idle");
   const [nameRuCandidates, setNameRuCandidates] = useState([]);
   const [showNameRuPicker, setShowNameRuPicker] = useState(false);
@@ -205,17 +242,20 @@ export default function FeaturePopup({
     setSharePanelOpen(false);
     setShareCopied(false);
     setGbifInfoOpen(false);
+    setInatInfoOpen(false);
     setNameRuCandidates([]);
     setShowNameRuPicker(false);
 
     const props = feature?.properties;
+    const isExternalSource =
+      props?.source === "gbif" || props?.source === "inaturalist";
     const overlayNameRu =
-      props?.source === "gbif" && props?.name_latin
+      isExternalSource && props?.name_latin
         ? getOverlayRussianName(props.name_latin)
         : null;
     const resolvedNameRu = props?.name_ru || overlayNameRu;
 
-    if (props?.source === "gbif" && props?.name_latin && !resolvedNameRu) {
+    if (isExternalSource && props?.name_latin && !resolvedNameRu) {
       const entry = getOverlayEntry(props.name_latin);
       if (entry && !entry.nameRu) {
         setNameRuLookupState("not_found");
@@ -255,22 +295,29 @@ export default function FeaturePopup({
   };
 
   const fromGbif = isGbifFeature(feature);
+  const fromInat = isInatFeature(feature);
+  const fromExternal = fromGbif || fromInat;
   const properties = feature?.properties;
   const nameLatin = properties?.name_latin;
   const nameRu =
     properties?.name_ru ||
-    (fromGbif && nameLatin ? getOverlayRussianName(nameLatin) : null);
+    (fromExternal && nameLatin ? getOverlayRussianName(nameLatin) : null);
   const collapsedSummary = feature
     ? nameRu ||
       nameLatin ||
-      (fromGbif ? `GBIF #${feature.properties?.gbif_key ?? ""}` : "Точка данных")
+      (fromGbif
+        ? `GBIF #${feature.properties?.gbif_key ?? ""}`
+        : fromInat
+          ? `iNat #${feature.properties?.inat_id ?? ""}`
+          : "Точка данных")
     : "Точка не выбрана";
 
-  const showGbifNameLookup = fromGbif && Boolean(nameLatin) && !nameRu;
+  const showExternalNameLookup = fromExternal && Boolean(nameLatin) && !nameRu;
   const speciesPointCount = feature ? getPointsForSpecies(feature).length : 0;
   const images = properties ? getImages(properties) : [];
   const descriptionPath = properties?.description_md;
   const gbifUrl = properties?.gbif_url;
+  const inatUrl = properties?.inat_url;
   // status выводится отдельно — у него свой фильтр через StatusFilterPanel.
   const displayProperties = properties
     ? sortPropertyEntries(
@@ -278,8 +325,9 @@ export default function FeaturePopup({
           ([key, value]) =>
             !INTERNAL_PROPERTIES.has(key) &&
             !GBIF_META_PROPERTIES.has(key) &&
+            !INAT_META_PROPERTIES.has(key) &&
             key !== "status" &&
-            !(fromGbif && key === "name_ru") &&
+            !(fromExternal && key === "name_ru") &&
             hasDisplayValue(value) &&
             // kingdom дублирует regnum, если оба есть.
             !(key === "kingdom" && properties.regnum)
@@ -292,6 +340,15 @@ export default function FeaturePopup({
       ? sortGbifMetaEntries(
           Object.entries(properties).filter(
             ([key, value]) => GBIF_META_PROPERTIES.has(key) && hasDisplayValue(value)
+          )
+        )
+      : [];
+
+  const inatMetaProperties =
+    fromInat && properties
+      ? sortInatMetaEntries(
+          Object.entries(properties).filter(
+            ([key, value]) => INAT_META_PROPERTIES.has(key) && hasDisplayValue(value)
           )
         )
       : [];
@@ -432,13 +489,21 @@ export default function FeaturePopup({
                     <span>GBIF</span>
                   </div>
                 )}
+                {fromInat && (
+                  <div className="popup-item">
+                    <strong>Источник:</strong>
+                    <span>iNaturalist</span>
+                  </div>
+                )}
 
                 <div className="popup-item">
                   <strong>Точек вида на карте:</strong>
                   <span>{formatPointCount(speciesPointCount)}</span>
                 </div>
 
-                {(displayProperties.length > 0 || showGbifNameLookup || (fromGbif && nameRu)) && (
+                {(displayProperties.length > 0 ||
+                  showExternalNameLookup ||
+                  (fromExternal && nameRu)) && (
                   <>
                     <hr />
                     <div className="popup-section-header">
@@ -455,7 +520,7 @@ export default function FeaturePopup({
                       </button>
                     </div>
 
-                    {(showGbifNameLookup || (fromGbif && nameRu)) && (
+                    {(showExternalNameLookup || (fromExternal && nameRu)) && (
                       <div className="popup-item popup-item--filter popup-item--name-ru">
                         <div className="popup-item-text">
                           <strong>{getPropertyLabel("name_ru")}:</strong>
@@ -570,6 +635,40 @@ export default function FeaturePopup({
                             rel="noopener noreferrer"
                           >
                             Открыть на GBIF
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                )}
+
+                {(inatMetaProperties.length > 0 || inatUrl) && (
+                  <details
+                    className="feature-gbif-info"
+                    open={inatInfoOpen}
+                    onToggle={(event) => setInatInfoOpen(event.currentTarget.open)}
+                  >
+                    <summary className="feature-gbif-info-summary">
+                      Информация из iNaturalist
+                    </summary>
+                    <div className="feature-gbif-info-body">
+                      {inatMetaProperties.map(([key, value]) => (
+                        <div key={key} className="popup-item">
+                          <div className="popup-item-text">
+                            <strong>{getPropertyLabel(key)}:</strong>
+                            <span>{formatPropertyValue(key, value)}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {inatUrl && (
+                        <div className="feature-gbif-info-actions">
+                          <a
+                            className="feature-popup-action-btn"
+                            href={inatUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Открыть на iNaturalist
                           </a>
                         </div>
                       )}

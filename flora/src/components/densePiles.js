@@ -15,6 +15,10 @@ export const GBIF_DENSE_PILES_SOURCE_ID = "gbif-dense-piles";
 export const GBIF_DENSE_PILES_CLUSTER_LAYER_ID = "gbif-dense-piles-clusters";
 export const GBIF_DENSE_PILES_COUNT_LAYER_ID = "gbif-dense-piles-count";
 
+export const INAT_DENSE_PILES_SOURCE_ID = "inat-dense-piles";
+export const INAT_DENSE_PILES_CLUSTER_LAYER_ID = "inat-dense-piles-clusters";
+export const INAT_DENSE_PILES_COUNT_LAYER_ID = "inat-dense-piles-count";
+
 /** Ключ по точным координатам точки. */
 export function exactCoordKey(lng, lat) {
   return `${lng},${lat}`;
