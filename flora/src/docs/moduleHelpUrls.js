@@ -13,6 +13,9 @@ export const HELP_SECTION_LABELS = {
   oopt: "ООПТ",
   "oopt-feature": "Сведения об ООПТ",
   submit: "Ввод данных о находке",
+  "data-sources": "Источники данных",
+  "external-processing": "Обработка внешних данных",
+  "data-work": "Работа с данными",
   gbif: "Данные GBIF",
   "gbif-processing": "Обработка данных GBIF"
 };

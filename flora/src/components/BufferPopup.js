@@ -7,6 +7,7 @@ import {
 } from "./addBufferLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/BufferPopup.css";
 
@@ -75,7 +76,8 @@ export default function BufferPopup({
   toolBlockedTitle,
   collapsed = false,
   onCollapsedChange,
-  onMinimize
+  onMinimize,
+  onClose
 }) {
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## buffer в docs/moduleHelp.md
@@ -109,6 +111,7 @@ export default function BufferPopup({
           >
             {collapsed ? "▾" : "▴"}
           </button>
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 

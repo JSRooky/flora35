@@ -10,6 +10,14 @@
   pointer-events: none;
 }
 
+.map-corner-controls-footer {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+
 .map-corner-controls-bar {
   position: relative;
   display: inline-flex;
@@ -186,6 +194,10 @@
   .map-corner-controls {
     left: 10px;
     bottom: 40px;
+    gap: 6px;
+  }
+
+  .map-corner-controls-footer {
     gap: 6px;
   }
 

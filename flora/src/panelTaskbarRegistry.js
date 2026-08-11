@@ -16,6 +16,7 @@ export const TASKBAR_PANEL_IDS = {
   GBIF_PROCESSING: "gbif-processing",
   DATA_SOURCES: "data-sources",
   EXTERNAL_PROCESSING: "external-processing",
+  DATA_WORK: "data-work",
   OOPT_SPECIES: "oopt-species",
   DENSE_SPECIES: "dense-species"
 };
@@ -44,6 +45,7 @@ export const PANEL_TASKBAR_META = {
     title: "Обработка внешних данных",
     icon: "gbifProcessing"
   },
+  [TASKBAR_PANEL_IDS.DATA_WORK]: { title: "Работа с данными", icon: "dataWork" },
   [TASKBAR_PANEL_IDS.OOPT_SPECIES]: { title: "Виды внутри выбранной ООПТ", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.DENSE_SPECIES]: { title: "Виды в плотной группе", icon: "speciesList" }
 };
@@ -69,6 +71,7 @@ export const PANEL_TASKBAR_MODULE_ID = {
   [TASKBAR_PANEL_IDS.GBIF_PROCESSING]: null,
   [TASKBAR_PANEL_IDS.DATA_SOURCES]: null,
   [TASKBAR_PANEL_IDS.EXTERNAL_PROCESSING]: null,
+  [TASKBAR_PANEL_IDS.DATA_WORK]: "data-work",
   [TASKBAR_PANEL_IDS.OOPT_SPECIES]: null,
   [TASKBAR_PANEL_IDS.DENSE_SPECIES]: null
 };

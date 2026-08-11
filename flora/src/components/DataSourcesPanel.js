@@ -3,6 +3,7 @@ import { setGbifData } from "./addGbifLayer";
 import { setInatData } from "./addInatLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import {
   GBIF_MAP_UPDATE_PAGES,
@@ -54,6 +55,7 @@ import {
   EXTERNAL_REGIONS,
   getExternalRegionById
 } from "../externalSources/regions";
+import { GBIF_KINGDOMS, buildTaxonSearchExtras } from "../gbif/taxonFilters";
 import "../styles/GbifPanel.css";
 
 function formatCount(value) {
@@ -63,17 +65,32 @@ function formatCount(value) {
   return new Intl.NumberFormat("ru-RU").format(value);
 }
 
+const KINGDOM_TO_INAT_ICONIC = {
+  plantae: "Plantae",
+  animalia: "Animalia",
+  fungi: "Fungi"
+};
 
-function buildGbifQuerySnapshot(regionId) {
-  return { regionId };
+const KINGDOM_LOAD_OPTIONS = [
+  { value: "", label: "Все царства" },
+  ...GBIF_KINGDOMS.map(({ id, label }) => ({ value: id, label }))
+];
+
+function buildGbifQuerySnapshot(regionId, kingdomId = null) {
+  return { regionId, kingdomId: kingdomId || null };
 }
 
-function buildInatQuerySnapshot(regionId, qualityGrade) {
-  return { regionId, qualityGrade };
+function buildInatQuerySnapshot(regionId, qualityGrade, kingdomId = null) {
+  return { regionId, qualityGrade, kingdomId: kingdomId || null };
 }
 
 function isSameGbifQuery(a, b) {
-  return Boolean(a && b && a.regionId === b.regionId);
+  return Boolean(
+    a &&
+      b &&
+      a.regionId === b.regionId &&
+      (a.kingdomId || null) === (b.kingdomId || null)
+  );
 }
 
 function isSameInatQuery(a, b) {
@@ -82,8 +99,25 @@ function isSameInatQuery(a, b) {
       b &&
       a.regionId === b.regionId &&
       (a.qualityGrade ?? INAT_QUALITY_MODES.RESEARCH) ===
-        (b.qualityGrade ?? INAT_QUALITY_MODES.RESEARCH)
+        (b.qualityGrade ?? INAT_QUALITY_MODES.RESEARCH) &&
+      (a.kingdomId || null) === (b.kingdomId || null)
   );
+}
+
+function buildGbifLoadExtras(kingdomId, incrementalExtras = {}) {
+  return {
+    ...incrementalExtras,
+    ...buildTaxonSearchExtras({ kingdomId: kingdomId || null })
+  };
+}
+
+function buildInatLoadExtras(kingdomId, incrementalExtras = {}) {
+  const extras = { ...incrementalExtras };
+  const iconic = kingdomId ? KINGDOM_TO_INAT_ICONIC[kingdomId] : null;
+  if (iconic) {
+    extras.iconicTaxa = iconic;
+  }
+  return extras;
 }
 
 function getInitialRegionId() {
@@ -205,11 +239,18 @@ export default function DataSourcesPanel({
   collapsed = false,
   onCollapsedChange,
   onMinimize,
+  onClose,
   onDataChange,
   onOpenProcessing
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [regionId, setRegionId] = useState(getInitialRegionId);
+  const [gbifKingdomId, setGbifKingdomId] = useState(
+    () => getGbifLoadedQuery()?.kingdomId ?? ""
+  );
+  const [inatKingdomId, setInatKingdomId] = useState(
+    () => getInatLoadedQuery()?.kingdomId ?? ""
+  );
   const [inatQualityGrade, setInatQualityGrade] = useState(
     () => getInatLoadedQuery()?.qualityGrade ?? INAT_QUALITY_MODES.RESEARCH
   );
@@ -237,18 +278,28 @@ export default function DataSourcesPanel({
   const [inatSavedQuery, setInatSavedQuery] = useState(() => getInatLoadedQuery());
   const [gbifError, setGbifError] = useState(null);
   const [inatError, setInatError] = useState(null);
-  const [confirmSource, setConfirmSource] = useState(null);
+  const [loadDialogSource, setLoadDialogSource] = useState(null);
+  const [draftRegionId, setDraftRegionId] = useState(getInitialRegionId);
+  const [draftKingdomId, setDraftKingdomId] = useState("");
+  const [draftQualityGrade, setDraftQualityGrade] = useState(INAT_QUALITY_MODES.RESEARCH);
+  const [dialogPreview, setDialogPreview] = useState(null);
+  const [dialogPreviewLoading, setDialogPreviewLoading] = useState(false);
 
   const gbifAbortRef = useRef(null);
   const inatAbortRef = useRef(null);
   const gbifPreviewAbortRef = useRef(null);
   const inatPreviewAbortRef = useRef(null);
+  const dialogPreviewAbortRef = useRef(null);
 
   const region = getExternalRegionById(regionId);
-  const gbifQuery = useMemo(() => buildGbifQuerySnapshot(regionId), [regionId]);
+  const draftRegion = getExternalRegionById(draftRegionId);
+  const gbifQuery = useMemo(
+    () => buildGbifQuerySnapshot(regionId, gbifKingdomId || null),
+    [regionId, gbifKingdomId]
+  );
   const inatQuery = useMemo(
-    () => buildInatQuerySnapshot(regionId, inatQualityGrade),
-    [regionId, inatQualityGrade]
+    () => buildInatQuerySnapshot(regionId, inatQualityGrade, inatKingdomId || null),
+    [regionId, inatQualityGrade, inatKingdomId]
   );
 
   const gbifIncremental =
@@ -257,16 +308,39 @@ export default function DataSourcesPanel({
     inatLoaded > 0 && isSameInatQuery(inatQuery, inatSavedQuery) && Boolean(inatSyncedAt);
 
   const gbifRequestExtras = useMemo(
-    () => (gbifIncremental ? withUpdateSinceExtras({}, gbifSyncedAt) : {}),
-    [gbifIncremental, gbifSyncedAt]
+    () =>
+      buildGbifLoadExtras(
+        gbifKingdomId,
+        gbifIncremental ? withUpdateSinceExtras({}, gbifSyncedAt) : {}
+      ),
+    [gbifKingdomId, gbifIncremental, gbifSyncedAt]
   );
   const inatRequestExtras = useMemo(
-    () => (inatIncremental ? withInatUpdateSinceExtras({}, inatSyncedAt) : {}),
-    [inatIncremental, inatSyncedAt]
+    () =>
+      buildInatLoadExtras(
+        inatKingdomId,
+        inatIncremental ? withInatUpdateSinceExtras({}, inatSyncedAt) : {}
+      ),
+    [inatKingdomId, inatIncremental, inatSyncedAt]
   );
 
   const loading = gbifLoading || inatLoading;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
+
+  const openLoadDialog = (source) => {
+    setDraftRegionId(regionId);
+    setDraftKingdomId(source === "gbif" ? gbifKingdomId : inatKingdomId);
+    setDraftQualityGrade(inatQualityGrade);
+    setDialogPreview(null);
+    setLoadDialogSource(source);
+  };
+
+  const closeLoadDialog = () => {
+    dialogPreviewAbortRef.current?.abort();
+    setLoadDialogSource(null);
+    setDialogPreview(null);
+    setDialogPreviewLoading(false);
+  };
 
   useEffect(() => {
     return () => {
@@ -274,6 +348,7 @@ export default function DataSourcesPanel({
       inatAbortRef.current?.abort();
       gbifPreviewAbortRef.current?.abort();
       inatPreviewAbortRef.current?.abort();
+      dialogPreviewAbortRef.current?.abort();
     };
   }, []);
 
@@ -347,12 +422,115 @@ export default function DataSourcesPanel({
     };
   }, [region, gbifRequestExtras, inatRequestExtras, inatQualityGrade]);
 
+  // Оценка объёма в диалоге загрузки при смене черновых фильтров.
+  useEffect(() => {
+    if (!loadDialogSource || !draftRegion) {
+      setDialogPreview(null);
+      return undefined;
+    }
+
+    dialogPreviewAbortRef.current?.abort();
+    const controller = new AbortController();
+    dialogPreviewAbortRef.current = controller;
+    setDialogPreviewLoading(true);
+
+    const timer = window.setTimeout(() => {
+      if (loadDialogSource === "gbif") {
+        const draftQuery = buildGbifQuerySnapshot(draftRegionId, draftKingdomId || null);
+        const incremental =
+          gbifLoaded > 0 &&
+          isSameGbifQuery(draftQuery, gbifSavedQuery) &&
+          Boolean(gbifSyncedAt);
+        const extras = buildGbifLoadExtras(
+          draftKingdomId,
+          incremental ? withUpdateSinceExtras({}, gbifSyncedAt) : {}
+        );
+
+        previewOccurrenceCount(draftRegion, { signal: controller.signal, extras })
+          .then((count) => {
+            if (!controller.signal.aborted) {
+              setDialogPreview(count);
+            }
+          })
+          .catch((err) => {
+            if (!isGbifAbortError(err, controller.signal)) {
+              setDialogPreview(null);
+            }
+          })
+          .finally(() => {
+            if (!controller.signal.aborted) {
+              setDialogPreviewLoading(false);
+            }
+          });
+        return;
+      }
+
+      const draftQuery = buildInatQuerySnapshot(
+        draftRegionId,
+        draftQualityGrade,
+        draftKingdomId || null
+      );
+      const incremental =
+        inatLoaded > 0 &&
+        isSameInatQuery(draftQuery, inatSavedQuery) &&
+        Boolean(inatSyncedAt);
+      const extras = buildInatLoadExtras(
+        draftKingdomId,
+        incremental ? withInatUpdateSinceExtras({}, inatSyncedAt) : {}
+      );
+
+      previewObservationCount(draftRegion, {
+        signal: controller.signal,
+        qualityGrade: draftQualityGrade,
+        extras
+      })
+        .then((count) => {
+          if (!controller.signal.aborted) {
+            setDialogPreview(count);
+          }
+        })
+        .catch((err) => {
+          if (!isInatAbortError(err, controller.signal)) {
+            setDialogPreview(null);
+          }
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) {
+            setDialogPreviewLoading(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [
+    loadDialogSource,
+    draftRegion,
+    draftRegionId,
+    draftKingdomId,
+    draftQualityGrade,
+    gbifLoaded,
+    gbifSavedQuery,
+    gbifSyncedAt,
+    inatLoaded,
+    inatSavedQuery,
+    inatSyncedAt
+  ]);
+
   const notifyDataChange = () => {
     onDataChange?.();
   };
 
-  const runGbifLoad = async () => {
-    if (!map || !region) {
+  const runGbifLoad = async ({
+    loadRegion = region,
+    loadKingdomId = gbifKingdomId,
+    loadExtras = gbifRequestExtras,
+    loadQuery = gbifQuery,
+    previewCount = gbifPreview
+  } = {}) => {
+    if (!map || !loadRegion) {
       return;
     }
 
@@ -362,7 +540,7 @@ export default function DataSourcesPanel({
 
     setGbifError(null);
     setGbifLoading(true);
-    setGbifTotal(gbifPreview);
+    setGbifTotal(previewCount);
     setGbifAdded(0);
     setGbifFetched(0);
 
@@ -371,13 +549,13 @@ export default function DataSourcesPanel({
     let fetchedTotal = 0;
 
     try {
-      await loadOccurrencesForRegion(region, {
+      await loadOccurrencesForRegion(loadRegion, {
         signal: controller.signal,
-        extras: gbifRequestExtras,
+        extras: loadExtras,
         onPage: (features) => {
           fetchedTotal += features.length;
           setGbifFetched(fetchedTotal);
-          const { collection, added } = upsertGbifFeatures(features, region.id);
+          const { collection, added } = upsertGbifFeatures(features, loadRegion.id);
           addedTotal += added;
           setGbifAdded(addedTotal);
           setGbifLoaded(collection.features.length);
@@ -408,8 +586,10 @@ export default function DataSourcesPanel({
       const nextSyncedAt = new Date().toISOString();
       setGbifLoading(false);
       setGbifLoaded(getGbifFeatureCount());
-      setGbifLoadedQuery(gbifQuery);
-      setGbifSavedQuery(gbifQuery);
+      setRegionId(loadRegion.id);
+      setGbifKingdomId(loadKingdomId || "");
+      setGbifLoadedQuery(loadQuery);
+      setGbifSavedQuery(loadQuery);
       setGbifSyncedAt(nextSyncedAt);
       setGbifSyncedAtState(nextSyncedAt);
       await persistGbifSnapshot();
@@ -417,8 +597,15 @@ export default function DataSourcesPanel({
     }
   };
 
-  const runInatLoad = async () => {
-    if (!map || !region) {
+  const runInatLoad = async ({
+    loadRegion = region,
+    loadKingdomId = inatKingdomId,
+    loadQualityGrade = inatQualityGrade,
+    loadExtras = inatRequestExtras,
+    loadQuery = inatQuery,
+    previewCount = inatPreview
+  } = {}) => {
+    if (!map || !loadRegion) {
       return;
     }
 
@@ -428,12 +615,12 @@ export default function DataSourcesPanel({
 
     setInatError(null);
     setInatLoading(true);
-    setInatTotal(inatPreview);
+    setInatTotal(previewCount);
     setInatAdded(0);
     setInatFetched(0);
     setInatSeriesIndex(null);
     setInatSeriesTotal(
-      inatPreview != null ? estimateInatLoadSeriesCount(inatPreview) : null
+      previewCount != null ? estimateInatLoadSeriesCount(previewCount) : null
     );
     setInatSeriesLabel(null);
 
@@ -442,11 +629,11 @@ export default function DataSourcesPanel({
     let fetchedTotal = 0;
 
     try {
-      await loadObservationsInSeries(region, {
+      await loadObservationsInSeries(loadRegion, {
         signal: controller.signal,
-        qualityGrade: inatQualityGrade,
-        extras: inatRequestExtras,
-        previewCount: inatPreview,
+        qualityGrade: loadQualityGrade,
+        extras: loadExtras,
+        previewCount,
         onSeriesStart: ({ series, index, planned, queued }) => {
           setInatSeriesIndex(index);
           setInatSeriesTotal(Math.max(planned, queued, index));
@@ -455,7 +642,7 @@ export default function DataSourcesPanel({
         onPage: (features) => {
           fetchedTotal += features.length;
           setInatFetched(fetchedTotal);
-          const { collection, added } = upsertInatFeatures(features, region.id);
+          const { collection, added } = upsertInatFeatures(features, loadRegion.id);
           addedTotal += added;
           setInatAdded(addedTotal);
           setInatLoaded(collection.features.length);
@@ -489,8 +676,11 @@ export default function DataSourcesPanel({
       setInatSeriesTotal(null);
       setInatSeriesLabel(null);
       setInatLoaded(getInatFeatureCount());
-      setInatLoadedQuery(inatQuery);
-      setInatSavedQuery(inatQuery);
+      setRegionId(loadRegion.id);
+      setInatKingdomId(loadKingdomId || "");
+      setInatQualityGrade(loadQualityGrade);
+      setInatLoadedQuery(loadQuery);
+      setInatSavedQuery(loadQuery);
       setInatSyncedAt(nextSyncedAt);
       setInatSyncedAtState(nextSyncedAt);
       await persistInatSnapshot();
@@ -499,19 +689,91 @@ export default function DataSourcesPanel({
   };
 
   const handleConfirmLoad = async () => {
-    const source = confirmSource;
-    setConfirmSource(null);
-    if (source === "gbif") {
-      await runGbifLoad();
-    } else if (source === "inat") {
-      await runInatLoad();
+    const source = loadDialogSource;
+    if (!source || !draftRegion) {
+      return;
     }
+
+    const nextKingdomId = draftKingdomId || "";
+    const nextQuality = draftQualityGrade;
+
+    if (source === "gbif") {
+      const nextQuery = buildGbifQuerySnapshot(draftRegion.id, nextKingdomId || null);
+      const incremental =
+        gbifLoaded > 0 &&
+        isSameGbifQuery(nextQuery, gbifSavedQuery) &&
+        Boolean(gbifSyncedAt);
+      const extras = buildGbifLoadExtras(
+        nextKingdomId,
+        incremental ? withUpdateSinceExtras({}, gbifSyncedAt) : {}
+      );
+      closeLoadDialog();
+      await runGbifLoad({
+        loadRegion: draftRegion,
+        loadKingdomId: nextKingdomId,
+        loadExtras: extras,
+        loadQuery: nextQuery,
+        previewCount: dialogPreview
+      });
+      return;
+    }
+
+    const nextQuery = buildInatQuerySnapshot(
+      draftRegion.id,
+      nextQuality,
+      nextKingdomId || null
+    );
+    const incremental =
+      inatLoaded > 0 &&
+      isSameInatQuery(nextQuery, inatSavedQuery) &&
+      Boolean(inatSyncedAt);
+    const extras = buildInatLoadExtras(
+      nextKingdomId,
+      incremental ? withInatUpdateSinceExtras({}, inatSyncedAt) : {}
+    );
+    closeLoadDialog();
+    await runInatLoad({
+      loadRegion: draftRegion,
+      loadKingdomId: nextKingdomId,
+      loadQualityGrade: nextQuality,
+      loadExtras: extras,
+      loadQuery: nextQuery,
+      previewCount: dialogPreview
+    });
   };
+
+  const dialogIncremental =
+    loadDialogSource === "gbif"
+      ? gbifLoaded > 0 &&
+        isSameGbifQuery(
+          buildGbifQuerySnapshot(draftRegionId, draftKingdomId || null),
+          gbifSavedQuery
+        ) &&
+        Boolean(gbifSyncedAt)
+      : loadDialogSource === "inat"
+        ? inatLoaded > 0 &&
+          isSameInatQuery(
+            buildInatQuerySnapshot(
+              draftRegionId,
+              draftQualityGrade,
+              draftKingdomId || null
+            ),
+            inatSavedQuery
+          ) &&
+          Boolean(inatSyncedAt)
+        : false;
 
   const inatSeriesEstimate =
     inatPreview != null ? estimateInatLoadSeriesCount(inatPreview) : null;
   const inatMultiSeriesLoad =
     inatPreview != null && inatPreview > INAT_API_RESULT_LIMIT && !inatIncremental;
+  const dialogSeriesEstimate =
+    dialogPreview != null ? estimateInatLoadSeriesCount(dialogPreview) : null;
+  const dialogMultiSeries =
+    loadDialogSource === "inat" &&
+    dialogPreview != null &&
+    dialogPreview > INAT_API_RESULT_LIMIT &&
+    !dialogIncremental;
 
   return (
     <div className={`feature-popup gbif-panel ${collapsed ? "feature-popup--collapsed" : ""}`}>
@@ -532,6 +794,7 @@ export default function DataSourcesPanel({
               {collapsed ? "▾" : "▴"}
             </button>
           ) : null}
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 
@@ -546,26 +809,9 @@ export default function DataSourcesPanel({
           <p className="gbif-panel-hint">
             Загрузка находок из GBIF и iNaturalist на отдельные слои карты. После
             загрузки карта, фильтры и popup работают только с локальной копией в
-            браузере (IndexedDB); к API обращаются лишь кнопки «Загрузить» и
-            «Обновить». Фильтры по таксонам — в панели «Обработка внешних данных».
+            браузере (IndexedDB). Параметры загрузки (регион, царство, качество)
+            задаются во всплывающем окне по кнопке «Загрузить».
           </p>
-
-          <label className="gbif-panel-field" htmlFor="data-sources-region">
-            <span className="gbif-panel-label">Регион</span>
-            <select
-              id="data-sources-region"
-              className="gbif-panel-select"
-              value={regionId}
-              disabled={loading}
-              onChange={(event) => setRegionId(event.target.value)}
-            >
-              {EXTERNAL_REGIONS.map(({ id, label }) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
 
           <section className="data-sources-section" aria-label="GBIF">
             <h4 className="data-sources-section-title">GBIF</h4>
@@ -588,10 +834,10 @@ export default function DataSourcesPanel({
               <button
                 type="button"
                 className="gbif-panel-btn"
-                disabled={!map || !region || gbifLoading}
-                onClick={() => setConfirmSource("gbif")}
+                disabled={!map || gbifLoading}
+                onClick={() => openLoadDialog("gbif")}
               >
-                {gbifIncremental ? "Обновить GBIF" : "Загрузить GBIF"}
+                {gbifIncremental ? "Обновить" : "Загрузить"}
               </button>
               <button
                 type="button"
@@ -607,22 +853,6 @@ export default function DataSourcesPanel({
 
           <section className="data-sources-section" aria-label="iNaturalist">
             <h4 className="data-sources-section-title">iNaturalist</h4>
-            <label className="gbif-panel-field" htmlFor="inat-quality-grade">
-              <span className="gbif-panel-label">Качество наблюдений</span>
-              <select
-                id="inat-quality-grade"
-                className="gbif-panel-select"
-                value={inatQualityGrade}
-                disabled={inatLoading}
-                onChange={(event) => setInatQualityGrade(event.target.value)}
-              >
-                {INAT_QUALITY_OPTIONS.map(({ value, label }) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
             {inatMultiSeriesLoad ? (
               <p className="gbif-panel-hint">
                 Наблюдений больше {formatCount(INAT_API_RESULT_LIMIT)} — загрузка пойдёт
@@ -652,10 +882,10 @@ export default function DataSourcesPanel({
               <button
                 type="button"
                 className="gbif-panel-btn"
-                disabled={!map || !region || inatLoading}
-                onClick={() => setConfirmSource("inat")}
+                disabled={!map || inatLoading}
+                onClick={() => openLoadDialog("inat")}
               >
-                {inatIncremental ? "Обновить iNaturalist" : "Загрузить iNaturalist"}
+                {inatIncremental ? "Обновить" : "Загрузить"}
               </button>
               <button
                 type="button"
@@ -681,47 +911,102 @@ export default function DataSourcesPanel({
 
       <ModuleHelpPanel sectionId={MODULE_IDS.DATA_SOURCES} open={helpOpen} />
 
-      {confirmSource && (
-        <div className="gbif-confirm-overlay" onClick={() => setConfirmSource(null)}>
+      {loadDialogSource && (
+        <div className="gbif-confirm-overlay" onClick={closeLoadDialog}>
           <div
-            className="gbif-confirm-dialog"
+            className="gbif-confirm-dialog gbif-confirm-dialog--load-options"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="data-sources-confirm-title"
+            aria-labelledby="data-sources-load-title"
             onClick={(event) => event.stopPropagation()}
           >
-            <h4 id="data-sources-confirm-title" className="gbif-confirm-title">
-              {confirmSource === "gbif"
-                ? gbifIncremental
-                  ? "Обновить данные GBIF?"
-                  : "Загрузить данные GBIF?"
-                : inatIncremental
-                  ? "Обновить данные iNaturalist?"
-                  : "Загрузить данные iNaturalist?"}
+            <h4 id="data-sources-load-title" className="gbif-confirm-title">
+              {loadDialogSource === "gbif"
+                ? dialogIncremental
+                  ? "Обновить GBIF"
+                  : "Загрузить GBIF"
+                : dialogIncremental
+                  ? "Обновить iNaturalist"
+                  : "Загрузить iNaturalist"}
             </h4>
+
+            <label className="gbif-panel-field" htmlFor="data-sources-load-region">
+              <span className="gbif-panel-label">Регион</span>
+              <select
+                id="data-sources-load-region"
+                className="gbif-panel-select"
+                value={draftRegionId}
+                onChange={(event) => setDraftRegionId(event.target.value)}
+              >
+                {EXTERNAL_REGIONS.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="gbif-panel-field" htmlFor="data-sources-load-kingdom">
+              <span className="gbif-panel-label">Царство</span>
+              <select
+                id="data-sources-load-kingdom"
+                className="gbif-panel-select"
+                value={draftKingdomId}
+                onChange={(event) => setDraftKingdomId(event.target.value)}
+              >
+                {KINGDOM_LOAD_OPTIONS.map(({ value, label }) => (
+                  <option key={value || "all"} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {loadDialogSource === "inat" ? (
+              <label className="gbif-panel-field" htmlFor="data-sources-load-quality">
+                <span className="gbif-panel-label">Качество наблюдений</span>
+                <select
+                  id="data-sources-load-quality"
+                  className="gbif-panel-select"
+                  value={draftQualityGrade}
+                  onChange={(event) => setDraftQualityGrade(event.target.value)}
+                >
+                  {INAT_QUALITY_OPTIONS.map(({ value, label }) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
             <p className="gbif-confirm-text">
-              Регион: {region?.label ?? regionId}. Данные сохранятся локально и добавятся к
-              уже загруженным (дубликаты обновятся).
-              {confirmSource === "inat" && inatMultiSeriesLoad
-                ? ` Загрузка iNaturalist будет выполнена сериями (≈ ${formatCount(inatSeriesEstimate)}).`
-                : null}
+              {dialogPreviewLoading
+                ? "Оценка числа находок…"
+                : dialogPreview != null
+                  ? `≈ ${formatCount(dialogPreview)} находок по выбранным фильтрам.`
+                  : "Выберите параметры загрузки."}
+              {dialogMultiSeries
+                ? ` Загрузка пойдёт сериями (≈ ${formatCount(dialogSeriesEstimate)}).`
+                : null}{" "}
+              Данные сохранятся локально и добавятся к уже загруженным (дубликаты обновятся).
             </p>
+
             <div className="gbif-confirm-actions">
               <button
                 type="button"
                 className="gbif-panel-btn gbif-panel-btn--secondary"
-                onClick={() => setConfirmSource(null)}
+                onClick={closeLoadDialog}
               >
                 Отмена
               </button>
-              <button type="button" className="gbif-panel-btn" onClick={handleConfirmLoad}>
-                {confirmSource === "gbif"
-                  ? gbifIncremental
-                    ? "Обновить"
-                    : "Загрузить"
-                  : inatIncremental
-                    ? "Обновить"
-                    : "Загрузить"}
+              <button
+                type="button"
+                className="gbif-panel-btn"
+                disabled={!draftRegion}
+                onClick={handleConfirmLoad}
+              >
+                {dialogIncremental ? "Обновить" : "Загрузить"}
               </button>
             </div>
           </div>

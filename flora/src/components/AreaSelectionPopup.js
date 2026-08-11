@@ -3,6 +3,7 @@ import { AREA_DRAW_MODES, AREA_OPERATION_MODES } from "./addAreaSelectionLayer";
 import { formatPointCount, formatSpeciesCount } from "./featurePropertyLabels";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import { ReactComponent as DrawFreeIcon } from "../images/draw-free.svg";
 import { ReactComponent as DrawRectIcon } from "../images/draw-rect.svg";
@@ -116,7 +117,8 @@ export default function AreaSelectionPopup({
   onReset,
   collapsed = false,
   onCollapsedChange,
-  onMinimize
+  onMinimize,
+  onClose
 }) {
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false);
@@ -140,6 +142,7 @@ export default function AreaSelectionPopup({
           >
             {collapsed ? "▾" : "▴"}
           </button>
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import {
+﻿import {
   findInatFeatureById,
   getInatFeatureCollection
 } from "../inaturalist/inatStore";
@@ -19,8 +19,11 @@ import {
 } from "./densePiles";
 import {
   COORDINATES_ORIGINAL_PROP,
+  fitMapToCoincidentSpread,
+  getCoincidentCoordKeys,
   getFeatureCoordinates,
   getSpreadPileFitBounds,
+  restoreOriginalCoordinates,
   spreadCoincidentFeatures
 } from "./spreadCoincidentPoints";
 import { safeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
@@ -54,12 +57,15 @@ const EMPTY_FEATURE_COLLECTION = {
 
 let interactionHandlers = null;
 let onPointClickCallback = null;
-let layerVisible = true;
+/** По умолчанию скрыт — показывается только в режиме «Внешние источники». */
+let layerVisible = false;
 let inatClusteringEnabled = true;
 let inatClusterByRegnum = true;
 let inatClusterPieChartsEnabled = false;
 let inatDenseClustersHighlightEnabled = false;
 let expandedInatDensePileKeys = new Set();
+/** Ключи lng,lat совпадающих точек, разведённых по клику на обычный кластер. */
+let expandedInatCoincidentKeys = new Set();
 /** Колбэк после раскрытия плотной группы iNat (карта или список). */
 let onInatDensePileExpandedCallback = null;
 /** Последняя FeatureCollection, переданная в setInatData (с учётом фильтров). */
@@ -91,7 +97,8 @@ export function getInatSourceIds() {
   }
 
   if (inatClusterByRegnum) {
-    return REGNUM_KEYS.map((regnum) => getInatSourceId(regnum));
+    // Базовый источник — точки без regnum (или с неизвестным царством).
+    return [...REGNUM_KEYS.map((regnum) => getInatSourceId(regnum)), INAT_SOURCE_ID];
   }
 
   return [INAT_SOURCE_ID];
@@ -109,6 +116,7 @@ function getAllInatClusterLayerIds() {
   if (inatClusterByRegnum) {
     return [
       ...REGNUM_KEYS.map((regnum) => getInatLayerIds(regnum).clusters),
+      INAT_CLUSTER_LAYER_ID,
       ...dense
     ];
   }
@@ -122,7 +130,10 @@ function getAllInatUnclusteredLayerIds() {
   }
 
   if (inatClusterByRegnum) {
-    return REGNUM_KEYS.map((regnum) => getInatLayerIds(regnum).unclustered);
+    return [
+      ...REGNUM_KEYS.map((regnum) => getInatLayerIds(regnum).unclustered),
+      INAT_UNCLUSTERED_LAYER_ID
+    ];
   }
 
   return [INAT_UNCLUSTERED_LAYER_ID];
@@ -143,6 +154,9 @@ function getAllInatLayerIds() {
         const ids = getInatLayerIds(regnum);
         return [ids.clusters, ids.clusterCount, ids.unclustered];
       }),
+      INAT_CLUSTER_LAYER_ID,
+      INAT_CLUSTER_COUNT_LAYER_ID,
+      INAT_UNCLUSTERED_LAYER_ID,
       ...dense
     ];
   }
@@ -323,18 +337,34 @@ function attachInteractions(map) {
     const sourceId = feature?.source;
     const source = sourceId ? map.getSource(sourceId) : null;
 
-    if (clusterId == null || !source?.getClusterExpansionZoom) {
+    if (clusterId == null || !source?.getClusterLeaves || !source?.getClusterExpansionZoom) {
       return;
     }
 
-    source.getClusterExpansionZoom(clusterId, (error, zoom) => {
-      if (error) {
+    source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
+      if (leavesErr) {
         return;
       }
 
-      map.easeTo({
-        center: feature.geometry.coordinates,
-        zoom
+      const restoredLeaves = (leaves ?? []).map(restoreOriginalCoordinates);
+      const coincidentKeys = getCoincidentCoordKeys(restoredLeaves);
+
+      if (coincidentKeys.size > 0) {
+        coincidentKeys.forEach((key) => expandedInatCoincidentKeys.add(key));
+        setInatData(map, lastInatInputCollection);
+        fitMapToCoincidentSpread(map, restoredLeaves);
+        return;
+      }
+
+      source.getClusterExpansionZoom(clusterId, (error, zoom) => {
+        if (error) {
+          return;
+        }
+
+        map.easeTo({
+          center: feature.geometry.coordinates,
+          zoom
+        });
       });
     });
   };
@@ -489,11 +519,11 @@ function addClusterInatLayers(map, sourceId, layerIds, regnum = null) {
 
 function prepareMapInatFeatures(features) {
   if (!inatDenseClustersHighlightEnabled) {
-    // При обычной Mapbox-кластеризации совпадения схлопываются в кластер —
-    // spiral spread здесь лишний и дорогой.
+    // При обычной Mapbox-кластеризации spread только для раскрытых по клику куч;
+    // без кластеризации — полный spiral spread.
     return {
       mapFeatures: isInatMapboxClusteringActive()
-        ? features
+        ? spreadCoincidentFeatures(features, expandedInatCoincidentKeys)
         : spreadCoincidentFeatures(features),
       denseClusterFeatures: []
     };
@@ -676,14 +706,19 @@ export function addInatLayer(map, { onPointClick } = {}) {
 }
 
 /** Обновляет GeoJSON источников iNat. */
-export function setInatData(map, collection) {
+export function setInatData(map, collection, options = {}) {
   if (!map) {
     return;
   }
 
   const data = collection?.type === "FeatureCollection" ? collection : EMPTY_FEATURE_COLLECTION;
   lastInatInputCollection = data;
-  const { mapFeatures, denseClusterFeatures } = prepareMapInatFeatures(data.features ?? []);
+  const { mapFeatures, denseClusterFeatures } = options.preview
+    ? {
+        mapFeatures: spreadCoincidentFeatures(data.features ?? []),
+        denseClusterFeatures: []
+      }
+    : prepareMapInatFeatures(data.features ?? []);
   const hasSource = getInatSourceIds().some((sourceId) => map.getSource(sourceId))
     || map.getSource(INAT_SOURCE_ID);
 
@@ -758,6 +793,9 @@ export function setInatClusteringEnabled(map, enabled) {
   }
 
   inatClusteringEnabled = next;
+  if (!next) {
+    expandedInatCoincidentKeys = new Set();
+  }
   if (map) {
     rebuildInatLayers(map);
   }
@@ -810,6 +848,7 @@ export function setInatDenseClustersHighlightEnabled(map, enabled) {
 
   inatDenseClustersHighlightEnabled = next;
   expandedInatDensePileKeys = new Set();
+  expandedInatCoincidentKeys = new Set();
   if (map) {
     rebuildInatLayers(map);
   }

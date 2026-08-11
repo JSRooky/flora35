@@ -69,13 +69,84 @@ function offsetCoordinate(lng, lat, index) {
 }
 
 /**
+ * Ключи lng,lat, где в наборе ≥2 точек с полностью одинаковыми координатами.
+ */
+export function getCoincidentCoordKeys(features) {
+  const counts = new Map();
+
+  (features ?? []).forEach((feature) => {
+    const coordinates = getFeatureCoordinates(feature);
+    if (!coordinates) {
+      return;
+    }
+
+    const key = coordKey(coordinates[0], coordinates[1]);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  });
+
+  const coincident = new Set();
+  counts.forEach((count, key) => {
+    if (count >= 2) {
+      coincident.add(key);
+    }
+  });
+
+  return coincident;
+}
+
+/**
+ * Самая крупная группа совпадающих координат среди features.
+ * @returns {{ key: string, coordinates: [number, number], pointCount: number } | null}
+ */
+export function getLargestCoincidentGroup(features) {
+  const groups = new Map();
+
+  (features ?? []).forEach((feature) => {
+    const coordinates = getFeatureCoordinates(feature);
+    if (!coordinates) {
+      return;
+    }
+
+    const key = coordKey(coordinates[0], coordinates[1]);
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        coordinates: [coordinates[0], coordinates[1]],
+        pointCount: 0
+      });
+    }
+    groups.get(key).pointCount += 1;
+  });
+
+  let largest = null;
+  groups.forEach((group) => {
+    if (group.pointCount < 2) {
+      return;
+    }
+    if (!largest || group.pointCount > largest.pointCount) {
+      largest = group;
+    }
+  });
+
+  return largest;
+}
+
+/**
  * Разводит точки с одинаковыми координатами по спирали вокруг исходной позиции.
  * Первая точка группы остаётся на месте; остальные получают coordinates_original.
  * Не мутирует входной массив и его элементы.
+ *
+ * @param {object[]} features
+ * @param {Set<string>|null} [onlyKeys] — если задан, разводить только эти ключи lng,lat;
+ *   пустой Set = не разводить ничего; null/undefined = все группы ≥2.
  */
-export function spreadCoincidentFeatures(features) {
+export function spreadCoincidentFeatures(features, onlyKeys = null) {
   if (!Array.isArray(features) || features.length < 2) {
     return features ?? [];
+  }
+
+  if (onlyKeys && onlyKeys.size === 0) {
+    return features;
   }
 
   const groups = new Map();
@@ -97,8 +168,12 @@ export function spreadCoincidentFeatures(features) {
 
   const result = features.slice();
 
-  groups.forEach((indices) => {
+  groups.forEach((indices, key) => {
     if (indices.length < 2) {
+      return;
+    }
+
+    if (onlyKeys && !onlyKeys.has(key)) {
       return;
     }
 
@@ -155,4 +230,35 @@ export function getSpreadPileFitBounds(coordinates, pointCount) {
     [lng - lngPad, lat - latPad],
     [lng + lngPad, lat + latPad]
   ];
+}
+
+/**
+ * Зумирует карту к самой крупной группе совпадающих координат (после spread).
+ * @returns {boolean} true, если камера сдвинута
+ */
+export function fitMapToCoincidentSpread(map, features) {
+  if (!map) {
+    return false;
+  }
+
+  const largest = getLargestCoincidentGroup(features);
+  if (!largest) {
+    return false;
+  }
+
+  const bounds = getSpreadPileFitBounds(largest.coordinates, largest.pointCount);
+  if (bounds && largest.pointCount > 1) {
+    map.fitBounds(bounds, {
+      padding: 56,
+      maxZoom: 18,
+      duration: 900
+    });
+  } else {
+    map.easeTo({
+      center: largest.coordinates,
+      zoom: Math.max(map.getZoom(), 15)
+    });
+  }
+
+  return true;
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/YearFilterPanel.css";
 
@@ -38,7 +39,8 @@ export default function YearFilterPanel({
   lockedByPropertyFilter = false,
   collapsed: collapsedProp,
   onCollapsedChange,
-  onMinimize
+  onMinimize,
+  onClose
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(true);
   const isControlled = collapsedProp !== undefined;
@@ -116,6 +118,7 @@ export default function YearFilterPanel({
           >
             {collapsed ? "▾" : "▴"}
           </button>
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 

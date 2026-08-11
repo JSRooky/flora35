@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import { GBIF_KINGDOMS } from "../gbif/taxonFilters";
 import {
@@ -24,7 +25,8 @@ export default function ExternalProcessingPanel({
   onFiltersReset,
   collapsed: collapsedProp,
   onCollapsedChange,
-  onMinimize
+  onMinimize,
+  onClose
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
   const isControlled = collapsedProp !== undefined;
@@ -149,6 +151,7 @@ export default function ExternalProcessingPanel({
           >
             {collapsed ? "▾" : "▴"}
           </button>
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 

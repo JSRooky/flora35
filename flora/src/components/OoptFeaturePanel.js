@@ -8,6 +8,7 @@ import {
 } from "./boundsPropertyLabels";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import { ReactComponent as FilterIcon } from "../images/filter_icon.svg";
 import "../styles/FeaturePopup.css";
@@ -46,7 +47,8 @@ export default function OoptFeaturePanel({
   onShowSpeciesList,
   collapsed = false,
   onCollapsedChange,
-  onMinimize
+  onMinimize,
+  onClose
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const properties = feature?.properties ?? {};
@@ -88,6 +90,7 @@ export default function OoptFeaturePanel({
               {collapsed ? "▾" : "▴"}
             </button>
           )}
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 

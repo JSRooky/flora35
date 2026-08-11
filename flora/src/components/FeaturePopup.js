@@ -3,6 +3,7 @@ import { getPointsForSpecies } from "./addSpeciesPolygonLayer";
 import FeatureImagesPopup from "./FeatureImagesPopup";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import RussianNamePickerPopup from "./RussianNamePickerPopup";
 import SpeciesDescriptionPopup from "./SpeciesDescriptionPopup";
@@ -221,7 +222,8 @@ export default function FeaturePopup({
   onLookupRussianName,
   onApplyRussianName,
   onClearRussianName,
-  onMinimize
+  onMinimize,
+  onClose
 }) {
   const [showImages, setShowImages] = useState(false);
   const [showSpeciesDescription, setShowSpeciesDescription] = useState(false);
@@ -470,6 +472,7 @@ export default function FeaturePopup({
                 {collapsed ? "▾" : "▴"}
               </button>
             )}
+            {onClose ? <PanelCloseButton onClick={onClose} /> : null}
           </div>
         </div>
 

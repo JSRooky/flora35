@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import { DEFAULT_POINT_COLOR } from "./pointColors";
 import "../styles/DenseClustersPanel.css";
@@ -181,6 +182,7 @@ export default function DenseClustersPanel({
           >
             {collapsed ? "▾" : "▴"}
           </button>
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 

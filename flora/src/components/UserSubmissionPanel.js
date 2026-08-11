@@ -12,6 +12,7 @@ import CoordinatesListPopup from "./CoordinatesListPopup";
 import MultiSpeciesEntryMenu from "./MultiSpeciesEntryMenu";
 import MultiSpeciesPopup from "./MultiSpeciesPopup";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import SubmissionAutocompleteField from "./SubmissionAutocompleteField";
 import SubmissionFieldLabel from "./SubmissionFieldLabel";
@@ -130,6 +131,7 @@ export default function UserSubmissionPanel({
   collapsed: collapsedProp,
   onCollapsedChange,
   onMinimize,
+  onClose,
   onSaved,
   onReset,
   onCoordinatesReset
@@ -436,6 +438,7 @@ export default function UserSubmissionPanel({
             >
               {collapsed ? "▾" : "▴"}
             </button>
+            {onClose ? <PanelCloseButton onClick={onClose} /> : null}
           </div>
         </div>
 

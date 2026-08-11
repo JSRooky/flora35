@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/StatusFilterPanel.css";
 
@@ -21,7 +22,8 @@ export default function StatusFilterPanel({
   onStatusFilterChange,
   collapsed: collapsedProp,
   onCollapsedChange,
-  onMinimize
+  onMinimize,
+  onClose
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(true);
   const isControlled = collapsedProp !== undefined;
@@ -49,6 +51,7 @@ export default function StatusFilterPanel({
           >
             {collapsed ? "▾" : "▴"}
           </button>
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 

@@ -308,6 +308,25 @@
   animation: gbifConfirmFadeIn 0.2s ease-out;
 }
 
+.gbif-confirm-dialog--load-options {
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gbif-confirm-dialog--load-options .gbif-confirm-title {
+  margin-bottom: 0;
+}
+
+.gbif-confirm-dialog--load-options .gbif-confirm-text {
+  margin: 0;
+}
+
+.gbif-confirm-dialog--load-options .gbif-confirm-actions {
+  margin-top: 4px;
+}
+
 @keyframes gbifConfirmFadeIn {
   from {
     opacity: 0;

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { setGbifData } from "./addGbifLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import {
   GBIF_MAP_UPDATE_PAGES,
@@ -88,6 +89,7 @@ export default function GbifPanel({
   collapsed = false,
   onCollapsedChange,
   onMinimize,
+  onClose,
   onDataChange,
   onOpenProcessing
 }) {
@@ -324,6 +326,7 @@ export default function GbifPanel({
               {collapsed ? "▾" : "▴"}
             </button>
           )}
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 

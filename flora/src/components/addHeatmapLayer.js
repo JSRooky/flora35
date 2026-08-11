@@ -111,3 +111,15 @@ export function updateHeatmapData(map, filters = {}) {
     source.setData(buildHeatmapData(filters));
   }
 }
+
+/** Временно подменяет данные тепловой карты заданным набором точек. */
+export function setHeatmapFeatures(map, features = []) {
+  if (!map?.getSource?.(SOURCE_ID)) {
+    return;
+  }
+
+  map.getSource(SOURCE_ID).setData({
+    type: "FeatureCollection",
+    features: Array.isArray(features) ? features : []
+  });
+}

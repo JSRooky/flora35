@@ -139,6 +139,20 @@ export async function planInatLoadSeries(
     return [buildSeriesItem({ id: "all", label: "Все наблюдения", extras })];
   }
 
+  // Уже сужено по iconic taxa — не разбиваем на другие группы.
+  if (extras.iconicTaxa) {
+    const label = Array.isArray(extras.iconicTaxa)
+      ? extras.iconicTaxa.join(", ")
+      : String(extras.iconicTaxa);
+    return [
+      buildSeriesItem({
+        id: `taxon-${label}`,
+        label,
+        extras
+      })
+    ];
+  }
+
   return buildIconicTaxaSeries().map((item) =>
     buildSeriesItem({
       id: item.id,

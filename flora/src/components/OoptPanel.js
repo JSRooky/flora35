@@ -5,6 +5,7 @@ import {
 } from "../firebase/boundsCollectionFirestore";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/OoptPanel.css";
 
@@ -229,7 +230,8 @@ export default function OoptPanel({
   onMarkersVisibleChange,
   collapsed: collapsedProp,
   onCollapsedChange,
-  onMinimize
+  onMinimize,
+  onClose
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -268,6 +270,7 @@ export default function OoptPanel({
           >
             {collapsed ? "▾" : "▴"}
           </button>
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 

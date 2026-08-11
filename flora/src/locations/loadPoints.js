@@ -298,12 +298,9 @@ export function isFindingInDataSource(findingId, mode) {
     case DATA_SOURCE_MODES.GBIF:
       return Boolean(gbifFeature || inatFeature);
     default:
-      return (
-        expandFindingsToFeatures(getAllSpeciesCollection()).features.some((feature) =>
-          featureMatchesFindingId(feature, findingId)
-        ) ||
-        Boolean(gbifFeature) ||
-        Boolean(inatFeature)
+      // «Все» — только локальные проверенные и пользовательские точки.
+      return expandFindingsToFeatures(getAllSpeciesCollection()).features.some((feature) =>
+        featureMatchesFindingId(feature, findingId)
       );
   }
 }

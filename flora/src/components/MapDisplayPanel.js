@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/MapDisplayPanel.css";
 
@@ -55,7 +56,8 @@ export default function MapDisplayPanel({
   onDenseProcessingOpen,
   collapsed: collapsedProp,
   onCollapsedChange,
-  onMinimize
+  onMinimize,
+  onClose
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(true);
   const isControlled = collapsedProp !== undefined;
@@ -87,6 +89,7 @@ export default function MapDisplayPanel({
           >
             {collapsed ? "▾" : "▴"}
           </button>
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 

@@ -159,6 +159,14 @@ import BufferPopup from "./components/BufferPopup";
 import AreaSelectionPopup from "./components/AreaSelectionPopup";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
+import DataWorkPanel from "./components/DataWorkPanel";
+import NearSpeciesMatchesPopup from "./components/NearSpeciesMatchesPopup";
+import { DATA_WORK_TOOL_IDS } from "./dataWork/dataWorkTools";
+import {
+  isolateNearSpeciesPairOnMap,
+  restoreNearSpeciesMapLayers
+} from "./dataWork/isolateNearSpeciesPairOnMap";
+import { fitMapToCoordinatePair } from "./geo/fitMapToCoordinatePair";
 import BasemapPicker from "./components/BasemapPicker";
 import YearFilterPanel from "./components/YearFilterPanel";
 import TimelineSlider from "./components/TimelineSlider";
@@ -185,6 +193,9 @@ import {
 } from "./names/russianNameResolver";
 import DataSourcesPanel from "./components/DataSourcesPanel";
 import ExternalProcessingPanel from "./components/ExternalProcessingPanel";
+import {
+  EXTERNAL_LAYER_IDS
+} from "./components/ExternalLayersPicker";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
@@ -209,6 +220,7 @@ const PANEL_IDS = {
   SUBMIT: "submit",
   DATA_SOURCES: "data-sources",
   EXTERNAL_PROCESSING: "external-processing",
+  DATA_WORK: "data-work",
   /** @deprecated алиасы для taskbar */
   GBIF: "data-sources",
   GBIF_PROCESSING: "external-processing"
@@ -234,7 +246,8 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.OOPT_FEATURE,
   PANEL_IDS.SUBMIT,
   PANEL_IDS.DATA_SOURCES,
-  PANEL_IDS.EXTERNAL_PROCESSING
+  PANEL_IDS.EXTERNAL_PROCESSING,
+  PANEL_IDS.DATA_WORK
 ];
 
 function isPanelExpandedInState(collapsedState, panelId) {
@@ -261,6 +274,7 @@ export default function MapView() {
   // Инвалидация списка плотных групп при смене данных в module-store (локальные/GBIF).
   const [pointsDataRevision, setPointsDataRevision] = useState(0);
   const densePileCameraBeforeRef = useRef(null);
+  const nearSpeciesCameraBeforeRef = useRef(null);
   const selectedDensePileKeyRef = useRef(null);
   selectedDensePileKeyRef.current = selectedDensePileKey;
 
@@ -331,7 +345,12 @@ export default function MapView() {
   const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.ALL);
   const externalOnly = dataSourceMode === DATA_SOURCE_MODES.EXTERNAL;
   const prevExternalOnlyRef = useRef(externalOnly);
+  const [externalLayersEnabled, setExternalLayersEnabled] = useState({
+    [EXTERNAL_LAYER_IDS.GBIF]: true,
+    [EXTERNAL_LAYER_IDS.INATURALIST]: true
+  });
   const [externalProcessingActive, setExternalProcessingActive] = useState(false);
+  const [nearSpeciesMatchesActive, setNearSpeciesMatchesActive] = useState(false);
   const [externalProcessingFilters, setExternalProcessingFiltersState] = useState(
     createDefaultExternalProcessingFilters
   );
@@ -701,6 +720,9 @@ export default function MapView() {
       case MODULE_IDS.SUBMIT:
         expandPanel(PANEL_IDS.SUBMIT);
         break;
+      case MODULE_IDS.DATA_WORK:
+        expandPanel(PANEL_IDS.DATA_WORK);
+        break;
       case MODULE_IDS.GBIF:
         expandGbifDataPanel();
         break;
@@ -1024,6 +1046,24 @@ export default function MapView() {
       } else {
         setExternalProcessingActive(false);
       }
+    },
+    [expandGbifDataPanel]
+  );
+
+  const handleExternalLayerToggle = useCallback((layerId, enabled) => {
+    setExternalLayersEnabled((prev) => {
+      if (prev[layerId] === enabled) {
+        return prev;
+      }
+      return { ...prev, [layerId]: enabled };
+    });
+  }, []);
+
+  const handleExternalLayerRequestLoad = useCallback(
+    (layerId) => {
+      setExternalLayersEnabled((prev) => ({ ...prev, [layerId]: true }));
+      stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DATA_SOURCES);
+      expandGbifDataPanel();
     },
     [expandGbifDataPanel]
   );
@@ -1443,6 +1483,10 @@ export default function MapView() {
 
     if (activeModule === MODULE_IDS.SUBMIT && !isMin(PANEL_IDS.SUBMIT)) {
       ids.push(PANEL_IDS.SUBMIT);
+    }
+
+    if (activeModule === MODULE_IDS.DATA_WORK && !isMin(PANEL_IDS.DATA_WORK)) {
+      ids.push(PANEL_IDS.DATA_WORK);
     }
 
     if (
@@ -2389,6 +2433,63 @@ export default function MapView() {
     expandGbifProcessingPanel();
   }, [expandGbifProcessingPanel]);
 
+  const handleOpenDataWorkTool = useCallback((toolId) => {
+    if (toolId === DATA_WORK_TOOL_IDS.NEAR_SPECIES_MATCHES) {
+      setNearSpeciesMatchesActive(true);
+    }
+  }, []);
+
+  const handleCloseNearSpeciesMatches = useCallback(() => {
+    if (map.current) {
+      restoreNearSpeciesMapLayers(map.current, locationFilters);
+    }
+    nearSpeciesCameraBeforeRef.current = null;
+    setNearSpeciesMatchesActive(false);
+  }, [locationFilters]);
+
+  const handleShowNearSpeciesPair = useCallback(
+    (match) => {
+      const mapInstance = map.current;
+      if (!mapInstance || !match) {
+        return;
+      }
+
+      if (!nearSpeciesCameraBeforeRef.current) {
+        nearSpeciesCameraBeforeRef.current = {
+          center: mapInstance.getCenter().toArray(),
+          zoom: mapInstance.getZoom(),
+          bearing: mapInstance.getBearing(),
+          pitch: mapInstance.getPitch()
+        };
+      }
+
+      isolateNearSpeciesPairOnMap(mapInstance, match);
+      fitMapToCoordinatePair(
+        mapInstance,
+        match.left?.coordinates,
+        match.right?.coordinates
+      );
+    },
+    []
+  );
+
+  const handleNearSpeciesPreviewEnd = useCallback(() => {
+    const mapInstance = map.current;
+    if (mapInstance) {
+      restoreNearSpeciesMapLayers(mapInstance, locationFilters);
+    }
+
+    const previous = nearSpeciesCameraBeforeRef.current;
+    if (mapInstance && previous) {
+      mapInstance.easeTo({
+        ...previous,
+        duration: 900
+      });
+    }
+
+    nearSpeciesCameraBeforeRef.current = null;
+  }, [locationFilters]);
+
   useEffect(() => {
     setHoverTooltipsEnabled(!hoverTooltipsDisabled);
   }, [hoverTooltipsDisabled]);
@@ -2505,19 +2606,21 @@ export default function MapView() {
       return;
     }
 
-    if (externalOnly && map.current) {
-      setGbifVisibility(map.current, true);
-      setInatVisibility(map.current, true);
+    if (map.current) {
+      const showGbif = externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.GBIF];
+      const showInat = externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST];
+      setGbifVisibility(map.current, showGbif);
+      setInatVisibility(map.current, showInat);
     }
 
     prevExternalOnlyRef.current = externalOnly;
-  }, [externalOnly]);
+  }, [externalOnly, externalLayersEnabled]);
 
   useEffect(() => {
     setToolFeaturesContext({
       includeLocal: !externalOnly,
-      includeGbif: true,
-      includeInat: true
+      includeGbif: externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.GBIF],
+      includeInat: externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST]
     });
 
     if (!map.current || !mapReady) {
@@ -2526,20 +2629,29 @@ export default function MapView() {
 
     updateHeatmapData(map.current, locationFilters);
     refreshAreal();
-  }, [externalOnly, mapReady, locationFilters, refreshAreal]);
+  }, [externalOnly, externalLayersEnabled, mapReady, locationFilters, refreshAreal]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
       return;
     }
 
-    // В режиме GBIF локальные маркеры скрыты; «Скрыть точки» управляет слоем GBIF.
+    // В режиме внешних источников локальные маркеры скрыты;
+    // «Скрыть точки» управляет включёнными слоями GBIF / iNaturalist.
     setMarkersVisible(map.current, externalOnly ? false : mapMarkersVisible);
-    if (externalOnly) {
-      setGbifVisibility(map.current, mapMarkersVisible);
-      setInatVisibility(map.current, mapMarkersVisible);
-    }
-  }, [mapMarkersVisible, externalOnly, mapReady]);
+    setGbifVisibility(
+      map.current,
+      externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.GBIF]
+        ? mapMarkersVisible
+        : false
+    );
+    setInatVisibility(
+      map.current,
+      externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST]
+        ? mapMarkersVisible
+        : false
+    );
+  }, [mapMarkersVisible, externalOnly, externalLayersEnabled, mapReady]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -3414,6 +3526,115 @@ export default function MapView() {
     setBufferDockedWithFeature(false);
   }, []);
 
+  const closePanel = useCallback(
+    (panelId) => {
+      switch (panelId) {
+        case PANEL_IDS.FEATURE: {
+          clearPointSelection();
+          unpinPanelsFromTaskbar([
+            PANEL_IDS.FEATURE,
+            PANEL_IDS.AREAL,
+            PANEL_IDS.BUFFER
+          ]);
+          break;
+        }
+        case PANEL_IDS.AREAL: {
+          unpinPanelsFromTaskbar([PANEL_IDS.AREAL]);
+          if (arealDockedWithFeature) {
+            setArealDockedWithFeature(false);
+          } else {
+            setActiveModule((current) =>
+              current === MODULE_IDS.AREAL ? null : current
+            );
+          }
+          break;
+        }
+        case PANEL_IDS.BUFFER: {
+          unpinPanelsFromTaskbar([PANEL_IDS.BUFFER]);
+          if (bufferDockedWithFeature) {
+            setBufferDockedWithFeature(false);
+          } else {
+            setActiveModule((current) =>
+              current === MODULE_IDS.BUFFER ? null : current
+            );
+          }
+          break;
+        }
+        case PANEL_IDS.DENSE: {
+          handleDenseProcessingClose();
+          break;
+        }
+        case PANEL_IDS.OOPT_FEATURE: {
+          setSelectedBoundsFeature(null);
+          setBoundsSpeciesListOpen(false);
+          setBoundsSpeciesRegnumFilter(null);
+          unpinPanelsFromTaskbar([
+            PANEL_IDS.OOPT_FEATURE,
+            TASKBAR_PANEL_IDS.OOPT_SPECIES
+          ]);
+          break;
+        }
+        case PANEL_IDS.DATA_SOURCES:
+        case PANEL_IDS.GBIF: {
+          unpinPanelsFromTaskbar([
+            PANEL_IDS.DATA_SOURCES,
+            PANEL_IDS.EXTERNAL_PROCESSING
+          ]);
+          if (dataSourceMode === DATA_SOURCE_MODES.EXTERNAL) {
+            handleDataSourceModeChange(DATA_SOURCE_MODES.ALL);
+          }
+          break;
+        }
+        case PANEL_IDS.EXTERNAL_PROCESSING:
+        case PANEL_IDS.GBIF_PROCESSING: {
+          setExternalProcessingActive(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.EXTERNAL_PROCESSING]);
+          break;
+        }
+        case PANEL_IDS.DATA_WORK: {
+          setNearSpeciesMatchesActive(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.DATA_WORK]);
+          setActiveModule((current) =>
+            current === MODULE_IDS.DATA_WORK ? null : current
+          );
+          break;
+        }
+        case TASKBAR_PANEL_IDS.OOPT_SPECIES: {
+          handleBoundsSpeciesListClose();
+          break;
+        }
+        case TASKBAR_PANEL_IDS.DENSE_SPECIES: {
+          handleDensePileSpeciesListClose();
+          break;
+        }
+        default: {
+          const moduleId = PANEL_TASKBAR_MODULE_ID[panelId];
+          unpinPanelsFromTaskbar([panelId]);
+          if (moduleId) {
+            setActiveModule((current) => (current === moduleId ? null : current));
+          }
+          break;
+        }
+      }
+    },
+    [
+      arealDockedWithFeature,
+      bufferDockedWithFeature,
+      clearPointSelection,
+      dataSourceMode,
+      handleBoundsSpeciesListClose,
+      handleDataSourceModeChange,
+      handleDensePileSpeciesListClose,
+      handleDenseProcessingClose,
+      unpinPanelsFromTaskbar
+    ]
+  );
+
+  const handleClosePanel = useCallback(
+    (panelId) => () => closePanel(panelId),
+    [closePanel]
+  );
+
   // Буфер строится только при включённом переключателе «Построить буфер».
   useEffect(() => {
     const mapInstance = map.current;
@@ -3445,7 +3666,16 @@ export default function MapView() {
     const { findingId, zoom } = pendingShare;
 
     if (!isFindingInDataSource(findingId, dataSourceMode)) {
-      if (dataSourceMode !== DATA_SOURCE_MODES.ALL) {
+      const sharedFeature = findFeatureByFindingId(findingId);
+      const isExternalFinding =
+        sharedFeature?.properties?.source === "gbif" ||
+        sharedFeature?.properties?.source === "inaturalist" ||
+        String(findingId).startsWith("gbif-") ||
+        String(findingId).startsWith("inat-");
+
+      if (isExternalFinding && dataSourceMode !== DATA_SOURCE_MODES.EXTERNAL) {
+        handleDataSourceModeChange(DATA_SOURCE_MODES.EXTERNAL);
+      } else if (!isExternalFinding && dataSourceMode !== DATA_SOURCE_MODES.ALL) {
         handleDataSourceModeChange(DATA_SOURCE_MODES.ALL);
       } else {
         pendingSharePointRef.current = null;
@@ -3479,14 +3709,25 @@ export default function MapView() {
       map.current = initMap(ref.current);
 
       map.current.on("load", async () => {
+        const mapInstance = map.current;
+        if (!mapInstance) {
+          return;
+        }
+
         await initLocationsFromFirestore();
         await hydrateGbifStoreFromPersistence();
         await hydrateInatStoreFromPersistence();
+
+        // Cleanup (HMR / размонтирование) мог уничтожить карту, пока ждали hydrate.
+        if (map.current !== mapInstance) {
+          return;
+        }
+
         syncYearBounds();
 
-        addOsmBasemapLayer(map.current);
-        addYandexBasemapLayer(map.current);
-        addLocationsLayer(map.current, {
+        addOsmBasemapLayer(mapInstance);
+        addYandexBasemapLayer(mapInstance);
+        addLocationsLayer(mapInstance, {
           onClusterExpanded: (leaves) => {
             const { arealEnabled: enabled, arealAllMarkers: allMarkers } =
               arealStateRef.current;
@@ -3614,14 +3855,14 @@ export default function MapView() {
           clusterPieChartsEnabled: DEFAULT_CLUSTER_PIE_CHARTS,
           markersVisible: DEFAULT_MARKERS_VISIBLE
         });
-        addBoundsLayers(map.current);
-        addArealLayer(map.current);
-        addSpeciesPolygonLayer(map.current); // слой экспериментального модуля «Полигон»
-        addArealDynamicsLayer(map.current);
-        addBufferLayer(map.current);
-        addAreaSelectionLayer(map.current);
-        addHeatmapLayer(map.current);
-        addGbifLayer(map.current, {
+        addBoundsLayers(mapInstance);
+        addArealLayer(mapInstance);
+        addSpeciesPolygonLayer(mapInstance); // слой экспериментального модуля «Полигон»
+        addArealDynamicsLayer(mapInstance);
+        addBufferLayer(mapInstance);
+        addAreaSelectionLayer(mapInstance);
+        addHeatmapLayer(mapInstance);
+        addGbifLayer(mapInstance, {
           onPointClick: (feature) => {
             if (isAreaDrawingActive()) {
               return;
@@ -3699,7 +3940,7 @@ export default function MapView() {
             });
           }
         });
-        addInatLayer(map.current, {
+        addInatLayer(mapInstance, {
           onPointClick: (feature) => {
             if (isAreaDrawingActive()) {
               return;
@@ -3777,6 +4018,11 @@ export default function MapView() {
             });
           }
         });
+
+        if (map.current !== mapInstance) {
+          return;
+        }
+
         setMapReady(true);
       });
     }
@@ -3818,6 +4064,20 @@ export default function MapView() {
 
     unpinPanelsFromTaskbar([PANEL_IDS.GBIF_PROCESSING]);
   }, [externalProcessingActive, unpinPanelsFromTaskbar]);
+
+  useEffect(() => {
+    if (activeModule === MODULE_IDS.DATA_WORK) {
+      return;
+    }
+
+    setNearSpeciesMatchesActive((wasActive) => {
+      if (wasActive && map.current) {
+        restoreNearSpeciesMapLayers(map.current, locationFilters);
+      }
+      return false;
+    });
+    nearSpeciesCameraBeforeRef.current = null;
+  }, [activeModule, locationFilters]);
 
   const arealDisplayedContainedPoints = arealContainedPoints ?? activeToolFilterPointsSummary;
 
@@ -3888,6 +4148,7 @@ export default function MapView() {
                   collapsed={isPanelCollapsed(PANEL_IDS.FEATURE)}
                   onCollapsedChange={handleFeaturePanelCollapsedChange}
                   onMinimize={handleMinimizePanel(PANEL_IDS.FEATURE)}
+                  onClose={handleClosePanel(PANEL_IDS.FEATURE)}
                   activeFilters={propertyFilters}
                   onFilterChange={handlePropertyFilterChange}
                   activeStatusFilters={statusFilters}
@@ -3933,6 +4194,7 @@ export default function MapView() {
               collapsed={isPanelCollapsed(PANEL_IDS.FEATURE)}
               onCollapsedChange={handleFeaturePanelCollapsedChange}
               onMinimize={handleMinimizePanel(PANEL_IDS.FEATURE)}
+              onClose={handleClosePanel(PANEL_IDS.FEATURE)}
               activeFilters={propertyFilters}
               onFilterChange={handlePropertyFilterChange}
               activeStatusFilters={statusFilters}
@@ -3969,6 +4231,7 @@ export default function MapView() {
               collapsed={isPanelCollapsed(PANEL_IDS.AREAL)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.AREAL)}
               onMinimize={handleMinimizePanel(PANEL_IDS.AREAL)}
+              onClose={handleClosePanel(PANEL_IDS.AREAL)}
             />
           )}
           {activeModule === MODULE_IDS.STATUS &&
@@ -3979,6 +4242,7 @@ export default function MapView() {
               collapsed={isPanelCollapsed(PANEL_IDS.STATUS)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.STATUS)}
               onMinimize={handleMinimizePanel(PANEL_IDS.STATUS)}
+              onClose={handleClosePanel(PANEL_IDS.STATUS)}
             />
           )}
           {activeModule === MODULE_IDS.MAP && !isPanelMinimized(PANEL_IDS.MAP) && (
@@ -3999,6 +4263,7 @@ export default function MapView() {
               collapsed={isPanelCollapsed(PANEL_IDS.MAP)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.MAP)}
               onMinimize={handleMinimizePanel(PANEL_IDS.MAP)}
+              onClose={handleClosePanel(PANEL_IDS.MAP)}
             />
           )}
           {activeModule === MODULE_IDS.YEAR &&
@@ -4013,6 +4278,7 @@ export default function MapView() {
               collapsed={isPanelCollapsed(PANEL_IDS.YEAR)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.YEAR)}
               onMinimize={handleMinimizePanel(PANEL_IDS.YEAR)}
+              onClose={handleClosePanel(PANEL_IDS.YEAR)}
             />
           )}
           {activeModule === MODULE_IDS.POLYGON &&
@@ -4047,6 +4313,7 @@ export default function MapView() {
               collapsed={isPanelCollapsed(PANEL_IDS.POLYGON)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.POLYGON)}
               onMinimize={handleMinimizePanel(PANEL_IDS.POLYGON)}
+              onClose={handleClosePanel(PANEL_IDS.POLYGON)}
             />
           )}
           {(activeModule === MODULE_IDS.BUFFER ||
@@ -4067,6 +4334,7 @@ export default function MapView() {
               collapsed={isPanelCollapsed(PANEL_IDS.BUFFER)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.BUFFER)}
               onMinimize={handleMinimizePanel(PANEL_IDS.BUFFER)}
+              onClose={handleClosePanel(PANEL_IDS.BUFFER)}
             />
           ) : null}
           {activeModule === MODULE_IDS.AREA &&
@@ -4084,6 +4352,22 @@ export default function MapView() {
               collapsed={isPanelCollapsed(PANEL_IDS.AREA)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.AREA)}
               onMinimize={handleMinimizePanel(PANEL_IDS.AREA)}
+              onClose={handleClosePanel(PANEL_IDS.AREA)}
+            />
+          )}
+          {activeModule === MODULE_IDS.DATA_WORK &&
+            !isPanelMinimized(PANEL_IDS.DATA_WORK) && (
+            <DataWorkPanel
+              collapsed={isPanelCollapsed(PANEL_IDS.DATA_WORK)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.DATA_WORK)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.DATA_WORK)}
+              onClose={handleClosePanel(PANEL_IDS.DATA_WORK)}
+              onOpenTool={handleOpenDataWorkTool}
+              activeToolId={
+                nearSpeciesMatchesActive
+                  ? DATA_WORK_TOOL_IDS.NEAR_SPECIES_MATCHES
+                  : null
+              }
             />
           )}
           {activeModule === MODULE_IDS.OOPT &&
@@ -4106,6 +4390,7 @@ export default function MapView() {
               collapsed={isPanelCollapsed(PANEL_IDS.OOPT)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.OOPT)}
               onMinimize={handleMinimizePanel(PANEL_IDS.OOPT)}
+              onClose={handleClosePanel(PANEL_IDS.OOPT)}
             />
           )}
           {showOoptFeaturePanel && !isPanelMinimized(PANEL_IDS.OOPT_FEATURE) ? (
@@ -4122,6 +4407,7 @@ export default function MapView() {
               collapsed={isPanelCollapsed(PANEL_IDS.OOPT_FEATURE)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.OOPT_FEATURE)}
               onMinimize={handleMinimizePanel(PANEL_IDS.OOPT_FEATURE)}
+              onClose={handleClosePanel(PANEL_IDS.OOPT_FEATURE)}
             />
           ) : null}
           {activeModule === MODULE_IDS.SUBMIT &&
@@ -4135,6 +4421,7 @@ export default function MapView() {
                 collapsed={isPanelCollapsed(PANEL_IDS.SUBMIT)}
                 onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.SUBMIT)}
                 onMinimize={handleMinimizePanel(PANEL_IDS.SUBMIT)}
+                onClose={handleClosePanel(PANEL_IDS.SUBMIT)}
                 onSaved={handleUserFindingSaved}
                 onReset={handleSubmissionCoordinatesReset}
                 onCoordinatesReset={handleSubmissionCoordinatesReset}
@@ -4149,6 +4436,7 @@ export default function MapView() {
                 collapsed={isPanelCollapsed(PANEL_IDS.DATA_SOURCES)}
                 onCollapsedChange={handleGbifPanelCollapsedChange}
                 onMinimize={handleMinimizePanel(PANEL_IDS.DATA_SOURCES)}
+                onClose={handleClosePanel(PANEL_IDS.DATA_SOURCES)}
                 onDataChange={handleExternalDataChange}
                 onOpenProcessing={handleOpenGbifProcessing}
               />
@@ -4162,6 +4450,7 @@ export default function MapView() {
                   collapsed={isPanelCollapsed(PANEL_IDS.EXTERNAL_PROCESSING)}
                   onCollapsedChange={handleGbifProcessingPanelCollapsedChange}
                   onMinimize={handleMinimizePanel(PANEL_IDS.EXTERNAL_PROCESSING)}
+                  onClose={handleClosePanel(PANEL_IDS.EXTERNAL_PROCESSING)}
                 />
               )}
             </>
@@ -4195,6 +4484,12 @@ export default function MapView() {
         />
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
+      <NearSpeciesMatchesPopup
+        open={nearSpeciesMatchesActive}
+        onClose={handleCloseNearSpeciesMatches}
+        onShowPair={handleShowNearSpeciesPair}
+        onPreviewEnd={handleNearSpeciesPreviewEnd}
+      />
       <BoundsSpeciesListPopup
         open={
           boundsSpeciesListOpen &&
@@ -4240,6 +4535,11 @@ export default function MapView() {
         activeFilters={activeMapFilters}
         onFiltersReset={handleMapFiltersReset}
         onFilterClear={handleMapFilterClear}
+        externalLayersVisible={externalOnly}
+        externalLayersEnabled={externalLayersEnabled}
+        externalLayersDataRevision={pointsDataRevision}
+        onExternalLayerToggle={handleExternalLayerToggle}
+        onExternalLayerRequestLoad={handleExternalLayerRequestLoad}
       />
     </>
   );

@@ -51,6 +51,8 @@ import {
   setDensePilesData
 } from "./densePiles";
 import {
+  fitMapToCoincidentSpread,
+  getCoincidentCoordKeys,
   getFeatureCoordinates,
   getSpreadPileFitBounds,
   restoreOriginalCoordinates,
@@ -110,6 +112,8 @@ let clusterPieChartsEnabled = false;
 let denseClustersHighlightEnabled = false;
 /** Раскрытые сверхплотные кучи (показывают отдельные точки). */
 let expandedDensePileKeys = new Set();
+/** Ключи lng,lat совпадающих точек, разведённых по клику на обычный кластер. */
+let expandedCoincidentKeys = new Set();
 /** Члены сверхплотных кластеров: id → features[]. */
 let locationsDensePileMembers = new Map();
 let markersVisible = true;
@@ -1309,6 +1313,32 @@ function attachLocationsInteractions(map) {
         return;
       }
 
+      const restoredLeaves = (leaves ?? []).map(restoreOriginalCoordinates);
+      const coincidentKeys = getCoincidentCoordKeys(restoredLeaves);
+
+      // Вне режима «Плотные группы»: совпадающие координаты разводим спиралью
+      // (иначе Mapbox-кластер «залипает» после clusterMaxZoom).
+      if (coincidentKeys.size > 0) {
+        coincidentKeys.forEach((key) => expandedCoincidentKeys.add(key));
+        updateLocationsSourceData(map, currentFilteredFeatures);
+        fitMapToCoincidentSpread(map, restoredLeaves);
+
+        map.once("moveend", () => {
+          if (requestId !== clusterExpandRequestId) {
+            return;
+          }
+
+          map.once("idle", () => {
+            if (requestId !== clusterExpandRequestId) {
+              return;
+            }
+
+            onClusterExpandedCallback?.(restoredLeaves);
+          });
+        });
+        return;
+      }
+
       source.getClusterExpansionZoom(clusterId, (err, zoom) => {
         if (err || requestId !== clusterExpandRequestId) {
           return;
@@ -1330,7 +1360,7 @@ function attachLocationsInteractions(map) {
               return;
             }
 
-            onClusterExpandedCallback?.(leaves.map(restoreOriginalCoordinates));
+            onClusterExpandedCallback?.(restoredLeaves);
           });
         });
       });
@@ -1654,13 +1684,16 @@ function locationsSourcesExist(map) {
 
 /**
  * Готовит точки к отрисовке: в режиме сверхплотных — только кучи ≥10 (остальные скрыты);
- * иначе обычный spread совпадающих координат.
+ * при обычной кластеризации — spread только для раскрытых по клику совпадающих координат;
+ * без кластеризации — полный spread совпадающих координат.
  */
 function prepareMapFeatures(features) {
   if (!denseClustersHighlightEnabled) {
     locationsDensePileMembers = new Map();
     return {
-      mapFeatures: spreadCoincidentFeatures(features),
+      mapFeatures: isMapboxClusteringActive()
+        ? spreadCoincidentFeatures(features, expandedCoincidentKeys)
+        : spreadCoincidentFeatures(features),
       denseClusterFeatures: []
     };
   }
@@ -1767,6 +1800,24 @@ function updateLocationsSourceData(map, filteredFeatures) {
 
   map.getSource("locations")?.setData(collection);
   syncDensePilesLayers(map, denseClusterFeatures);
+}
+
+/** Временно подменяет локальные точки на карте (без смены currentFilters). */
+export function setTemporaryLocationsFeatures(map, features = []) {
+  if (!map || !locationsSourcesExist(map)) {
+    return;
+  }
+
+  updateLocationsSourceData(map, Array.isArray(features) ? features : []);
+}
+
+/** Восстанавливает локальные точки по текущим фильтрам слоя. */
+export function refreshLocationsFromCurrentFilters(map) {
+  if (!map || !locationsSourcesExist(map)) {
+    return;
+  }
+
+  updateLocationsSourceData(map, getFilteredFeatures(currentFilters));
 }
 
 /** Добавляет или убирает точки при изменении года таймлайна без пересборки слоёв. */
@@ -2365,6 +2416,7 @@ export function applyLocationsFilter(map, filters = {}) {
 
   currentFilters = filters;
   expandedDensePileKeys = new Set();
+  expandedCoincidentKeys = new Set();
   rebuildLocationsLayers(map);
   applyGbifLocationsFilter(map, filters);
   applyInatLocationsFilter(map, filters);
@@ -2386,6 +2438,9 @@ export function setClusterByRegnum(map, enabled) {
 /** Включает/выключает кластеризацию точек и пересобирает слои. */
 export function setClusteringEnabled(map, enabled) {
   clusteringEnabled = enabled;
+  if (!enabled) {
+    expandedCoincidentKeys = new Set();
+  }
   rebuildLocationsLayers(map);
 }
 
@@ -2434,6 +2489,7 @@ export function setDenseClustersHighlightEnabled(map, enabled) {
 
   denseClustersHighlightEnabled = next;
   expandedDensePileKeys = new Set();
+  expandedCoincidentKeys = new Set();
   if (map) {
     rebuildLocationsLayers(map);
   }

@@ -3,6 +3,7 @@ import {
   buildSpeciesRegnumFamilyTree,
   formatSpeciesCount
 } from "./featurePropertyLabels";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/FeaturePopup.css";
 import "../styles/ArealPopup.css";
@@ -404,7 +405,6 @@ export default function BoundsSpeciesListPopup({
     return null;
   }
 
-  const closeLabel = "Закрыть";
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const speciesCount = species.length;
   const territoryCategory = territoryHeading?.category ?? "";
@@ -441,15 +441,7 @@ export default function BoundsSpeciesListPopup({
             >
               {collapsed ? "▾" : "▴"}
             </button>
-            <button
-              type="button"
-              className="popup-panel-toggle"
-              onClick={onClose}
-              aria-label={closeLabel}
-              title={closeLabel}
-            >
-              ×
-            </button>
+            {onClose ? <PanelCloseButton onClick={onClose} /> : null}
           </div>
         </div>
 

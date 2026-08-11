@@ -4,6 +4,7 @@ import { getPointsForSpecies, POLYGON_BUILD_MODES } from "./addSpeciesPolygonLay
 import { formatPointCount } from "./featurePropertyLabels";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import PolygonModeIcon from "./PolygonModeIcon";
 import "../styles/SpeciesPolygonPopup.css";
@@ -274,7 +275,8 @@ export default function SpeciesPolygonPopup({
   onIntersectionPointSelect,
   collapsed = false,
   onCollapsedChange,
-  onMinimize
+  onMinimize,
+  onClose
 }) {
   const hasSelectedPoint = Boolean(feature);
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
@@ -348,6 +350,7 @@ export default function SpeciesPolygonPopup({
           >
             {collapsed ? "▾" : "▴"}
           </button>
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 

@@ -34,6 +34,8 @@ export const MODULE_IDS = {
   EXTERNAL_PROCESSING: "external-processing",
   /** @deprecated Используйте EXTERNAL_PROCESSING */
   GBIF_PROCESSING: "external-processing",
+  // Инструменты работы с внешними данными (меню «Инструменты»).
+  DATA_WORK: "data-work",
   ABOUT: "about"
 };
 
@@ -59,7 +61,8 @@ const TOOL_MODULE_ITEMS = [
   { id: MODULE_IDS.BUFFER, label: "Буфер", mapToolAccent: true },
   { id: MODULE_IDS.POLYGON, label: "Полигон", mapToolAccent: true },
   { id: MODULE_IDS.AREA, label: "Область", mapToolAccent: true },
-  { id: MODULE_IDS.OOPT, label: "ООПТ", mapToolAccent: true }
+  { id: MODULE_IDS.OOPT, label: "ООПТ", mapToolAccent: true },
+  { id: MODULE_IDS.DATA_WORK, label: "Работа с данными", mapToolAccent: true }
 ];
 
 const TOOL_MODULE_IDS = new Set([

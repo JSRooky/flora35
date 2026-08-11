@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ReactComponent as FilterIcon } from "../images/filter_icon.svg";
+import ExternalLayersPicker from "./ExternalLayersPicker";
 import FeedbackWidget from "./FeedbackWidget";
 import "../styles/MapCornerControls.css";
 
@@ -57,7 +58,12 @@ function TrashIcon() {
 export default function MapCornerControls({
   activeFilters = [],
   onFiltersReset,
-  onFilterClear
+  onFilterClear,
+  externalLayersVisible = false,
+  externalLayersEnabled,
+  externalLayersDataRevision = 0,
+  onExternalLayerToggle,
+  onExternalLayerRequestLoad
 }) {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const wrapRef = useRef(null);
@@ -196,7 +202,16 @@ export default function MapCornerControls({
           </div>
         ) : null}
       </div>
-      <FeedbackWidget />
+      <div className="map-corner-controls-footer">
+        <FeedbackWidget />
+        <ExternalLayersPicker
+          visible={externalLayersVisible}
+          enabledLayers={externalLayersEnabled}
+          dataRevision={externalLayersDataRevision}
+          onToggleLayer={onExternalLayerToggle}
+          onRequestLoad={onExternalLayerRequestLoad}
+        />
+      </div>
     </div>
   );
 }

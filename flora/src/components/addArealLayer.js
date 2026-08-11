@@ -1,5 +1,6 @@
 import mapboxgl from "mapbox-gl";
 import { circle } from "@turf/turf";
+import { getHaversineDistanceKm } from "../geo/getHaversineDistanceKm";
 import {
   getToolFeatures,
   getPointColorForRegnum,
@@ -13,7 +14,7 @@ const EMPTY_COLLECTION = {
   features: []
 };
 
-const EARTH_RADIUS_KM = 6371;
+export { getHaversineDistanceKm };
 /** Порог (~1 м): ближе считаем той же точкой, что и центр ареала. */
 const SAME_POINT_THRESHOLD_KM = 0.001;
 /** Допуск для сопоставления точки с карты с записью в dataset. */
@@ -124,20 +125,6 @@ function resolveCenterFeature(centerFeature, filters = {}) {
   }
 
   return closest;
-}
-
-/** Расстояние между двумя точками [lng, lat] по поверхности Земли, в км. */
-export function getHaversineDistanceKm(center, point) {
-  const [lng1, lat1] = center;
-  const [lng2, lat2] = point;
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-
-  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
 }
 
 /**
