@@ -4050,16 +4050,9 @@ export default function MapView() {
       } else if (
         !isExternalFinding &&
         !isMergedFinding &&
-        isFindingInDataSource(findingId, DATA_SOURCE_MODES.USERPOINTS) &&
         dataSourceMode !== DATA_SOURCE_MODES.USERPOINTS
       ) {
         handleDataSourceModeChange(DATA_SOURCE_MODES.USERPOINTS);
-      } else if (
-        !isExternalFinding &&
-        !isMergedFinding &&
-        dataSourceMode !== DATA_SOURCE_MODES.POINTS
-      ) {
-        handleDataSourceModeChange(DATA_SOURCE_MODES.POINTS);
       } else {
         pendingSharePointRef.current = null;
       }
