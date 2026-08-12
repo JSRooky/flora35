@@ -177,11 +177,31 @@ export function toGbifDateParam(value) {
 }
 
 /**
- * Добавляет фильтр lastInterpreted=день,* для подгрузки только обновлений
- * с момента последней синхронизации (день включительно, дубликаты отсекаются по ключу).
+ * Следующий UTC-день после syncedAt (yyyy-MM-dd).
+ * Нужен потому что lastInterpreted у GBIF — дневная точность с закрытой нижней границей:
+ * фильтр `день,*` снова включает все записи дня синка и превью «Обновлений» не обнуляется.
+ */
+export function toNextGbifDateParam(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Добавляет фильтр lastInterpreted=день,* для подгрузки обновлений
+ * после дня последней синхронизации (нижняя граница — следующий день).
+ * Дубликаты по ключу всё равно отсекаются при upsert.
  */
 export function withUpdateSinceExtras(extras = {}, syncedAt) {
-  const day = toGbifDateParam(syncedAt);
+  const day = toNextGbifDateParam(syncedAt);
   if (!day) {
     return extras;
   }

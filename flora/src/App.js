@@ -465,23 +465,25 @@ export default function MapView() {
         setDenseProcessingActive(true);
         setActiveModule(MODULE_IDS.MAP);
         break;
+      case TASKBAR_PANEL_IDS.DATA_SOURCES:
       case TASKBAR_PANEL_IDS.GBIF:
         setDataSourceModeState(DATA_SOURCE_MODES.EXTERNAL);
         setActiveModule(null);
         setPanelCollapsed((prev) => ({
           ...prev,
-          [PANEL_IDS.GBIF]: false,
-          [PANEL_IDS.GBIF_PROCESSING]: true
+          [PANEL_IDS.DATA_SOURCES]: false,
+          [PANEL_IDS.EXTERNAL_PROCESSING]: true
         }));
         break;
+      case TASKBAR_PANEL_IDS.EXTERNAL_PROCESSING:
       case TASKBAR_PANEL_IDS.GBIF_PROCESSING:
         setDataSourceModeState(DATA_SOURCE_MODES.EXTERNAL);
         setExternalProcessingActive(true);
         setActiveModule(null);
         setPanelCollapsed((prev) => ({
           ...prev,
-          [PANEL_IDS.GBIF]: true,
-          [PANEL_IDS.GBIF_PROCESSING]: false
+          [PANEL_IDS.DATA_SOURCES]: true,
+          [PANEL_IDS.EXTERNAL_PROCESSING]: false
         }));
         break;
       case TASKBAR_PANEL_IDS.OOPT_SPECIES:
@@ -3592,7 +3594,9 @@ export default function MapView() {
           break;
         }
         case PANEL_IDS.DATA_WORK: {
-          setNearSpeciesMatchesActive(false);
+          // Сначала восстанавливаем слои (как в handleCloseNearSpeciesMatches),
+          // иначе setNearSpeciesMatchesActive(false) опередит cleanup-effect.
+          handleCloseNearSpeciesMatches();
           unpinPanelsFromTaskbar([PANEL_IDS.DATA_WORK]);
           setActiveModule((current) =>
             current === MODULE_IDS.DATA_WORK ? null : current
@@ -3623,6 +3627,7 @@ export default function MapView() {
       clearPointSelection,
       dataSourceMode,
       handleBoundsSpeciesListClose,
+      handleCloseNearSpeciesMatches,
       handleDataSourceModeChange,
       handleDensePileSpeciesListClose,
       handleDenseProcessingClose,

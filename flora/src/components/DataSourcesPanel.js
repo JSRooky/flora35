@@ -548,6 +548,7 @@ export default function DataSourcesPanel({
     let pagesSinceMapUpdate = 0;
     let addedTotal = 0;
     let fetchedTotal = 0;
+    let succeeded = false;
 
     try {
       await loadOccurrencesForRegion(loadRegion, {
@@ -574,6 +575,7 @@ export default function DataSourcesPanel({
       });
 
       setGbifData(map, getGbifFeatureCollection());
+      succeeded = true;
     } catch (err) {
       if (!isGbifAbortError(err, controller.signal)) {
         setGbifError(getGbifNetworkErrorMessage(err));
@@ -584,15 +586,18 @@ export default function DataSourcesPanel({
       if (gbifAbortRef.current === controller) {
         gbifAbortRef.current = null;
       }
-      const nextSyncedAt = new Date().toISOString();
       setGbifLoading(false);
       setGbifLoaded(getGbifFeatureCount());
-      setRegionId(loadRegion.id);
-      setGbifKingdomId(loadKingdomId || "");
-      setGbifLoadedQuery(loadQuery);
-      setGbifSavedQuery(loadQuery);
-      setGbifSyncedAt(nextSyncedAt);
-      setGbifSyncedAtState(nextSyncedAt);
+      // syncedAt/query только при успехе — иначе «Обновить» пропустит недокачанное.
+      if (succeeded) {
+        const nextSyncedAt = new Date().toISOString();
+        setRegionId(loadRegion.id);
+        setGbifKingdomId(loadKingdomId || "");
+        setGbifLoadedQuery(loadQuery);
+        setGbifSavedQuery(loadQuery);
+        setGbifSyncedAt(nextSyncedAt);
+        setGbifSyncedAtState(nextSyncedAt);
+      }
       await persistGbifSnapshot();
       notifyDataChange();
     }
@@ -628,6 +633,7 @@ export default function DataSourcesPanel({
     let pagesSinceMapUpdate = 0;
     let addedTotal = 0;
     let fetchedTotal = 0;
+    let succeeded = false;
 
     try {
       await loadObservationsInSeries(loadRegion, {
@@ -661,6 +667,7 @@ export default function DataSourcesPanel({
       });
 
       setInatData(map, getInatFeatureCollection());
+      succeeded = true;
     } catch (err) {
       if (!isInatAbortError(err, controller.signal)) {
         setInatError(getInatNetworkErrorMessage(err));
@@ -671,19 +678,22 @@ export default function DataSourcesPanel({
       if (inatAbortRef.current === controller) {
         inatAbortRef.current = null;
       }
-      const nextSyncedAt = new Date().toISOString();
       setInatLoading(false);
       setInatSeriesIndex(null);
       setInatSeriesTotal(null);
       setInatSeriesLabel(null);
       setInatLoaded(getInatFeatureCount());
-      setRegionId(loadRegion.id);
-      setInatKingdomId(loadKingdomId || "");
-      setInatQualityGrade(loadQualityGrade);
-      setInatLoadedQuery(loadQuery);
-      setInatSavedQuery(loadQuery);
-      setInatSyncedAt(nextSyncedAt);
-      setInatSyncedAtState(nextSyncedAt);
+      // syncedAt/query только при успехе — иначе «Обновить» пропустит недокачанное.
+      if (succeeded) {
+        const nextSyncedAt = new Date().toISOString();
+        setRegionId(loadRegion.id);
+        setInatKingdomId(loadKingdomId || "");
+        setInatQualityGrade(loadQualityGrade);
+        setInatLoadedQuery(loadQuery);
+        setInatSavedQuery(loadQuery);
+        setInatSyncedAt(nextSyncedAt);
+        setInatSyncedAtState(nextSyncedAt);
+      }
       await persistInatSnapshot();
       notifyDataChange();
     }

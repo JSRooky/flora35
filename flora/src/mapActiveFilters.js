@@ -39,7 +39,7 @@ export function collectActiveMapFilters({
   boundsSpeciesRegnumFilter,
   denseClustersHighlight,
   denseProcessingActive,
-  gbifProcessingFilters
+  externalProcessingFilters
 }) {
   const entries = [];
 
@@ -108,7 +108,7 @@ export function collectActiveMapFilters({
     });
   }
 
-  if (hasActiveExternalProcessingFilters(gbifProcessingFilters)) {
+  if (hasActiveExternalProcessingFilters(externalProcessingFilters)) {
     entries.push({
       id: MAP_FILTER_IDS.EXTERNAL_PROCESSING,
       label: "Обработка внешних данных"

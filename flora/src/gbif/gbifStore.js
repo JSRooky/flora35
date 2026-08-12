@@ -10,7 +10,7 @@ let gbifCollection = EMPTY_COLLECTION;
 let loadedRegionId = null;
 /** Параметры последней загрузки (для восстановления панели и повторного использования). */
 let loadedQuery = null;
-/** ISO-время последней полной загрузки / обновления (для lastInterpreted). */
+/** ISO-время последней полной загрузки / обновления (для инкрементального lastInterpreted). */
 let syncedAt = null;
 
 /** Кэш обогащённой коллекции: не пересчитывать enrich на каждый get. */
