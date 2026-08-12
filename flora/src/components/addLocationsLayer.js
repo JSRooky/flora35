@@ -1555,7 +1555,7 @@ function locationsSourcesExist(map) {
 }
 
 /**
- * Готовит точки к отрисовке: в режиме сверхплотных — только кучи ≥10 (остальные скрыты);
+ * Готовит точки к отрисовке: в режиме сверхплотных — только кучи ≥порога (остальные скрыты);
  * при обычной кластеризации — spread только для раскрытых по клику совпадающих координат;
  * без кластеризации — полный spread совпадающих координат.
  */
@@ -2528,7 +2528,7 @@ export function isClusterPieChartsEnabled() {
   return clusterPieChartsEnabled;
 }
 
-/** Сверхплотные кластеры: без обычной кластеризации, только кучи ≥10 с одинаковыми координатами. */
+/** Сверхплотные кластеры: без обычной кластеризации, только кучи ≥порога с одинаковыми координатами. */
 export function setDenseClustersHighlightEnabled(map, enabled) {
   const next = Boolean(enabled);
   if (denseClustersHighlightEnabled === next) {
@@ -2541,6 +2541,14 @@ export function setDenseClustersHighlightEnabled(map, enabled) {
   if (map) {
     rebuildLocationsLayers(map);
   }
+}
+
+/** Пересчитывает сверхплотные кучи после смены порога (если режим уже включён). */
+export function refreshLocationsDensePiles(map) {
+  if (!map || !denseClustersHighlightEnabled) {
+    return;
+  }
+  updateLocationsSourceData(map, currentFilteredFeatures);
 }
 
 export function isDenseClustersHighlightEnabled() {

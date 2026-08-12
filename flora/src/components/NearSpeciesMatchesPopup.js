@@ -79,12 +79,15 @@ function MergePairIcon() {
 }
 
 const THRESHOLD_MIN = 0;
-const THRESHOLD_MAX = 500;
-const THRESHOLD_DEFAULT = 100;
+const THRESHOLD_MAX = 50;
+const THRESHOLD_DEFAULT = 50;
 const THRESHOLD_STEP = 5;
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const PAGE_SIZE_DEFAULT = 100;
+
+const RESULT_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
+const RESULT_LIMIT_DEFAULT = 100;
 
 const SORT_COLUMNS = [
   { key: "leftSource", label: "Источник" },
@@ -215,6 +218,8 @@ export default function NearSpeciesMatchesPopup({
   const [sortDirection, setSortDirection] = useState("asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_DEFAULT);
+  const [resultLimit, setResultLimit] = useState(RESULT_LIMIT_DEFAULT);
+  const [resultTruncated, setResultTruncated] = useState(false);
   const [mapPreviewHidden, setMapPreviewHidden] = useState(false);
   const [previewMatch, setPreviewMatch] = useState(null);
   const [highlightedRowKey, setHighlightedRowKey] = useState(null);
@@ -226,8 +231,11 @@ export default function NearSpeciesMatchesPopup({
     setSearching(false);
   }, []);
 
-  const applySearch = useCallback(async (thresholdValue) => {
+  const applySearch = useCallback(async (thresholdValue, limitValue) => {
     const threshold = clampThreshold(thresholdValue);
+    const limit = RESULT_LIMIT_OPTIONS.includes(Number(limitValue))
+      ? Number(limitValue)
+      : RESULT_LIMIT_DEFAULT;
     const generation = searchGenerationRef.current + 1;
     searchGenerationRef.current = generation;
     const signal = {
@@ -237,11 +245,13 @@ export default function NearSpeciesMatchesPopup({
     };
 
     setThresholdMeters(threshold);
+    setResultLimit(limit);
     setSearching(true);
     setStatusMessage("Ищем…");
     setSearched(true);
     setPage(1);
     setHighlightedRowKey(null);
+    setResultTruncated(false);
 
     // Даём UI отрисовать состояние «Ищем…» до тяжёлой работы.
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -264,13 +274,14 @@ export default function NearSpeciesMatchesPopup({
       return;
     }
 
-    const nextMatches = await findNearSpeciesMatchesAsync(
+    const { matches: nextMatches, truncated } = await findNearSpeciesMatchesAsync(
       {
         leftFeatures: gbifFeatures,
         rightFeatures: inatFeatures,
         thresholdMeters: threshold,
         leftSourceId: MATCH_SOURCE_IDS.GBIF,
-        rightSourceId: MATCH_SOURCE_IDS.INATURALIST
+        rightSourceId: MATCH_SOURCE_IDS.INATURALIST,
+        maxMatches: limit
       },
       { signal }
     );
@@ -280,11 +291,16 @@ export default function NearSpeciesMatchesPopup({
     }
 
     setMatches(nextMatches);
-    setStatusMessage(
-      nextMatches.length === 0
-        ? `Совпадений не найдено в радиусе ${threshold} м.`
-        : null
-    );
+    setResultTruncated(Boolean(truncated));
+    if (nextMatches.length === 0) {
+      setStatusMessage(`Совпадений не найдено в радиусе ${threshold} м.`);
+    } else if (truncated) {
+      setStatusMessage(
+        `В таблицу выведено ${nextMatches.length.toLocaleString("ru-RU")} пар (лимит). Совпадений может быть больше.`
+      );
+    } else {
+      setStatusMessage(null);
+    }
     setSearching(false);
   }, []);
 
@@ -303,6 +319,8 @@ export default function NearSpeciesMatchesPopup({
     setSortDirection("asc");
     setPage(1);
     setPageSize(PAGE_SIZE_DEFAULT);
+    setResultLimit(RESULT_LIMIT_DEFAULT);
+    setResultTruncated(false);
     setMapPreviewHidden(false);
     setPreviewMatch(null);
     setHighlightedRowKey(null);
@@ -321,11 +339,20 @@ export default function NearSpeciesMatchesPopup({
     setThresholdMeters(clampThreshold(event.target.value));
   };
 
+  const handleResultLimitChange = (event) => {
+    const nextLimit = Number(event.target.value);
+    setResultLimit(
+      RESULT_LIMIT_OPTIONS.includes(nextLimit)
+        ? nextLimit
+        : RESULT_LIMIT_DEFAULT
+    );
+  };
+
   const handleFind = () => {
     if (searching) {
       return;
     }
-    applySearch(thresholdMeters);
+    applySearch(thresholdMeters, resultLimit);
   };
 
   const handleSort = useCallback((columnKey) => {
@@ -634,6 +661,26 @@ export default function NearSpeciesMatchesPopup({
             onChange={handleThresholdInput}
             disabled={searching}
           />
+          <label
+            className="near-species-matches-limit-label"
+            htmlFor="near-species-matches-result-limit"
+          >
+            Всего в таблице
+          </label>
+          <select
+            id="near-species-matches-result-limit"
+            className="near-species-matches-result-limit"
+            value={resultLimit}
+            onChange={handleResultLimitChange}
+            disabled={searching}
+            aria-label="Сколько пар выводить в таблицу"
+          >
+            {RESULT_LIMIT_OPTIONS.map((limit) => (
+              <option key={limit} value={limit}>
+                {limit}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             className="near-species-matches-find-button"
@@ -644,7 +691,9 @@ export default function NearSpeciesMatchesPopup({
           </button>
           {searched && !searching ? (
             <span className="near-species-matches-count" aria-live="polite">
-              Найдено: {matchCount}
+              {resultTruncated
+                ? `В таблице: ${matchCount.toLocaleString("ru-RU")} (лимит)`
+                : `В таблице: ${matchCount.toLocaleString("ru-RU")}`}
             </span>
           ) : null}
         </div>
@@ -798,7 +847,7 @@ export default function NearSpeciesMatchesPopup({
             </select>
 
             <span className="near-species-matches-page-range" aria-live="polite">
-              {pageStartIndex + 1}–{pageEndIndex} из {matchCount}
+              {pageStartIndex + 1}–{pageEndIndex} из {matchCount.toLocaleString("ru-RU")}
             </span>
 
             <div className="near-species-matches-page-nav">

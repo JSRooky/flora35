@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { setGbifData } from "./addGbifLayer";
 import { setInatData } from "./addInatLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
@@ -6,55 +6,55 @@ import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import {
-  GBIF_MAP_UPDATE_PAGES,
   GBIF_PAGE_SIZE,
-  getGbifNetworkErrorMessage,
   isGbifAbortError,
-  loadOccurrencesForRegion,
   previewOccurrenceCount,
   withUpdateSinceExtras
 } from "../gbif/gbifClient";
+import {
+  estimateGbifLoadSeriesCount,
+  GBIF_SERIES_SOFT_LIMIT
+} from "../gbif/gbifLoadSeries";
 import {
   getGbifFeatureCollection,
   getGbifFeatureCount,
   getGbifLoadedQuery,
   getGbifLoadedRegionId,
   getGbifSyncedAt,
-  setGbifLoadedQuery,
-  setGbifSyncedAt,
-  upsertGbifFeatures
+  setGbifLoadedQuery
 } from "../gbif/gbifStore";
-import { persistGbifSnapshot, clearGbifStoreAndPersistence } from "../gbif/gbifPersistence";
+import { clearGbifStoreAndPersistence } from "../gbif/gbifPersistence";
 import {
   INAT_API_RESULT_LIMIT,
-  INAT_MAP_UPDATE_PAGES,
   INAT_PAGE_SIZE,
   INAT_QUALITY_MODES,
-  getInatNetworkErrorMessage,
   isInatAbortError,
   previewObservationCount,
   withInatUpdateSinceExtras
 } from "../inaturalist/inatClient";
-import {
-  estimateInatLoadSeriesCount,
-  loadObservationsInSeries
-} from "../inaturalist/inatLoadSeries";
+import { estimateInatLoadSeriesCount } from "../inaturalist/inatLoadSeries";
 import {
   getInatFeatureCollection,
   getInatFeatureCount,
   getInatLoadedQuery,
   getInatLoadedRegionId,
-  getInatSyncedAt,
-  setInatLoadedQuery,
-  setInatSyncedAt,
-  upsertInatFeatures
+  getInatSyncedAt
 } from "../inaturalist/inatStore";
-import { persistInatSnapshot, clearInatStoreAndPersistence } from "../inaturalist/inatPersistence";
+import { clearInatStoreAndPersistence } from "../inaturalist/inatPersistence";
 import {
   DEFAULT_EXTERNAL_REGION_ID,
   EXTERNAL_REGIONS,
   getExternalRegionById
 } from "../externalSources/regions";
+import {
+  cancelGbifExternalLoad,
+  cancelInatExternalLoad,
+  getExternalSourcesLoadSnapshot,
+  setExternalSourcesLoadContext,
+  startGbifExternalLoad,
+  startInatExternalLoad,
+  subscribeExternalSourcesLoad
+} from "../externalSources/externalSourcesLoadManager";
 import { GBIF_KINGDOMS, buildTaxonSearchExtras } from "../gbif/taxonFilters";
 import "../styles/GbifPanel.css";
 
@@ -241,8 +241,8 @@ export default function DataSourcesPanel({
   onCollapsedChange,
   onMinimize,
   onClose,
-  onDataChange,
-  onOpenProcessing
+  onOpenProcessing,
+  storeRevision = 0
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [regionId, setRegionId] = useState(getInitialRegionId);
@@ -256,29 +256,49 @@ export default function DataSourcesPanel({
     () => getInatLoadedQuery()?.qualityGrade ?? INAT_QUALITY_MODES.RESEARCH
   );
 
-  const [gbifLoading, setGbifLoading] = useState(false);
-  const [inatLoading, setInatLoading] = useState(false);
-  const [gbifLoaded, setGbifLoaded] = useState(getGbifFeatureCount);
-  const [inatLoaded, setInatLoaded] = useState(getInatFeatureCount);
+  const initialLoadSnapshot = getExternalSourcesLoadSnapshot();
+  const [gbifLoading, setGbifLoading] = useState(() => initialLoadSnapshot.gbif.loading);
+  const [inatLoading, setInatLoading] = useState(() => initialLoadSnapshot.inat.loading);
+  const [gbifLoaded, setGbifLoaded] = useState(
+    () => initialLoadSnapshot.gbif.loaded || getGbifFeatureCount()
+  );
+  const [inatLoaded, setInatLoaded] = useState(
+    () => initialLoadSnapshot.inat.loaded || getInatFeatureCount()
+  );
   const [gbifPreview, setGbifPreview] = useState(null);
   const [inatPreview, setInatPreview] = useState(null);
   const [gbifPreviewLoading, setGbifPreviewLoading] = useState(false);
   const [inatPreviewLoading, setInatPreviewLoading] = useState(false);
-  const [gbifTotal, setGbifTotal] = useState(null);
-  const [inatTotal, setInatTotal] = useState(null);
-  const [gbifFetched, setGbifFetched] = useState(0);
-  const [inatFetched, setInatFetched] = useState(0);
-  const [gbifAdded, setGbifAdded] = useState(0);
-  const [inatAdded, setInatAdded] = useState(0);
-  const [inatSeriesIndex, setInatSeriesIndex] = useState(null);
-  const [inatSeriesTotal, setInatSeriesTotal] = useState(null);
-  const [inatSeriesLabel, setInatSeriesLabel] = useState(null);
+  const [gbifTotal, setGbifTotal] = useState(() => initialLoadSnapshot.gbif.total);
+  const [inatTotal, setInatTotal] = useState(() => initialLoadSnapshot.inat.total);
+  const [gbifFetched, setGbifFetched] = useState(() => initialLoadSnapshot.gbif.fetched);
+  const [inatFetched, setInatFetched] = useState(() => initialLoadSnapshot.inat.fetched);
+  const [gbifAdded, setGbifAdded] = useState(() => initialLoadSnapshot.gbif.added);
+  const [inatAdded, setInatAdded] = useState(() => initialLoadSnapshot.inat.added);
+  const [gbifSeriesIndex, setGbifSeriesIndex] = useState(
+    () => initialLoadSnapshot.gbif.seriesIndex
+  );
+  const [gbifSeriesTotal, setGbifSeriesTotal] = useState(
+    () => initialLoadSnapshot.gbif.seriesTotal
+  );
+  const [gbifSeriesLabel, setGbifSeriesLabel] = useState(
+    () => initialLoadSnapshot.gbif.seriesLabel
+  );
+  const [inatSeriesIndex, setInatSeriesIndex] = useState(
+    () => initialLoadSnapshot.inat.seriesIndex
+  );
+  const [inatSeriesTotal, setInatSeriesTotal] = useState(
+    () => initialLoadSnapshot.inat.seriesTotal
+  );
+  const [inatSeriesLabel, setInatSeriesLabel] = useState(
+    () => initialLoadSnapshot.inat.seriesLabel
+  );
   const [gbifSyncedAt, setGbifSyncedAtState] = useState(() => getGbifSyncedAt());
   const [inatSyncedAt, setInatSyncedAtState] = useState(() => getInatSyncedAt());
   const [gbifSavedQuery, setGbifSavedQuery] = useState(() => getGbifLoadedQuery());
   const [inatSavedQuery, setInatSavedQuery] = useState(() => getInatLoadedQuery());
-  const [gbifError, setGbifError] = useState(null);
-  const [inatError, setInatError] = useState(null);
+  const [gbifError, setGbifError] = useState(() => initialLoadSnapshot.gbif.error);
+  const [inatError, setInatError] = useState(() => initialLoadSnapshot.inat.error);
   const [loadDialogSource, setLoadDialogSource] = useState(null);
   /** "load" — обычная загрузка/инкремент; "full" — заменить локальную копию. */
   const [loadDialogMode, setLoadDialogMode] = useState("load");
@@ -288,11 +308,85 @@ export default function DataSourcesPanel({
   const [dialogPreview, setDialogPreview] = useState(null);
   const [dialogPreviewLoading, setDialogPreviewLoading] = useState(false);
 
-  const gbifAbortRef = useRef(null);
-  const inatAbortRef = useRef(null);
   const gbifPreviewAbortRef = useRef(null);
   const inatPreviewAbortRef = useRef(null);
   const dialogPreviewAbortRef = useRef(null);
+  const appliedGbifSyncedAtRef = useRef(null);
+  const appliedInatSyncedAtRef = useRef(null);
+  const wasGbifLoadingRef = useRef(initialLoadSnapshot.gbif.loading);
+  const wasInatLoadingRef = useRef(initialLoadSnapshot.inat.loading);
+
+  const syncGbifIncrementalFromStore = useCallback(() => {
+    const count = getGbifFeatureCount();
+    const storeQuery = getGbifLoadedQuery();
+    const storeSyncedAt = getGbifSyncedAt();
+    const storeRegionId = storeQuery?.regionId || getGbifLoadedRegionId();
+
+    setGbifLoaded(count);
+
+    if (storeSyncedAt) {
+      setGbifSyncedAtState(storeSyncedAt);
+      appliedGbifSyncedAtRef.current = storeSyncedAt;
+    }
+
+    if (storeQuery && typeof storeQuery === "object") {
+      setGbifSavedQuery(storeQuery);
+      if (storeQuery.regionId) {
+        setRegionId(storeQuery.regionId);
+      }
+      setGbifKingdomId(storeQuery.kingdomId || "");
+      return;
+    }
+
+    // Store с точками, но без query (старый снимок) — синтезируем.
+    if (count > 0 && storeRegionId) {
+      const synthesized = { regionId: storeRegionId, kingdomId: null };
+      setGbifLoadedQuery(synthesized);
+      setGbifSavedQuery(synthesized);
+      setRegionId(storeRegionId);
+      setGbifKingdomId("");
+      if (!storeSyncedAt) {
+        // Без syncedAt инкремент невозможен — хотя бы зафиксируем query.
+      }
+    }
+  }, []);
+
+  const syncInatIncrementalFromStore = useCallback(() => {
+    const count = getInatFeatureCount();
+    const storeQuery = getInatLoadedQuery();
+    const storeSyncedAt = getInatSyncedAt();
+    const storeRegionId = storeQuery?.regionId || getInatLoadedRegionId();
+
+    setInatLoaded(count);
+
+    if (storeSyncedAt) {
+      setInatSyncedAtState(storeSyncedAt);
+      appliedInatSyncedAtRef.current = storeSyncedAt;
+    }
+
+    if (storeQuery && typeof storeQuery === "object") {
+      setInatSavedQuery(storeQuery);
+      if (storeQuery.regionId) {
+        setRegionId(storeQuery.regionId);
+      }
+      setInatKingdomId(storeQuery.kingdomId || "");
+      if (storeQuery.qualityGrade) {
+        setInatQualityGrade(storeQuery.qualityGrade);
+      }
+      return;
+    }
+
+    if (count > 0 && storeRegionId) {
+      const synthesized = {
+        regionId: storeRegionId,
+        qualityGrade: INAT_QUALITY_MODES.RESEARCH,
+        kingdomId: null
+      };
+      setInatSavedQuery(synthesized);
+      setRegionId(storeRegionId);
+      setInatKingdomId("");
+    }
+  }, []);
 
   const region = getExternalRegionById(regionId);
   const draftRegion = getExternalRegionById(draftRegionId);
@@ -348,9 +442,110 @@ export default function DataSourcesPanel({
   };
 
   useEffect(() => {
+    if (map) {
+      setExternalSourcesLoadContext({ map });
+    }
+  }, [map]);
+
+  // После гидрации IndexedDB / успешной загрузки подтягиваем meta для «Обновить».
+  useEffect(() => {
+    syncGbifIncrementalFromStore();
+    syncInatIncrementalFromStore();
+  }, [syncGbifIncrementalFromStore, syncInatIncrementalFromStore, storeRevision]);
+
+  useEffect(() => {
+    const wasLoading = wasGbifLoadingRef.current;
+    wasGbifLoadingRef.current = gbifLoading;
+    if (wasLoading && !gbifLoading) {
+      syncGbifIncrementalFromStore();
+    }
+    if (gbifLoading) {
+      // Чтобы повторный успех с тем же timestamp всё равно применился после full refresh.
+      appliedGbifSyncedAtRef.current = null;
+    }
+  }, [gbifLoading, syncGbifIncrementalFromStore]);
+
+  useEffect(() => {
+    const wasLoading = wasInatLoadingRef.current;
+    wasInatLoadingRef.current = inatLoading;
+    if (wasLoading && !inatLoading) {
+      syncInatIncrementalFromStore();
+    }
+    if (inatLoading) {
+      appliedInatSyncedAtRef.current = null;
+    }
+  }, [inatLoading, syncInatIncrementalFromStore]);
+
+  useEffect(() => {
+    return subscribeExternalSourcesLoad((snap) => {
+      setGbifLoading(snap.gbif.loading);
+      setGbifError(snap.gbif.error);
+      setGbifTotal(snap.gbif.total);
+      setGbifFetched(snap.gbif.fetched);
+      setGbifAdded(snap.gbif.added);
+      setGbifLoaded(snap.gbif.loaded || getGbifFeatureCount());
+      setGbifSeriesIndex(snap.gbif.seriesIndex);
+      setGbifSeriesTotal(snap.gbif.seriesTotal);
+      setGbifSeriesLabel(snap.gbif.seriesLabel);
+
+      setInatLoading(snap.inat.loading);
+      setInatError(snap.inat.error);
+      setInatTotal(snap.inat.total);
+      setInatFetched(snap.inat.fetched);
+      setInatAdded(snap.inat.added);
+      setInatLoaded(snap.inat.loaded || getInatFeatureCount());
+      setInatSeriesIndex(snap.inat.seriesIndex);
+      setInatSeriesTotal(snap.inat.seriesTotal);
+      setInatSeriesLabel(snap.inat.seriesLabel);
+
+      if (
+        !snap.gbif.loading &&
+        snap.gbif.lastSucceededSyncedAt &&
+        snap.gbif.lastSucceededSyncedAt !== appliedGbifSyncedAtRef.current
+      ) {
+        appliedGbifSyncedAtRef.current = snap.gbif.lastSucceededSyncedAt;
+        setGbifSyncedAtState(snap.gbif.lastSucceededSyncedAt);
+        const successQuery =
+          snap.gbif.lastSucceededQuery || getGbifLoadedQuery();
+        if (successQuery) {
+          setRegionId(successQuery.regionId);
+          setGbifKingdomId(
+            snap.gbif.lastSucceededKingdomId || successQuery.kingdomId || ""
+          );
+          setGbifSavedQuery(successQuery);
+        }
+      }
+
+      if (
+        !snap.inat.loading &&
+        snap.inat.lastSucceededSyncedAt &&
+        snap.inat.lastSucceededSyncedAt !== appliedInatSyncedAtRef.current
+      ) {
+        appliedInatSyncedAtRef.current = snap.inat.lastSucceededSyncedAt;
+        setInatSyncedAtState(snap.inat.lastSucceededSyncedAt);
+        const successQuery =
+          snap.inat.lastSucceededQuery || getInatLoadedQuery();
+        if (successQuery) {
+          setRegionId(successQuery.regionId);
+          setInatKingdomId(
+            snap.inat.lastSucceededKingdomId || successQuery.kingdomId || ""
+          );
+          if (
+            snap.inat.lastSucceededQualityGrade ||
+            successQuery.qualityGrade
+          ) {
+            setInatQualityGrade(
+              snap.inat.lastSucceededQualityGrade || successQuery.qualityGrade
+            );
+          }
+          setInatSavedQuery(successQuery);
+        }
+      }
+    });
+  }, []);
+
+  useEffect(() => {
     return () => {
-      gbifAbortRef.current?.abort();
-      inatAbortRef.current?.abort();
       gbifPreviewAbortRef.current?.abort();
       inatPreviewAbortRef.current?.abort();
       dialogPreviewAbortRef.current?.abort();
@@ -527,10 +722,6 @@ export default function DataSourcesPanel({
     inatSyncedAt
   ]);
 
-  const notifyDataChange = () => {
-    onDataChange?.();
-  };
-
   const runGbifLoad = async ({
     loadRegion = region,
     loadKingdomId = gbifKingdomId,
@@ -542,72 +733,13 @@ export default function DataSourcesPanel({
       return;
     }
 
-    gbifAbortRef.current?.abort();
-    const controller = new AbortController();
-    gbifAbortRef.current = controller;
-
-    setGbifError(null);
-    setGbifLoading(true);
-    setGbifTotal(previewCount);
-    setGbifAdded(0);
-    setGbifFetched(0);
-
-    let pagesSinceMapUpdate = 0;
-    let addedTotal = 0;
-    let fetchedTotal = 0;
-    let succeeded = false;
-
-    try {
-      await loadOccurrencesForRegion(loadRegion, {
-        signal: controller.signal,
-        extras: loadExtras,
-        onPage: (features) => {
-          fetchedTotal += features.length;
-          setGbifFetched(fetchedTotal);
-          const { collection, added } = upsertGbifFeatures(features, loadRegion.id);
-          addedTotal += added;
-          setGbifAdded(addedTotal);
-          setGbifLoaded(collection.features.length);
-          pagesSinceMapUpdate += 1;
-          if (pagesSinceMapUpdate >= GBIF_MAP_UPDATE_PAGES) {
-            setGbifData(map, collection);
-            pagesSinceMapUpdate = 0;
-          }
-        },
-        onProgress: ({ total: nextTotal }) => {
-          if (typeof nextTotal === "number") {
-            setGbifTotal(nextTotal);
-          }
-        }
-      });
-
-      setGbifData(map, getGbifFeatureCollection());
-      succeeded = true;
-    } catch (err) {
-      if (!isGbifAbortError(err, controller.signal)) {
-        setGbifError(getGbifNetworkErrorMessage(err));
-      } else {
-        setGbifData(map, getGbifFeatureCollection());
-      }
-    } finally {
-      if (gbifAbortRef.current === controller) {
-        gbifAbortRef.current = null;
-      }
-      setGbifLoading(false);
-      setGbifLoaded(getGbifFeatureCount());
-      // syncedAt/query только при успехе — иначе «Обновить» пропустит недокачанное.
-      if (succeeded) {
-        const nextSyncedAt = new Date().toISOString();
-        setRegionId(loadRegion.id);
-        setGbifKingdomId(loadKingdomId || "");
-        setGbifLoadedQuery(loadQuery);
-        setGbifSavedQuery(loadQuery);
-        setGbifSyncedAt(nextSyncedAt);
-        setGbifSyncedAtState(nextSyncedAt);
-      }
-      await persistGbifSnapshot();
-      notifyDataChange();
-    }
+    await startGbifExternalLoad({
+      region: loadRegion,
+      kingdomId: loadKingdomId,
+      extras: loadExtras,
+      query: loadQuery,
+      previewCount
+    });
   };
 
   const runInatLoad = async ({
@@ -622,88 +754,14 @@ export default function DataSourcesPanel({
       return;
     }
 
-    inatAbortRef.current?.abort();
-    const controller = new AbortController();
-    inatAbortRef.current = controller;
-
-    setInatError(null);
-    setInatLoading(true);
-    setInatTotal(previewCount);
-    setInatAdded(0);
-    setInatFetched(0);
-    setInatSeriesIndex(null);
-    setInatSeriesTotal(
-      previewCount != null ? estimateInatLoadSeriesCount(previewCount) : null
-    );
-    setInatSeriesLabel(null);
-
-    let pagesSinceMapUpdate = 0;
-    let addedTotal = 0;
-    let fetchedTotal = 0;
-    let succeeded = false;
-
-    try {
-      await loadObservationsInSeries(loadRegion, {
-        signal: controller.signal,
-        qualityGrade: loadQualityGrade,
-        extras: loadExtras,
-        previewCount,
-        onSeriesStart: ({ series, index, planned, queued }) => {
-          setInatSeriesIndex(index);
-          setInatSeriesTotal(Math.max(planned, queued, index));
-          setInatSeriesLabel(series.label);
-        },
-        onPage: (features) => {
-          fetchedTotal += features.length;
-          setInatFetched(fetchedTotal);
-          const { collection, added } = upsertInatFeatures(features, loadRegion.id);
-          addedTotal += added;
-          setInatAdded(addedTotal);
-          setInatLoaded(collection.features.length);
-          pagesSinceMapUpdate += 1;
-          if (pagesSinceMapUpdate >= INAT_MAP_UPDATE_PAGES) {
-            setInatData(map, collection);
-            pagesSinceMapUpdate = 0;
-          }
-        },
-        onProgress: ({ total: nextTotal }) => {
-          if (typeof nextTotal === "number") {
-            setInatTotal(nextTotal);
-          }
-        }
-      });
-
-      setInatData(map, getInatFeatureCollection());
-      succeeded = true;
-    } catch (err) {
-      if (!isInatAbortError(err, controller.signal)) {
-        setInatError(getInatNetworkErrorMessage(err));
-      } else {
-        setInatData(map, getInatFeatureCollection());
-      }
-    } finally {
-      if (inatAbortRef.current === controller) {
-        inatAbortRef.current = null;
-      }
-      setInatLoading(false);
-      setInatSeriesIndex(null);
-      setInatSeriesTotal(null);
-      setInatSeriesLabel(null);
-      setInatLoaded(getInatFeatureCount());
-      // syncedAt/query только при успехе — иначе «Обновить» пропустит недокачанное.
-      if (succeeded) {
-        const nextSyncedAt = new Date().toISOString();
-        setRegionId(loadRegion.id);
-        setInatKingdomId(loadKingdomId || "");
-        setInatQualityGrade(loadQualityGrade);
-        setInatLoadedQuery(loadQuery);
-        setInatSavedQuery(loadQuery);
-        setInatSyncedAt(nextSyncedAt);
-        setInatSyncedAtState(nextSyncedAt);
-      }
-      await persistInatSnapshot();
-      notifyDataChange();
-    }
+    await startInatExternalLoad({
+      region: loadRegion,
+      kingdomId: loadKingdomId,
+      qualityGrade: loadQualityGrade,
+      extras: loadExtras,
+      query: loadQuery,
+      previewCount
+    });
   };
 
   const handleConfirmLoad = async () => {
@@ -736,6 +794,7 @@ export default function DataSourcesPanel({
         setGbifSavedQuery(null);
         setGbifSyncedAtState(null);
         setGbifPreview(null);
+        appliedGbifSyncedAtRef.current = null;
       }
 
       await runGbifLoad({
@@ -771,6 +830,7 @@ export default function DataSourcesPanel({
       setInatSavedQuery(null);
       setInatSyncedAtState(null);
       setInatPreview(null);
+      appliedInatSyncedAtRef.current = null;
     }
 
     await runInatLoad({
@@ -805,17 +865,25 @@ export default function DataSourcesPanel({
           Boolean(inatSyncedAt)
         : false);
 
+  const gbifSeriesEstimate =
+    gbifPreview != null ? estimateGbifLoadSeriesCount(gbifPreview) : null;
+  const gbifMultiSeriesLoad =
+    gbifPreview != null && gbifPreview > GBIF_SERIES_SOFT_LIMIT && !gbifIncremental;
   const inatSeriesEstimate =
     inatPreview != null ? estimateInatLoadSeriesCount(inatPreview) : null;
   const inatMultiSeriesLoad =
     inatPreview != null && inatPreview > INAT_API_RESULT_LIMIT && !inatIncremental;
   const dialogSeriesEstimate =
-    dialogPreview != null ? estimateInatLoadSeriesCount(dialogPreview) : null;
+    dialogPreview == null
+      ? null
+      : loadDialogSource === "gbif"
+        ? estimateGbifLoadSeriesCount(dialogPreview)
+        : estimateInatLoadSeriesCount(dialogPreview);
   const dialogMultiSeries =
-    loadDialogSource === "inat" &&
     dialogPreview != null &&
-    dialogPreview > INAT_API_RESULT_LIMIT &&
-    !dialogIncremental;
+    !dialogIncremental &&
+    ((loadDialogSource === "gbif" && dialogPreview > GBIF_SERIES_SOFT_LIMIT) ||
+      (loadDialogSource === "inat" && dialogPreview > INAT_API_RESULT_LIMIT));
 
   return (
     <div className={`feature-popup gbif-panel ${collapsed ? "feature-popup--collapsed" : ""}`}>
@@ -850,6 +918,14 @@ export default function DataSourcesPanel({
         <div className="gbif-panel-content">
           <section className="data-sources-section" aria-label="GBIF">
             <h4 className="data-sources-section-title">GBIF</h4>
+            {gbifMultiSeriesLoad ? (
+              <p className="gbif-panel-hint">
+                Находок больше {formatCount(GBIF_SERIES_SOFT_LIMIT)} — загрузка пойдёт
+                сериями (≈ {formatCount(gbifSeriesEstimate)} и более) по годам, при
+                необходимости по месяцам, и отдельно по датасетам для записей без года.
+                Все серии объединяются в одну локальную копию.
+              </p>
+            ) : null}
             <div
               className={`gbif-panel-status${gbifLoading ? " gbif-panel-status--loading" : ""}`}
             >
@@ -863,6 +939,9 @@ export default function DataSourcesPanel({
                 fetched={gbifFetched}
                 added={gbifAdded}
                 pageSize={GBIF_PAGE_SIZE}
+                seriesIndex={gbifSeriesIndex}
+                seriesTotal={gbifSeriesTotal}
+                seriesLabel={gbifSeriesLabel}
               />
             </div>
             <div className="gbif-panel-actions">
@@ -887,7 +966,7 @@ export default function DataSourcesPanel({
                 type="button"
                 className="gbif-panel-btn gbif-panel-btn--secondary"
                 disabled={!gbifLoading}
-                onClick={() => gbifAbortRef.current?.abort()}
+                onClick={() => cancelGbifExternalLoad()}
               >
                 Отменить
               </button>
@@ -944,7 +1023,7 @@ export default function DataSourcesPanel({
                 type="button"
                 className="gbif-panel-btn gbif-panel-btn--secondary"
                 disabled={!inatLoading}
-                onClick={() => inatAbortRef.current?.abort()}
+                onClick={() => cancelInatExternalLoad()}
               >
                 Отменить
               </button>

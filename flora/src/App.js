@@ -27,6 +27,7 @@ import {
   setClusteringEnabled,
   setClusterPieChartsEnabled,
   setDenseClustersHighlightEnabled,
+  refreshLocationsDensePiles,
   expandDensePileByKey,
   setDensePileExpandedHandler,
   setMarkersVisible,
@@ -50,7 +51,9 @@ import {
 import {
   buildSpeciesSummaryFromDensePile,
   listDensePiles,
-  mergeDensePileLists
+  mergeDensePileLists,
+  MIN_DENSE_PILE_SIZE,
+  setDensePileMinSize
 } from "./components/densePiles";
 import DenseClustersPanel from "./components/DenseClustersPanel";
 import {
@@ -190,8 +193,8 @@ import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
 import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
-import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum, setGbifClusterPieChartsEnabled, setGbifDenseClustersHighlightEnabled, expandGbifDensePileByKey, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
-import { addInatLayer, setInatVisibility, setInatClusteringEnabled, setInatClusterByRegnum, setInatClusterPieChartsEnabled, setInatDenseClustersHighlightEnabled, expandInatDensePileByKey, setInatDensePileExpandedHandler } from "./components/addInatLayer";
+import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum, setGbifClusterPieChartsEnabled, setGbifDenseClustersHighlightEnabled, refreshGbifDensePiles, expandGbifDensePileByKey, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
+import { addInatLayer, setInatVisibility, setInatClusteringEnabled, setInatClusterByRegnum, setInatClusterPieChartsEnabled, setInatDenseClustersHighlightEnabled, refreshInatDensePiles, expandInatDensePileByKey, setInatDensePileExpandedHandler } from "./components/addInatLayer";
 import {
   addMergedLayer,
   setMergedData,
@@ -213,11 +216,17 @@ import {
   toInatProcessingFiltersFromExternal
 } from "./externalSources/externalProcessingFilters";
 import {
+  isExternalSourcesLoadActive,
+  setExternalSourcesLoadContext,
+  subscribeExternalSourcesLoad
+} from "./externalSources/externalSourcesLoadManager";
+import {
   clearRussianNameChoice,
   lookupRussianNameCandidates,
   saveRussianNameChoice
 } from "./names/russianNameResolver";
 import DataSourcesPanel from "./components/DataSourcesPanel";
+import ExternalSourcesLoadStatusBar from "./components/ExternalSourcesLoadStatusBar";
 import ExternalProcessingPanel from "./components/ExternalProcessingPanel";
 import {
   EXTERNAL_LAYER_IDS
@@ -298,6 +307,7 @@ export default function MapView() {
   const [denseClustersHighlight, setDenseClustersHighlightState] = useState(
     DEFAULT_DENSE_CLUSTERS_HIGHLIGHT
   );
+  const [densePileMinSize, setDensePileMinSizeState] = useState(MIN_DENSE_PILE_SIZE);
   const [denseProcessingActive, setDenseProcessingActive] = useState(false);
   const [selectedDensePileKey, setSelectedDensePileKey] = useState(null);
   const [densePileSpeciesListOpen, setDensePileSpeciesListOpen] = useState(false);
@@ -1650,6 +1660,30 @@ export default function MapView() {
     [collectVisiblePanelIds, minimizePanel, restorePanel]
   );
 
+  const [externalSourcesLoadActive, setExternalSourcesLoadActive] = useState(
+    () => isExternalSourcesLoadActive()
+  );
+
+  useEffect(() => {
+    return subscribeExternalSourcesLoad((snap) => {
+      setExternalSourcesLoadActive(Boolean(snap.gbif.loading || snap.inat.loading));
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!externalSourcesLoadActive) {
+      return;
+    }
+    pinPanelsToTaskbar([PANEL_IDS.DATA_SOURCES]);
+  }, [externalSourcesLoadActive, pinPanelsToTaskbar]);
+
+  const handleOpenExternalLoadPanel = useCallback(() => {
+    if (dataSourceMode !== DATA_SOURCE_MODES.EXTERNAL) {
+      handleDataSourceModeChange(DATA_SOURCE_MODES.EXTERNAL);
+    }
+    restorePanel(PANEL_IDS.DATA_SOURCES);
+  }, [dataSourceMode, handleDataSourceModeChange, restorePanel]);
+
   const effectiveWithinFeature = useMemo(() => {
     if (ooptPointsFilterActive && ooptWithinFeature) {
       return ooptWithinFeature;
@@ -1719,15 +1753,21 @@ export default function MapView() {
     const gbifFeatures = getVisibleGbifFeatures(locationFilters);
     const inatFeatures = getVisibleInatFeatures(locationFilters);
     const piles = mergeDensePileLists([
-      listDensePiles(localFeatures),
-      listDensePiles(gbifFeatures),
-      listDensePiles(inatFeatures)
+      listDensePiles(localFeatures, { minSize: densePileMinSize }),
+      listDensePiles(gbifFeatures, { minSize: densePileMinSize }),
+      listDensePiles(inatFeatures, { minSize: densePileMinSize })
     ]);
     const pileCount = piles.length;
     const pointCount = piles.reduce((sum, pile) => sum + pile.pointCount, 0);
 
     return { piles, pileCount, pointCount };
-  }, [locationFilters, pointsDataRevision, mapReady, externalProcessingFilters]);
+  }, [
+    locationFilters,
+    pointsDataRevision,
+    mapReady,
+    externalProcessingFilters,
+    densePileMinSize
+  ]);
 
   const seasonalityNameLatin = popupData?.properties?.name_latin || null;
   const seasonalityNameRu = popupData?.properties?.name_ru || null;
@@ -2964,6 +3004,13 @@ export default function MapView() {
   }, [mapReady, locationFilters, refreshAreal, syncYearBounds, bumpPointsDataRevision]);
 
   useEffect(() => {
+    setExternalSourcesLoadContext({
+      map: mapReady ? map.current : null,
+      onDataChange: handleExternalDataChange
+    });
+  }, [mapReady, handleExternalDataChange]);
+
+  useEffect(() => {
     if (externalOnly === prevExternalOnlyRef.current) {
       return;
     }
@@ -3105,6 +3152,17 @@ export default function MapView() {
     applyGbifLocationsFilter(map.current, locationFilters);
     applyInatLocationsFilter(map.current, locationFilters);
   }, [denseClustersHighlight, mapReady, locationFilters]);
+
+  useEffect(() => {
+    setDensePileMinSize(densePileMinSize);
+    if (!map.current || !mapReady || !denseClustersHighlight) {
+      return;
+    }
+
+    refreshLocationsDensePiles(map.current);
+    refreshGbifDensePiles(map.current);
+    refreshInatDensePiles(map.current);
+  }, [densePileMinSize, denseClustersHighlight, mapReady]);
 
   // После режимов кластеризации: иначе rebuild*Layers мог вернуть полную выборку.
   useEffect(() => {
@@ -4018,6 +4076,11 @@ export default function MapView() {
         }
         case PANEL_IDS.DATA_SOURCES:
         case PANEL_IDS.GBIF: {
+          // Пока идёт загрузка — только в трей, без abort и без смены режима.
+          if (isExternalSourcesLoadActive()) {
+            minimizePanel(PANEL_IDS.DATA_SOURCES);
+            break;
+          }
           unpinPanelsFromTaskbar([
             PANEL_IDS.DATA_SOURCES,
             PANEL_IDS.EXTERNAL_PROCESSING
@@ -4075,6 +4138,7 @@ export default function MapView() {
       handleDataSourceModeChange,
       handleDensePileSpeciesListClose,
       handleDenseProcessingClose,
+      minimizePanel,
       unpinPanelsFromTaskbar
     ]
   );
@@ -4182,6 +4246,7 @@ export default function MapView() {
         }
 
         syncYearBounds();
+        setPointsDataRevision((value) => value + 1);
 
         addOsmBasemapLayer(mapInstance);
         addYandexBasemapLayer(mapInstance);
@@ -4674,6 +4739,10 @@ export default function MapView() {
                 selectedPileKey={selectedDensePileKey}
                 canZoomBack={Boolean(selectedDensePileKey)}
                 speciesListOpen={densePileSpeciesListOpen}
+                minPileSize={densePileMinSize}
+                onMinPileSizeChange={(value) => {
+                  setDensePileMinSizeState(setDensePileMinSize(value));
+                }}
                 onSelectPile={handleDensePileSelect}
                 onZoomBack={handleDensePileZoomBack}
                 onToggleSpeciesList={handleDensePileSpeciesListToggle}
@@ -4957,17 +5026,17 @@ export default function MapView() {
           )}
           {dataSourceMode === DATA_SOURCE_MODES.EXTERNAL && (
             <>
-              {!isPanelMinimized(PANEL_IDS.DATA_SOURCES) && (
+              <div hidden={isPanelMinimized(PANEL_IDS.DATA_SOURCES)}>
               <DataSourcesPanel
                 map={map.current}
                 collapsed={isPanelCollapsed(PANEL_IDS.DATA_SOURCES)}
                 onCollapsedChange={handleGbifPanelCollapsedChange}
                 onMinimize={handleMinimizePanel(PANEL_IDS.DATA_SOURCES)}
                 onClose={handleClosePanel(PANEL_IDS.DATA_SOURCES)}
-                onDataChange={handleExternalDataChange}
                 onOpenProcessing={handleOpenGbifProcessing}
+                storeRevision={pointsDataRevision}
               />
-              )}
+              </div>
               {externalProcessingActive &&
                 !isPanelMinimized(PANEL_IDS.EXTERNAL_PROCESSING) && (
                 <ExternalProcessingPanel
@@ -5072,8 +5141,15 @@ export default function MapView() {
       <PanelTaskbar
         items={panelTaskbarOrder}
         activeIds={activeTaskbarPanelIds}
+        loadingIds={
+          externalSourcesLoadActive ? [PANEL_IDS.DATA_SOURCES] : []
+        }
         onActivate={handleTaskbarPanelClick}
         bottomOccupyPx={timelineBottomOccupyPx}
+      />
+      <ExternalSourcesLoadStatusBar
+        bottomOccupyPx={timelineBottomOccupyPx}
+        onOpenPanel={handleOpenExternalLoadPanel}
       />
       <MapCornerControls
         activeFilters={activeMapFilters}

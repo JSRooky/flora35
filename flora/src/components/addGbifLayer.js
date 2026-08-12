@@ -972,6 +972,14 @@ export function setGbifDenseClustersHighlightEnabled(map, enabled) {
   }
 }
 
+/** Пересчитывает сверхплотные кучи GBIF после смены порога. */
+export function refreshGbifDensePiles(map) {
+  if (!map || !gbifDenseClustersHighlightEnabled) {
+    return;
+  }
+  setGbifData(map, lastGbifInputCollection);
+}
+
 export function isGbifDenseClustersHighlightEnabled() {
   return gbifDenseClustersHighlightEnabled;
 }

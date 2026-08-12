@@ -168,10 +168,12 @@ function TaskbarIcon({ name }) {
 export default function PanelTaskbar({
   items = [],
   activeIds = [],
+  loadingIds = [],
   onActivate,
   bottomOccupyPx = 0
 }) {
   const activeSet = useMemo(() => new Set(activeIds), [activeIds]);
+  const loadingSet = useMemo(() => new Set(loadingIds), [loadingIds]);
 
   if (!items.length) {
     return null;
@@ -191,16 +193,26 @@ export default function PanelTaskbar({
         {items.map((panelId) => {
           const meta = getPanelTaskbarMeta(panelId);
           const isActive = activeSet.has(panelId);
+          const isLoading = loadingSet.has(panelId);
 
           return (
             <button
               key={panelId}
               type="button"
-              className={`panel-taskbar-btn${isActive ? " panel-taskbar-btn--active" : ""}`}
+              className={`panel-taskbar-btn${isActive ? " panel-taskbar-btn--active" : ""}${
+                isLoading ? " panel-taskbar-btn--loading" : ""
+              }`}
               onClick={() => onActivate?.(panelId)}
-              title={meta.title}
+              title={isLoading ? `${meta.title} (загрузка…)` : meta.title}
               aria-pressed={isActive}
-              aria-label={isActive ? `Свернуть: ${meta.title}` : `Развернуть: ${meta.title}`}
+              aria-busy={isLoading || undefined}
+              aria-label={
+                isActive
+                  ? `Свернуть: ${meta.title}`
+                  : isLoading
+                    ? `Развернуть: ${meta.title} (идёт загрузка)`
+                    : `Развернуть: ${meta.title}`
+              }
             >
               <TaskbarIcon name={meta.icon} />
             </button>

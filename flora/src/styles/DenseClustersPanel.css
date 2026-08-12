@@ -139,6 +139,85 @@
   color: #666;
 }
 
+.dense-clusters-panel-threshold {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dense-clusters-panel-threshold-label {
+  font-size: 13px;
+  color: #555;
+}
+
+.dense-clusters-panel-threshold-label strong {
+  color: #ea580c;
+}
+
+.dense-clusters-panel-threshold-range {
+  width: 100%;
+  height: 6px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.dense-clusters-panel-threshold-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    #ea580c 0%,
+    #ea580c var(--range-progress, 0%),
+    #ddd var(--range-progress, 0%),
+    #ddd 100%
+  );
+}
+
+.dense-clusters-panel-threshold-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #ea580c;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.dense-clusters-panel-threshold-range::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: #ddd;
+}
+
+.dense-clusters-panel-threshold-range::-moz-range-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: #ea580c;
+}
+
+.dense-clusters-panel-threshold-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #ea580c;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.dense-clusters-panel-threshold-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888;
+}
+
 .dense-clusters-panel-stats {
   display: flex;
   gap: 10px;

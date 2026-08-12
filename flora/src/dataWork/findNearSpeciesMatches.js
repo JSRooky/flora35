@@ -199,12 +199,22 @@ function passesBboxPrefilter(leftCoords, rightCoords, thresholdMeters, latDeltaD
  * @param {IndexedPoint[]} rightPoints
  * @param {number} thresholdMeters
  * @param {NearSpeciesMatch[]} matches
+ * @param {number|null} [maxMatches]
+ * @returns {boolean} true, если достигнут лимит maxMatches
  */
-function collectMatchesForSpecies(leftPoints, rightPoints, thresholdMeters, matches) {
+function collectMatchesForSpecies(
+  leftPoints,
+  rightPoints,
+  thresholdMeters,
+  matches,
+  maxMatches = null
+) {
   const latDeltaDeg = thresholdMeters / METERS_PER_DEG_LAT;
   const sortedRight = [...rightPoints].sort(
     (a, b) => a.coordinates[1] - b.coordinates[1]
   );
+  const hasLimit =
+    Number.isFinite(maxMatches) && maxMatches != null && maxMatches >= 0;
 
   for (const left of leftPoints) {
     const leftLat = left.coordinates[1];
@@ -212,6 +222,10 @@ function collectMatchesForSpecies(leftPoints, rightPoints, thresholdMeters, matc
     const end = upperBoundByLat(sortedRight, leftLat + latDeltaDeg);
 
     for (let index = start; index < end; index += 1) {
+      if (hasLimit && matches.length >= maxMatches) {
+        return true;
+      }
+
       const right = sortedRight[index];
 
       if (
@@ -248,6 +262,8 @@ function collectMatchesForSpecies(leftPoints, rightPoints, thresholdMeters, matc
       });
     }
   }
+
+  return hasLimit && matches.length >= maxMatches;
 }
 
 /**
@@ -274,7 +290,8 @@ function sortMatches(matches) {
  *   rightFeatures: object[],
  *   thresholdMeters: number,
  *   leftSourceId?: string,
- *   rightSourceId?: string
+ *   rightSourceId?: string,
+ *   maxMatches?: number|null
  * }} options
  * @returns {NearSpeciesMatch[]}
  */
@@ -283,12 +300,18 @@ export function findNearSpeciesMatches({
   rightFeatures,
   thresholdMeters,
   leftSourceId = "gbif",
-  rightSourceId = "inaturalist"
+  rightSourceId = "inaturalist",
+  maxMatches = null
 }) {
   const threshold = Number(thresholdMeters);
   if (!Number.isFinite(threshold) || threshold < 0) {
     return [];
   }
+
+  const limit =
+    Number.isFinite(maxMatches) && maxMatches != null && maxMatches >= 0
+      ? Math.floor(maxMatches)
+      : null;
 
   const leftGroups = groupByLatinName(leftFeatures, leftSourceId);
   const rightGroups = groupByLatinName(rightFeatures, rightSourceId);
@@ -301,7 +324,16 @@ export function findNearSpeciesMatches({
       continue;
     }
 
-    collectMatchesForSpecies(leftPoints, rightPoints, threshold, matches);
+    const hitLimit = collectMatchesForSpecies(
+      leftPoints,
+      rightPoints,
+      threshold,
+      matches,
+      limit
+    );
+    if (hitLimit) {
+      break;
+    }
   }
 
   sortMatches(matches);
@@ -316,13 +348,14 @@ export function findNearSpeciesMatches({
  *   rightFeatures: object[],
  *   thresholdMeters: number,
  *   leftSourceId?: string,
- *   rightSourceId?: string
+ *   rightSourceId?: string,
+ *   maxMatches?: number|null
  * }} options
  * @param {{
  *   signal?: { aborted?: boolean },
  *   speciesPerChunk?: number
  * }} [asyncOptions]
- * @returns {Promise<NearSpeciesMatch[]>}
+ * @returns {Promise<{ matches: NearSpeciesMatch[], truncated: boolean }>}
  */
 export async function findNearSpeciesMatchesAsync(
   options,
@@ -330,8 +363,15 @@ export async function findNearSpeciesMatchesAsync(
 ) {
   const threshold = Number(options?.thresholdMeters);
   if (!Number.isFinite(threshold) || threshold < 0) {
-    return [];
+    return { matches: [], truncated: false };
   }
+
+  const limit =
+    Number.isFinite(options?.maxMatches) &&
+    options.maxMatches != null &&
+    options.maxMatches >= 0
+      ? Math.floor(options.maxMatches)
+      : null;
 
   const leftGroups = groupByLatinName(options.leftFeatures, options.leftSourceId ?? "gbif");
   const rightGroups = groupByLatinName(
@@ -340,6 +380,7 @@ export async function findNearSpeciesMatchesAsync(
   );
   /** @type {NearSpeciesMatch[]} */
   const matches = [];
+  let truncated = false;
 
   const sharedKeys = [];
   for (const key of leftGroups.keys()) {
@@ -353,17 +394,26 @@ export async function findNearSpeciesMatchesAsync(
 
   for (let offset = 0; offset < sharedKeys.length; offset += chunkSize) {
     if (signal?.aborted) {
-      return [];
+      return { matches: [], truncated: false };
     }
 
     const slice = sharedKeys.slice(offset, offset + chunkSize);
     for (const key of slice) {
-      collectMatchesForSpecies(
+      const hitLimit = collectMatchesForSpecies(
         leftGroups.get(key),
         rightGroups.get(key),
         threshold,
-        matches
+        matches,
+        limit
       );
+      if (hitLimit) {
+        truncated = true;
+        break;
+      }
+    }
+
+    if (truncated) {
+      break;
     }
 
     if (offset + chunkSize < sharedKeys.length) {
@@ -372,11 +422,11 @@ export async function findNearSpeciesMatchesAsync(
   }
 
   if (signal?.aborted) {
-    return [];
+    return { matches: [], truncated: false };
   }
 
   sortMatches(matches);
-  return matches;
+  return { matches, truncated };
 }
 
 /**

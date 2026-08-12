@@ -156,10 +156,20 @@ export async function hydrateGbifStoreFromPersistence() {
   );
 
   setGbifFeatureCollection(collection, snapshot.regionId ?? null);
-  setGbifLoadedQuery(snapshot.query ?? null);
+
+  const restoredQuery =
+    snapshot.query && typeof snapshot.query === "object"
+      ? snapshot.query
+      : snapshot.regionId
+        ? { regionId: snapshot.regionId, kingdomId: null }
+        : null;
+  setGbifLoadedQuery(restoredQuery);
   setGbifSyncedAt(snapshot.syncedAt ?? null);
 
-  if (migrated > 0 || stripped > 0) {
+  // Старые снимки без query — допишем синтетический, чтобы «Обновить» работал.
+  if (!snapshot.query && restoredQuery) {
+    await persistGbifSnapshot();
+  } else if (migrated > 0 || stripped > 0) {
     await persistGbifSnapshot();
   }
 

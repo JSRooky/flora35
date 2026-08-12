@@ -214,16 +214,27 @@ export function withUpdateSinceExtras(extras = {}, syncedAt) {
 
 /**
  * Постранично загружает находки для региона.
- * onPage(features) — инкрементально; onProgress({ loaded, total, endOfRecords }).
+ * onPage(features) — инкрементально; onProgress({ loaded, total, endOfRecords, truncated }).
+ *
+ * softLimit — мягкая отсечка по offset (для серийной загрузки): дальше пагинация GBIF
+ * сильно замедляется, серию лучше дробить (годы → месяцы).
  */
 export async function loadOccurrencesForRegion(
   region,
-  { signal, onPage, onProgress, pageSize = GBIF_PAGE_SIZE, extras = {} } = {}
+  {
+    signal,
+    onPage,
+    onProgress,
+    pageSize = GBIF_PAGE_SIZE,
+    extras = {},
+    softLimit = null
+  } = {}
 ) {
   let offset = 0;
   let loaded = 0;
   let total = null;
   let endOfRecords = false;
+  let truncated = false;
 
   while (!endOfRecords) {
     if (signal?.aborted) {
@@ -245,8 +256,8 @@ export async function loadOccurrencesForRegion(
     total = typeof page.count === "number" ? page.count : total;
     endOfRecords = Boolean(page.endOfRecords) || !(page.results?.length);
 
-    onPage?.(features, { offset, loaded, total, endOfRecords });
-    onProgress?.({ loaded, total, endOfRecords });
+    onPage?.(features, { offset, loaded, total, endOfRecords, truncated: false });
+    onProgress?.({ loaded, total, endOfRecords, truncated: false });
 
     if (endOfRecords) {
       break;
@@ -256,6 +267,14 @@ export async function loadOccurrencesForRegion(
 
     // Жёсткий лимит Occurrence Search API: offset + limit ≤ 100_000.
     if (offset >= 100000) {
+      truncated = true;
+      onProgress?.({ loaded, total, endOfRecords: true, truncated: true });
+      break;
+    }
+
+    // Мягкий лимит для серий (глубокий offset у GBIF становится очень медленным).
+    if (softLimit != null && offset >= softLimit) {
+      truncated = true;
       onProgress?.({ loaded, total, endOfRecords: true, truncated: true });
       break;
     }
@@ -264,5 +283,5 @@ export async function loadOccurrencesForRegion(
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
-  return { loaded, total, endOfRecords: true };
+  return { loaded, total, endOfRecords: true, truncated };
 }

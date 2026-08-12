@@ -927,6 +927,14 @@ export function setInatDenseClustersHighlightEnabled(map, enabled) {
   }
 }
 
+/** Пересчитывает сверхплотные кучи iNat после смены порога. */
+export function refreshInatDensePiles(map) {
+  if (!map || !inatDenseClustersHighlightEnabled) {
+    return;
+  }
+  setInatData(map, lastInatInputCollection);
+}
+
 export function isInatDenseClustersHighlightEnabled() {
   return inatDenseClustersHighlightEnabled;
 }

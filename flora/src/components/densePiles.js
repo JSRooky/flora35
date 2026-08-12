@@ -1,8 +1,31 @@
 import { getFeatureCoordinates } from "./spreadCoincidentPoints";
 import { getPointColorForRegnum } from "./pointColors";
 
-/** Минимум точек с полностью одинаковыми координатами для сверхплотного кластера. */
+/** Минимум точек с полностью одинаковыми координатами для сверхплотного кластера (по умолчанию). */
 export const MIN_DENSE_PILE_SIZE = 10;
+export const DENSE_PILE_MIN_SIZE_MIN = 2;
+export const DENSE_PILE_MIN_SIZE_MAX = 50;
+
+let densePileMinSize = MIN_DENSE_PILE_SIZE;
+
+/** Текущий порог «плотной группы». */
+export function getDensePileMinSize() {
+  return densePileMinSize;
+}
+
+/** Задаёт порог «плотной группы» (кламп в [min, max]). */
+export function setDensePileMinSize(value) {
+  const numeric = Math.round(Number(value));
+  if (!Number.isFinite(numeric)) {
+    return densePileMinSize;
+  }
+
+  densePileMinSize = Math.min(
+    DENSE_PILE_MIN_SIZE_MAX,
+    Math.max(DENSE_PILE_MIN_SIZE_MIN, numeric)
+  );
+  return densePileMinSize;
+}
 
 export const DENSE_HIGHLIGHT_COLOR = "#ea580c";
 export const DENSE_HIGHLIGHT_STROKE_COLOR = "#9a3412";
@@ -41,7 +64,7 @@ function abbreviatePointCount(count) {
  */
 export function partitionFeaturesByDensePiles(
   features,
-  { minSize = MIN_DENSE_PILE_SIZE, expandedPileKeys = null } = {}
+  { minSize = getDensePileMinSize(), expandedPileKeys = null } = {}
 ) {
   const groups = new Map();
 
@@ -119,7 +142,7 @@ export function partitionFeaturesByDensePiles(
  * Список всех плотных групп (≥ minSize точек с одинаковыми координатами),
  * по убыванию числа точек. color — цвет точек группы на карте (по regnum).
  */
-export function listDensePiles(features, { minSize = MIN_DENSE_PILE_SIZE } = {}) {
+export function listDensePiles(features, { minSize = getDensePileMinSize() } = {}) {
   const groups = new Map();
 
   (features ?? []).forEach((feature) => {

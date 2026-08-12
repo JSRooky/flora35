@@ -153,10 +153,23 @@ export async function hydrateInatStoreFromPersistence() {
   );
 
   setInatFeatureCollection(collection, snapshot.regionId ?? null);
-  setInatLoadedQuery(snapshot.query ?? null);
+
+  const restoredQuery =
+    snapshot.query && typeof snapshot.query === "object"
+      ? snapshot.query
+      : snapshot.regionId
+        ? {
+            regionId: snapshot.regionId,
+            qualityGrade: "research",
+            kingdomId: null
+          }
+        : null;
+  setInatLoadedQuery(restoredQuery);
   setInatSyncedAt(snapshot.syncedAt ?? null);
 
-  if (migrated > 0 || stripped > 0) {
+  if (!snapshot.query && restoredQuery) {
+    await persistInatSnapshot();
+  } else if (migrated > 0 || stripped > 0) {
     await persistInatSnapshot();
   }
 

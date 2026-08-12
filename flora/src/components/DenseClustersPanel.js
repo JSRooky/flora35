@@ -1,8 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
+import {
+  DENSE_PILE_MIN_SIZE_MAX,
+  DENSE_PILE_MIN_SIZE_MIN,
+  MIN_DENSE_PILE_SIZE
+} from "./densePiles";
 import { DEFAULT_POINT_COLOR } from "./pointColors";
 import "../styles/DenseClustersPanel.css";
 
@@ -104,6 +109,8 @@ export default function DenseClustersPanel({
   selectedPileKey = null,
   canZoomBack = false,
   speciesListOpen = false,
+  minPileSize = MIN_DENSE_PILE_SIZE,
+  onMinPileSizeChange,
   onSelectPile,
   onZoomBack,
   onToggleSpeciesList,
@@ -120,6 +127,14 @@ export default function DenseClustersPanel({
   const [helpOpen, setHelpOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const selectedPileRowRef = useRef(null);
+
+  const rangeProgress = useMemo(() => {
+    const span = DENSE_PILE_MIN_SIZE_MAX - DENSE_PILE_MIN_SIZE_MIN;
+    if (span <= 0) {
+      return 0;
+    }
+    return ((minPileSize - DENSE_PILE_MIN_SIZE_MIN) / span) * 100;
+  }, [minPileSize]);
 
   useEffect(() => {
     if (selectedPileKey) {
@@ -188,14 +203,46 @@ export default function DenseClustersPanel({
 
       {collapsed ? (
         <p className="dense-clusters-panel-summary">
-          {typeof pileCount === "number" ? `групп: ${pileCount}` : "плотные группы"}
+          {typeof pileCount === "number"
+            ? `групп: ${pileCount} · порог ≥${minPileSize}`
+            : `порог ≥${minPileSize}`}
         </p>
       ) : (
         <div className="dense-clusters-panel-content">
           <p className="dense-clusters-panel-note">
-            На карте только группы из ≥10 точек с полностью одинаковыми координатами.
-            Остальные панели скрыты на время обработки.
+            На карте только группы из ≥{minPileSize} точек с полностью одинаковыми
+            координатами. Остальные панели скрыты на время обработки.
           </p>
+
+          <div className="dense-clusters-panel-threshold">
+            <label
+              className="dense-clusters-panel-threshold-label"
+              htmlFor="dense-pile-min-size"
+            >
+              Минимум точек в группе: <strong>{minPileSize}</strong>
+            </label>
+            <input
+              id="dense-pile-min-size"
+              type="range"
+              className="dense-clusters-panel-threshold-range"
+              min={DENSE_PILE_MIN_SIZE_MIN}
+              max={DENSE_PILE_MIN_SIZE_MAX}
+              step={1}
+              value={minPileSize}
+              onChange={(event) =>
+                onMinPileSizeChange?.(Number(event.target.value))
+              }
+              style={{ "--range-progress": `${rangeProgress}%` }}
+              aria-valuemin={DENSE_PILE_MIN_SIZE_MIN}
+              aria-valuemax={DENSE_PILE_MIN_SIZE_MAX}
+              aria-valuenow={minPileSize}
+              aria-label="Минимальное число точек в плотной группе"
+            />
+            <div className="dense-clusters-panel-threshold-scale" aria-hidden="true">
+              <span>{DENSE_PILE_MIN_SIZE_MIN}</span>
+              <span>{DENSE_PILE_MIN_SIZE_MAX}</span>
+            </div>
+          </div>
 
           <div className="dense-clusters-panel-stats">
             <div className="dense-clusters-panel-stat">
