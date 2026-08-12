@@ -2,6 +2,7 @@ import {
   findGbifFeatureByKey,
   getGbifFeatureCollection
 } from "../gbif/gbifStore";
+import { findInatFeatureById } from "../inaturalist/inatStore";
 import {
   DEFAULT_CLUSTER_COLOR,
   REGNUM_COLORS,
@@ -80,6 +81,41 @@ let onGbifDensePileExpandedCallback = null;
 let lastGbifInputCollection = EMPTY_FEATURE_COLLECTION;
 /** Ключи точек, скрытых под булавкой выделения / share. */
 let hiddenPointFeatureKeys = [];
+
+function getGbifFeatureStableKey(feature) {
+  if (feature?.id != null && feature.id !== "") {
+    return String(feature.id);
+  }
+
+  const properties = feature?.properties ?? {};
+  const source = String(properties.source || "").toLowerCase();
+  if (
+    properties.inat_id != null &&
+    properties.inat_id !== "" &&
+    (source === "inaturalist" || source === "inat" || properties.gbif_key == null)
+  ) {
+    return `inat-${properties.inat_id}`;
+  }
+
+  const gbifKey = properties.gbif_key;
+  if (gbifKey != null && gbifKey !== "") {
+    return `gbif-${gbifKey}`;
+  }
+
+  return "";
+}
+
+function excludeGbifHiddenPinFeatures(features) {
+  if (!hiddenPointFeatureKeys.length) {
+    return features;
+  }
+
+  const hidden = new Set(hiddenPointFeatureKeys.map(String));
+  return (features ?? []).filter((feature) => {
+    const key = getGbifFeatureStableKey(feature);
+    return !key || !hidden.has(key);
+  });
+}
 
 function isGbifMapboxClusteringActive() {
   return gbifClusteringEnabled && !gbifDenseClustersHighlightEnabled;
@@ -238,12 +274,54 @@ function applyGbifUnclusteredFilter(map) {
  */
 export function setGbifHiddenPointFeatureKeys(map, keys) {
   hiddenPointFeatureKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
-  if (map) {
-    applyGbifUnclusteredFilter(map);
+  if (!map) {
+    return;
   }
+
+  if (lastGbifInputCollection) {
+    setGbifData(map, lastGbifInputCollection);
+    return;
+  }
+
+  applyGbifUnclusteredFilter(map);
 }
 
 function resolveClickedFeature(rawFeature) {
+  const source = String(rawFeature?.properties?.source || "").toLowerCase();
+  const inatKey = rawFeature?.properties?.inat_id;
+  const isInatFeature =
+    source === "inaturalist" ||
+    source === "inat" ||
+    (inatKey != null && rawFeature?.properties?.gbif_key == null);
+
+  if (isInatFeature) {
+    const fromInatStore = findInatFeatureById(inatKey);
+    const base = fromInatStore ?? {
+      type: "Feature",
+      id: rawFeature.id ?? (inatKey != null ? `inat-${inatKey}` : undefined),
+      geometry: rawFeature.geometry,
+      properties: {
+        ...rawFeature.properties,
+        source: "inaturalist"
+      }
+    };
+    const original =
+      getFeatureCoordinates(rawFeature) ??
+      getFeatureCoordinates(base) ??
+      base.geometry?.coordinates;
+
+    return {
+      ...base,
+      geometry: rawFeature.geometry ?? base.geometry,
+      properties: {
+        ...base.properties,
+        ...(Array.isArray(original)
+          ? { [COORDINATES_ORIGINAL_PROP]: original }
+          : {})
+      }
+    };
+  }
+
   const gbifKey = rawFeature?.properties?.gbif_key;
   const fromStore = findGbifFeatureByKey(gbifKey);
 
@@ -729,6 +807,9 @@ export function setGbifData(map, collection, options = {}) {
         denseClusterFeatures: []
       }
     : prepareMapGbifFeatures(data.features ?? []);
+  const renderFeatures = options.preview
+    ? mapFeatures
+    : excludeGbifHiddenPinFeatures(mapFeatures);
   const hasSource = getGbifSourceIds().some((sourceId) => map.getSource(sourceId))
     || map.getSource(GBIF_SOURCE_ID);
 
@@ -739,7 +820,7 @@ export function setGbifData(map, collection, options = {}) {
   if (!isGbifMapboxClusteringActive()) {
     map.getSource(GBIF_SOURCE_ID)?.setData({
       type: "FeatureCollection",
-      features: mapFeatures
+      features: renderFeatures
     });
   } else if (gbifClusterByRegnum) {
     REGNUM_KEYS.forEach((regnum) => {
@@ -750,7 +831,7 @@ export function setGbifData(map, collection, options = {}) {
 
       source.setData({
         type: "FeatureCollection",
-        features: mapFeatures.filter(
+        features: renderFeatures.filter(
           (feature) =>
           String(feature.properties?.regnum || "").toLowerCase() === regnum
         )
@@ -761,7 +842,7 @@ export function setGbifData(map, collection, options = {}) {
     if (otherSource) {
       otherSource.setData({
         type: "FeatureCollection",
-        features: mapFeatures.filter(
+        features: renderFeatures.filter(
           (feature) =>
         !REGNUM_KEYS.includes(String(feature.properties?.regnum || "").toLowerCase())
         )
@@ -770,7 +851,7 @@ export function setGbifData(map, collection, options = {}) {
   } else {
     map.getSource(GBIF_SOURCE_ID)?.setData({
       type: "FeatureCollection",
-      features: mapFeatures
+      features: renderFeatures
     });
   }
 

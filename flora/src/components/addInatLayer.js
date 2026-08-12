@@ -81,6 +81,31 @@ let lastInatInputCollection = EMPTY_FEATURE_COLLECTION;
 /** Ключи точек, скрытых под булавкой выделения / share. */
 let hiddenPointFeatureKeys = [];
 
+function getInatFeatureStableKey(feature) {
+  if (feature?.id != null && feature.id !== "") {
+    return String(feature.id);
+  }
+
+  const inatId = feature?.properties?.inat_id;
+  if (inatId != null && inatId !== "") {
+    return `inat-${inatId}`;
+  }
+
+  return "";
+}
+
+function excludeInatHiddenPinFeatures(features) {
+  if (!hiddenPointFeatureKeys.length) {
+    return features;
+  }
+
+  const hidden = new Set(hiddenPointFeatureKeys.map(String));
+  return (features ?? []).filter((feature) => {
+    const key = getInatFeatureStableKey(feature);
+    return !key || !hidden.has(key);
+  });
+}
+
 function isInatMapboxClusteringActive() {
   return inatClusteringEnabled && !inatDenseClustersHighlightEnabled;
 }
@@ -238,9 +263,17 @@ function applyInatUnclusteredFilter(map) {
  */
 export function setInatHiddenPointFeatureKeys(map, keys) {
   hiddenPointFeatureKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
-  if (map) {
-    applyInatUnclusteredFilter(map);
+  if (!map) {
+    return;
   }
+
+  // Надёжнее убрать точку из GeoJSON (фильтр слоя на clustered source иногда не срабатывает).
+  if (lastInatInputCollection) {
+    setInatData(map, lastInatInputCollection);
+    return;
+  }
+
+  applyInatUnclusteredFilter(map);
 }
 
 function resolveClickedFeature(rawFeature) {
@@ -729,6 +762,9 @@ export function setInatData(map, collection, options = {}) {
         denseClusterFeatures: []
       }
     : prepareMapInatFeatures(data.features ?? []);
+  const renderFeatures = options.preview
+    ? mapFeatures
+    : excludeInatHiddenPinFeatures(mapFeatures);
   const hasSource = getInatSourceIds().some((sourceId) => map.getSource(sourceId))
     || map.getSource(INAT_SOURCE_ID);
 
@@ -739,7 +775,7 @@ export function setInatData(map, collection, options = {}) {
   if (!isInatMapboxClusteringActive()) {
     map.getSource(INAT_SOURCE_ID)?.setData({
       type: "FeatureCollection",
-      features: mapFeatures
+      features: renderFeatures
     });
   } else if (inatClusterByRegnum) {
     REGNUM_KEYS.forEach((regnum) => {
@@ -750,7 +786,7 @@ export function setInatData(map, collection, options = {}) {
 
       source.setData({
         type: "FeatureCollection",
-        features: mapFeatures.filter(
+        features: renderFeatures.filter(
           (feature) =>
           String(feature.properties?.regnum || "").toLowerCase() === regnum
         )
@@ -761,7 +797,7 @@ export function setInatData(map, collection, options = {}) {
     if (otherSource) {
       otherSource.setData({
         type: "FeatureCollection",
-        features: mapFeatures.filter(
+        features: renderFeatures.filter(
           (feature) =>
         !REGNUM_KEYS.includes(String(feature.properties?.regnum || "").toLowerCase())
         )
@@ -770,7 +806,7 @@ export function setInatData(map, collection, options = {}) {
   } else {
     map.getSource(INAT_SOURCE_ID)?.setData({
       type: "FeatureCollection",
-      features: mapFeatures
+      features: renderFeatures
     });
   }
 

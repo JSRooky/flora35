@@ -143,6 +143,9 @@ let hiddenPointKeysSet = new Set();
 /** Клиентские фильтры панели «Обработка внешних данных» (не влияют на локальный слой). */
 let gbifProcessingFilters = createDefaultGbifProcessingFilters();
 let inatProcessingFilters = createDefaultInatProcessingFilters();
+/** Совместная кластеризация GBIF+iNat в одном источнике. */
+let externalUnifiedClusteringEnabled = false;
+let externalLayerIncludeFlags = { includeGbif: true, includeInat: true };
 /** Кэш видимых GBIF после processing + locationFilters. */
 let visibleGbifCache = {
   locationFilters: null,
@@ -2388,9 +2391,68 @@ export function applyGbifLocationsFilter(map, filters = currentFilters) {
     return;
   }
 
+  if (externalUnifiedClusteringEnabled) {
+    refreshExternalUnifiedMapLayers(map, filters, externalLayerIncludeFlags);
+    return;
+  }
+
   setGbifData(map, {
     type: "FeatureCollection",
     features: getVisibleGbifFeatures(filters)
+  });
+}
+
+/**
+ * Включает режим, когда GBIF и iNat рисуются в одном clustered-источнике.
+ * @param {boolean} enabled
+ * @param {{ includeGbif?: boolean, includeInat?: boolean }} [includes]
+ */
+export function setExternalUnifiedClusteringEnabled(
+  enabled,
+  { includeGbif = true, includeInat = true } = {}
+) {
+  externalUnifiedClusteringEnabled = Boolean(enabled);
+  externalLayerIncludeFlags = {
+    includeGbif: includeGbif !== false,
+    includeInat: includeInat !== false
+  };
+}
+
+/**
+ * Обновляет отображение внешних слоёв: при включённых GBIF и iNat
+ * точки кладутся в один GeoJSON-источник (слой GBIF), чтобы кластеризовались вместе.
+ */
+export function refreshExternalUnifiedMapLayers(
+  map,
+  filters = currentFilters,
+  { includeGbif = true, includeInat = true } = {}
+) {
+  if (!map) {
+    return;
+  }
+
+  const gbifFeatures = includeGbif ? getVisibleGbifFeatures(filters) : [];
+  const inatFeatures = includeInat ? getVisibleInatFeatures(filters) : [];
+
+  if (includeGbif && includeInat) {
+    setGbifData(map, {
+      type: "FeatureCollection",
+      features: [...gbifFeatures, ...inatFeatures]
+    });
+    setInatData(map, {
+      type: "FeatureCollection",
+      features: []
+    });
+    return;
+  }
+
+  setGbifData(map, {
+    type: "FeatureCollection",
+    features: gbifFeatures
+  });
+  setInatData(map, {
+    type: "FeatureCollection",
+    features: inatFeatures
   });
 }
 
@@ -2457,6 +2519,11 @@ export function getVisibleInatFeatures(locationFilters = currentFilters) {
 
 export function applyInatLocationsFilter(map, filters = currentFilters) {
   if (!map) {
+    return;
+  }
+
+  if (externalUnifiedClusteringEnabled) {
+    refreshExternalUnifiedMapLayers(map, filters, externalLayerIncludeFlags);
     return;
   }
 

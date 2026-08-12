@@ -8,39 +8,51 @@ import localPointsCollection from "./points.json";
 import localUserpointsCollection from "./userpoints.json";
 
 export const DATA_SOURCE_MODES = {
+  NONE: "none",
   ALL: "all",
   POINTS: "points",
   USERPOINTS: "userpoints",
   EXTERNAL: "external",
+  MERGED: "merged",
   /** @deprecated Используйте EXTERNAL */
   GBIF: "external"
 };
 
 export const DATA_SOURCE_OPTIONS = [
   {
-    value: DATA_SOURCE_MODES.ALL,
-    label: "Все",
-    title: "Проверенные и пользовательские данные"
+    value: DATA_SOURCE_MODES.NONE,
+    label: "Не выбран",
+    title: "Карта без слоя данных"
   },
   {
     value: DATA_SOURCE_MODES.POINTS,
     label: "Проверенные",
-    title: "Только проверенные данные",
-    hidden: true
+    title: "Проверенные находки (findings)"
   },
   {
     value: DATA_SOURCE_MODES.USERPOINTS,
     label: "Пользовательские",
-    title: "Только пользовательские данные"
+    title: "Пользовательские находки (user_submissions)"
   },
   {
     value: DATA_SOURCE_MODES.EXTERNAL,
     label: "Внешние источники",
     title: "Данные GBIF и iNaturalist"
+  },
+  {
+    value: DATA_SOURCE_MODES.MERGED,
+    label: "Слитые точки",
+    title: "Объединённые точки (merged_points)"
+  },
+  {
+    value: DATA_SOURCE_MODES.ALL,
+    label: "Все локальные",
+    title: "Проверенные и пользовательские данные",
+    hidden: true
   }
 ];
 
-/** Опции для селектора «Точки» в меню (скрытые режимы не показываются). */
+/** Опции для селектора «Слой данных» в меню (скрытые режимы не показываются). */
 export const VISIBLE_DATA_SOURCE_OPTIONS = DATA_SOURCE_OPTIONS.filter(
   (option) => !option.hidden
 );
@@ -52,7 +64,7 @@ const EMPTY_SPECIES_COLLECTION = {
 
 let pointsCollection = EMPTY_SPECIES_COLLECTION;
 let userpointsCollection = EMPTY_SPECIES_COLLECTION;
-let dataSourceFilter = DATA_SOURCE_MODES.ALL;
+let dataSourceFilter = DATA_SOURCE_MODES.NONE;
 let locationsInitPromise = null;
 
 let cachedFeatureCollection = null;
@@ -188,9 +200,12 @@ export function getSpeciesCollection() {
       return pointsCollection;
     case DATA_SOURCE_MODES.USERPOINTS:
       return userpointsCollection;
+    case DATA_SOURCE_MODES.NONE:
     case DATA_SOURCE_MODES.EXTERNAL:
+    case DATA_SOURCE_MODES.MERGED:
     case DATA_SOURCE_MODES.GBIF:
       return EMPTY_SPECIES_COLLECTION;
+    case DATA_SOURCE_MODES.ALL:
     default:
       return getAllSpeciesCollection();
   }
@@ -282,10 +297,13 @@ export function isFindingInDataSource(findingId, mode) {
     return false;
   }
 
+  const normalizedId = String(findingId);
   const gbifFeature = findGbifFeatureByKey(resolveGbifKeyFromFindingId(findingId));
   const inatFeature = findInatFeatureById(resolveInatIdFromFindingId(findingId));
 
   switch (mode) {
+    case DATA_SOURCE_MODES.NONE:
+      return false;
     case DATA_SOURCE_MODES.POINTS:
       return expandFindingsToFeatures(pointsCollection).features.some((feature) =>
         featureMatchesFindingId(feature, findingId)
@@ -297,8 +315,14 @@ export function isFindingInDataSource(findingId, mode) {
     case DATA_SOURCE_MODES.EXTERNAL:
     case DATA_SOURCE_MODES.GBIF:
       return Boolean(gbifFeature || inatFeature);
+    case DATA_SOURCE_MODES.MERGED:
+      return (
+        normalizedId.startsWith("merged") ||
+        normalizedId.startsWith("merged__")
+      );
+    case DATA_SOURCE_MODES.ALL:
     default:
-      // «Все» — только локальные проверенные и пользовательские точки.
+      // «Все локальные» — только проверенные и пользовательские точки.
       return expandFindingsToFeatures(getAllSpeciesCollection()).features.some((feature) =>
         featureMatchesFindingId(feature, findingId)
       );

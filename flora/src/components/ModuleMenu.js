@@ -330,7 +330,7 @@ export default function ModuleMenu({
           <li className="module-menu-separator" aria-hidden="true" />
           <li className="module-menu-toggle-item module-menu-data-source">
             <label className="module-menu-data-source-field" htmlFor="module-menu-data-source-select">
-              <span className="module-menu-data-source-label">Точки</span>
+              <span className="module-menu-data-source-label">Слой данных</span>
               <select
                 id="module-menu-data-source-select"
                 className="module-menu-data-source-select"

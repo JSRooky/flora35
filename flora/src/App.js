@@ -20,6 +20,8 @@ import {
   getContainedPointsSummaryForWithinFeature,
   applyGbifLocationsFilter,
   applyInatLocationsFilter,
+  setExternalUnifiedClusteringEnabled,
+  refreshExternalUnifiedMapLayers,
   reloadLocationsData,
   setClusterByRegnum,
   setClusteringEnabled,
@@ -364,8 +366,13 @@ export default function MapView() {
   const [areaGeometry, setAreaGeometry] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
-  const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.ALL);
+  const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.NONE);
+  const localDataActive =
+    dataSourceMode === DATA_SOURCE_MODES.ALL ||
+    dataSourceMode === DATA_SOURCE_MODES.POINTS ||
+    dataSourceMode === DATA_SOURCE_MODES.USERPOINTS;
   const externalOnly = dataSourceMode === DATA_SOURCE_MODES.EXTERNAL;
+  const mergedOnly = dataSourceMode === DATA_SOURCE_MODES.MERGED;
   const prevExternalOnlyRef = useRef(externalOnly);
   const [externalLayersEnabled, setExternalLayersEnabled] = useState({
     [EXTERNAL_LAYER_IDS.GBIF]: true,
@@ -377,7 +384,7 @@ export default function MapView() {
   const [undoMergedPointsActive, setUndoMergedPointsActive] = useState(false);
   const [hiddenPointKeys, setHiddenPointKeys] = useState([]);
   const [mergeHiddenKeys, setMergeHiddenKeys] = useState([]);
-  const [mergedPointsVisible, setMergedPointsVisible] = useState(true);
+  const [mergedPointsVisible, setMergedPointsVisible] = useState(false);
   const [externalProcessingFilters, setExternalProcessingFiltersState] = useState(
     createDefaultExternalProcessingFilters
   );
@@ -1065,6 +1072,7 @@ export default function MapView() {
   const handleDataSourceModeChange = useCallback(
     (mode) => {
       setDataSourceModeState(mode);
+      setMergedPointsVisible(mode === DATA_SOURCE_MODES.MERGED);
 
       if (mode === DATA_SOURCE_MODES.EXTERNAL) {
         stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DATA_SOURCES);
@@ -2917,10 +2925,10 @@ export default function MapView() {
 
   useEffect(() => {
     setToolFeaturesContext({
-      includeLocal: !externalOnly,
+      includeLocal: localDataActive,
       includeGbif: externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.GBIF],
       includeInat: externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST],
-      includeMerged: mergedPointsVisible
+      includeMerged: mergedOnly && mergedPointsVisible
     });
 
     if (!map.current || !mapReady) {
@@ -2930,7 +2938,9 @@ export default function MapView() {
     updateHeatmapData(map.current, locationFilters);
     refreshAreal();
   }, [
+    localDataActive,
     externalOnly,
+    mergedOnly,
     externalLayersEnabled,
     mergedPointsVisible,
     mapReady,
@@ -2943,27 +2953,55 @@ export default function MapView() {
       return;
     }
 
-    // В режиме внешних источников локальные маркеры скрыты;
-    // «Скрыть точки» управляет включёнными слоями GBIF / iNaturalist.
-    setMarkersVisible(map.current, externalOnly ? false : mapMarkersVisible);
-    setGbifVisibility(
+    const includeGbif = Boolean(externalLayersEnabled[EXTERNAL_LAYER_IDS.GBIF]);
+    const includeInat = Boolean(externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST]);
+    const unifyExternal = externalOnly && includeGbif && includeInat;
+
+    setExternalUnifiedClusteringEnabled(unifyExternal, {
+      includeGbif: externalOnly ? includeGbif : true,
+      includeInat: externalOnly ? includeInat : true
+    });
+
+    // Виден только выбранный слой данных; «Скрыть точки» действует внутри него.
+    setMarkersVisible(map.current, localDataActive ? mapMarkersVisible : false);
+
+    if (externalOnly && unifyExternal) {
+      // Оба внешних источника — один clustered-слой (GBIF) с объединёнными точками.
+      setGbifVisibility(map.current, mapMarkersVisible);
+      setInatVisibility(map.current, false);
+      refreshExternalUnifiedMapLayers(map.current, locationFilters, {
+        includeGbif: true,
+        includeInat: true
+      });
+    } else {
+      setGbifVisibility(
+        map.current,
+        externalOnly && includeGbif ? mapMarkersVisible : false
+      );
+      setInatVisibility(
+        map.current,
+        externalOnly && includeInat ? mapMarkersVisible : false
+      );
+      if (externalOnly) {
+        refreshExternalUnifiedMapLayers(map.current, locationFilters, {
+          includeGbif,
+          includeInat
+        });
+      }
+    }
+
+    setMergedVisibility(
       map.current,
-      externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.GBIF]
-        ? mapMarkersVisible
-        : false
+      mergedOnly && mergedPointsVisible && mapMarkersVisible
     );
-    setInatVisibility(
-      map.current,
-      externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST]
-        ? mapMarkersVisible
-        : false
-    );
-    setMergedVisibility(map.current, mergedPointsVisible && mapMarkersVisible);
   }, [
     mapMarkersVisible,
+    localDataActive,
     externalOnly,
+    mergedOnly,
     externalLayersEnabled,
     mergedPointsVisible,
+    locationFilters,
     mapReady
   ]);
 
@@ -3780,7 +3818,7 @@ export default function MapView() {
   }, []);
 
   const clearPointSelection = useCallback(() => {
-    // Панель GBIF привязана к источнику «Точки», а не к модулю — сворачиваем
+    // Панель GBIF привязана к слою данных «Внешние источники», а не к модулю — сворачиваем
     // даже если выбора точки нет (иначе клик мимо её не закрывал).
     setPanelCollapsed((prev) =>
       prev[PANEL_IDS.GBIF] ? prev : { ...prev, [PANEL_IDS.GBIF]: true }
@@ -3903,7 +3941,7 @@ export default function MapView() {
             PANEL_IDS.EXTERNAL_PROCESSING
           ]);
           if (dataSourceMode === DATA_SOURCE_MODES.EXTERNAL) {
-            handleDataSourceModeChange(DATA_SOURCE_MODES.ALL);
+            handleDataSourceModeChange(DATA_SOURCE_MODES.NONE);
           }
           break;
         }
@@ -4001,11 +4039,27 @@ export default function MapView() {
         sharedFeature?.properties?.source === "inaturalist" ||
         String(findingId).startsWith("gbif-") ||
         String(findingId).startsWith("inat-");
+      const isMergedFinding =
+        sharedFeature?.properties?.source === "merged" ||
+        String(findingId).startsWith("merged");
 
-      if (isExternalFinding && dataSourceMode !== DATA_SOURCE_MODES.EXTERNAL) {
+      if (isMergedFinding && dataSourceMode !== DATA_SOURCE_MODES.MERGED) {
+        handleDataSourceModeChange(DATA_SOURCE_MODES.MERGED);
+      } else if (isExternalFinding && dataSourceMode !== DATA_SOURCE_MODES.EXTERNAL) {
         handleDataSourceModeChange(DATA_SOURCE_MODES.EXTERNAL);
-      } else if (!isExternalFinding && dataSourceMode !== DATA_SOURCE_MODES.ALL) {
-        handleDataSourceModeChange(DATA_SOURCE_MODES.ALL);
+      } else if (
+        !isExternalFinding &&
+        !isMergedFinding &&
+        isFindingInDataSource(findingId, DATA_SOURCE_MODES.USERPOINTS) &&
+        dataSourceMode !== DATA_SOURCE_MODES.USERPOINTS
+      ) {
+        handleDataSourceModeChange(DATA_SOURCE_MODES.USERPOINTS);
+      } else if (
+        !isExternalFinding &&
+        !isMergedFinding &&
+        dataSourceMode !== DATA_SOURCE_MODES.POINTS
+      ) {
+        handleDataSourceModeChange(DATA_SOURCE_MODES.POINTS);
       } else {
         pendingSharePointRef.current = null;
       }
@@ -4213,8 +4267,8 @@ export default function MapView() {
             if (!pointSelectionStateRef.current.ooptPointsFilterEnabled) {
               setSelectedBoundsFeature(null);
             }
-            clearSelectedPointHighlight(map.current);
             setPopupData(feature);
+            updateSelectedPointHighlight(map.current, feature);
 
             const {
               bufferSelectionMode: selectionMode,
@@ -4291,8 +4345,8 @@ export default function MapView() {
             if (!pointSelectionStateRef.current.ooptPointsFilterEnabled) {
               setSelectedBoundsFeature(null);
             }
-            clearSelectedPointHighlight(map.current);
             setPopupData(feature);
+            updateSelectedPointHighlight(map.current, feature);
 
             const {
               bufferSelectionMode: selectionMode,
@@ -4369,8 +4423,8 @@ export default function MapView() {
             if (!pointSelectionStateRef.current.ooptPointsFilterEnabled) {
               setSelectedBoundsFeature(null);
             }
-            clearSelectedPointHighlight(map.current);
             setPopupData(feature);
+            updateSelectedPointHighlight(map.current, feature);
             setActiveModule((current) => {
               if (current === MODULE_IDS.BUFFER || current === MODULE_IDS.POLYGON) {
                 return current;
@@ -4631,7 +4685,17 @@ export default function MapView() {
               onDenseClustersHighlightChange={handleDenseClustersHighlightChange}
               onDenseProcessingOpen={handleDenseProcessingOpen}
               mergedPointsVisible={mergedPointsVisible}
-              onMergedPointsVisibleChange={setMergedPointsVisible}
+              onMergedPointsVisibleChange={(visible) => {
+                if (visible) {
+                  handleDataSourceModeChange(DATA_SOURCE_MODES.MERGED);
+                  return;
+                }
+                if (dataSourceMode === DATA_SOURCE_MODES.MERGED) {
+                  handleDataSourceModeChange(DATA_SOURCE_MODES.NONE);
+                  return;
+                }
+                setMergedPointsVisible(false);
+              }}
               collapsed={isPanelCollapsed(PANEL_IDS.MAP)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.MAP)}
               onMinimize={handleMinimizePanel(PANEL_IDS.MAP)}
