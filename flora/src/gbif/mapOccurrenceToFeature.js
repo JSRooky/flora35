@@ -1,5 +1,9 @@
 import { isRussianVernacular } from "../names/vernacularUtils";
 import { mapKingdomNameToRegnum } from "./taxonFilters";
+import {
+  parseFoundMonthFromDateString,
+  parseFoundMonthFromParts
+} from "../geo/foundDate";
 
 function resolveOccurrenceNameRu(occurrence) {
   const vernacularName = occurrence?.vernacularName;
@@ -8,6 +12,19 @@ function resolveOccurrenceNameRu(occurrence) {
   }
 
   return isRussianVernacular(vernacularName, occurrence?.language) ? vernacularName : null;
+}
+
+function resolveOccurrenceFoundMonth(occurrence) {
+  const fromParts = parseFoundMonthFromParts({
+    year: occurrence?.year,
+    month: occurrence?.month,
+    day: occurrence?.day
+  });
+  if (fromParts != null) {
+    return fromParts;
+  }
+
+  return parseFoundMonthFromDateString(occurrence?.eventDate);
 }
 
 /**
@@ -53,6 +70,7 @@ export function mapOccurrenceToFeature(occurrence) {
       regnum: mapKingdomNameToRegnum(occurrence.kingdom),
       family: occurrence.family ?? null,
       found_year: occurrence.year ?? null,
+      found_month: resolveOccurrenceFoundMonth(occurrence),
       found_by: occurrence.recordedBy ?? null,
       identified_by: occurrence.identifiedBy ?? null,
       datasetKey: occurrence.datasetKey ?? null,

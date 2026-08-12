@@ -39,6 +39,7 @@ import {
   getFilteredFeatures,
   getVisibleGbifFeatures,
   getVisibleInatFeatures,
+  getToolFeatures,
   getStablePointKey,
   setHiddenPointKeysForFilter,
   setGbifProcessingFilters,
@@ -178,9 +179,11 @@ import {
   restoreUnattributedMapLayers
 } from "./dataWork/isolateUnattributedPointOnMap";
 import { collectHiddenKeysFromMerged } from "./dataWork/buildMergedPoint";
+import { buildSeasonalityStats } from "./dataWork/buildSeasonalityStats";
 import { fitMapToCoordinatePair } from "./geo/fitMapToCoordinatePair";
 import BasemapPicker from "./components/BasemapPicker";
 import YearFilterPanel from "./components/YearFilterPanel";
+import SeasonalityPanel from "./components/SeasonalityPanel";
 import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
@@ -236,6 +239,7 @@ const PANEL_IDS = {
   MAP: "map",
   DENSE: "dense",
   YEAR: "year",
+  SEASONALITY: "seasonality",
   POLYGON: "polygon",
   BUFFER: "buffer",
   AREA: "area",
@@ -263,6 +267,7 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.MAP,
   PANEL_IDS.DENSE,
   PANEL_IDS.YEAR,
+  PANEL_IDS.SEASONALITY,
   PANEL_IDS.POLYGON,
   PANEL_IDS.BUFFER,
   PANEL_IDS.AREA,
@@ -739,6 +744,9 @@ export default function MapView() {
         break;
       case MODULE_IDS.YEAR:
         expandPanel(PANEL_IDS.YEAR);
+        break;
+      case MODULE_IDS.SEASONALITY:
+        expandPanel(PANEL_IDS.SEASONALITY);
         break;
       case MODULE_IDS.POLYGON:
         expandPanel(PANEL_IDS.POLYGON);
@@ -1520,6 +1528,10 @@ export default function MapView() {
       ids.push(PANEL_IDS.YEAR);
     }
 
+    if (activeModule === MODULE_IDS.SEASONALITY && !isMin(PANEL_IDS.SEASONALITY)) {
+      ids.push(PANEL_IDS.SEASONALITY);
+    }
+
     if (activeModule === MODULE_IDS.POLYGON && !isMin(PANEL_IDS.POLYGON)) {
       ids.push(PANEL_IDS.POLYGON);
     }
@@ -1716,6 +1728,28 @@ export default function MapView() {
 
     return { piles, pileCount, pointCount };
   }, [locationFilters, pointsDataRevision, mapReady, externalProcessingFilters]);
+
+  const seasonalityNameLatin = popupData?.properties?.name_latin || null;
+  const seasonalityNameRu = popupData?.properties?.name_ru || null;
+
+  const seasonalityStats = useMemo(() => {
+    if (!seasonalityNameLatin) {
+      return null;
+    }
+
+    // Revision / processing: getToolFeatures читает актуальные внешние слои.
+    void pointsDataRevision;
+    void externalProcessingFilters;
+    void mapReady;
+
+    return buildSeasonalityStats(getToolFeatures(locationFilters), seasonalityNameLatin);
+  }, [
+    seasonalityNameLatin,
+    locationFilters,
+    pointsDataRevision,
+    mapReady,
+    externalProcessingFilters
+  ]);
 
   const selectedDensePile = useMemo(
     () => densePilesStats.piles.find((pile) => pile.key === selectedDensePileKey) ?? null,
@@ -4756,6 +4790,18 @@ export default function MapView() {
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.YEAR)}
               onMinimize={handleMinimizePanel(PANEL_IDS.YEAR)}
               onClose={handleClosePanel(PANEL_IDS.YEAR)}
+            />
+          )}
+          {activeModule === MODULE_IDS.SEASONALITY &&
+            !isPanelMinimized(PANEL_IDS.SEASONALITY) && (
+            <SeasonalityPanel
+              nameLatin={seasonalityNameLatin}
+              nameRu={seasonalityNameRu}
+              stats={seasonalityStats}
+              collapsed={isPanelCollapsed(PANEL_IDS.SEASONALITY)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.SEASONALITY)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.SEASONALITY)}
+              onClose={handleClosePanel(PANEL_IDS.SEASONALITY)}
             />
           )}
           {activeModule === MODULE_IDS.POLYGON &&

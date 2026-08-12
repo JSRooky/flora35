@@ -24,7 +24,7 @@ import {
   setGbifSyncedAt,
   upsertGbifFeatures
 } from "../gbif/gbifStore";
-import { persistGbifSnapshot } from "../gbif/gbifPersistence";
+import { persistGbifSnapshot, clearGbifStoreAndPersistence } from "../gbif/gbifPersistence";
 import {
   INAT_API_RESULT_LIMIT,
   INAT_MAP_UPDATE_PAGES,
@@ -49,7 +49,7 @@ import {
   setInatSyncedAt,
   upsertInatFeatures
 } from "../inaturalist/inatStore";
-import { persistInatSnapshot } from "../inaturalist/inatPersistence";
+import { persistInatSnapshot, clearInatStoreAndPersistence } from "../inaturalist/inatPersistence";
 import {
   DEFAULT_EXTERNAL_REGION_ID,
   EXTERNAL_REGIONS,
@@ -280,6 +280,8 @@ export default function DataSourcesPanel({
   const [gbifError, setGbifError] = useState(null);
   const [inatError, setInatError] = useState(null);
   const [loadDialogSource, setLoadDialogSource] = useState(null);
+  /** "load" — обычная загрузка/инкремент; "full" — заменить локальную копию. */
+  const [loadDialogMode, setLoadDialogMode] = useState("load");
   const [draftRegionId, setDraftRegionId] = useState(getInitialRegionId);
   const [draftKingdomId, setDraftKingdomId] = useState("");
   const [draftQualityGrade, setDraftQualityGrade] = useState(INAT_QUALITY_MODES.RESEARCH);
@@ -328,17 +330,19 @@ export default function DataSourcesPanel({
   const loading = gbifLoading || inatLoading;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
 
-  const openLoadDialog = (source) => {
+  const openLoadDialog = (source, mode = "load") => {
     setDraftRegionId(regionId);
     setDraftKingdomId(source === "gbif" ? gbifKingdomId : inatKingdomId);
     setDraftQualityGrade(inatQualityGrade);
     setDialogPreview(null);
+    setLoadDialogMode(mode === "full" ? "full" : "load");
     setLoadDialogSource(source);
   };
 
   const closeLoadDialog = () => {
     dialogPreviewAbortRef.current?.abort();
     setLoadDialogSource(null);
+    setLoadDialogMode("load");
     setDialogPreview(null);
     setDialogPreviewLoading(false);
   };
@@ -439,6 +443,7 @@ export default function DataSourcesPanel({
       if (loadDialogSource === "gbif") {
         const draftQuery = buildGbifQuerySnapshot(draftRegionId, draftKingdomId || null);
         const incremental =
+          loadDialogMode !== "full" &&
           gbifLoaded > 0 &&
           isSameGbifQuery(draftQuery, gbifSavedQuery) &&
           Boolean(gbifSyncedAt);
@@ -472,6 +477,7 @@ export default function DataSourcesPanel({
         draftKingdomId || null
       );
       const incremental =
+        loadDialogMode !== "full" &&
         inatLoaded > 0 &&
         isSameInatQuery(draftQuery, inatSavedQuery) &&
         Boolean(inatSyncedAt);
@@ -512,6 +518,7 @@ export default function DataSourcesPanel({
     draftRegionId,
     draftKingdomId,
     draftQualityGrade,
+    loadDialogMode,
     gbifLoaded,
     gbifSavedQuery,
     gbifSyncedAt,
@@ -707,10 +714,12 @@ export default function DataSourcesPanel({
 
     const nextKingdomId = draftKingdomId || "";
     const nextQuality = draftQualityGrade;
+    const forceFull = loadDialogMode === "full";
 
     if (source === "gbif") {
       const nextQuery = buildGbifQuerySnapshot(draftRegion.id, nextKingdomId || null);
       const incremental =
+        !forceFull &&
         gbifLoaded > 0 &&
         isSameGbifQuery(nextQuery, gbifSavedQuery) &&
         Boolean(gbifSyncedAt);
@@ -719,6 +728,16 @@ export default function DataSourcesPanel({
         incremental ? withUpdateSinceExtras({}, gbifSyncedAt) : {}
       );
       closeLoadDialog();
+
+      if (forceFull) {
+        await clearGbifStoreAndPersistence();
+        setGbifData(map, getGbifFeatureCollection());
+        setGbifLoaded(0);
+        setGbifSavedQuery(null);
+        setGbifSyncedAtState(null);
+        setGbifPreview(null);
+      }
+
       await runGbifLoad({
         loadRegion: draftRegion,
         loadKingdomId: nextKingdomId,
@@ -735,6 +754,7 @@ export default function DataSourcesPanel({
       nextKingdomId || null
     );
     const incremental =
+      !forceFull &&
       inatLoaded > 0 &&
       isSameInatQuery(nextQuery, inatSavedQuery) &&
       Boolean(inatSyncedAt);
@@ -743,6 +763,16 @@ export default function DataSourcesPanel({
       incremental ? withInatUpdateSinceExtras({}, inatSyncedAt) : {}
     );
     closeLoadDialog();
+
+    if (forceFull) {
+      await clearInatStoreAndPersistence();
+      setInatData(map, getInatFeatureCollection());
+      setInatLoaded(0);
+      setInatSavedQuery(null);
+      setInatSyncedAtState(null);
+      setInatPreview(null);
+    }
+
     await runInatLoad({
       loadRegion: draftRegion,
       loadKingdomId: nextKingdomId,
@@ -754,7 +784,8 @@ export default function DataSourcesPanel({
   };
 
   const dialogIncremental =
-    loadDialogSource === "gbif"
+    loadDialogMode !== "full" &&
+    (loadDialogSource === "gbif"
       ? gbifLoaded > 0 &&
         isSameGbifQuery(
           buildGbifQuerySnapshot(draftRegionId, draftKingdomId || null),
@@ -772,7 +803,7 @@ export default function DataSourcesPanel({
             inatSavedQuery
           ) &&
           Boolean(inatSyncedAt)
-        : false;
+        : false);
 
   const inatSeriesEstimate =
     inatPreview != null ? estimateInatLoadSeriesCount(inatPreview) : null;
@@ -846,6 +877,15 @@ export default function DataSourcesPanel({
               <button
                 type="button"
                 className="gbif-panel-btn gbif-panel-btn--secondary"
+                disabled={!map || gbifLoading || gbifLoaded === 0}
+                title="Очистить локальную копию и загрузить заново"
+                onClick={() => openLoadDialog("gbif", "full")}
+              >
+                Полностью обновить
+              </button>
+              <button
+                type="button"
+                className="gbif-panel-btn gbif-panel-btn--secondary"
                 disabled={!gbifLoading}
                 onClick={() => gbifAbortRef.current?.abort()}
               >
@@ -894,6 +934,15 @@ export default function DataSourcesPanel({
               <button
                 type="button"
                 className="gbif-panel-btn gbif-panel-btn--secondary"
+                disabled={!map || inatLoading || inatLoaded === 0}
+                title="Очистить локальную копию и загрузить заново"
+                onClick={() => openLoadDialog("inat", "full")}
+              >
+                Полностью обновить
+              </button>
+              <button
+                type="button"
+                className="gbif-panel-btn gbif-panel-btn--secondary"
                 disabled={!inatLoading}
                 onClick={() => inatAbortRef.current?.abort()}
               >
@@ -926,12 +975,16 @@ export default function DataSourcesPanel({
           >
             <h4 id="data-sources-load-title" className="gbif-confirm-title">
               {loadDialogSource === "gbif"
-                ? dialogIncremental
-                  ? "Обновить GBIF"
-                  : "Загрузить GBIF"
-                : dialogIncremental
-                  ? "Обновить iNaturalist"
-                  : "Загрузить iNaturalist"}
+                ? loadDialogMode === "full"
+                  ? "Полностью обновить GBIF"
+                  : dialogIncremental
+                    ? "Обновить GBIF"
+                    : "Загрузить GBIF"
+                : loadDialogMode === "full"
+                  ? "Полностью обновить iNaturalist"
+                  : dialogIncremental
+                    ? "Обновить iNaturalist"
+                    : "Загрузить iNaturalist"}
             </h4>
 
             <label className="gbif-panel-field" htmlFor="data-sources-load-region">
@@ -993,7 +1046,9 @@ export default function DataSourcesPanel({
               {dialogMultiSeries
                 ? ` Загрузка пойдёт сериями (≈ ${formatCount(dialogSeriesEstimate)}).`
                 : null}{" "}
-              Данные сохранятся локально и добавятся к уже загруженным (дубликаты обновятся).
+              {loadDialogMode === "full"
+                ? "Текущая локальная копия будет удалена и заменена полной загрузкой."
+                : "Данные сохранятся локально и добавятся к уже загруженным (дубликаты обновятся)."}
             </p>
 
             <div className="gbif-confirm-actions">
@@ -1010,7 +1065,11 @@ export default function DataSourcesPanel({
                 disabled={!draftRegion}
                 onClick={handleConfirmLoad}
               >
-                {dialogIncremental ? "Обновить" : "Загрузить"}
+                {loadDialogMode === "full"
+                  ? "Полностью обновить"
+                  : dialogIncremental
+                    ? "Обновить"
+                    : "Загрузить"}
               </button>
             </div>
           </div>

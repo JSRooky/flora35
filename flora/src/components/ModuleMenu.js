@@ -12,6 +12,7 @@ export const MODULE_IDS = {
   MAP: "map",
   YEAR: "year",
   TIMELINE: "timeline",
+  SEASONALITY: "seasonality",
   FEATURE: "feature",
   AREAL: "areal",
   // Совпадает с заголовком ## polygon в docs/moduleHelp.md.
@@ -47,7 +48,8 @@ const POINT_MODULE_ITEMS = [
 
 const TIME_MODULE_ITEMS = [
   { id: MODULE_IDS.YEAR, label: "Год находки", timeAccent: true },
-  { id: MODULE_IDS.TIMELINE, label: "Таймлайн", timeAccent: true }
+  { id: MODULE_IDS.TIMELINE, label: "Таймлайн", timeAccent: true },
+  { id: MODULE_IDS.SEASONALITY, label: "Сезонность", timeAccent: true }
 ];
 
 const MAP_DISPLAY_MODULE_ITEM = {

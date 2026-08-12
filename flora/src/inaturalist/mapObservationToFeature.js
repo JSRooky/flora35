@@ -1,5 +1,9 @@
 import { isRussianVernacular } from "../names/vernacularUtils";
 import { mapKingdomNameToRegnum } from "../gbif/taxonFilters";
+import {
+  parseFoundMonthFromDateString,
+  parseFoundMonthFromParts
+} from "../geo/foundDate";
 
 const ICONIC_TO_REGNUM = {
   Plantae: "plantae",
@@ -79,6 +83,23 @@ function resolveCommunityTaxon(observation) {
   return observation?.taxon ?? null;
 }
 
+function resolveObservationFoundMonth(observation) {
+  const details = observation?.observed_on_details;
+  const fromParts = parseFoundMonthFromParts({
+    year: details?.year,
+    month: details?.month,
+    day: details?.day
+  });
+  if (fromParts != null) {
+    return fromParts;
+  }
+
+  return (
+    parseFoundMonthFromDateString(observation?.observed_on) ??
+    parseFoundMonthFromDateString(observation?.time_observed_at)
+  );
+}
+
 /**
  * Преобразует наблюдение iNaturalist в GeoJSON Feature.
  * Пропускает записи без валидных координат или id.
@@ -125,6 +146,7 @@ export function mapObservationToFeature(observation) {
       regnum,
       family: getAncestorName(ancestors, "family"),
       found_year: observation?.observed_on_details?.year ?? null,
+      found_month: resolveObservationFoundMonth(observation),
       found_by: observation?.user?.login ?? observation?.user?.name ?? null,
       quality_grade: observation?.quality_grade ?? null,
       place_guess: observation?.place_guess ?? null,
