@@ -28,6 +28,11 @@ import {
   spreadCoincidentFeatures
 } from "./spreadCoincidentPoints";
 import { safeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
+import {
+  cancelClusterHoverRequest,
+  removePointHoverPopup,
+  showClusterRegnumHover
+} from "./pointHoverTooltips";
 import "../styles/GbifPanel.css";
 
 export const GBIF_SOURCE_ID = "gbif-locations";
@@ -73,6 +78,8 @@ let gbifClusterByRegnum = true;
 let gbifClusterPieChartsEnabled = false;
 let gbifDenseClustersHighlightEnabled = false;
 let expandedGbifDensePileKeys = new Set();
+/** Члены сверхплотных кластеров: id → features[]. */
+let gbifDensePileMembers = new Map();
 /** Ключи lng,lat совпадающих точек, разведённых по клику на обычный кластер. */
 let expandedGbifCoincidentKeys = new Set();
 /** Колбэк после раскрытия плотной группы GBIF (карта или список). */
@@ -115,6 +122,15 @@ function excludeGbifHiddenPinFeatures(features) {
     const key = getGbifFeatureStableKey(feature);
     return !key || !hidden.has(key);
   });
+}
+
+function getGbifDensePileMembers(feature) {
+  const key = feature?.properties?.dense_pile_key;
+  if (!key) {
+    return [];
+  }
+
+  return gbifDensePileMembers.get(`dense-${key}`) ?? [];
 }
 
 function isGbifMapboxClusteringActive() {
@@ -455,12 +471,17 @@ function attachInteractions(map) {
     });
   };
 
-  const clusterEnter = () => {
+  const clusterEnter = (event) => {
     map.getCanvas().style.cursor = "pointer";
+    showClusterRegnumHover(map, event, {
+      getDensePileLeaves: getGbifDensePileMembers
+    });
   };
 
   const clusterLeave = () => {
     map.getCanvas().style.cursor = "";
+    cancelClusterHoverRequest();
+    removePointHoverPopup();
   };
 
   const pointClick = (event) => {
@@ -607,6 +628,7 @@ function prepareMapGbifFeatures(features) {
   if (!gbifDenseClustersHighlightEnabled) {
     // При обычной Mapbox-кластеризации spread только для раскрытых по клику куч;
     // без кластеризации — полный spiral spread.
+    gbifDensePileMembers = new Map();
     return {
       mapFeatures: isGbifMapboxClusteringActive()
         ? spreadCoincidentFeatures(features, expandedGbifCoincidentKeys)
@@ -615,12 +637,12 @@ function prepareMapGbifFeatures(features) {
     };
   }
 
-  const { expandedDenseFeatures, denseClusterFeatures } = partitionFeaturesByDensePiles(
-    features,
-    {
+  const { expandedDenseFeatures, denseClusterFeatures, densePileMembersById } =
+    partitionFeaturesByDensePiles(features, {
       expandedPileKeys: expandedGbifDensePileKeys
-    }
-  );
+    });
+
+  gbifDensePileMembers = densePileMembersById;
 
   return {
     // Точки вне сверхплотных куч не показываем; раскрытые кучи — отдельными маркерами.
@@ -693,7 +715,10 @@ function rebuildGbifLayers(map) {
     return;
   }
 
-  const collection = getGbifFeatureCollection();
+  const collection =
+    lastGbifInputCollection?.type === "FeatureCollection"
+      ? lastGbifInputCollection
+      : getGbifFeatureCollection();
   const { mapFeatures, denseClusterFeatures } = prepareMapGbifFeatures(
     collection.features ?? []
   );

@@ -232,6 +232,7 @@ const PANEL_IDS = {
   FEATURE: "feature",
   AREAL: "areal",
   STATUS: "status",
+  REGNUM: "regnum",
   MAP: "map",
   DENSE: "dense",
   YEAR: "year",
@@ -285,6 +286,7 @@ export default function MapView() {
   const [popupData, setPopupData] = useState(null);
   const [propertyFilters, setPropertyFilters] = useState({});
   const [statusFilters, setStatusFilters] = useState([]);
+  const [regnumFilters, setRegnumFilters] = useState([]);
   const [clusterByRegnum, setClusterByRegnumState] = useState(DEFAULT_CLUSTER_BY_REGNUM);
   const [clusteringEnabled, setClusteringEnabledState] = useState(DEFAULT_CLUSTERING_ENABLED);
   const [clusterPieCharts, setClusterPieChartsState] = useState(DEFAULT_CLUSTER_PIE_CHARTS);
@@ -1319,6 +1321,25 @@ export default function MapView() {
   const baseLocationFilters = useMemo(() => {
     const filters = { ...propertyFilters };
 
+    if (regnumFilters.length > 0) {
+      if (filters.regnum != null) {
+        const existing = Array.isArray(filters.regnum)
+          ? filters.regnum
+          : [filters.regnum];
+        const existingNormalized = existing.map((value) =>
+          value == null || value === "" ? "" : String(value).toLowerCase()
+        );
+        const intersected = regnumFilters.filter((regnum) =>
+          existingNormalized.includes(
+            regnum == null || regnum === "" ? "" : String(regnum).toLowerCase()
+          )
+        );
+        filters.regnum = intersected.length > 0 ? intersected : ["__none__"];
+      } else {
+        filters.regnum = regnumFilters;
+      }
+    }
+
     if (statusFilters.length > 0) {
       filters.status = statusFilters;
     }
@@ -1343,6 +1364,7 @@ export default function MapView() {
     return filters;
   }, [
     propertyFilters,
+    regnumFilters,
     statusFilters,
     yearFilterEnabled,
     yearRange,
@@ -1646,7 +1668,14 @@ export default function MapView() {
         filters.regnum = ["__none__"];
       } else if (filters.regnum != null) {
         const existing = Array.isArray(filters.regnum) ? filters.regnum : [filters.regnum];
-        const intersected = enabledRegnums.filter((regnum) => existing.includes(regnum));
+        const existingNormalized = existing.map((value) =>
+          value == null || value === "" ? "" : String(value).toLowerCase()
+        );
+        const intersected = enabledRegnums.filter((regnum) =>
+          existingNormalized.includes(
+            regnum == null || regnum === "" ? "" : String(regnum).toLowerCase()
+          )
+        );
         filters.regnum = intersected.length > 0 ? intersected : ["__none__"];
       } else {
         filters.regnum = enabledRegnums;
@@ -2442,14 +2471,6 @@ export default function MapView() {
   }, [arealEnabled, arealAllMarkers]);
 
   useEffect(() => {
-    if (!map.current) {
-      return;
-    }
-
-    applyLocationsFilter(map.current, locationFilters);
-  }, [locationFilters]);
-
-  useEffect(() => {
     if (!map.current || !mapReady) {
       return;
     }
@@ -3051,6 +3072,15 @@ export default function MapView() {
     applyInatLocationsFilter(map.current, locationFilters);
   }, [denseClustersHighlight, mapReady, locationFilters]);
 
+  // После режимов кластеризации: иначе rebuild*Layers мог вернуть полную выборку.
+  useEffect(() => {
+    if (!map.current) {
+      return;
+    }
+
+    applyLocationsFilter(map.current, locationFilters);
+  }, [locationFilters]);
+
   useEffect(() => {
     if (!map.current) {
       return;
@@ -3297,6 +3327,16 @@ export default function MapView() {
     });
   };
 
+  const handleRegnumFilterChange = (regnum, enabled) => {
+    setRegnumFilters((prev) => {
+      if (enabled) {
+        return prev.includes(regnum) ? prev : [...prev, regnum];
+      }
+
+      return prev.filter((value) => value !== regnum);
+    });
+  };
+
   const handleClusteringEnabledChange = (enabled) => {
     if (!enabled) {
       setClusterPieChartsState(false);
@@ -3357,6 +3397,7 @@ export default function MapView() {
       collectActiveMapFilters({
         propertyFilters,
         statusFilters,
+        regnumFilters,
         yearFilterEnabled,
         toolPointsFilterEnabled,
         boundsSpeciesRegnumFilter,
@@ -3368,6 +3409,7 @@ export default function MapView() {
     [
       propertyFilters,
       statusFilters,
+      regnumFilters,
       yearFilterEnabled,
       toolPointsFilterEnabled,
       boundsSpeciesRegnumFilter,
@@ -3381,6 +3423,7 @@ export default function MapView() {
   const handleMapFiltersReset = useCallback(() => {
     setPropertyFilters({});
     setStatusFilters([]);
+    setRegnumFilters([]);
     setYearFilterEnabled(false);
     setToolPointsFilterEnabled(createDefaultToolPointsFilterState());
     setOoptFilterBoundsFeature(null);
@@ -3404,6 +3447,11 @@ export default function MapView() {
 
       if (filterId === MAP_FILTER_IDS.STATUS) {
         setStatusFilters([]);
+        return;
+      }
+
+      if (filterId === MAP_FILTER_IDS.REGNUM) {
+        setRegnumFilters([]);
         return;
       }
 
@@ -4990,6 +5038,8 @@ export default function MapView() {
         externalLayersDataRevision={pointsDataRevision}
         onExternalLayerToggle={handleExternalLayerToggle}
         onExternalLayerRequestLoad={handleExternalLayerRequestLoad}
+        regnumFilters={regnumFilters}
+        onRegnumFilterChange={handleRegnumFilterChange}
       />
     </>
   );

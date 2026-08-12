@@ -27,6 +27,11 @@ import {
   spreadCoincidentFeatures
 } from "./spreadCoincidentPoints";
 import { safeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
+import {
+  cancelClusterHoverRequest,
+  removePointHoverPopup,
+  showClusterRegnumHover
+} from "./pointHoverTooltips";
 import "../styles/GbifPanel.css";
 
 export const INAT_SOURCE_ID = "inat-locations";
@@ -72,6 +77,8 @@ let inatClusterByRegnum = true;
 let inatClusterPieChartsEnabled = false;
 let inatDenseClustersHighlightEnabled = false;
 let expandedInatDensePileKeys = new Set();
+/** Члены сверхплотных кластеров: id → features[]. */
+let inatDensePileMembers = new Map();
 /** Ключи lng,lat совпадающих точек, разведённых по клику на обычный кластер. */
 let expandedInatCoincidentKeys = new Set();
 /** Колбэк после раскрытия плотной группы iNat (карта или список). */
@@ -104,6 +111,15 @@ function excludeInatHiddenPinFeatures(features) {
     const key = getInatFeatureStableKey(feature);
     return !key || !hidden.has(key);
   });
+}
+
+function getInatDensePileMembers(feature) {
+  const key = feature?.properties?.dense_pile_key;
+  if (!key) {
+    return [];
+  }
+
+  return inatDensePileMembers.get(`dense-${key}`) ?? [];
 }
 
 function isInatMapboxClusteringActive() {
@@ -410,12 +426,17 @@ function attachInteractions(map) {
     });
   };
 
-  const clusterEnter = () => {
+  const clusterEnter = (event) => {
     map.getCanvas().style.cursor = "pointer";
+    showClusterRegnumHover(map, event, {
+      getDensePileLeaves: getInatDensePileMembers
+    });
   };
 
   const clusterLeave = () => {
     map.getCanvas().style.cursor = "";
+    cancelClusterHoverRequest();
+    removePointHoverPopup();
   };
 
   const pointClick = (event) => {
@@ -562,6 +583,7 @@ function prepareMapInatFeatures(features) {
   if (!inatDenseClustersHighlightEnabled) {
     // При обычной Mapbox-кластеризации spread только для раскрытых по клику куч;
     // без кластеризации — полный spiral spread.
+    inatDensePileMembers = new Map();
     return {
       mapFeatures: isInatMapboxClusteringActive()
         ? spreadCoincidentFeatures(features, expandedInatCoincidentKeys)
@@ -570,12 +592,12 @@ function prepareMapInatFeatures(features) {
     };
   }
 
-  const { expandedDenseFeatures, denseClusterFeatures } = partitionFeaturesByDensePiles(
-    features,
-    {
+  const { expandedDenseFeatures, denseClusterFeatures, densePileMembersById } =
+    partitionFeaturesByDensePiles(features, {
       expandedPileKeys: expandedInatDensePileKeys
-    }
-  );
+    });
+
+  inatDensePileMembers = densePileMembersById;
 
   return {
     // Точки вне сверхплотных куч не показываем; раскрытые кучи — отдельными маркерами.
@@ -648,7 +670,10 @@ function rebuildInatLayers(map) {
     return;
   }
 
-  const collection = getInatFeatureCollection();
+  const collection =
+    lastInatInputCollection?.type === "FeatureCollection"
+      ? lastInatInputCollection
+      : getInatFeatureCollection();
   const { mapFeatures, denseClusterFeatures } = prepareMapInatFeatures(
     collection.features ?? []
   );

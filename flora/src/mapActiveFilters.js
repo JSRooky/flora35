@@ -6,6 +6,7 @@ import { TOOL_POINTS_FILTER_MODULES } from "./toolPointsFilterStorage";
 export const MAP_FILTER_IDS = {
   FEATURE: "feature",
   STATUS: "status",
+  REGNUM: "regnum",
   YEAR: "year",
   OOPT_FEATURE: "oopt-feature",
   OOPT_SPECIES: "oopt-species",
@@ -35,6 +36,7 @@ function toolFilterId(moduleId) {
 export function collectActiveMapFilters({
   propertyFilters,
   statusFilters,
+  regnumFilters,
   yearFilterEnabled,
   toolPointsFilterEnabled,
   boundsSpeciesRegnumFilter,
@@ -49,6 +51,13 @@ export function collectActiveMapFilters({
     entries.push({
       id: MAP_FILTER_IDS.FEATURE,
       label: "Сведения о точке данных"
+    });
+  }
+
+  if ((regnumFilters || []).length > 0) {
+    entries.push({
+      id: MAP_FILTER_IDS.REGNUM,
+      label: "Царство"
     });
   }
 

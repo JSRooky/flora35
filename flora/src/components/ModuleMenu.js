@@ -8,6 +8,7 @@ const HOME_URL = `${process.env.PUBLIC_URL || ""}/`;
 
 export const MODULE_IDS = {
   STATUS: "status",
+  REGNUM: "regnum",
   MAP: "map",
   YEAR: "year",
   TIMELINE: "timeline",

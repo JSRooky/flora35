@@ -47,6 +47,14 @@ import {
 } from "./pointColors";
 import { safeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
 import {
+  cancelClusterHoverRequest,
+  isHoverTooltipsEnabled,
+  removePointHoverPopup,
+  setHoverTooltipsEnabled as setHoverTooltipsEnabledInternal,
+  showClusterRegnumHover,
+  showPointHoverPopup
+} from "./pointHoverTooltips";
+import {
   DENSE_PILES_CLUSTER_LAYER_ID,
   DENSE_PILES_COUNT_LAYER_ID,
   DENSE_PILES_SOURCE_ID,
@@ -168,11 +176,7 @@ let onPointClickCallback = null;
 let onMapBackgroundClickCallback = null;
 /** Колбэк после раскрытия плотной группы (карта или список). */
 let onDensePileExpandedCallback = null;
-let pointHoverPopup = null;
-let pointHoverPopupHideTimer = null;
-let clusterHoverRequestId = 0;
 let clusterExpandRequestId = 0;
-let hoverTooltipsEnabled = true;
 let mapCursorOverride = null;
 let sharedPointPinMarker = null;
 let sharedPointPinFeatureKey = null;
@@ -206,8 +210,6 @@ export function setMapCursorOverride(map, cursor) {
     applyMapCursor(map, cursor ?? "");
   }
 }
-
-const POINT_TOOLTIP_FADE_MS = 180;
 
 function escapeHtml(text) {
   return String(text)
@@ -325,94 +327,6 @@ function formatClusterPointsCount(count) {
   }
 
   return `${count} точек`;
-}
-
-function formatClusterSpeciesCount(count) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-
-  if (mod10 === 1 && mod100 !== 11) {
-    return `${count} вид`;
-  }
-
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${count} вида`;
-  }
-
-  return `${count} видов`;
-}
-
-const MAX_CLUSTER_TOOLTIP_SPECIES = 5;
-
-/** Уникальные виды в кластере с количеством точек каждого вида. */
-function getSpeciesSummaryFromLeaves(leaves) {
-  const speciesMap = new Map();
-
-  leaves.forEach((leaf) => {
-    const { name_ru: nameRu = "", name_latin: nameLatin = "", regnum = "" } = leaf.properties ?? {};
-    const key = nameLatin || nameRu || leaf.id || `${leaf.geometry?.coordinates?.join(",")}`;
-
-    if (!speciesMap.has(key)) {
-      speciesMap.set(key, {
-        nameRu,
-        nameLatin,
-        regnum,
-        count: 1
-      });
-      return;
-    }
-
-    speciesMap.get(key).count += 1;
-  });
-
-  return [...speciesMap.values()].sort((a, b) => {
-    const nameA = a.nameRu || a.nameLatin || "";
-    const nameB = b.nameRu || b.nameLatin || "";
-    return nameA.localeCompare(nameB, "ru");
-  });
-}
-
-function getSpeciesLabel(species, speciesList) {
-  const label = species.nameRu || species.nameLatin || "Без названия";
-  const hasDuplicateName = speciesList.filter((item) => item.nameRu === species.nameRu).length > 1;
-
-  if (hasDuplicateName && species.nameLatin) {
-    return `${species.nameRu || species.nameLatin} (${species.nameLatin})`;
-  }
-
-  return label;
-}
-
-/** HTML-подсказка со списком видов в кластере. */
-function buildClusterTooltipHtml(leaves) {
-  const speciesList = getSpeciesSummaryFromLeaves(leaves);
-
-  if (speciesList.length === 0) {
-    return `<div class="cluster-tooltip-title">${formatClusterPointsCount(leaves.length)}</div>`;
-  }
-
-  const visibleSpecies = speciesList.slice(0, MAX_CLUSTER_TOOLTIP_SPECIES);
-  const hiddenSpecies = speciesList.slice(MAX_CLUSTER_TOOLTIP_SPECIES);
-
-  const items = visibleSpecies
-    .map((species) => {
-      const label = escapeHtml(getSpeciesLabel(species, speciesList));
-      const color = getPointColorForRegnum(species.regnum);
-      const countSuffix = species.count > 1 ? ` <span class="cluster-tooltip-count">— ${species.count}</span>` : "";
-      return `<li class="cluster-tooltip-item"><span class="cluster-tooltip-species" style="color: ${color}">${label}</span>${countSuffix}</li>`;
-    })
-    .join("");
-
-  const moreItem =
-    hiddenSpecies.length > 0
-      ? `<li class="cluster-tooltip-item cluster-tooltip-more">и еще ${formatClusterSpeciesCount(hiddenSpecies.length)}</li>`
-      : "";
-
-  return `
-    <div class="cluster-tooltip-title">${formatClusterSpeciesCount(speciesList.length)}</div>
-    <div class="cluster-tooltip-subtitle">${formatClusterPointsCount(leaves.length)}</div>
-    <ul class="cluster-tooltip-list">${items}${moreItem}</ul>
-  `;
 }
 
 /** Mapbox Supercluster активен только если включена обычная кластеризация и не режим сверхплотных. */
@@ -677,82 +591,6 @@ function attachClusterPieChartMarkers(map) {
   updateClusterPieChartMarkers(map);
 }
 
-function cancelClusterHoverRequest() {
-  clusterHoverRequestId += 1;
-}
-
-function clearPointHoverHideTimer() {
-  if (pointHoverPopupHideTimer) {
-    clearTimeout(pointHoverPopupHideTimer);
-    pointHoverPopupHideTimer = null;
-  }
-}
-
-function setPointHoverPopupVisible(visible, popup = pointHoverPopup) {
-  const popupElement = popup?.getElement();
-  if (!popupElement) {
-    return;
-  }
-
-  popupElement.classList.toggle("point-hover-tooltip--visible", visible);
-}
-
-function showPointHoverPopup(map, coordinates, html) {
-  if (!hoverTooltipsEnabled) {
-    return;
-  }
-
-  clearPointHoverHideTimer();
-
-  if (!pointHoverPopup) {
-    pointHoverPopup = new mapboxgl.Popup({
-      closeButton: false,
-      closeOnClick: false,
-      className: "point-hover-tooltip",
-      offset: 10
-    });
-  }
-
-  const isNewPopup = !pointHoverPopup.isOpen();
-
-  pointHoverPopup.setLngLat(coordinates).setHTML(html).addTo(map);
-
-  if (isNewPopup) {
-    setPointHoverPopupVisible(false);
-    requestAnimationFrame(() => {
-      setPointHoverPopupVisible(true);
-    });
-    return;
-  }
-
-  setPointHoverPopupVisible(true);
-}
-
-function removePointHoverPopup({ immediate = false } = {}) {
-  clearPointHoverHideTimer();
-
-  if (!pointHoverPopup) {
-    return;
-  }
-
-  const popup = pointHoverPopup;
-
-  if (immediate) {
-    pointHoverPopup = null;
-    popup.remove();
-    return;
-  }
-
-  setPointHoverPopupVisible(false, popup);
-  pointHoverPopupHideTimer = setTimeout(() => {
-    pointHoverPopupHideTimer = null;
-    if (pointHoverPopup === popup) {
-      pointHoverPopup = null;
-    }
-    popup.remove();
-  }, POINT_TOOLTIP_FADE_MS);
-}
-
 /** Добавляет каждой точке URL иконки по полю regnum (растение / животное). */
 function enrichWithImages(data) {
   if (!data?.features) {
@@ -779,7 +617,19 @@ function enrichWithImages(data) {
 }
 
 function getRegnumValues(features = locationsData?.features ?? []) {
-  return [...new Set(features.map((feature) => feature.properties.regnum).filter(Boolean))];
+  return [
+    ...new Set(
+      features
+        .map((feature) => {
+          const raw = feature.properties?.regnum;
+          if (raw == null || String(raw).trim() === "") {
+            return "";
+          }
+          return String(raw).toLowerCase();
+        })
+        .filter(Boolean)
+    )
+  ];
 }
 
 /** ID GeoJSON-источника: общий или отдельный для каждого regnum. */
@@ -1395,38 +1245,8 @@ function attachLocationsInteractions(map) {
       map.getCanvas().style.cursor = "pointer";
     }
 
-    if (!hoverTooltipsEnabled) {
-      return;
-    }
-
-    const clusterFeature = event.features?.[0];
-    const coordinates = clusterFeature?.geometry?.coordinates;
-
-    if (clusterFeature?.properties?.dense_pile) {
-      const leaves = getDensePileMembers(clusterFeature);
-      if (leaves.length && coordinates) {
-        showPointHoverPopup(map, coordinates, buildClusterTooltipHtml(leaves));
-      }
-      return;
-    }
-
-    const clusterId = clusterFeature?.properties?.cluster_id;
-    const sourceId = clusterFeature?.source;
-    const source = sourceId ? map.getSource(sourceId) : null;
-
-    if (!source || clusterId === undefined || !coordinates) {
-      return;
-    }
-
-    const requestId = clusterHoverRequestId + 1;
-    clusterHoverRequestId = requestId;
-
-    source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
-      if (leavesErr || requestId !== clusterHoverRequestId || !leaves?.length) {
-        return;
-      }
-
-      showPointHoverPopup(map, coordinates, buildClusterTooltipHtml(leaves));
+    showClusterRegnumHover(map, event, {
+      getDensePileLeaves: getDensePileMembers
     });
   };
 
@@ -1450,7 +1270,7 @@ function attachLocationsInteractions(map) {
       map.getCanvas().style.cursor = "pointer";
     }
 
-    if (!hoverTooltipsEnabled) {
+    if (!isHoverTooltipsEnabled()) {
       return;
     }
 
@@ -1841,9 +1661,13 @@ function updateLocationsSourceData(map, filteredFeatures) {
         return;
       }
 
+      const regnumKey = String(regnum).toLowerCase();
       source.setData({
         type: "FeatureCollection",
-        features: mapFeatures.filter((feature) => feature.properties.regnum === regnum)
+        features: mapFeatures.filter(
+          (feature) =>
+            String(feature.properties?.regnum || "").toLowerCase() === regnumKey
+        )
       });
     });
     syncDensePilesLayers(map, denseClusterFeatures);
@@ -1914,7 +1738,10 @@ function applyFoundYearFilterChange(map, nextFilters) {
     return;
   }
 
-  const filteredFeatures = filterFeatures(locationsData.features, nextFilters);
+  const filteredFeatures = filterFeatures(
+    enrichFeaturesWithAttribution(locationsData.features, getStablePointKey),
+    nextFilters
+  );
   setCurrentFilteredFeatures(filteredFeatures);
   currentFilters = nextFilters;
   updateLocationsSourceData(map, filteredFeatures);
@@ -1932,7 +1759,10 @@ function rebuildLocationsLayers(map) {
   detachLocationsInteractions(map);
   removeLocationsFromMap(map);
 
-  const filteredFeatures = filterFeatures(locationsData.features, currentFilters);
+  const filteredFeatures = filterFeatures(
+    enrichFeaturesWithAttribution(locationsData.features, getStablePointKey),
+    currentFilters
+  );
   setCurrentFilteredFeatures(filteredFeatures);
   const { mapFeatures, denseClusterFeatures } = prepareMapFeatures(filteredFeatures);
 
@@ -1950,8 +1780,10 @@ function rebuildLocationsLayers(map) {
     // Отдельный кластеризуемый источник на каждое царство — кластеры не смешивают regnum.
     getRegnumValues().forEach((regnum) => {
       const sourceId = getSourceId(regnum);
+      const regnumKey = String(regnum).toLowerCase();
       const features = mapFeatures.filter(
-        (feature) => feature.properties.regnum === regnum
+        (feature) =>
+          String(feature.properties?.regnum || "").toLowerCase() === regnumKey
       );
 
       map.addSource(sourceId, {
@@ -2033,7 +1865,40 @@ export function filterFeatures(features, filters = {}) {
             return true;
           }
 
+          if (key === "regnum") {
+            const raw = feature.properties?.regnum;
+            const normalized =
+              raw == null || String(raw).trim() === ""
+                ? ""
+                : String(raw).toLowerCase();
+
+            return value.some((entry) => {
+              if (entry === "__none__") {
+                return false;
+              }
+
+              const allowed =
+                entry == null || entry === ""
+                  ? ""
+                  : String(entry).toLowerCase();
+              return allowed === normalized;
+            });
+          }
+
           return value.includes(feature.properties[key]);
+        }
+
+        if (key === "regnum") {
+          const raw = feature.properties?.regnum;
+          const normalized =
+            raw == null || String(raw).trim() === ""
+              ? ""
+              : String(raw).toLowerCase();
+          const allowed =
+            value == null || value === ""
+              ? ""
+              : String(value).toLowerCase();
+          return allowed === normalized;
         }
 
         return feature.properties[key] === value;
@@ -2074,9 +1939,9 @@ export function getFilteredFeatures(filters = {}) {
     return [];
   }
 
-  return enrichFeaturesWithAttribution(
-    filterFeatures(locationsData.features, filters),
-    getStablePointKey
+  return filterFeatures(
+    enrichFeaturesWithAttribution(locationsData.features, getStablePointKey),
+    filters
   );
 }
 
@@ -2367,9 +2232,9 @@ export function getVisibleGbifFeatures(locationFilters = currentFilters) {
   }
 
   const processed = applyGbifProcessingFilters(enrichedFeatures, gbifProcessingFilters);
-  const features = enrichFeaturesWithAttribution(
-    filterFeatures(processed, locationFilters),
-    getStablePointKey
+  const features = filterFeatures(
+    enrichFeaturesWithAttribution(processed, getStablePointKey),
+    locationFilters
   );
 
   visibleGbifCache = {
@@ -2502,9 +2367,9 @@ export function getVisibleInatFeatures(locationFilters = currentFilters) {
   }
 
   const processed = applyInatProcessingFilters(enrichedFeatures, inatProcessingFilters);
-  const features = enrichFeaturesWithAttribution(
-    filterFeatures(processed, locationFilters),
-    getStablePointKey
+  const features = filterFeatures(
+    enrichFeaturesWithAttribution(processed, getStablePointKey),
+    locationFilters
   );
 
   visibleInatCache = {
@@ -2569,16 +2434,27 @@ export function applyLocationsFilter(map, filters = {}) {
     return;
   }
 
-  if (map && locationsSourcesExist(map) && filtersEqual(currentFilters, filters)) {
+  if (filtersEqual(currentFilters, filters)) {
+    // Локальные слои уже актуальны; внешние всё равно синхронизируем
+    // (их могла пересобрать полная коллекция из store).
+    if (map) {
+      applyGbifLocationsFilter(map, filters);
+      applyInatLocationsFilter(map, filters);
+    }
     return;
   }
 
   currentFilters = filters;
+  invalidateVisibleGbifCache();
+  invalidateVisibleInatCache();
   expandedDensePileKeys = new Set();
   expandedCoincidentKeys = new Set();
-  rebuildLocationsLayers(map);
-  applyGbifLocationsFilter(map, filters);
-  applyInatLocationsFilter(map, filters);
+
+  if (map) {
+    rebuildLocationsLayers(map);
+    applyGbifLocationsFilter(map, filters);
+    applyInatLocationsFilter(map, filters);
+  }
 }
 
 /** Сбрасывает все фильтры точек. */
@@ -2588,19 +2464,32 @@ export function clearLocationsFilter(map) {
 }
 
 /** Включает/выключает группировку кластеров по regnum и пересобирает слои. */
-/** Включает/выключает группировку кластеров по regnum и пересобирает слои. */
 export function setClusterByRegnum(map, enabled) {
-  clusterByRegnum = enabled;
-  rebuildLocationsLayers(map);
+  const next = Boolean(enabled);
+  if (clusterByRegnum === next) {
+    return;
+  }
+
+  clusterByRegnum = next;
+  if (map) {
+    rebuildLocationsLayers(map);
+  }
 }
 
 /** Включает/выключает кластеризацию точек и пересобирает слои. */
 export function setClusteringEnabled(map, enabled) {
-  clusteringEnabled = enabled;
-  if (!enabled) {
+  const next = Boolean(enabled);
+  if (clusteringEnabled === next) {
+    return;
+  }
+
+  clusteringEnabled = next;
+  if (!next) {
     expandedCoincidentKeys = new Set();
   }
-  rebuildLocationsLayers(map);
+  if (map) {
+    rebuildLocationsLayers(map);
+  }
 }
 
 /** Показывает/скрывает маркеры точек и диаграммы кластеров. */
@@ -2717,17 +2606,10 @@ export function setDensePileExpandedHandler(handler) {
 
 /** Включает или отключает всплывающие подсказки при наведении на точки и кластеры. */
 export function setHoverTooltipsEnabled(enabled) {
-  hoverTooltipsEnabled = enabled;
-
-  if (!enabled) {
-    cancelClusterHoverRequest();
-    removePointHoverPopup({ immediate: true });
-  }
+  setHoverTooltipsEnabledInternal(enabled);
 }
 
-export function isHoverTooltipsEnabled() {
-  return hoverTooltipsEnabled;
-}
+export { isHoverTooltipsEnabled };
 
 /** Точка входа: инициализация слоя маркеров и регистрация колбэков из App. */
 export function addLocationsLayer(
