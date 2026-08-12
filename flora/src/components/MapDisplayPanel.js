@@ -54,6 +54,8 @@ export default function MapDisplayPanel({
   denseClustersHighlight = false,
   onDenseClustersHighlightChange,
   onDenseProcessingOpen,
+  mergedPointsVisible = true,
+  onMergedPointsVisibleChange,
   collapsed: collapsedProp,
   onCollapsedChange,
   onMinimize,
@@ -223,6 +225,19 @@ export default function MapDisplayPanel({
             />
             <span className="map-display-switch-slider" />
             <span className="map-display-switch-label">Скрыть точки</span>
+          </label>
+
+          <label
+            className="map-display-switch"
+            title="Показать или скрыть слой точек, полученных слиянием дубликатов"
+          >
+            <input
+              type="checkbox"
+              checked={mergedPointsVisible}
+              onChange={(e) => onMergedPointsVisibleChange?.(e.target.checked)}
+            />
+            <span className="map-display-switch-slider" />
+            <span className="map-display-switch-label">Слитые точки</span>
           </label>
 
           <label className="map-display-switch" title="Показать тепловую карту по всем точкам">

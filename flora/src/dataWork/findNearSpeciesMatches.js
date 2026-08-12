@@ -7,6 +7,7 @@ import { normalizeLatinName } from "./normalizeLatinName";
  *   source: string,
  *   nameLatin: string,
  *   coordinates: [number, number],
+ *   foundYear: number|null,
  *   feature: object
  * }} MatchPoint
  * @typedef {{
@@ -19,6 +20,7 @@ import { normalizeLatinName } from "./normalizeLatinName";
  *   key: string,
  *   nameLatin: string,
  *   coordinates: [number, number],
+ *   foundYear: number|null,
  *   source: string,
  *   feature: object
  * }} IndexedPoint
@@ -26,6 +28,22 @@ import { normalizeLatinName } from "./normalizeLatinName";
 
 /** Примерно метров на градус широты. */
 const METERS_PER_DEG_LAT = 111320;
+
+/**
+ * Нормализует год находки до целого числа или null.
+ * @param {unknown} value
+ * @returns {number|null}
+ */
+function normalizeFoundYear(value) {
+  if (value == null || value === "") {
+    return null;
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.trunc(numeric);
+}
 
 function isValidCoordinates(coordinates) {
   return (
@@ -57,6 +75,7 @@ function toIndexedPoint(feature, sourceId) {
     key,
     nameLatin,
     coordinates: [coordinates[0], coordinates[1]],
+    foundYear: normalizeFoundYear(feature?.properties?.found_year),
     source: sourceId,
     feature
   };
@@ -100,6 +119,7 @@ function toMatchPoint(point) {
     source: point.source,
     nameLatin: point.nameLatin,
     coordinates: point.coordinates,
+    foundYear: point.foundYear ?? null,
     feature: point.feature
   };
 }
@@ -195,6 +215,14 @@ function collectMatchesForSpecies(leftPoints, rightPoints, thresholdMeters, matc
       const right = sortedRight[index];
 
       if (
+        left.foundYear != null &&
+        right.foundYear != null &&
+        left.foundYear !== right.foundYear
+      ) {
+        continue;
+      }
+
+      if (
         !passesBboxPrefilter(
           left.coordinates,
           right.coordinates,
@@ -238,6 +266,8 @@ function sortMatches(matches) {
 /**
  * Ищет пары точек из двух источников с одинаковым латинским названием
  * и расстоянием ≤ thresholdMeters.
+ * Если у обеих точек указан год находки — он тоже должен совпадать;
+ * если год не указан хотя бы у одной — пара всё равно учитывается.
  *
  * @param {{
  *   leftFeatures: object[],

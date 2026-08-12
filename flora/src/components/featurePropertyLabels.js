@@ -8,6 +8,7 @@ export const PROPERTY_LABELS = {
   identified_by: "Определил",
   found_year: "Год находки",
   status: "Статус",
+  distance_meters: "Расстояние исходников, м",
   basisOfRecord: "Тип записи",
   datasetKey: "Набор данных",
   gbif_key: "GBIF ID",

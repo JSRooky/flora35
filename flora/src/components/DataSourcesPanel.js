@@ -908,7 +908,7 @@ export default function DataSourcesPanel({
             className="gbif-panel-btn gbif-panel-btn--processing"
             onClick={() => onOpenProcessing?.()}
           >
-            Обработка внешних данных
+            Работа с данными
           </button>
         </div>
       )}

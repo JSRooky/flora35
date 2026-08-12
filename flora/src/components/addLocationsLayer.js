@@ -34,6 +34,11 @@ import {
   setInatHiddenPointFeatureKeys
 } from "./addInatLayer";
 import {
+  getMergedFeatures,
+  isMergedLayerVisible
+} from "./addMergedLayer";
+import { enrichFeaturesWithAttribution } from "../dataWork/pointAttributionOverlay";
+import {
   DEFAULT_CLUSTER_COLOR,
   DEFAULT_POINT_COLOR,
   REGNUM_COLORS,
@@ -78,6 +83,9 @@ const CLUSTER_OPTIONS = {
 
 /** Ключ фильтра GeoJSON-полигона в объекте filters для applyLocationsFilter. */
 export const WITHIN_FEATURE_FILTER_KEY = "__withinFeature";
+
+/** Ключ массива стабильных id скрытых точек в объекте filters. */
+export const HIDDEN_FEATURE_KEYS_FILTER_KEY = "__hiddenFeatureKeys";
 
 const SHARE_PIN_CENTER_COLORS = [
   REGNUM_COLORS.plantae,
@@ -130,6 +138,8 @@ let clusterPieChartMarkersOnScreen = {};
 let clusterPieChartRenderHandler = null;
 let clusterPieChartMap = null;
 let currentFilters = {};
+/** Стабильные ключи точек, скрытых пользователем (исключаются из карты и инструментов). */
+let hiddenPointKeysSet = new Set();
 /** Клиентские фильтры панели «Обработка внешних данных» (не влияют на локальный слой). */
 let gbifProcessingFilters = createDefaultGbifProcessingFilters();
 let inatProcessingFilters = createDefaultInatProcessingFilters();
@@ -174,6 +184,7 @@ let selectedPointPinObjectUrl = null;
 let toolIncludeLocal = true;
 let toolIncludeGbif = true;
 let toolIncludeInat = true;
+let toolIncludeMerged = true;
 
 /** Поля, показываемые в компактном окне при открытии share-ссылки. */
 const SHARED_POINT_POPUP_FIELDS = ["regnum", "family", "found_year", "status"];
@@ -1585,23 +1596,52 @@ function addClusterLayers(map, sourceId, regnum = null) {
   addUnclusteredLayer(map, sourceId, regnum);
 }
 
-function getFeatureKey(feature) {
-  if (feature.id != null) {
+/**
+ * Стабильный ключ точки для скрытия/выбора: feature.id, finding_id, gbif-*, inat-*.
+ * @param {object|null|undefined} feature
+ * @returns {string}
+ */
+export function getStablePointKey(feature) {
+  if (feature?.id != null && feature.id !== "") {
     return String(feature.id);
   }
 
-  const findingId = feature.properties?.finding_id;
-  const coordinates = feature.geometry?.coordinates;
+  const properties = feature?.properties ?? {};
 
-  if (findingId != null) {
-    return String(findingId);
+  if (properties.finding_id != null && properties.finding_id !== "") {
+    return String(properties.finding_id);
   }
 
-  if (Array.isArray(coordinates)) {
+  if (properties.gbif_key != null && properties.gbif_key !== "") {
+    return `gbif-${properties.gbif_key}`;
+  }
+
+  if (properties.inat_id != null && properties.inat_id !== "") {
+    return `inat-${properties.inat_id}`;
+  }
+
+  const coordinates = feature?.geometry?.coordinates;
+  if (Array.isArray(coordinates) && coordinates.length >= 2) {
     return coordinates.join(",");
   }
 
-  return JSON.stringify(feature.properties ?? {});
+  return JSON.stringify(properties);
+}
+
+/**
+ * Синхронизирует набор скрытых точек (вызывается из App при изменении state).
+ * @param {Iterable<string>|null|undefined} keys
+ */
+export function setHiddenPointKeysForFilter(keys) {
+  hiddenPointKeysSet = new Set(
+    keys == null ? [] : Array.from(keys, (key) => String(key))
+  );
+  invalidateVisibleGbifCache();
+  invalidateVisibleInatCache();
+}
+
+function getFeatureKey(feature) {
+  return getStablePointKey(feature);
 }
 
 function filterValueEqual(a, b) {
@@ -1949,10 +1989,20 @@ function rebuildLocationsLayers(map) {
 
 /** Фильтрует GeoJSON-объекты по properties; массив значений — логика «любой из». */
 export function filterFeatures(features, filters = {}) {
-  const { [WITHIN_FEATURE_FILTER_KEY]: withinFeature, ...propertyFilters } = filters;
+  const {
+    [WITHIN_FEATURE_FILTER_KEY]: withinFeature,
+    [HIDDEN_FEATURE_KEYS_FILTER_KEY]: _hiddenFeatureKeys,
+    ...propertyFilters
+  } = filters;
   const filterEntries = Object.entries(propertyFilters);
 
   let result = features;
+
+  if (hiddenPointKeysSet.size > 0) {
+    result = result.filter(
+      (feature) => !hiddenPointKeysSet.has(getStablePointKey(feature))
+    );
+  }
 
   if (filterEntries.length > 0) {
     result = result.filter((feature) =>
@@ -2021,7 +2071,10 @@ export function getFilteredFeatures(filters = {}) {
     return [];
   }
 
-  return filterFeatures(locationsData.features, filters);
+  return enrichFeaturesWithAttribution(
+    filterFeatures(locationsData.features, filters),
+    getStablePointKey
+  );
 }
 
 /** Является ли feature точкой GBIF. */
@@ -2035,7 +2088,12 @@ export function isInatFeature(feature) {
 }
 
 /** Задаёт, какие источники участвуют в инструментах карты. */
-export function setToolFeaturesContext({ includeLocal, includeGbif, includeInat } = {}) {
+export function setToolFeaturesContext({
+  includeLocal,
+  includeGbif,
+  includeInat,
+  includeMerged
+} = {}) {
   if (typeof includeLocal === "boolean") {
     toolIncludeLocal = includeLocal;
   }
@@ -2045,13 +2103,17 @@ export function setToolFeaturesContext({ includeLocal, includeGbif, includeInat 
   if (typeof includeInat === "boolean") {
     toolIncludeInat = includeInat;
   }
+  if (typeof includeMerged === "boolean") {
+    toolIncludeMerged = includeMerged;
+  }
 }
 
 export function getToolFeaturesContext() {
   return {
     includeLocal: toolIncludeLocal,
     includeGbif: toolIncludeGbif,
-    includeInat: toolIncludeInat
+    includeInat: toolIncludeInat,
+    includeMerged: toolIncludeMerged
   };
 }
 
@@ -2072,6 +2134,15 @@ export function getToolFeatures(filters = {}) {
 
   if (toolIncludeInat && isInatLayerVisible()) {
     features.push(...getVisibleInatFeatures(filters));
+  }
+
+  if (toolIncludeMerged && isMergedLayerVisible()) {
+    features.push(
+      ...enrichFeaturesWithAttribution(
+        filterFeatures(getMergedFeatures(), filters),
+        getStablePointKey
+      )
+    );
   }
 
   return features;
@@ -2293,7 +2364,10 @@ export function getVisibleGbifFeatures(locationFilters = currentFilters) {
   }
 
   const processed = applyGbifProcessingFilters(enrichedFeatures, gbifProcessingFilters);
-  const features = filterFeatures(processed, locationFilters);
+  const features = enrichFeaturesWithAttribution(
+    filterFeatures(processed, locationFilters),
+    getStablePointKey
+  );
 
   visibleGbifCache = {
     locationFilters,
@@ -2346,6 +2420,12 @@ function invalidateVisibleInatCache() {
   };
 }
 
+/** Сброс кэшей видимых точек после смены оверлея атрибуции. */
+export function invalidateVisibleAttributionCaches() {
+  invalidateVisibleGbifCache();
+  invalidateVisibleInatCache();
+}
+
 export function getVisibleInatFeatures(locationFilters = currentFilters) {
   const enriched = getInatFeatureCollection();
   const enrichedFeatures = enriched.features ?? [];
@@ -2360,7 +2440,10 @@ export function getVisibleInatFeatures(locationFilters = currentFilters) {
   }
 
   const processed = applyInatProcessingFilters(enrichedFeatures, inatProcessingFilters);
-  const features = filterFeatures(processed, locationFilters);
+  const features = enrichFeaturesWithAttribution(
+    filterFeatures(processed, locationFilters),
+    getStablePointKey
+  );
 
   visibleInatCache = {
     locationFilters,

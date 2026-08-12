@@ -12,6 +12,7 @@ export const MAP_FILTER_IDS = {
   MAP_GROUPS: "map-groups",
   DENSE: "dense",
   EXTERNAL_PROCESSING: "external-processing",
+  HIDDEN_POINTS: "hidden-points",
   /** @deprecated */
   GBIF_PROCESSING: "external-processing"
 };
@@ -39,7 +40,8 @@ export function collectActiveMapFilters({
   boundsSpeciesRegnumFilter,
   denseClustersHighlight,
   denseProcessingActive,
-  externalProcessingFilters
+  externalProcessingFilters,
+  hiddenPointKeys
 }) {
   const entries = [];
 
@@ -112,6 +114,14 @@ export function collectActiveMapFilters({
     entries.push({
       id: MAP_FILTER_IDS.EXTERNAL_PROCESSING,
       label: "Обработка внешних данных"
+    });
+  }
+
+  const hiddenCount = Array.isArray(hiddenPointKeys) ? hiddenPointKeys.length : 0;
+  if (hiddenCount > 0) {
+    entries.push({
+      id: MAP_FILTER_IDS.HIDDEN_POINTS,
+      label: `Скрытые точки (${hiddenCount})`
     });
   }
 

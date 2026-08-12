@@ -9,9 +9,9 @@ import {
   setTemporaryLocationsFeatures
 } from "../components/addLocationsLayer";
 import {
-  clearNearSpeciesPairPreview,
-  showNearSpeciesPairPreview
-} from "./nearSpeciesPairPreviewLayer";
+  clearUnattributedPointPreview,
+  showUnattributedPointPreview
+} from "./unattributedPointPreviewLayer";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -19,12 +19,12 @@ const EMPTY_COLLECTION = {
 };
 
 /**
- * Оставляет на карте только пару точек: остальные слои очищаются,
- * пара рисуется на отдельном preview-слое (всегда видимом).
+ * Оставляет на карте только выбранную точку: остальные слои очищаются,
+ * точка рисуется на отдельном preview-маркере.
  * @param {import("mapbox-gl").Map|null|undefined} map
- * @param {{ left?: object, right?: object }|null|undefined} match
+ * @param {{ feature?: object, coordinates?: number[] }|null|undefined} row
  */
-export function isolateNearSpeciesPairOnMap(map, match) {
+export function isolateUnattributedPointOnMap(map, row) {
   if (!map) {
     return;
   }
@@ -35,7 +35,7 @@ export function isolateNearSpeciesPairOnMap(map, match) {
   setTemporaryLocationsFeatures(map, []);
   setHeatmapFeatures(map, []);
 
-  showNearSpeciesPairPreview(map, match);
+  showUnattributedPointPreview(map, row);
 }
 
 /**
@@ -43,12 +43,12 @@ export function isolateNearSpeciesPairOnMap(map, match) {
  * @param {import("mapbox-gl").Map|null|undefined} map
  * @param {object} [locationFilters]
  */
-export function restoreNearSpeciesMapLayers(map, locationFilters = {}) {
+export function restoreUnattributedMapLayers(map, locationFilters = {}) {
   if (!map) {
     return;
   }
 
-  clearNearSpeciesPairPreview(map);
+  clearUnattributedPointPreview(map);
   applyGbifLocationsFilter(map, locationFilters);
   applyInatLocationsFilter(map, locationFilters);
   setMergedData(map, getMergedFeatureCollection());

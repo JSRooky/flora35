@@ -37,9 +37,12 @@ import {
   getFilteredFeatures,
   getVisibleGbifFeatures,
   getVisibleInatFeatures,
+  getStablePointKey,
+  setHiddenPointKeysForFilter,
   setGbifProcessingFilters,
   setInatProcessingFilters,
-  WITHIN_FEATURE_FILTER_KEY
+  WITHIN_FEATURE_FILTER_KEY,
+  HIDDEN_FEATURE_KEYS_FILTER_KEY
 } from "./components/addLocationsLayer";
 import {
   buildSpeciesSummaryFromDensePile,
@@ -161,11 +164,18 @@ import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
 import DataWorkPanel from "./components/DataWorkPanel";
 import NearSpeciesMatchesPopup from "./components/NearSpeciesMatchesPopup";
+import UnattributedPointsPopup from "./components/UnattributedPointsPopup";
+import UndoMergedPointsPopup from "./components/UndoMergedPointsPopup";
 import { DATA_WORK_TOOL_IDS } from "./dataWork/dataWorkTools";
 import {
   isolateNearSpeciesPairOnMap,
   restoreNearSpeciesMapLayers
 } from "./dataWork/isolateNearSpeciesPairOnMap";
+import {
+  isolateUnattributedPointOnMap,
+  restoreUnattributedMapLayers
+} from "./dataWork/isolateUnattributedPointOnMap";
+import { collectHiddenKeysFromMerged } from "./dataWork/buildMergedPoint";
 import { fitMapToCoordinatePair } from "./geo/fitMapToCoordinatePair";
 import BasemapPicker from "./components/BasemapPicker";
 import YearFilterPanel from "./components/YearFilterPanel";
@@ -177,6 +187,17 @@ import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
 import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum, setGbifClusterPieChartsEnabled, setGbifDenseClustersHighlightEnabled, expandGbifDensePileByKey, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
 import { addInatLayer, setInatVisibility, setInatClusteringEnabled, setInatClusterByRegnum, setInatClusterPieChartsEnabled, setInatDenseClustersHighlightEnabled, expandInatDensePileByKey, setInatDensePileExpandedHandler } from "./components/addInatLayer";
+import {
+  addMergedLayer,
+  setMergedData,
+  setMergedVisibility,
+  upsertMergedFeature,
+  removeMergedFeature
+} from "./components/addMergedLayer";
+import { loadMergedPointsFromFirestore } from "./firebase/loadMergedPointsFromFirestore";
+import { submitMergedPoint } from "./firebase/submitMergedPoint";
+import { deleteMergedPoint } from "./firebase/deleteMergedPoint";
+import { loadPointAttributionsFromFirestore } from "./firebase/loadPointAttributionsFromFirestore";
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
 import { hydrateInatStoreFromPersistence } from "./inaturalist/inatPersistence";
 import { findGbifFeatureByKey } from "./gbif/gbifStore";
@@ -199,7 +220,7 @@ import {
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
-import { ReactComponent as YandexLogo } from "./images/yndex_logo_ru.svg";
+import { ReactComponent as YandexLogo } from "./images/yandex_logo_ru.svg";
 import "./styles/mapToolsTheme.css";
 import "./MapView.css";
 
@@ -275,6 +296,7 @@ export default function MapView() {
   const [pointsDataRevision, setPointsDataRevision] = useState(0);
   const densePileCameraBeforeRef = useRef(null);
   const nearSpeciesCameraBeforeRef = useRef(null);
+  const unattributedCameraBeforeRef = useRef(null);
   const selectedDensePileKeyRef = useRef(null);
   selectedDensePileKeyRef.current = selectedDensePileKey;
 
@@ -351,6 +373,11 @@ export default function MapView() {
   });
   const [externalProcessingActive, setExternalProcessingActive] = useState(false);
   const [nearSpeciesMatchesActive, setNearSpeciesMatchesActive] = useState(false);
+  const [unattributedPointsActive, setUnattributedPointsActive] = useState(false);
+  const [undoMergedPointsActive, setUndoMergedPointsActive] = useState(false);
+  const [hiddenPointKeys, setHiddenPointKeys] = useState([]);
+  const [mergeHiddenKeys, setMergeHiddenKeys] = useState([]);
+  const [mergedPointsVisible, setMergedPointsVisible] = useState(true);
   const [externalProcessingFilters, setExternalProcessingFiltersState] = useState(
     createDefaultExternalProcessingFilters
   );
@@ -1589,6 +1616,14 @@ export default function MapView() {
     return null;
   }, [ooptPointsFilterActive, ooptWithinFeature]);
 
+  const effectiveHiddenPointKeys = useMemo(() => {
+    if (hiddenPointKeys.length === 0 && mergeHiddenKeys.length === 0) {
+      return [];
+    }
+
+    return [...new Set([...hiddenPointKeys, ...mergeHiddenKeys].map(String))];
+  }, [hiddenPointKeys, mergeHiddenKeys]);
+
   const locationFilters = useMemo(() => {
     const filters = { ...baseLocationFilters };
 
@@ -1610,8 +1645,17 @@ export default function MapView() {
       }
     }
 
+    if (effectiveHiddenPointKeys.length > 0) {
+      filters[HIDDEN_FEATURE_KEYS_FILTER_KEY] = effectiveHiddenPointKeys;
+    }
+
     return filters;
-  }, [baseLocationFilters, boundsSpeciesRegnumFilter, effectiveWithinFeature]);
+  }, [
+    baseLocationFilters,
+    boundsSpeciesRegnumFilter,
+    effectiveWithinFeature,
+    effectiveHiddenPointKeys
+  ]);
 
   const densePilesStats = useMemo(() => {
     if (!mapReady) {
@@ -2430,16 +2474,41 @@ export default function MapView() {
   }, []);
 
   const handleOpenGbifProcessing = useCallback(() => {
-    // Обработка открывается поверх панели загрузки — её уводим в taskbar.
-    stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.GBIF_PROCESSING);
-    expandGbifProcessingPanel();
-  }, [expandGbifProcessingPanel]);
+    // Из «Источников данных» переходим в хаб «Работа с данными».
+    stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DATA_WORK);
+    setActiveModule(MODULE_IDS.DATA_WORK);
+    expandPanel(PANEL_IDS.DATA_WORK);
+  }, [expandPanel]);
 
   const handleOpenDataWorkTool = useCallback((toolId) => {
     if (toolId === DATA_WORK_TOOL_IDS.NEAR_SPECIES_MATCHES) {
+      if (map.current) {
+        restoreUnattributedMapLayers(map.current, locationFilters);
+      }
+      unattributedCameraBeforeRef.current = null;
+      setUnattributedPointsActive(false);
+      setUndoMergedPointsActive(false);
       setNearSpeciesMatchesActive(true);
+    } else if (toolId === DATA_WORK_TOOL_IDS.UNATTRIBUTED_POINTS) {
+      if (map.current) {
+        restoreNearSpeciesMapLayers(map.current, locationFilters);
+      }
+      nearSpeciesCameraBeforeRef.current = null;
+      setNearSpeciesMatchesActive(false);
+      setUndoMergedPointsActive(false);
+      setUnattributedPointsActive(true);
+    } else if (toolId === DATA_WORK_TOOL_IDS.UNDO_MERGED_POINTS) {
+      if (map.current) {
+        restoreNearSpeciesMapLayers(map.current, locationFilters);
+        restoreUnattributedMapLayers(map.current, locationFilters);
+      }
+      nearSpeciesCameraBeforeRef.current = null;
+      unattributedCameraBeforeRef.current = null;
+      setNearSpeciesMatchesActive(false);
+      setUnattributedPointsActive(false);
+      setUndoMergedPointsActive(true);
     }
-  }, []);
+  }, [locationFilters]);
 
   const handleCloseNearSpeciesMatches = useCallback(() => {
     if (map.current) {
@@ -2448,6 +2517,65 @@ export default function MapView() {
     nearSpeciesCameraBeforeRef.current = null;
     setNearSpeciesMatchesActive(false);
   }, [locationFilters]);
+
+  const handleCloseUnattributedPoints = useCallback(() => {
+    if (map.current) {
+      restoreUnattributedMapLayers(map.current, locationFilters);
+    }
+    unattributedCameraBeforeRef.current = null;
+    setUnattributedPointsActive(false);
+  }, [locationFilters]);
+
+  const handleCloseUndoMergedPoints = useCallback(() => {
+    setUndoMergedPointsActive(false);
+  }, []);
+
+  const handleShowUndoMergedPoint = useCallback((row) => {
+    const mapInstance = map.current;
+    if (!mapInstance || !row) {
+      return;
+    }
+
+    const left = row.mergedFrom?.[0]?.coordinates;
+    const right = row.mergedFrom?.[1]?.coordinates;
+    if (
+      Array.isArray(left) &&
+      left.length >= 2 &&
+      Array.isArray(right) &&
+      right.length >= 2
+    ) {
+      fitMapToCoordinatePair(mapInstance, left, right);
+      return;
+    }
+
+    const coordinates = row.coordinates;
+    if (
+      Array.isArray(coordinates) &&
+      coordinates.length >= 2 &&
+      Number.isFinite(coordinates[0]) &&
+      Number.isFinite(coordinates[1])
+    ) {
+      mapInstance.easeTo({
+        center: coordinates,
+        zoom: Math.max(mapInstance.getZoom(), 14),
+        duration: 900
+      });
+    }
+  }, []);
+
+  const handleUndoMergedPoint = useCallback(
+    async (row) => {
+      if (!row?.id) {
+        throw new Error("Нельзя отменить слияние: нет идентификатора точки.");
+      }
+
+      await deleteMergedPoint(row.id);
+      const remaining = removeMergedFeature(map.current, row.id);
+      setMergeHiddenKeys(collectHiddenKeysFromMerged(remaining));
+      bumpPointsDataRevision();
+    },
+    [bumpPointsDataRevision]
+  );
 
   const handleShowNearSpeciesPair = useCallback(
     (match) => {
@@ -2475,6 +2603,61 @@ export default function MapView() {
     []
   );
 
+  const handleMergeNearSpeciesPair = useCallback(
+    async (match) => {
+      const result = await submitMergedPoint(match);
+
+      if (map.current) {
+        upsertMergedFeature(map.current, result.feature);
+      }
+
+      setMergeHiddenKeys((current) => {
+        const nextSet = new Set(current);
+        (result.hiddenKeys || []).forEach((key) => {
+          if (key) {
+            nextSet.add(String(key));
+          }
+        });
+        return [...nextSet];
+      });
+
+      bumpPointsDataRevision();
+    },
+    [bumpPointsDataRevision]
+  );
+
+  const handleShowUnattributedPoint = useCallback((row) => {
+    const mapInstance = map.current;
+    if (!mapInstance || !row) {
+      return;
+    }
+
+    if (!unattributedCameraBeforeRef.current) {
+      unattributedCameraBeforeRef.current = {
+        center: mapInstance.getCenter().toArray(),
+        zoom: mapInstance.getZoom(),
+        bearing: mapInstance.getBearing(),
+        pitch: mapInstance.getPitch()
+      };
+    }
+
+    isolateUnattributedPointOnMap(mapInstance, row);
+
+    const coordinates = row.coordinates;
+    if (
+      Array.isArray(coordinates) &&
+      coordinates.length >= 2 &&
+      Number.isFinite(coordinates[0]) &&
+      Number.isFinite(coordinates[1])
+    ) {
+      mapInstance.easeTo({
+        center: coordinates,
+        zoom: Math.max(mapInstance.getZoom(), 15),
+        duration: 900
+      });
+    }
+  }, []);
+
   const handleNearSpeciesPreviewEnd = useCallback(() => {
     const mapInstance = map.current;
     if (mapInstance) {
@@ -2491,6 +2674,120 @@ export default function MapView() {
 
     nearSpeciesCameraBeforeRef.current = null;
   }, [locationFilters]);
+
+  const handleUnattributedPreviewEnd = useCallback(() => {
+    const mapInstance = map.current;
+    if (mapInstance) {
+      restoreUnattributedMapLayers(mapInstance, locationFilters);
+    }
+
+    const previous = unattributedCameraBeforeRef.current;
+    if (mapInstance && previous) {
+      mapInstance.easeTo({
+        ...previous,
+        duration: 900
+      });
+    }
+
+    unattributedCameraBeforeRef.current = null;
+  }, [locationFilters]);
+
+  const handleToggleUnattributedHidden = useCallback((row) => {
+    const key = getStablePointKey(row?.feature);
+    if (!key) {
+      return;
+    }
+
+    setHiddenPointKeys((current) => {
+      if (current.includes(key)) {
+        return current.filter((value) => value !== key);
+      }
+      return [...current, key];
+    });
+  }, []);
+
+  const handleUnattributedAttributionSaved = useCallback(() => {
+    if (!map.current) {
+      return;
+    }
+
+    applyLocationsFilter(map.current, locationFilters);
+    applyGbifLocationsFilter(map.current, locationFilters);
+    applyInatLocationsFilter(map.current, locationFilters);
+    bumpPointsDataRevision();
+  }, [locationFilters, bumpPointsDataRevision]);
+
+  useEffect(() => {
+    setHiddenPointKeysForFilter(effectiveHiddenPointKeys);
+  }, [effectiveHiddenPointKeys]);
+
+  useEffect(() => {
+    if (!mapReady || !map.current) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        await loadPointAttributionsFromFirestore();
+        if (cancelled || !map.current) {
+          return;
+        }
+
+        applyLocationsFilter(map.current, locationFilters);
+        applyGbifLocationsFilter(map.current, locationFilters);
+        applyInatLocationsFilter(map.current, locationFilters);
+        bumpPointsDataRevision();
+      } catch (error) {
+        console.warn("Failed to load point attributions:", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Только при готовности карты: locationFilters подхватит оверлей через apply* ниже.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, bumpPointsDataRevision]);
+
+  useEffect(() => {
+    if (!mapReady || !map.current) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const result = await loadMergedPointsFromFirestore();
+        if (cancelled || !map.current) {
+          return;
+        }
+
+        setMergedData(map.current, result.collection);
+
+        if (result.hiddenKeys.length > 0) {
+          setMergeHiddenKeys((current) => {
+            const nextSet = new Set(current);
+            result.hiddenKeys.forEach((key) => {
+              if (key) {
+                nextSet.add(String(key));
+              }
+            });
+            return [...nextSet];
+          });
+          bumpPointsDataRevision();
+        }
+      } catch (error) {
+        console.warn("Failed to load merged points:", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mapReady, bumpPointsDataRevision]);
 
   useEffect(() => {
     setHoverTooltipsEnabled(!hoverTooltipsDisabled);
@@ -2622,7 +2919,8 @@ export default function MapView() {
     setToolFeaturesContext({
       includeLocal: !externalOnly,
       includeGbif: externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.GBIF],
-      includeInat: externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST]
+      includeInat: externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST],
+      includeMerged: mergedPointsVisible
     });
 
     if (!map.current || !mapReady) {
@@ -2631,7 +2929,14 @@ export default function MapView() {
 
     updateHeatmapData(map.current, locationFilters);
     refreshAreal();
-  }, [externalOnly, externalLayersEnabled, mapReady, locationFilters, refreshAreal]);
+  }, [
+    externalOnly,
+    externalLayersEnabled,
+    mergedPointsVisible,
+    mapReady,
+    locationFilters,
+    refreshAreal
+  ]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -2653,7 +2958,14 @@ export default function MapView() {
         ? mapMarkersVisible
         : false
     );
-  }, [mapMarkersVisible, externalOnly, externalLayersEnabled, mapReady]);
+    setMergedVisibility(map.current, mergedPointsVisible && mapMarkersVisible);
+  }, [
+    mapMarkersVisible,
+    externalOnly,
+    externalLayersEnabled,
+    mergedPointsVisible,
+    mapReady
+  ]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -3012,7 +3324,8 @@ export default function MapView() {
         boundsSpeciesRegnumFilter,
         denseClustersHighlight,
         denseProcessingActive,
-        externalProcessingFilters
+        externalProcessingFilters,
+        hiddenPointKeys
       }),
     [
       propertyFilters,
@@ -3022,7 +3335,8 @@ export default function MapView() {
       boundsSpeciesRegnumFilter,
       denseClustersHighlight,
       denseProcessingActive,
-      externalProcessingFilters
+      externalProcessingFilters,
+      hiddenPointKeys
     ]
   );
 
@@ -3039,6 +3353,7 @@ export default function MapView() {
     setDensePileSpeciesListOpen(false);
     densePileCameraBeforeRef.current = null;
     setExternalProcessingFiltersState(createDefaultExternalProcessingFilters());
+    setHiddenPointKeys([]);
     expandPanel(PANEL_IDS.MAP);
   }, [expandPanel]);
 
@@ -3093,6 +3408,11 @@ export default function MapView() {
 
       if (filterId === MAP_FILTER_IDS.EXTERNAL_PROCESSING) {
         setExternalProcessingFiltersState(createDefaultExternalProcessingFilters());
+        return;
+      }
+
+      if (filterId === MAP_FILTER_IDS.HIDDEN_POINTS) {
+        setHiddenPointKeys([]);
         return;
       }
 
@@ -3597,6 +3917,8 @@ export default function MapView() {
           // Сначала восстанавливаем слои (как в handleCloseNearSpeciesMatches),
           // иначе setNearSpeciesMatchesActive(false) опередит cleanup-effect.
           handleCloseNearSpeciesMatches();
+          handleCloseUnattributedPoints();
+          handleCloseUndoMergedPoints();
           unpinPanelsFromTaskbar([PANEL_IDS.DATA_WORK]);
           setActiveModule((current) =>
             current === MODULE_IDS.DATA_WORK ? null : current
@@ -3628,6 +3950,8 @@ export default function MapView() {
       dataSourceMode,
       handleBoundsSpeciesListClose,
       handleCloseNearSpeciesMatches,
+      handleCloseUnattributedPoints,
+      handleCloseUndoMergedPoints,
       handleDataSourceModeChange,
       handleDensePileSpeciesListClose,
       handleDenseProcessingClose,
@@ -4023,6 +4347,38 @@ export default function MapView() {
             });
           }
         });
+        addMergedLayer(mapInstance, {
+          onPointClick: (feature) => {
+            if (isAreaDrawingActive()) {
+              return;
+            }
+
+            if (
+              submissionStateRef.current.active &&
+              submissionStateRef.current.pickingLocation
+            ) {
+              const coords = feature?.geometry?.coordinates;
+              if (coords) {
+                submissionStateRef.current.setCoordinates(coords);
+              }
+              return;
+            }
+
+            dismissArealPointHintOnPointClick(feature);
+            clearSharedPointPin(map.current);
+            if (!pointSelectionStateRef.current.ooptPointsFilterEnabled) {
+              setSelectedBoundsFeature(null);
+            }
+            clearSelectedPointHighlight(map.current);
+            setPopupData(feature);
+            setActiveModule((current) => {
+              if (current === MODULE_IDS.BUFFER || current === MODULE_IDS.POLYGON) {
+                return current;
+              }
+              return MODULE_IDS.FEATURE;
+            });
+          }
+        });
 
         if (map.current !== mapInstance) {
           return;
@@ -4082,6 +4438,15 @@ export default function MapView() {
       return false;
     });
     nearSpeciesCameraBeforeRef.current = null;
+
+    setUnattributedPointsActive((wasActive) => {
+      if (wasActive && map.current) {
+        restoreUnattributedMapLayers(map.current, locationFilters);
+      }
+      return false;
+    });
+    unattributedCameraBeforeRef.current = null;
+    setUndoMergedPointsActive(false);
   }, [activeModule, locationFilters]);
 
   const arealDisplayedContainedPoints = arealContainedPoints ?? activeToolFilterPointsSummary;
@@ -4265,6 +4630,8 @@ export default function MapView() {
               denseClustersHighlight={denseClustersHighlight}
               onDenseClustersHighlightChange={handleDenseClustersHighlightChange}
               onDenseProcessingOpen={handleDenseProcessingOpen}
+              mergedPointsVisible={mergedPointsVisible}
+              onMergedPointsVisibleChange={setMergedPointsVisible}
               collapsed={isPanelCollapsed(PANEL_IDS.MAP)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.MAP)}
               onMinimize={handleMinimizePanel(PANEL_IDS.MAP)}
@@ -4371,7 +4738,11 @@ export default function MapView() {
               activeToolId={
                 nearSpeciesMatchesActive
                   ? DATA_WORK_TOOL_IDS.NEAR_SPECIES_MATCHES
-                  : null
+                  : unattributedPointsActive
+                    ? DATA_WORK_TOOL_IDS.UNATTRIBUTED_POINTS
+                    : undoMergedPointsActive
+                      ? DATA_WORK_TOOL_IDS.UNDO_MERGED_POINTS
+                      : null
               }
             />
           )}
@@ -4494,6 +4865,23 @@ export default function MapView() {
         onClose={handleCloseNearSpeciesMatches}
         onShowPair={handleShowNearSpeciesPair}
         onPreviewEnd={handleNearSpeciesPreviewEnd}
+        onMergePair={handleMergeNearSpeciesPair}
+      />
+      <UnattributedPointsPopup
+        open={unattributedPointsActive}
+        onClose={handleCloseUnattributedPoints}
+        onShowPoint={handleShowUnattributedPoint}
+        onPreviewEnd={handleUnattributedPreviewEnd}
+        onToggleHiddenPoint={handleToggleUnattributedHidden}
+        onAttributionSaved={handleUnattributedAttributionSaved}
+        hiddenPointKeys={hiddenPointKeys}
+        locationFilters={locationFilters}
+      />
+      <UndoMergedPointsPopup
+        open={undoMergedPointsActive}
+        onClose={handleCloseUndoMergedPoints}
+        onShowPoint={handleShowUndoMergedPoint}
+        onUndoMerge={handleUndoMergedPoint}
       />
       <BoundsSpeciesListPopup
         open={

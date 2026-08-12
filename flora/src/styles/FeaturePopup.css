@@ -168,6 +168,16 @@
   margin-top: 4px;
 }
 
+.feature-merged-from-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #333;
+}
+
+.feature-merged-from-item .popup-item-text a {
+  color: var(--map-tool-accent, #2f6f4e);
+}
+
 .popup-item {
   display: flex;
   justify-content: space-between;

@@ -31,6 +31,10 @@ const INTERNAL_PROPERTIES = new Set([
   "species_key",
   "coordinates_original",
   "dense_pile_size",
+  "merged_id",
+  "merged_from_json",
+  "gbif_key",
+  "inat_id",
   // Дублирует regnum; единая категория «Царство» — только regnum.
   "kingdom"
 ]);
@@ -67,6 +71,47 @@ const INAT_META_DISPLAY_ORDER = [
 
 function isInatFeature(feature) {
   return feature?.properties?.source === "inaturalist";
+}
+
+function isMergedFeature(feature) {
+  return feature?.properties?.source === "merged";
+}
+
+function parseMergedFrom(properties) {
+  const raw = properties?.merged_from_json;
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function formatMergedSourceCoords(coordinates) {
+  if (
+    !Array.isArray(coordinates) ||
+    coordinates.length < 2 ||
+    !Number.isFinite(coordinates[0]) ||
+    !Number.isFinite(coordinates[1])
+  ) {
+    return null;
+  }
+
+  return `${coordinates[1].toFixed(5)}, ${coordinates[0].toFixed(5)}`;
+}
+
+function getMergedSourceLabel(source) {
+  if (source === "gbif") {
+    return "GBIF";
+  }
+  if (source === "inaturalist") {
+    return "iNaturalist";
+  }
+  return String(source || "Источник");
 }
 
 function sortInatMetaEntries(entries) {
@@ -301,6 +346,7 @@ export default function FeaturePopup({
 
   const fromGbif = isGbifFeature(feature);
   const fromInat = isInatFeature(feature);
+  const fromMerged = isMergedFeature(feature);
   const fromExternal = fromGbif || fromInat;
   const properties = feature?.properties;
   const nameLatin = properties?.name_latin;
@@ -314,8 +360,12 @@ export default function FeaturePopup({
         ? `GBIF #${feature.properties?.gbif_key ?? ""}`
         : fromInat
           ? `iNat #${feature.properties?.inat_id ?? ""}`
-          : "Точка данных")
+          : fromMerged
+            ? "Слияние точек"
+            : "Точка данных")
     : "Точка не выбрана";
+
+  const mergedFromEntries = fromMerged ? parseMergedFrom(properties) : [];
 
   const showExternalNameLookup = fromExternal && Boolean(nameLatin) && !nameRu;
   const speciesPointCount = feature ? getPointsForSpecies(feature).length : 0;
@@ -504,6 +554,12 @@ export default function FeaturePopup({
                     <span>iNaturalist</span>
                   </div>
                 )}
+                {fromMerged && (
+                  <div className="popup-item">
+                    <strong>Источник:</strong>
+                    <span>Слияние точек</span>
+                  </div>
+                )}
 
                 <div className="popup-item">
                   <strong>Точек вида на карте:</strong>
@@ -683,6 +739,41 @@ export default function FeaturePopup({
                       )}
                     </div>
                   </details>
+                )}
+
+                {fromMerged && mergedFromEntries.length > 0 && (
+                  <div className="feature-merged-from">
+                    <hr />
+                    <h4 className="feature-merged-from-title">Объединено из</h4>
+                    {mergedFromEntries.map((entry, index) => {
+                      const label = getMergedSourceLabel(entry.source);
+                      const coordsLabel = formatMergedSourceCoords(entry.coordinates);
+                      return (
+                        <div
+                          key={`${entry.source}-${entry.id || index}`}
+                          className="popup-item feature-merged-from-item"
+                        >
+                          <div className="popup-item-text">
+                            <strong>{label}:</strong>
+                            <span>
+                              {entry.url ? (
+                                <a
+                                  href={entry.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {entry.id || "открыть"}
+                                </a>
+                              ) : (
+                                entry.id || "—"
+                              )}
+                              {coordsLabel ? ` (${coordsLabel})` : ""}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
 
                 {(descriptionPath ||
