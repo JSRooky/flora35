@@ -37,9 +37,6 @@ import {
   showSharedPointPin,
   showSharedPointPopup,
   updateSelectedPointHighlight,
-  getFilteredFeatures,
-  getVisibleGbifFeatures,
-  getVisibleInatFeatures,
   getToolFeatures,
   getStablePointKey,
   setHiddenPointKeysForFilter,
@@ -51,7 +48,6 @@ import {
 import {
   buildSpeciesSummaryFromDensePile,
   listDensePiles,
-  mergeDensePileLists,
   MIN_DENSE_PILE_SIZE,
   setDensePileMinSize
 } from "./components/densePiles";
@@ -202,6 +198,15 @@ import {
   upsertMergedFeature,
   removeMergedFeature
 } from "./components/addMergedLayer";
+import {
+  addRedBookLayer,
+  setRedBookData,
+  setRedBookVisibility,
+  applyRedBookLocationsFilter,
+  upsertRedBookFeatures
+} from "./components/addRedBookLayer";
+import RedBookSearchPanel from "./components/RedBookSearchPanel";
+import { hydrateRedBookStoreFromPersistence } from "./redbook/redBookStore";
 import { loadMergedPointsFromFirestore } from "./firebase/loadMergedPointsFromFirestore";
 import { submitMergedPoint } from "./firebase/submitMergedPoint";
 import { deleteMergedPoint } from "./firebase/deleteMergedPoint";
@@ -238,6 +243,8 @@ import { ReactComponent as YandexLogo } from "./images/yandex_logo_ru.svg";
 import "./styles/mapToolsTheme.css";
 import "./MapView.css";
 
+hydrateRedBookStoreFromPersistence();
+
 const UserSubmissionPanel = lazy(() => import("./components/UserSubmissionPanel"));
 
 const PANEL_IDS = {
@@ -258,6 +265,7 @@ const PANEL_IDS = {
   DATA_SOURCES: "data-sources",
   EXTERNAL_PROCESSING: "external-processing",
   DATA_WORK: "data-work",
+  REDBOOK: "redbook",
   /** @deprecated алиасы для taskbar */
   GBIF: "data-sources",
   GBIF_PROCESSING: "external-processing"
@@ -285,7 +293,8 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.SUBMIT,
   PANEL_IDS.DATA_SOURCES,
   PANEL_IDS.EXTERNAL_PROCESSING,
-  PANEL_IDS.DATA_WORK
+  PANEL_IDS.DATA_WORK,
+  PANEL_IDS.REDBOOK
 ];
 
 function isPanelExpandedInState(collapsedState, panelId) {
@@ -390,6 +399,7 @@ export default function MapView() {
     dataSourceMode === DATA_SOURCE_MODES.USERPOINTS;
   const externalOnly = dataSourceMode === DATA_SOURCE_MODES.EXTERNAL;
   const mergedOnly = dataSourceMode === DATA_SOURCE_MODES.MERGED;
+  const redbookOnly = dataSourceMode === DATA_SOURCE_MODES.REDBOOK;
   const prevExternalOnlyRef = useRef(externalOnly);
   const [externalLayersEnabled, setExternalLayersEnabled] = useState({
     [EXTERNAL_LAYER_IDS.GBIF]: true,
@@ -402,6 +412,7 @@ export default function MapView() {
   const [hiddenPointKeys, setHiddenPointKeys] = useState([]);
   const [mergeHiddenKeys, setMergeHiddenKeys] = useState([]);
   const [mergedPointsVisible, setMergedPointsVisible] = useState(false);
+  const [redBookPointsVisible, setRedBookPointsVisible] = useState(false);
   const [externalProcessingFilters, setExternalProcessingFiltersState] = useState(
     createDefaultExternalProcessingFilters
   );
@@ -779,6 +790,9 @@ export default function MapView() {
       case MODULE_IDS.DATA_WORK:
         expandPanel(PANEL_IDS.DATA_WORK);
         break;
+      case MODULE_IDS.REDBOOK:
+        expandPanel(PANEL_IDS.REDBOOK);
+        break;
       case MODULE_IDS.GBIF:
         expandGbifDataPanel();
         break;
@@ -1093,6 +1107,7 @@ export default function MapView() {
     (mode) => {
       setDataSourceModeState(mode);
       setMergedPointsVisible(mode === DATA_SOURCE_MODES.MERGED);
+      setRedBookPointsVisible(mode === DATA_SOURCE_MODES.REDBOOK);
 
       if (mode === DATA_SOURCE_MODES.EXTERNAL) {
         stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DATA_SOURCES);
@@ -1570,6 +1585,10 @@ export default function MapView() {
       ids.push(PANEL_IDS.DATA_WORK);
     }
 
+    if (activeModule === MODULE_IDS.REDBOOK && !isMin(PANEL_IDS.REDBOOK)) {
+      ids.push(PANEL_IDS.REDBOOK);
+    }
+
     if (
       selectedBoundsFeature &&
       (activeModule === MODULE_IDS.OOPT || ooptPointsFilterActive) &&
@@ -1745,18 +1764,14 @@ export default function MapView() {
       return { piles: [], pileCount: 0, pointCount: 0 };
     }
 
-    // Читаем revision и processing-фильтры: getVisibleGbifFeatures берёт их из module-store.
+    // Revision / processing / mode: getToolFeatures читает актуальный контекст источников.
     void pointsDataRevision;
     void externalProcessingFilters;
+    void dataSourceMode;
 
-    const localFeatures = getFilteredFeatures(locationFilters);
-    const gbifFeatures = getVisibleGbifFeatures(locationFilters);
-    const inatFeatures = getVisibleInatFeatures(locationFilters);
-    const piles = mergeDensePileLists([
-      listDensePiles(localFeatures, { minSize: densePileMinSize }),
-      listDensePiles(gbifFeatures, { minSize: densePileMinSize }),
-      listDensePiles(inatFeatures, { minSize: densePileMinSize })
-    ]);
+    const piles = listDensePiles(getToolFeatures(locationFilters), {
+      minSize: densePileMinSize
+    });
     const pileCount = piles.length;
     const pointCount = piles.reduce((sum, pile) => sum + pile.pointCount, 0);
 
@@ -1766,7 +1781,8 @@ export default function MapView() {
     pointsDataRevision,
     mapReady,
     externalProcessingFilters,
-    densePileMinSize
+    densePileMinSize,
+    dataSourceMode
   ]);
 
   const seasonalityNameLatin = popupData?.properties?.name_latin || null;
@@ -1777,10 +1793,11 @@ export default function MapView() {
       return null;
     }
 
-    // Revision / processing: getToolFeatures читает актуальные внешние слои.
+    // Revision / processing / mode: getToolFeatures читает актуальные источники.
     void pointsDataRevision;
     void externalProcessingFilters;
     void mapReady;
+    void dataSourceMode;
 
     return buildSeasonalityStats(getToolFeatures(locationFilters), seasonalityNameLatin);
   }, [
@@ -1788,7 +1805,8 @@ export default function MapView() {
     locationFilters,
     pointsDataRevision,
     mapReady,
-    externalProcessingFilters
+    externalProcessingFilters,
+    dataSourceMode
   ]);
 
   const selectedDensePile = useMemo(
@@ -2113,8 +2131,11 @@ export default function MapView() {
       return null;
     }
 
+    void pointsDataRevision;
+    void dataSourceMode;
+
     return getAreaContainedPointsSummary(areaGeometry, locationFilters);
-  }, [areaGeometry, locationFilters, mapReady]);
+  }, [areaGeometry, locationFilters, mapReady, pointsDataRevision, dataSourceMode]);
 
   const boundsContainedSpecies = useMemo(() => {
     if (!selectedBoundsFeature?.feature || !mapReady) {
@@ -2147,11 +2168,20 @@ export default function MapView() {
       return null;
     }
 
+    void pointsDataRevision;
+    void dataSourceMode;
+
     return getContainedPointsSummaryForWithinFeature(
       activeToolWithinFeature,
       baseLocationFilters
     );
-  }, [activeToolWithinFeature, baseLocationFilters, mapReady]);
+  }, [
+    activeToolWithinFeature,
+    baseLocationFilters,
+    mapReady,
+    pointsDataRevision,
+    dataSourceMode
+  ]);
 
   const speciesPolygonContainedSpecies = useMemo(() => {
     if (
@@ -2162,12 +2192,22 @@ export default function MapView() {
       return null;
     }
 
+    void pointsDataRevision;
+    void dataSourceMode;
+
     return getSpeciesPolygonContainedSummary(
       activePolygon.polygon,
       activePolygon.nameLatin,
       locationFilters
     );
-  }, [visibleBuiltPolygons, activePolygon, locationFilters, mapReady]);
+  }, [
+    visibleBuiltPolygons,
+    activePolygon,
+    locationFilters,
+    mapReady,
+    pointsDataRevision,
+    dataSourceMode
+  ]);
 
   const intersectionContainedPoints = useMemo(() => {
     if (!intersectionResult?.hasIntersection || !intersectionResult.feature || !mapReady) {
@@ -2519,6 +2559,9 @@ export default function MapView() {
       return null;
     }
 
+    void pointsDataRevision;
+    void dataSourceMode;
+
     const filters = locationFilters;
 
     if (
@@ -2535,7 +2578,9 @@ export default function MapView() {
     popupData,
     arealRadius,
     locationFilters,
-    mapReady
+    mapReady,
+    pointsDataRevision,
+    dataSourceMode
   ]);
 
   useEffect(() => {
@@ -3030,24 +3075,41 @@ export default function MapView() {
       includeLocal: localDataActive,
       includeGbif: externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.GBIF],
       includeInat: externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST],
-      includeMerged: mergedOnly && mergedPointsVisible
+      includeMerged: mergedOnly,
+      includeRedBook: redbookOnly
     });
 
     if (!map.current || !mapReady) {
       return;
     }
 
+    setMergedVisibility(
+      map.current,
+      mergedOnly && mergedPointsVisible && mapMarkersVisible
+    );
+    setRedBookVisibility(
+      map.current,
+      redbookOnly && redBookPointsVisible && mapMarkersVisible
+    );
+
     updateHeatmapData(map.current, locationFilters);
     refreshAreal();
+    syncYearBounds();
+    bumpPointsDataRevision();
   }, [
     localDataActive,
     externalOnly,
     mergedOnly,
+    redbookOnly,
     externalLayersEnabled,
     mergedPointsVisible,
+    redBookPointsVisible,
+    mapMarkersVisible,
     mapReady,
     locationFilters,
-    refreshAreal
+    refreshAreal,
+    syncYearBounds,
+    bumpPointsDataRevision
   ]);
 
   useEffect(() => {
@@ -3096,13 +3158,19 @@ export default function MapView() {
       map.current,
       mergedOnly && mergedPointsVisible && mapMarkersVisible
     );
+    setRedBookVisibility(
+      map.current,
+      redbookOnly && redBookPointsVisible && mapMarkersVisible
+    );
   }, [
     mapMarkersVisible,
     localDataActive,
     externalOnly,
     mergedOnly,
+    redbookOnly,
     externalLayersEnabled,
     mergedPointsVisible,
+    redBookPointsVisible,
     locationFilters,
     mapReady
   ]);
@@ -3117,6 +3185,7 @@ export default function MapView() {
     setInatClusteringEnabled(map.current, clusteringEnabled);
     applyGbifLocationsFilter(map.current, locationFilters);
     applyInatLocationsFilter(map.current, locationFilters);
+    applyRedBookLocationsFilter(map.current, locationFilters);
   }, [clusteringEnabled, mapReady, locationFilters]);
 
   useEffect(() => {
@@ -3129,6 +3198,7 @@ export default function MapView() {
     setInatClusterByRegnum(map.current, clusterByRegnum);
     applyGbifLocationsFilter(map.current, locationFilters);
     applyInatLocationsFilter(map.current, locationFilters);
+    applyRedBookLocationsFilter(map.current, locationFilters);
   }, [clusterByRegnum, clusteringEnabled, mapReady, locationFilters]);
 
   useEffect(() => {
@@ -3151,6 +3221,7 @@ export default function MapView() {
     setInatDenseClustersHighlightEnabled(map.current, denseClustersHighlight);
     applyGbifLocationsFilter(map.current, locationFilters);
     applyInatLocationsFilter(map.current, locationFilters);
+    applyRedBookLocationsFilter(map.current, locationFilters);
   }, [denseClustersHighlight, mapReady, locationFilters]);
 
   useEffect(() => {
@@ -3698,8 +3769,11 @@ export default function MapView() {
       return 0;
     }
 
+    void pointsDataRevision;
+    void dataSourceMode;
+
     return getPointsForSpecies(arealDynamicsFeature).length;
-  }, [arealDynamicsFeature]);
+  }, [arealDynamicsFeature, pointsDataRevision, dataSourceMode]);
 
   const handleArealDynamicsYearSelect = useCallback((year) => {
     setTimelineYear(year);
@@ -4188,14 +4262,21 @@ export default function MapView() {
       const isMergedFinding =
         sharedFeature?.properties?.source === "merged" ||
         String(findingId).startsWith("merged");
+      const isRedBookFinding =
+        sharedFeature?.properties?.source === "redbook" ||
+        String(findingId).startsWith("rb-") ||
+        String(findingId).startsWith("redbook");
 
       if (isMergedFinding && dataSourceMode !== DATA_SOURCE_MODES.MERGED) {
         handleDataSourceModeChange(DATA_SOURCE_MODES.MERGED);
+      } else if (isRedBookFinding && dataSourceMode !== DATA_SOURCE_MODES.REDBOOK) {
+        handleDataSourceModeChange(DATA_SOURCE_MODES.REDBOOK);
       } else if (isExternalFinding && dataSourceMode !== DATA_SOURCE_MODES.EXTERNAL) {
         handleDataSourceModeChange(DATA_SOURCE_MODES.EXTERNAL);
       } else if (
         !isExternalFinding &&
         !isMergedFinding &&
+        !isRedBookFinding &&
         dataSourceMode !== DATA_SOURCE_MODES.USERPOINTS
       ) {
         handleDataSourceModeChange(DATA_SOURCE_MODES.USERPOINTS);
@@ -4239,6 +4320,7 @@ export default function MapView() {
         await initLocationsFromFirestore();
         await hydrateGbifStoreFromPersistence();
         await hydrateInatStoreFromPersistence();
+        hydrateRedBookStoreFromPersistence();
 
         // Cleanup (HMR / размонтирование) мог уничтожить карту, пока ждали hydrate.
         if (map.current !== mapInstance) {
@@ -4542,6 +4624,38 @@ export default function MapView() {
           }
         });
         addMergedLayer(mapInstance, {
+          onPointClick: (feature) => {
+            if (isAreaDrawingActive()) {
+              return;
+            }
+
+            if (
+              submissionStateRef.current.active &&
+              submissionStateRef.current.pickingLocation
+            ) {
+              const coords = feature?.geometry?.coordinates;
+              if (coords) {
+                submissionStateRef.current.setCoordinates(coords);
+              }
+              return;
+            }
+
+            dismissArealPointHintOnPointClick(feature);
+            clearSharedPointPin(map.current);
+            if (!pointSelectionStateRef.current.ooptPointsFilterEnabled) {
+              setSelectedBoundsFeature(null);
+            }
+            setPopupData(feature);
+            updateSelectedPointHighlight(map.current, feature);
+            setActiveModule((current) => {
+              if (current === MODULE_IDS.BUFFER || current === MODULE_IDS.POLYGON) {
+                return current;
+              }
+              return MODULE_IDS.FEATURE;
+            });
+          }
+        });
+        addRedBookLayer(mapInstance, {
           onPointClick: (feature) => {
             if (isAreaDrawingActive()) {
               return;
@@ -4964,6 +5078,34 @@ export default function MapView() {
                       ? DATA_WORK_TOOL_IDS.UNDO_MERGED_POINTS
                       : null
               }
+            />
+          )}
+          {activeModule === MODULE_IDS.REDBOOK &&
+            !isPanelMinimized(PANEL_IDS.REDBOOK) && (
+            <RedBookSearchPanel
+              collapsed={isPanelCollapsed(PANEL_IDS.REDBOOK)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.REDBOOK)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.REDBOOK)}
+              onClose={handleClosePanel(PANEL_IDS.REDBOOK)}
+              onMatchesReady={(collection) => {
+                if (map.current) {
+                  setRedBookData(map.current, collection);
+                }
+                syncYearBounds();
+                bumpPointsDataRevision();
+              }}
+              onAddSpeciesToLayer={(features) => {
+                if (!map.current) {
+                  return null;
+                }
+                const result = upsertRedBookFeatures(map.current, features);
+                syncYearBounds();
+                bumpPointsDataRevision();
+                return result;
+              }}
+              onShowMatchesLayer={() => {
+                handleDataSourceModeChange(DATA_SOURCE_MODES.REDBOOK);
+              }}
             />
           )}
           {activeModule === MODULE_IDS.OOPT &&

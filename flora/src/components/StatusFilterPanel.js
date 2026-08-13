@@ -5,7 +5,7 @@ import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/StatusFilterPanel.css";
 
-/** Коды и подписи категорий МСОП (IUCN Red List). */
+/** Коды и подписи категорий МСОП (IUCN Red List) + None для списка без статуса. */
 export const STATUS_OPTIONS = [
   { code: "EX", label: "Исчезнувший" },
   { code: "EW", label: "Исчезнувший в дикой природе" },
@@ -13,7 +13,8 @@ export const STATUS_OPTIONS = [
   { code: "EN", label: "Находящийся под угрозой исчезновения" },
   { code: "VU", label: "Уязвимый" },
   { code: "NT", label: "Близкий к уязвимому положению" },
-  { code: "LC", label: "Вызывающий наименьшие опасения" }
+  { code: "LC", label: "Вызывающий наименьшие опасения" },
+  { code: "None", label: "Без статуса" }
 ];
 
 /** Панель фильтра точек по природоохранному статусу (МСОП). */

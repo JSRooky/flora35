@@ -26,6 +26,7 @@ const INTERNAL_PROPERTIES = new Set([
   "finding_id",
   "description_md",
   "source",
+  "origin_source",
   "gbif_url",
   "inat_url",
   "species_key",
@@ -35,6 +36,7 @@ const INTERNAL_PROPERTIES = new Set([
   "merged_from_json",
   "gbif_key",
   "inat_id",
+  "redbook_match_id",
   // Дублирует regnum; единая категория «Царство» — только regnum.
   "kingdom"
 ]);
@@ -75,6 +77,10 @@ function isInatFeature(feature) {
 
 function isMergedFeature(feature) {
   return feature?.properties?.source === "merged";
+}
+
+function isRedBookFeature(feature) {
+  return feature?.properties?.source === "redbook";
 }
 
 function parseMergedFrom(properties) {
@@ -298,7 +304,9 @@ export default function FeaturePopup({
 
     const props = feature?.properties;
     const isExternalSource =
-      props?.source === "gbif" || props?.source === "inaturalist";
+      props?.source === "gbif" ||
+      props?.source === "inaturalist" ||
+      props?.source === "redbook";
     const overlayNameRu =
       isExternalSource && props?.name_latin
         ? getOverlayRussianName(props.name_latin)
@@ -347,7 +355,8 @@ export default function FeaturePopup({
   const fromGbif = isGbifFeature(feature);
   const fromInat = isInatFeature(feature);
   const fromMerged = isMergedFeature(feature);
-  const fromExternal = fromGbif || fromInat;
+  const fromRedBook = isRedBookFeature(feature);
+  const fromExternal = fromGbif || fromInat || fromRedBook;
   const properties = feature?.properties;
   const nameLatin = properties?.name_latin;
   const nameRu =
@@ -362,7 +371,9 @@ export default function FeaturePopup({
           ? `iNat #${feature.properties?.inat_id ?? ""}`
           : fromMerged
             ? "Слияние точек"
-            : "Точка данных")
+            : fromRedBook
+              ? "Красная книга"
+              : "Точка данных")
     : "Точка не выбрана";
 
   const mergedFromEntries = fromMerged ? parseMergedFrom(properties) : [];
@@ -394,7 +405,7 @@ export default function FeaturePopup({
     : [];
 
   const gbifMetaProperties =
-    fromGbif && properties
+    (fromGbif || (fromRedBook && properties?.origin_source === "gbif")) && properties
       ? sortGbifMetaEntries(
           Object.entries(properties).filter(
             ([key, value]) => GBIF_META_PROPERTIES.has(key) && hasDisplayValue(value)
@@ -403,7 +414,8 @@ export default function FeaturePopup({
       : [];
 
   const inatMetaProperties =
-    fromInat && properties
+    (fromInat || (fromRedBook && properties?.origin_source === "inaturalist")) &&
+    properties
       ? sortInatMetaEntries(
           Object.entries(properties).filter(
             ([key, value]) => INAT_META_PROPERTIES.has(key) && hasDisplayValue(value)

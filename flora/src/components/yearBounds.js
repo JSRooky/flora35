@@ -1,11 +1,15 @@
 import { getFeatureCollection, getFeatureCacheVersion } from "../locations/loadPoints";
 import { getGbifFeatureCollection } from "../gbif/gbifStore";
 import { getInatFeatureCollection } from "../inaturalist/inatStore";
+import { getMergedFeatures } from "./addMergedLayer";
+import { getRedBookFeatures } from "./addRedBookLayer";
 
 let cachedYearBounds = null;
 let cachedYearBoundsVersion = -1;
 let cachedYearBoundsGbifCount = -1;
 let cachedYearBoundsInatCount = -1;
+let cachedYearBoundsMergedCount = -1;
+let cachedYearBoundsRedBookCount = -1;
 
 /** Запасной диапазон, пока точки ещё не загружены (не схлопываем в один год). */
 function getFallbackYearBounds() {
@@ -28,19 +32,23 @@ function collectYears(features) {
 
 /**
  * Минимальный и максимальный год находки среди локальных точек и загруженных
- * внешних источников (GBIF, iNaturalist).
+ * внешних источников (GBIF, iNaturalist, merged, Красная книга).
  * Пока данных нет — 1950…текущий год (а не один «текущий» год).
  */
 export function getYearBounds() {
   const cacheVersion = getFeatureCacheVersion();
   const gbifCount = getGbifFeatureCollection().features?.length ?? 0;
   const inatCount = getInatFeatureCollection().features?.length ?? 0;
+  const mergedCount = getMergedFeatures()?.length ?? 0;
+  const redBookCount = getRedBookFeatures()?.length ?? 0;
 
   if (
     cachedYearBounds &&
     cachedYearBoundsVersion === cacheVersion &&
     cachedYearBoundsGbifCount === gbifCount &&
-    cachedYearBoundsInatCount === inatCount
+    cachedYearBoundsInatCount === inatCount &&
+    cachedYearBoundsMergedCount === mergedCount &&
+    cachedYearBoundsRedBookCount === redBookCount
   ) {
     return cachedYearBounds;
   }
@@ -48,7 +56,9 @@ export function getYearBounds() {
   const years = [
     ...collectYears(getFeatureCollection().features),
     ...collectYears(getGbifFeatureCollection().features),
-    ...collectYears(getInatFeatureCollection().features)
+    ...collectYears(getInatFeatureCollection().features),
+    ...collectYears(getMergedFeatures()),
+    ...collectYears(getRedBookFeatures())
   ];
 
   if (years.length === 0) {
@@ -63,5 +73,7 @@ export function getYearBounds() {
   cachedYearBoundsVersion = cacheVersion;
   cachedYearBoundsGbifCount = gbifCount;
   cachedYearBoundsInatCount = inatCount;
+  cachedYearBoundsMergedCount = mergedCount;
+  cachedYearBoundsRedBookCount = redBookCount;
   return cachedYearBounds;
 }

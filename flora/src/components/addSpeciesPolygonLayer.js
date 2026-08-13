@@ -17,6 +17,7 @@ import {
   rewind,
   truncate
 } from "@turf/turf";
+import { normalizeLatinName } from "../dataWork/normalizeLatinName";
 import { getToolFeatures, getPointColorForRegnum } from "./addLocationsLayer";
 
 const EMPTY_COLLECTION = {
@@ -65,8 +66,14 @@ export function getPointsForSpecies(feature) {
     return [];
   }
 
+  const nameLatinNorm = normalizeLatinName(nameLatin);
+  if (!nameLatinNorm) {
+    return [];
+  }
+
   return getToolFeatures({}).filter(
-    (candidate) => candidate.properties?.name_latin === nameLatin
+    (candidate) =>
+      normalizeLatinName(candidate.properties?.name_latin) === nameLatinNorm
   );
 }
 

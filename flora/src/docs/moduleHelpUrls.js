@@ -16,6 +16,7 @@ export const HELP_SECTION_LABELS = {
   "data-sources": "Источники данных",
   "external-processing": "Обработка внешних данных",
   "data-work": "Работа с данными",
+  redbook: "Поиск редких видов",
   gbif: "Данные GBIF",
   "gbif-processing": "Обработка данных GBIF"
 };

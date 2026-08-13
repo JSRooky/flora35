@@ -1,0 +1,249 @@
+.redbook-species-table-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.redbook-species-table-dialog {
+  --redbook-table-accent: #b91c1c;
+  --redbook-table-accent-border: rgba(185, 28, 28, 0.35);
+
+  position: relative;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  min-width: min(720px, calc(100vw - 32px));
+  max-height: min(90vh, 720px);
+  overflow: auto;
+  padding: 16px 20px 20px;
+  border: 1px solid var(--redbook-table-accent-border);
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  font-family: Arial, sans-serif;
+  animation: redbookSpeciesTableFadeIn 0.25s ease-out;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@keyframes redbookSpeciesTableFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.redbook-species-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.redbook-species-table-title {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+  border-bottom: 2px solid var(--redbook-table-accent);
+  padding-bottom: 4px;
+}
+
+.redbook-species-table-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #555;
+}
+
+.redbook-species-table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.redbook-species-table-search-button {
+  appearance: none;
+  border: 1px solid var(--redbook-table-accent);
+  background: var(--redbook-table-accent);
+  color: #fff;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.redbook-species-table-search-button:hover:not(:disabled) {
+  background: #991b1b;
+  border-color: #991b1b;
+}
+
+.redbook-species-table-search-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.redbook-species-table-count {
+  font-size: 13px;
+  color: #444;
+}
+
+.redbook-species-table-status {
+  margin: 0;
+  font-size: 13px;
+  color: #2f4f3a;
+}
+
+.redbook-species-table-wrap {
+  overflow: auto;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.redbook-species-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.redbook-species-table th,
+.redbook-species-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.redbook-species-table thead th {
+  position: sticky;
+  top: 0;
+  background: rgba(255, 248, 248, 0.96);
+  z-index: 1;
+  font-weight: 600;
+  color: #333;
+}
+
+.redbook-species-table-rownum-col,
+.redbook-species-table-rownum {
+  width: 44px;
+  text-align: right;
+  color: #777;
+}
+
+.redbook-species-table-rownum-heading {
+  display: inline-block;
+  width: 100%;
+  text-align: right;
+}
+
+.redbook-species-table-sort-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+}
+
+.redbook-species-table-sort-button--active {
+  color: var(--redbook-table-accent);
+}
+
+.redbook-species-table-sort-indicator {
+  font-size: 11px;
+}
+
+.redbook-species-table-latin {
+  font-style: italic;
+  color: #222;
+}
+
+.redbook-species-table-status-cell {
+  font-weight: 600;
+  color: var(--redbook-table-accent);
+}
+
+.redbook-species-table-count-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.redbook-species-table-count-cell--total {
+  font-weight: 600;
+}
+
+.redbook-species-table-actions-col {
+  white-space: nowrap;
+  text-align: center;
+}
+
+.redbook-species-table-actions-heading {
+  display: inline-block;
+  font-weight: 600;
+  color: #555;
+}
+
+.redbook-species-table-row-action {
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.redbook-species-table-add-button {
+  appearance: none;
+  border: 1px solid #b91c1c;
+  background: rgba(255, 255, 255, 0.9);
+  color: #b91c1c;
+  border-radius: 5px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.redbook-species-table-add-button:hover:not(:disabled) {
+  background: rgba(185, 28, 28, 0.08);
+  border-color: #991b1b;
+  color: #991b1b;
+}
+
+.redbook-species-table-add-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.redbook-species-table-add-button--added {
+  border-color: #9ca3af;
+  color: #6b7280;
+  background: rgba(243, 244, 246, 0.9);
+}
+
+.redbook-species-table-action-placeholder {
+  color: #aaa;
+}
+
+.redbook-species-table-empty {
+  text-align: center;
+  color: #777;
+  padding: 24px 12px !important;
+}
+
+.redbook-species-table tbody tr:hover {
+  background: rgba(185, 28, 28, 0.04);
+}

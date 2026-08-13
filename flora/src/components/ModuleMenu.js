@@ -38,6 +38,8 @@ export const MODULE_IDS = {
   GBIF_PROCESSING: "external-processing",
   // Инструменты работы с внешними данными (меню «Инструменты»).
   DATA_WORK: "data-work",
+  // Поиск редких видов по пользовательскому списку (Красная книга).
+  REDBOOK: "redbook",
   ABOUT: "about"
 };
 
@@ -76,6 +78,8 @@ const TOOL_MODULE_IDS = new Set([
 const TEST_MODULE_ITEMS = [
   { id: MODULE_IDS.SUBMIT, label: "Новая находка" }
 ];
+
+const REDBOOK_MODULE_ITEM = { id: MODULE_IDS.REDBOOK, label: "Красная книга" };
 
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
 
@@ -330,6 +334,8 @@ export default function ModuleMenu({
           </li>
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />
           {TEST_MODULE_ITEMS.map(renderModuleItem)}
+          <li className="module-menu-separator" aria-hidden="true" />
+          {renderModuleItem(REDBOOK_MODULE_ITEM)}
           <li className="module-menu-separator" aria-hidden="true" />
           <li className="module-menu-toggle-item module-menu-data-source">
             <label className="module-menu-data-source-field" htmlFor="module-menu-data-source-select">

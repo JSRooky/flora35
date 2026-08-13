@@ -1,0 +1,239 @@
+.redbook-search-panel {
+  box-sizing: border-box;
+  width: 380px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 120px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  background-color: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 12px 16px;
+  font-family: Arial, sans-serif;
+  animation: redbookSearchPanelSlideIn 0.3s ease-out;
+}
+
+@keyframes redbookSearchPanelSlideIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.redbook-search-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.redbook-search-panel-title {
+  margin: 0;
+  font-size: 15px;
+  color: #333;
+  border-bottom: 2px solid #b91c1c;
+  padding-bottom: 6px;
+  flex: 1;
+}
+
+.redbook-search-panel--collapsed .redbook-search-panel-title {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.redbook-search-panel-summary {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #555;
+}
+
+.redbook-search-panel-content {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.redbook-search-panel-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #444;
+}
+
+.redbook-search-sources {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: #555;
+}
+
+.redbook-search-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+.redbook-search-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.redbook-search-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.redbook-search-actions--secondary {
+  padding-top: 4px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.redbook-search-btn {
+  appearance: none;
+  border: 1px solid #c5c5c5;
+  background: rgba(255, 255, 255, 0.85);
+  color: #333;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.redbook-search-btn:hover:not(:disabled) {
+  border-color: #999;
+  background: #fff;
+}
+
+.redbook-search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.redbook-search-btn--primary {
+  border-color: #b91c1c;
+  background: #b91c1c;
+  color: #fff;
+}
+
+.redbook-search-btn--primary:hover:not(:disabled) {
+  border-color: #991b1b;
+  background: #991b1b;
+}
+
+.redbook-search-preview {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.redbook-search-preview--table-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.redbook-search-btn--table {
+  align-self: flex-start;
+  border-color: #b91c1c;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.redbook-search-btn--table:hover:not(:disabled) {
+  background: rgba(185, 28, 28, 0.08);
+  border-color: #991b1b;
+  color: #991b1b;
+}
+
+.redbook-search-preview-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.redbook-search-species-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 160px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.redbook-search-species-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.redbook-search-species-latin {
+  font-style: italic;
+  color: #222;
+}
+
+.redbook-search-species-status {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.redbook-search-muted {
+  color: #777;
+  font-size: 12px;
+}
+
+.redbook-search-stats {
+  font-size: 13px;
+  color: #333;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.redbook-search-stats p {
+  margin: 0;
+}
+
+.redbook-search-unmatched {
+  font-size: 12px;
+}
+
+.redbook-search-unmatched ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.redbook-search-message {
+  margin: 0;
+  font-size: 12px;
+  color: #2f4f3a;
+}
+
+.redbook-search-error {
+  margin: 0;
+  font-size: 12px;
+  color: #9b1c1c;
+}

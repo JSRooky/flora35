@@ -2,6 +2,8 @@ import { isFirebaseConfigured } from "../firebase/config";
 import { loadLocationsFromFirestore } from "../firebase/loadLocationsFromFirestore";
 import { findGbifFeatureByKey } from "../gbif/gbifStore";
 import { findInatFeatureById } from "../inaturalist/inatStore";
+import { getMergedFeatures } from "../components/addMergedLayer";
+import { getRedBookFeatures } from "../components/addRedBookLayer";
 import { expandFindingsToFeatures } from "./expandFindings";
 import localUserpointsCollection from "./userpoints.json";
 
@@ -12,6 +14,7 @@ export const DATA_SOURCE_MODES = {
   USERPOINTS: "userpoints",
   EXTERNAL: "external",
   MERGED: "merged",
+  REDBOOK: "redbook",
   /** @deprecated Используйте EXTERNAL */
   GBIF: "external"
 };
@@ -42,6 +45,11 @@ export const DATA_SOURCE_OPTIONS = [
     value: DATA_SOURCE_MODES.MERGED,
     label: "Слитые точки",
     title: "Объединённые точки (merged_points)"
+  },
+  {
+    value: DATA_SOURCE_MODES.REDBOOK,
+    label: "Красная книга",
+    title: "Совпадения списка редких видов (GBIF / iNat)"
   },
   {
     value: DATA_SOURCE_MODES.ALL,
@@ -209,6 +217,7 @@ export function getSpeciesCollection() {
     case DATA_SOURCE_MODES.NONE:
     case DATA_SOURCE_MODES.EXTERNAL:
     case DATA_SOURCE_MODES.MERGED:
+    case DATA_SOURCE_MODES.REDBOOK:
     case DATA_SOURCE_MODES.GBIF:
       return EMPTY_SPECIES_COLLECTION;
     case DATA_SOURCE_MODES.ALL:
@@ -290,6 +299,33 @@ export function findFeatureByFindingId(findingId) {
   }
 
   const normalizedId = String(findingId);
+
+  if (normalizedId.startsWith("rb-") || normalizedId.startsWith("redbook")) {
+    const redBookFeature =
+      getRedBookFeatures().find(
+        (feature) =>
+          String(feature.id ?? "") === normalizedId ||
+          String(feature.properties?.redbook_match_id ?? "") === normalizedId ||
+          featureMatchesFindingId(feature, findingId)
+      ) ?? null;
+    if (redBookFeature) {
+      return redBookFeature;
+    }
+  }
+
+  if (normalizedId.startsWith("merged") || normalizedId.startsWith("merged__")) {
+    const mergedFeature =
+      getMergedFeatures().find(
+        (feature) =>
+          String(feature.id ?? "") === normalizedId ||
+          String(feature.properties?.merged_id ?? "") === normalizedId ||
+          featureMatchesFindingId(feature, findingId)
+      ) ?? null;
+    if (mergedFeature) {
+      return mergedFeature;
+    }
+  }
+
   if (normalizedId.startsWith("inat-")) {
     return findInatFeatureById(resolveInatIdFromFindingId(findingId));
   }
@@ -325,6 +361,17 @@ export function isFindingInDataSource(findingId, mode) {
       return (
         normalizedId.startsWith("merged") ||
         normalizedId.startsWith("merged__")
+      );
+    case DATA_SOURCE_MODES.REDBOOK:
+      return (
+        normalizedId.startsWith("rb-") ||
+        normalizedId.startsWith("redbook") ||
+        getRedBookFeatures().some(
+          (feature) =>
+            String(feature.id ?? "") === normalizedId ||
+            String(feature.properties?.redbook_match_id ?? "") === normalizedId ||
+            featureMatchesFindingId(feature, findingId)
+        )
       );
     case DATA_SOURCE_MODES.ALL:
     default:

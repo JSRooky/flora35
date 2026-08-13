@@ -34,9 +34,12 @@ import {
   setInatHiddenPointFeatureKeys
 } from "./addInatLayer";
 import {
-  getMergedFeatures,
-  isMergedLayerVisible
+  getMergedFeatures
 } from "./addMergedLayer";
+import {
+  applyRedBookLocationsFilter,
+  getRedBookFeatures
+} from "./addRedBookLayer";
 import { enrichFeaturesWithAttribution } from "../dataWork/pointAttributionOverlay";
 import {
   DEFAULT_CLUSTER_COLOR,
@@ -192,6 +195,7 @@ let toolIncludeLocal = true;
 let toolIncludeGbif = true;
 let toolIncludeInat = true;
 let toolIncludeMerged = true;
+let toolIncludeRedBook = true;
 
 /** Поля, показываемые в компактном окне при открытии share-ссылки. */
 const SHARED_POINT_POPUP_FIELDS = ["regnum", "family", "found_year", "status"];
@@ -1955,12 +1959,23 @@ export function isInatFeature(feature) {
   return feature?.properties?.source === "inaturalist";
 }
 
+/** Является ли feature точкой слоя Красной книги. */
+export function isRedBookFeature(feature) {
+  return feature?.properties?.source === "redbook";
+}
+
+/** Является ли feature слитой точкой. */
+export function isMergedFeature(feature) {
+  return feature?.properties?.source === "merged";
+}
+
 /** Задаёт, какие источники участвуют в инструментах карты. */
 export function setToolFeaturesContext({
   includeLocal,
   includeGbif,
   includeInat,
-  includeMerged
+  includeMerged,
+  includeRedBook
 } = {}) {
   if (typeof includeLocal === "boolean") {
     toolIncludeLocal = includeLocal;
@@ -1974,6 +1989,9 @@ export function setToolFeaturesContext({
   if (typeof includeMerged === "boolean") {
     toolIncludeMerged = includeMerged;
   }
+  if (typeof includeRedBook === "boolean") {
+    toolIncludeRedBook = includeRedBook;
+  }
 }
 
 export function getToolFeaturesContext() {
@@ -1981,13 +1999,15 @@ export function getToolFeaturesContext() {
     includeLocal: toolIncludeLocal,
     includeGbif: toolIncludeGbif,
     includeInat: toolIncludeInat,
-    includeMerged: toolIncludeMerged
+    includeMerged: toolIncludeMerged,
+    includeRedBook: toolIncludeRedBook
   };
 }
 
 /**
- * Точки для инструментов: локальные + внешние источники с учётом контекста видимости и фильтров.
+ * Точки для инструментов: локальные + внешние источники с учётом контекста режима данных.
  * Не меняет отображение слоя locations — только выборку для анализа.
+ * Для merged/redbook не завязываемся на map visibility (иначе гонка со слоем и пустые инструменты).
  */
 export function getToolFeatures(filters = {}) {
   const features = [];
@@ -2004,13 +2024,17 @@ export function getToolFeatures(filters = {}) {
     features.push(...getVisibleInatFeatures(filters));
   }
 
-  if (toolIncludeMerged && isMergedLayerVisible()) {
+  if (toolIncludeMerged) {
     features.push(
       ...enrichFeaturesWithAttribution(
         filterFeatures(getMergedFeatures(), filters),
         getStablePointKey
       )
     );
+  }
+
+  if (toolIncludeRedBook) {
+    features.push(...filterFeatures(getRedBookFeatures(), filters));
   }
 
   return features;
@@ -2131,12 +2155,26 @@ export function getUnclusteredFeatures(map, filters = {}, candidateFeatures = nu
     );
   }
 
+  // Слитые и Красная книга — без кластеризации: берём из store по флагу режима.
+  const mergedVisible = toolIncludeMerged
+    ? enrichFeaturesWithAttribution(getMergedFeatures(), getStablePointKey)
+    : [];
+  const redBookVisible = toolIncludeRedBook ? getRedBookFeatures() : [];
+
   if (candidateFeatures?.length) {
     const visibleKeys = new Set(
-      [...localVisible, ...gbifVisible, ...inatVisible].map((feature) => {
-        const coordinates = getFeatureCoordinates(feature);
-        return coordinates ? `${coordinates[0]},${coordinates[1]}` : "";
-      }).filter(Boolean)
+      [
+        ...localVisible,
+        ...gbifVisible,
+        ...inatVisible,
+        ...mergedVisible,
+        ...redBookVisible
+      ]
+        .map((feature) => {
+          const coordinates = getFeatureCoordinates(feature);
+          return coordinates ? `${coordinates[0]},${coordinates[1]}` : "";
+        })
+        .filter(Boolean)
     );
 
     return dedupeFeaturesByCoordinates(
@@ -2153,7 +2191,13 @@ export function getUnclusteredFeatures(map, filters = {}, candidateFeatures = nu
 
   return dedupeFeaturesByCoordinates(
     filterFeatures(
-      [...localVisible, ...gbifVisible, ...inatVisible].map(restoreOriginalCoordinates),
+      [
+        ...localVisible,
+        ...gbifVisible,
+        ...inatVisible,
+        ...mergedVisible,
+        ...redBookVisible
+      ].map(restoreOriginalCoordinates),
       filters
     )
   );
@@ -2172,8 +2216,14 @@ export function isFeatureUnclusteredOnMap(map, feature) {
     return false;
   }
 
-  // GBIF / iNaturalist: после клика точка уже выбрана; кластеры раскрываются отдельно.
-  if (isGbifFeature(feature) || isInatFeature(feature)) {
+  // GBIF / iNaturalist / merged / redbook: после клика точка уже выбрана;
+  // у merged/redbook кластеризации нет.
+  if (
+    isGbifFeature(feature) ||
+    isInatFeature(feature) ||
+    isMergedFeature(feature) ||
+    isRedBookFeature(feature)
+  ) {
     return featureMatchesFilters(feature, currentFilters);
   }
 
@@ -2424,6 +2474,7 @@ export function applyLocationsFilter(map, filters = {}) {
     applyTimelineYearChange(map, currentFilters, filters);
     applyGbifLocationsFilter(map, filters);
     applyInatLocationsFilter(map, filters);
+    applyRedBookLocationsFilter(map, filters);
     return;
   }
 
@@ -2431,6 +2482,7 @@ export function applyLocationsFilter(map, filters = {}) {
     applyFoundYearFilterChange(map, filters);
     applyGbifLocationsFilter(map, filters);
     applyInatLocationsFilter(map, filters);
+    applyRedBookLocationsFilter(map, filters);
     return;
   }
 
@@ -2440,6 +2492,7 @@ export function applyLocationsFilter(map, filters = {}) {
     if (map) {
       applyGbifLocationsFilter(map, filters);
       applyInatLocationsFilter(map, filters);
+      applyRedBookLocationsFilter(map, filters);
     }
     return;
   }
@@ -2454,6 +2507,7 @@ export function applyLocationsFilter(map, filters = {}) {
     rebuildLocationsLayers(map);
     applyGbifLocationsFilter(map, filters);
     applyInatLocationsFilter(map, filters);
+    applyRedBookLocationsFilter(map, filters);
   }
 }
 
