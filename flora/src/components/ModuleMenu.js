@@ -81,6 +81,11 @@ const TEST_MODULE_ITEMS = [
 
 const REDBOOK_MODULE_ITEM = { id: MODULE_IDS.REDBOOK, label: "Красная книга" };
 
+const DATA_SOURCES_MODULE_ITEM = {
+  id: MODULE_IDS.DATA_SOURCES,
+  label: "Источники данных"
+};
+
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
 
 function isPointRequiredModule(id) {
@@ -275,6 +280,8 @@ export default function ModuleMenu({
   onHoverTooltipsDisabledChange,
   dataSourceMode,
   onDataSourceModeChange,
+  dataSourcesPanelOpen = false,
+  onDataSourcesPanelToggle,
   accountUser = null,
   onAccountClick
 }) {
@@ -356,6 +363,16 @@ export default function ModuleMenu({
                 ))}
               </select>
             </label>
+          </li>
+          <li>
+            <ModuleMenuButton
+              id={DATA_SOURCES_MODULE_ITEM.id}
+              label={DATA_SOURCES_MODULE_ITEM.label}
+              activeModule={
+                dataSourcesPanelOpen ? MODULE_IDS.DATA_SOURCES : activeModule
+              }
+              onModuleSelect={onDataSourcesPanelToggle}
+            />
           </li>
           <li className="module-menu-toggle-item">
             <label className="module-menu-switch" title="Показывать подсказки при наведении на точки и кластеры">

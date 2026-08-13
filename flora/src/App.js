@@ -178,7 +178,6 @@ import {
   restoreUnattributedMapLayers
 } from "./dataWork/isolateUnattributedPointOnMap";
 import { collectHiddenKeysFromMerged } from "./dataWork/buildMergedPoint";
-import { buildSeasonalityStats } from "./dataWork/buildSeasonalityStats";
 import { fitMapToCoordinatePair } from "./geo/fitMapToCoordinatePair";
 import BasemapPicker from "./components/BasemapPicker";
 import YearFilterPanel from "./components/YearFilterPanel";
@@ -1110,16 +1109,22 @@ export default function MapView() {
       setRedBookPointsVisible(mode === DATA_SOURCE_MODES.REDBOOK);
 
       if (mode === DATA_SOURCE_MODES.EXTERNAL) {
-        stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DATA_SOURCES);
-        setArealDockedWithFeature(false);
-        setBufferDockedWithFeature(false);
-        setActiveModule(null);
-        expandGbifDataPanel();
+        // Слой «Внешние источники» сам по себе панель загрузки не открывает —
+        // только отдельная кнопка «Источники данных» в меню.
+        setPanelMinimized((prev) => ({
+          ...prev,
+          [PANEL_IDS.DATA_SOURCES]: true
+        }));
       } else {
         setExternalProcessingActive(false);
+        setPanelMinimized((prev) => ({
+          ...prev,
+          [PANEL_IDS.DATA_SOURCES]: true,
+          [PANEL_IDS.EXTERNAL_PROCESSING]: true
+        }));
       }
     },
-    [expandGbifDataPanel]
+    []
   );
 
   const handleExternalLayerToggle = useCallback((layerId, enabled) => {
@@ -1703,6 +1708,38 @@ export default function MapView() {
     restorePanel(PANEL_IDS.DATA_SOURCES);
   }, [dataSourceMode, handleDataSourceModeChange, restorePanel]);
 
+  const handleDataSourcesPanelToggle = useCallback(() => {
+    const panelOpen =
+      dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
+      !isPanelMinimized(PANEL_IDS.DATA_SOURCES);
+
+    if (panelOpen) {
+      if (isExternalSourcesLoadActive()) {
+        minimizePanel(PANEL_IDS.DATA_SOURCES);
+        return;
+      }
+      setExternalProcessingActive(false);
+      setPanelMinimized((prev) => ({
+        ...prev,
+        [PANEL_IDS.DATA_SOURCES]: true,
+        [PANEL_IDS.EXTERNAL_PROCESSING]: true
+      }));
+      unpinPanelsFromTaskbar([
+        PANEL_IDS.DATA_SOURCES,
+        PANEL_IDS.EXTERNAL_PROCESSING
+      ]);
+      return;
+    }
+
+    handleOpenExternalLoadPanel();
+  }, [
+    dataSourceMode,
+    handleOpenExternalLoadPanel,
+    isPanelMinimized,
+    minimizePanel,
+    unpinPanelsFromTaskbar
+  ]);
+
   const effectiveWithinFeature = useMemo(() => {
     if (ooptPointsFilterActive && ooptWithinFeature) {
       return ooptWithinFeature;
@@ -1788,9 +1825,9 @@ export default function MapView() {
   const seasonalityNameLatin = popupData?.properties?.name_latin || null;
   const seasonalityNameRu = popupData?.properties?.name_ru || null;
 
-  const seasonalityStats = useMemo(() => {
+  const seasonalityFeatures = useMemo(() => {
     if (!seasonalityNameLatin) {
-      return null;
+      return [];
     }
 
     // Revision / processing / mode: getToolFeatures читает актуальные источники.
@@ -1799,7 +1836,7 @@ export default function MapView() {
     void mapReady;
     void dataSourceMode;
 
-    return buildSeasonalityStats(getToolFeatures(locationFilters), seasonalityNameLatin);
+    return getToolFeatures(locationFilters);
   }, [
     seasonalityNameLatin,
     locationFilters,
@@ -2620,13 +2657,6 @@ export default function MapView() {
   const handleExternalProcessingFiltersReset = useCallback(() => {
     setExternalProcessingFiltersState(createDefaultExternalProcessingFilters());
   }, []);
-
-  const handleOpenGbifProcessing = useCallback(() => {
-    // Из «Источников данных» переходим в хаб «Работа с данными».
-    stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DATA_WORK);
-    setActiveModule(MODULE_IDS.DATA_WORK);
-    expandPanel(PANEL_IDS.DATA_WORK);
-  }, [expandPanel]);
 
   const handleOpenDataWorkTool = useCallback((toolId) => {
     if (toolId === DATA_WORK_TOOL_IDS.NEAR_SPECIES_MATCHES) {
@@ -4155,13 +4185,17 @@ export default function MapView() {
             minimizePanel(PANEL_IDS.DATA_SOURCES);
             break;
           }
+          setExternalProcessingActive(false);
+          setPanelMinimized((prev) => ({
+            ...prev,
+            [PANEL_IDS.DATA_SOURCES]: true,
+            [PANEL_IDS.EXTERNAL_PROCESSING]: true
+          }));
           unpinPanelsFromTaskbar([
             PANEL_IDS.DATA_SOURCES,
             PANEL_IDS.EXTERNAL_PROCESSING
           ]);
-          if (dataSourceMode === DATA_SOURCE_MODES.EXTERNAL) {
-            handleDataSourceModeChange(DATA_SOURCE_MODES.NONE);
-          }
+          // Закрытие панели загрузки больше не сбрасывает слой «Внешние источники».
           break;
         }
         case PANEL_IDS.EXTERNAL_PROCESSING:
@@ -4204,12 +4238,10 @@ export default function MapView() {
       arealDockedWithFeature,
       bufferDockedWithFeature,
       clearPointSelection,
-      dataSourceMode,
       handleBoundsSpeciesListClose,
       handleCloseNearSpeciesMatches,
       handleCloseUnattributedPoints,
       handleCloseUndoMergedPoints,
-      handleDataSourceModeChange,
       handleDensePileSpeciesListClose,
       handleDenseProcessingClose,
       minimizePanel,
@@ -4537,12 +4569,7 @@ export default function MapView() {
               setPolygonAddMode(false);
             }
 
-            setActiveModule((current) => {
-              if (current === MODULE_IDS.BUFFER || current === MODULE_IDS.POLYGON) {
-                return current;
-              }
-              return MODULE_IDS.FEATURE;
-            });
+            setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
           }
         });
         addInatLayer(mapInstance, {
@@ -4615,12 +4642,7 @@ export default function MapView() {
               setPolygonAddMode(false);
             }
 
-            setActiveModule((current) => {
-              if (current === MODULE_IDS.BUFFER || current === MODULE_IDS.POLYGON) {
-                return current;
-              }
-              return MODULE_IDS.FEATURE;
-            });
+            setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
           }
         });
         addMergedLayer(mapInstance, {
@@ -4647,12 +4669,53 @@ export default function MapView() {
             }
             setPopupData(feature);
             updateSelectedPointHighlight(map.current, feature);
-            setActiveModule((current) => {
-              if (current === MODULE_IDS.BUFFER || current === MODULE_IDS.POLYGON) {
-                return current;
+
+            const {
+              bufferSelectionMode: selectionMode,
+              activeModule: currentModule,
+              bufferDockedWithFeature: bufferDocked
+            } = bufferStateRef.current;
+            const bufferPanelOpen =
+              currentModule === MODULE_IDS.BUFFER ||
+              (currentModule === MODULE_IDS.FEATURE && bufferDocked);
+
+            if (bufferPanelOpen) {
+              if (selectionMode) {
+                setBufferSelectedPoints((points) => {
+                  const key = getArealPointKey(feature);
+                  const existingIndex = points.findIndex(
+                    (point) => getArealPointKey(point) === key
+                  );
+
+                  if (existingIndex >= 0) {
+                    return points.filter((_, index) => index !== existingIndex);
+                  }
+
+                  return [...points, feature];
+                });
+              } else {
+                setBufferSelectedPoints([]);
               }
-              return MODULE_IDS.FEATURE;
-            });
+            }
+
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+              polygonStateRef.current;
+
+            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+              const nameLatin = feature.properties?.name_latin;
+
+              setSpeciesPolygons((prev) =>
+                upsertSpeciesPolygon(prev, feature, POLYGON_BUILD_MODES.CONVEX)
+              );
+
+              if (nameLatin) {
+                setActivePolygonId(nameLatin);
+              }
+
+              setPolygonAddMode(false);
+            }
+
+            setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
           }
         });
         addRedBookLayer(mapInstance, {
@@ -4679,12 +4742,53 @@ export default function MapView() {
             }
             setPopupData(feature);
             updateSelectedPointHighlight(map.current, feature);
-            setActiveModule((current) => {
-              if (current === MODULE_IDS.BUFFER || current === MODULE_IDS.POLYGON) {
-                return current;
+
+            const {
+              bufferSelectionMode: selectionMode,
+              activeModule: currentModule,
+              bufferDockedWithFeature: bufferDocked
+            } = bufferStateRef.current;
+            const bufferPanelOpen =
+              currentModule === MODULE_IDS.BUFFER ||
+              (currentModule === MODULE_IDS.FEATURE && bufferDocked);
+
+            if (bufferPanelOpen) {
+              if (selectionMode) {
+                setBufferSelectedPoints((points) => {
+                  const key = getArealPointKey(feature);
+                  const existingIndex = points.findIndex(
+                    (point) => getArealPointKey(point) === key
+                  );
+
+                  if (existingIndex >= 0) {
+                    return points.filter((_, index) => index !== existingIndex);
+                  }
+
+                  return [...points, feature];
+                });
+              } else {
+                setBufferSelectedPoints([]);
               }
-              return MODULE_IDS.FEATURE;
-            });
+            }
+
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+              polygonStateRef.current;
+
+            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+              const nameLatin = feature.properties?.name_latin;
+
+              setSpeciesPolygons((prev) =>
+                upsertSpeciesPolygon(prev, feature, POLYGON_BUILD_MODES.CONVEX)
+              );
+
+              if (nameLatin) {
+                setActivePolygonId(nameLatin);
+              }
+
+              setPolygonAddMode(false);
+            }
+
+            setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
           }
         });
 
@@ -4795,6 +4899,11 @@ export default function MapView() {
         onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
         dataSourceMode={dataSourceMode}
         onDataSourceModeChange={handleDataSourceModeChange}
+        dataSourcesPanelOpen={
+          dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
+          !isPanelMinimized(PANEL_IDS.DATA_SOURCES)
+        }
+        onDataSourcesPanelToggle={handleDataSourcesPanelToggle}
       />
       <div
         ref={ref}
@@ -4980,7 +5089,8 @@ export default function MapView() {
             <SeasonalityPanel
               nameLatin={seasonalityNameLatin}
               nameRu={seasonalityNameRu}
-              stats={seasonalityStats}
+              features={seasonalityFeatures}
+              selectionKey={popupData ? getStablePointKey(popupData) : null}
               collapsed={isPanelCollapsed(PANEL_IDS.SEASONALITY)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.SEASONALITY)}
               onMinimize={handleMinimizePanel(PANEL_IDS.SEASONALITY)}
@@ -5175,7 +5285,6 @@ export default function MapView() {
                 onCollapsedChange={handleGbifPanelCollapsedChange}
                 onMinimize={handleMinimizePanel(PANEL_IDS.DATA_SOURCES)}
                 onClose={handleClosePanel(PANEL_IDS.DATA_SOURCES)}
-                onOpenProcessing={handleOpenGbifProcessing}
                 storeRevision={pointsDataRevision}
               />
               </div>

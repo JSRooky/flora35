@@ -18,6 +18,102 @@ let redBookCollection = EMPTY_FEATURE_COLLECTION;
 let layerVisible = true;
 let onPointClickCallback = null;
 let interactionHandlers = null;
+/** @type {string[]} */
+let hiddenPointFeatureKeys = [];
+/** @type {object} */
+let lastLocationFilters = {};
+
+function buildPinnedKeyExclusion(key) {
+  return [
+    "!",
+    [
+      "any",
+      ["==", ["to-string", ["id"]], key],
+      ["==", ["to-string", ["coalesce", ["get", "redbook_match_id"], ""]], key],
+      ["==", ["to-string", ["coalesce", ["get", "finding_id"], ""]], key],
+      ["==", ["to-string", ["coalesce", ["get", "gbif_key"], ""]], key],
+      [
+        "==",
+        ["concat", "gbif-", ["to-string", ["coalesce", ["get", "gbif_key"], ""]]],
+        key
+      ],
+      ["==", ["to-string", ["coalesce", ["get", "inat_id"], ""]], key],
+      [
+        "==",
+        ["concat", "inat-", ["to-string", ["coalesce", ["get", "inat_id"], ""]]],
+        key
+      ],
+      [
+        "==",
+        [
+          "concat",
+          "rb-gbif-",
+          ["to-string", ["coalesce", ["get", "gbif_key"], ""]]
+        ],
+        key
+      ],
+      [
+        "==",
+        [
+          "concat",
+          "rb-inat-",
+          ["to-string", ["coalesce", ["get", "inat_id"], ""]]
+        ],
+        key
+      ]
+    ]
+  ];
+}
+
+function buildRedBookLayerFilter(filters = lastLocationFilters) {
+  const parts = [];
+
+  if (Array.isArray(filters.status) && filters.status.length > 0) {
+    parts.push(["in", ["get", "status"], ["literal", filters.status]]);
+  }
+
+  if (Array.isArray(filters.regnum) && filters.regnum.length > 0) {
+    const normalized = filters.regnum.map((value) =>
+      value == null || value === "" ? "" : String(value).toLowerCase()
+    );
+    parts.push([
+      "in",
+      ["downcase", ["to-string", ["coalesce", ["get", "regnum"], ""]]],
+      ["literal", normalized]
+    ]);
+  }
+
+  if (
+    filters.found_year &&
+    typeof filters.found_year === "object" &&
+    filters.found_year.min != null &&
+    filters.found_year.max != null
+  ) {
+    parts.push([
+      "all",
+      [">=", ["get", "found_year"], filters.found_year.min],
+      ["<=", ["get", "found_year"], filters.found_year.max]
+    ]);
+  }
+
+  hiddenPointFeatureKeys.forEach((key) => {
+    parts.push(buildPinnedKeyExclusion(key));
+  });
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  return parts.length === 1 ? parts[0] : ["all", ...parts];
+}
+
+function applyRedBookLayerFilter(map) {
+  if (!map?.getLayer?.(REDBOOK_UNCLUSTERED_LAYER_ID)) {
+    return;
+  }
+
+  map.setFilter(REDBOOK_UNCLUSTERED_LAYER_ID, buildRedBookLayerFilter());
+}
 
 function applyVisibility(map) {
   if (!map?.getLayer?.(REDBOOK_UNCLUSTERED_LAYER_ID)) {
@@ -44,6 +140,10 @@ function attachInteractions(map) {
     if (!feature) {
       return;
     }
+
+    // Не даём клику «провалиться» в map-background clear (локальный mapClick).
+    event.preventDefault?.();
+    event.originalEvent?.stopPropagation?.();
 
     onPointClickCallback?.(feature);
   };
@@ -166,6 +266,7 @@ export function setRedBookData(map, collectionOrFeatures, options = {}) {
 
   map.getSource(REDBOOK_SOURCE_ID)?.setData(redBookCollection);
   applyVisibility(map);
+  applyRedBookLayerFilter(map);
 }
 
 export function setRedBookVisibility(map, visible) {
@@ -177,6 +278,14 @@ export function setRedBookVisibility(map, visible) {
 
 export function isRedBookLayerVisible() {
   return layerVisible;
+}
+
+/** Id интерактивных слоёв Красной книги (для проверки hit при клике по карте). */
+export function getRedBookInteractiveLayerIds(map) {
+  if (!map?.getLayer?.(REDBOOK_UNCLUSTERED_LAYER_ID)) {
+    return [];
+  }
+  return [REDBOOK_UNCLUSTERED_LAYER_ID];
 }
 
 export function getRedBookFeatures() {
@@ -233,52 +342,28 @@ export function upsertRedBookFeatures(map, features) {
 }
 
 /**
+ * Скрывает обычные маркеры Красной книги для точек, показанных булавкой
+ * (выделение в «Сведения о точке» или share-ссылка).
+ * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {Iterable<string>|null|undefined} keys
+ */
+export function setRedBookHiddenPointFeatureKeys(map, keys) {
+  hiddenPointFeatureKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
+  if (map) {
+    applyRedBookLayerFilter(map);
+  }
+}
+
+/**
  * Фильтр слоя по статусу (и при необходимости по царству/году — через properties).
  * @param {import("mapbox-gl").Map|null|undefined} map
  * @param {object} [filters]
  */
 export function applyRedBookLocationsFilter(map, filters = {}) {
-  if (!map?.getLayer?.(REDBOOK_UNCLUSTERED_LAYER_ID)) {
+  lastLocationFilters = filters && typeof filters === "object" ? filters : {};
+  if (!map) {
     return;
   }
 
-  const parts = [];
-
-  if (Array.isArray(filters.status) && filters.status.length > 0) {
-    parts.push(["in", ["get", "status"], ["literal", filters.status]]);
-  }
-
-  if (Array.isArray(filters.regnum) && filters.regnum.length > 0) {
-    const normalized = filters.regnum.map((value) =>
-      value == null || value === "" ? "" : String(value).toLowerCase()
-    );
-    parts.push([
-      "in",
-      ["downcase", ["to-string", ["coalesce", ["get", "regnum"], ""]]],
-      ["literal", normalized]
-    ]);
-  }
-
-  if (
-    filters.found_year &&
-    typeof filters.found_year === "object" &&
-    filters.found_year.min != null &&
-    filters.found_year.max != null
-  ) {
-    parts.push([
-      "all",
-      [">=", ["get", "found_year"], filters.found_year.min],
-      ["<=", ["get", "found_year"], filters.found_year.max]
-    ]);
-  }
-
-  if (parts.length === 0) {
-    map.setFilter(REDBOOK_UNCLUSTERED_LAYER_ID, null);
-    return;
-  }
-
-  map.setFilter(
-    REDBOOK_UNCLUSTERED_LAYER_ID,
-    parts.length === 1 ? parts[0] : ["all", ...parts]
-  );
+  applyRedBookLayerFilter(map);
 }

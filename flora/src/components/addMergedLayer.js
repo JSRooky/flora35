@@ -61,6 +61,10 @@ function attachInteractions(map) {
       return;
     }
 
+    // Не даём клику «провалиться» в map-background clear (локальный mapClick).
+    event.preventDefault?.();
+    event.originalEvent?.stopPropagation?.();
+
     onPointClickCallback?.(feature);
   };
 
@@ -359,6 +363,14 @@ export function setMergedVisibility(map, visible) {
 
 export function isMergedLayerVisible() {
   return layerVisible;
+}
+
+/** Id интерактивных слоёв слитых точек (для проверки hit при клике по карте). */
+export function getMergedInteractiveLayerIds(map) {
+  if (!map?.getLayer?.(MERGED_UNCLUSTERED_LAYER_ID)) {
+    return [];
+  }
+  return [MERGED_UNCLUSTERED_LAYER_ID];
 }
 
 export function getMergedFeatures() {

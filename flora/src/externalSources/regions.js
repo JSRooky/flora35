@@ -1,15 +1,32 @@
 /**
  * Общий реестр регионов для загрузки внешних источников (GBIF, iNaturalist).
+ * Базовый список — субъекты РФ из GADM 4.1; placeId iNaturalist — в russiaRegionsGadm.json.
  */
 
-export const EXTERNAL_REGIONS = [
-  {
-    id: "vologda",
-    label: "Вологодская область",
-    gbif: { gadmGid: "RUS.78_1" },
-    inaturalist: { placeId: 134604 }
+import russiaRegionsGadm from "./russiaRegionsGadm.json";
+
+/** Дополнительные / устаревшие placeId iNaturalist (перекрывают JSON при необходимости). */
+const INAT_PLACE_ID_OVERRIDES = {
+  vologda: 134604
+};
+
+export const EXTERNAL_REGIONS = russiaRegionsGadm.map((region) => {
+  const overrideId = INAT_PLACE_ID_OVERRIDES[region.id];
+  const placeId =
+    overrideId != null ? overrideId : region.inaturalist?.placeId ?? null;
+
+  if (placeId == null) {
+    return {
+      ...region,
+      inaturalist: { placeId: null }
+    };
   }
-];
+
+  return {
+    ...region,
+    inaturalist: { placeId }
+  };
+});
 
 export const DEFAULT_EXTERNAL_REGION_ID = "vologda";
 
@@ -50,14 +67,22 @@ export function toGbifSpatialRegion(region) {
   return region;
 }
 
-/** Параметры пространственного фильтра для iNaturalist Observations API. */
+/**
+ * Параметры пространственного фильтра для iNaturalist Observations API.
+ * Принимает и полный регистр (inaturalist.placeId), и уже нормализованный
+ * объект { id, placeId } / { id, bbox } после предыдущего toInatSpatialRegion.
+ */
 export function toInatSpatialRegion(region) {
   if (!region) {
     return null;
   }
 
-  if (region.inaturalist) {
+  if (region.inaturalist?.placeId != null) {
     return { id: region.id, ...region.inaturalist };
+  }
+
+  if (region.placeId != null || region.bbox) {
+    return region;
   }
 
   return null;

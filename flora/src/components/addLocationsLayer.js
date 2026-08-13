@@ -34,11 +34,14 @@ import {
   setInatHiddenPointFeatureKeys
 } from "./addInatLayer";
 import {
-  getMergedFeatures
+  getMergedFeatures,
+  getMergedInteractiveLayerIds
 } from "./addMergedLayer";
 import {
   applyRedBookLocationsFilter,
-  getRedBookFeatures
+  getRedBookFeatures,
+  getRedBookInteractiveLayerIds,
+  setRedBookHiddenPointFeatureKeys
 } from "./addRedBookLayer";
 import { enrichFeaturesWithAttribution } from "../dataWork/pointAttributionOverlay";
 import {
@@ -671,6 +674,7 @@ function buildPinnedKeyExclusion(key) {
       "any",
       ["==", ["to-string", ["id"]], key],
       ["==", ["to-string", ["coalesce", ["get", "finding_id"], ""]], key],
+      ["==", ["to-string", ["coalesce", ["get", "redbook_match_id"], ""]], key],
       ["==", ["to-string", ["coalesce", ["get", "gbif_key"], ""]], key],
       [
         "==",
@@ -726,12 +730,16 @@ function applyUnclusteredLayerFilters(map) {
     map.setFilter(layerId, filter);
   });
 
-  // Тот же набор ключей — скрываем кружок на слоях GBIF и iNaturalist под булавкой.
+  // Тот же набор ключей — скрываем кружок на слоях GBIF / iNaturalist / Красная книга под булавкой.
   setGbifHiddenPointFeatureKeys(map, [
     sharedPointPinFeatureKey,
     selectedPointPinFeatureKey
   ]);
   setInatHiddenPointFeatureKeys(map, [
+    sharedPointPinFeatureKey,
+    selectedPointPinFeatureKey
+  ]);
+  setRedBookHiddenPointFeatureKeys(map, [
     sharedPointPinFeatureKey,
     selectedPointPinFeatureKey
   ]);
@@ -1335,7 +1343,15 @@ function attachLocationsInteractions(map) {
     ].filter((layerId) => map.getLayer(layerId));
     const gbifLayerIds = getGbifInteractiveLayerIds(map);
     const inatLayerIds = getInatInteractiveLayerIds(map);
-    const hitLayerIds = [...locationLayerIds, ...gbifLayerIds, ...inatLayerIds];
+    const mergedLayerIds = getMergedInteractiveLayerIds(map);
+    const redBookLayerIds = getRedBookInteractiveLayerIds(map);
+    const hitLayerIds = [
+      ...locationLayerIds,
+      ...gbifLayerIds,
+      ...inatLayerIds,
+      ...mergedLayerIds,
+      ...redBookLayerIds
+    ];
 
     if (hitLayerIds.length > 0) {
       const features = safeQueryRenderedFeatures(map, event.point, {

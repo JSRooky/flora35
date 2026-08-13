@@ -48,6 +48,7 @@
 .map-display-panel-toggle,
 .dense-clusters-panel-toggle,
 .year-filter-panel-toggle,
+.seasonality-panel-toggle,
 .status-filter-panel-toggle,
 .user-submission-panel-toggle {
   flex-shrink: 0;
@@ -71,6 +72,7 @@
 .map-display-panel-toggle:hover,
 .dense-clusters-panel-toggle:hover,
 .year-filter-panel-toggle:hover,
+.seasonality-panel-toggle:hover,
 .status-filter-panel-toggle:hover,
 .user-submission-panel-toggle:hover {
   background: rgba(255, 255, 255, 0.9);
