@@ -323,6 +323,44 @@
   color: #222;
 }
 
+.data-sources-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.data-sources-action-btn {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.data-sources-action-btn--danger {
+  border-color: #b45309;
+  background: #fff;
+  color: #b45309;
+}
+
+.data-sources-action-btn--danger:hover:not(:disabled) {
+  background: rgba(180, 83, 9, 0.08);
+}
+
+.data-sources-action-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.data-sources-action-busy {
+  font-size: 14px;
+  line-height: 1;
+  color: inherit;
+}
+
 .data-sources-summary-line {
   margin: 0;
   font-size: 13px;

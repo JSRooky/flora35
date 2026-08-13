@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { previewOccurrenceCount, withUpdateSinceExtras } from "../gbif/gbifClient";
 import {
   getGbifLoadedQuery,
-  getGbifLoadedRegionId,
+  getGbifLoadedRegionIds,
   getGbifSyncedAt
 } from "../gbif/gbifStore";
 import { GBIF_KINGDOMS, buildTaxonSearchExtras } from "../gbif/taxonFilters";
@@ -13,7 +13,7 @@ import {
 } from "../inaturalist/inatClient";
 import {
   getInatLoadedQuery,
-  getInatLoadedRegionId,
+  getInatLoadedRegionIds,
   getInatSyncedAt
 } from "../inaturalist/inatStore";
 import {
@@ -239,9 +239,7 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
   // Перечитываем store после загрузки/удаления.
   void datasetRevision;
   const loadedQuery = isInat ? getInatLoadedQuery() : getGbifLoadedQuery();
-  const loadedRegionId = isInat
-    ? getInatLoadedRegionId() || loadedQuery?.regionId || null
-    : getGbifLoadedRegionId() || loadedQuery?.regionId || null;
+  const loadedRegionIds = isInat ? getInatLoadedRegionIds() : getGbifLoadedRegionIds();
   const loadedKingdomsLabel = formatLoadedKingdoms(loadedQuery);
   const syncedAt = isInat ? getInatSyncedAt() : getGbifSyncedAt();
 
@@ -631,7 +629,7 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
               const preview = previews[region.id];
               const kingdomIds = kingdomsByRegion[region.id] || [];
               const selectedBytes = resolveSelectedBytes(preview, kingdomIds);
-              const isLoaded = loadedRegionId === region.id;
+              const isLoaded = loadedRegionIds.has(region.id);
               const rowBusy = busyRegionId === region.id;
               const canUpdate = isLoaded && Boolean(syncedAt);
               const hasSpatial = isInat

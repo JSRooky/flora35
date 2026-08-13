@@ -4,16 +4,17 @@ import {
   buildGbifIdIndex,
   compactGbifTable,
   createEmptyGbifTable,
+  collectGbifRegionIds,
   decodeGbifFeatures,
   encodeGbifFeatures,
+  fillUniformMissingGbifRegionId,
   gbifRowToFeature,
   gbifRowToSlimFeature,
   gbifTablePackedBytes,
-  collectGbifRegionIds,
-  fillUniformMissingGbifRegionId,
   hydrateGbifTable,
   readGbifKey,
   readGbifNameLatin,
+  readGbifRegionId,
   upsertGbifFeaturesIntoTable
 } from "./gbifColumnar";
 import { stampFeatureRegionIds } from "../externalSources/regionVisibility";
@@ -26,6 +27,7 @@ const EMPTY_COLLECTION = {
 let table = createEmptyGbifTable();
 let idToIndex = new Map();
 let loadedRegionId = null;
+let loadedRegionIds = new Set();
 let loadedQuery = null;
 let syncedAt = null;
 let storeGeneration = 0;
@@ -215,12 +217,53 @@ export function getGbifFeaturesByIndices(indices) {
   return features;
 }
 
+function rememberLoadedRegionId(regionId) {
+  if (!regionId) {
+    return;
+  }
+  loadedRegionId = regionId;
+  loadedRegionIds.add(regionId);
+}
+
+export function replaceGbifLoadedRegionIds(ids, lastId = null) {
+  loadedRegionIds = new Set(
+    Array.isArray(ids) ? ids.filter((id) => id != null && id !== "") : []
+  );
+  if (lastId) {
+    loadedRegionId = lastId;
+    loadedRegionIds.add(lastId);
+  } else if (!loadedRegionIds.has(loadedRegionId)) {
+    loadedRegionId = loadedRegionIds.size > 0 ? [...loadedRegionIds][0] : null;
+  }
+}
+
+export function restoreGbifRegionsFromSnapshot(snapshot) {
+  const fromTable = [...collectGbifRegionIds(table)];
+  const fromSnapshot = Array.isArray(snapshot?.regionIds)
+    ? snapshot.regionIds.filter(Boolean)
+    : [];
+  const ids = fromSnapshot.length
+    ? fromSnapshot
+    : fromTable.length
+      ? fromTable
+      : snapshot?.regionId
+        ? [snapshot.regionId]
+        : [];
+
+  replaceGbifLoadedRegionIds(ids, snapshot?.regionId ?? null);
+
+  if (fromTable.length === 0 && fromSnapshot.length === 1) {
+    fillUniformMissingGbifRegionId(table, fromSnapshot[0]);
+  }
+}
+
 export function getGbifLoadedRegionId() {
   return loadedRegionId;
 }
 
 export function getGbifLoadedRegionIds() {
-  const ids = collectGbifRegionIds(table);
+  const ids = new Set(loadedRegionIds);
+  collectGbifRegionIds(table).forEach((id) => ids.add(id));
   if (loadedRegionId) {
     ids.add(loadedRegionId);
   }
@@ -282,10 +325,9 @@ export function countGbifFeaturesByNameLatin(nameLatin) {
 
 function installTable(nextTable, regionId = null) {
   table = nextTable ?? createEmptyGbifTable();
-  fillUniformMissingGbifRegionId(table, regionId);
   idToIndex = buildGbifIdIndex(table);
-  if (regionId !== undefined) {
-    loadedRegionId = regionId;
+  if (regionId) {
+    rememberLoadedRegionId(regionId);
   }
   bumpGeneration();
 }
@@ -308,9 +350,7 @@ export function appendGbifFeatures(features, regionId = null) {
 
 export function upsertGbifFeatures(features, regionId = null) {
   if (!Array.isArray(features) || features.length === 0) {
-    if (regionId != null) {
-      loadedRegionId = regionId;
-    }
+    rememberLoadedRegionId(regionId);
     return { collection: getGbifFeatureCollectionRaw(), added: 0, updated: 0 };
   }
 
@@ -318,9 +358,7 @@ export function upsertGbifFeatures(features, regionId = null) {
   const result = upsertGbifFeaturesIntoTable(table, idToIndex, features);
   table = result.table;
   idToIndex = result.idToIndex;
-  if (regionId != null) {
-    loadedRegionId = regionId;
-  }
+  rememberLoadedRegionId(regionId);
   bumpGeneration();
 
   return {
@@ -334,10 +372,58 @@ export function clearGbifStore() {
   table = createEmptyGbifTable();
   idToIndex = new Map();
   loadedRegionId = null;
+  loadedRegionIds = new Set();
   loadedQuery = null;
   syncedAt = null;
   bumpGeneration();
   return EMPTY_COLLECTION;
+}
+
+export function removeGbifRegionFromStore(regionId) {
+  if (!regionId) {
+    return { removed: false, clearedAll: false };
+  }
+
+  const tagged = collectGbifRegionIds(table);
+  if (!tagged.has(regionId)) {
+    if (!loadedRegionIds.has(regionId) && loadedRegionId !== regionId) {
+      return { removed: false, clearedAll: false };
+    }
+
+    if (tagged.size === 0) {
+      clearGbifStore();
+      return { removed: true, clearedAll: true };
+    }
+
+    loadedRegionIds.delete(regionId);
+    if (loadedRegionId === regionId) {
+      loadedRegionId = loadedRegionIds.size > 0 ? [...loadedRegionIds][0] : null;
+    }
+    bumpGeneration();
+    return { removed: true, clearedAll: table.rowCount === 0 };
+  }
+
+  const kept = [];
+  for (let i = 0; i < table.rowCount; i += 1) {
+    if (readGbifRegionId(table, i) !== regionId) {
+      kept.push(gbifRowToFeature(table, i));
+    }
+  }
+
+  if (kept.length === 0) {
+    clearGbifStore();
+    return { removed: true, clearedAll: true };
+  }
+
+  table = encodeGbifFeatures(kept);
+  idToIndex = buildGbifIdIndex(table);
+  loadedRegionIds.delete(regionId);
+  collectGbifRegionIds(table).forEach((id) => loadedRegionIds.add(id));
+  if (loadedRegionId === regionId || !loadedRegionIds.has(loadedRegionId)) {
+    loadedRegionId = loadedRegionIds.size > 0 ? [...loadedRegionIds][0] : null;
+  }
+  bumpGeneration();
+  return { removed: true, clearedAll: false };
 }
 
 export { readGbifKey };

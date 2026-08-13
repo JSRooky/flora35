@@ -2,8 +2,10 @@ import {
   clearGbifStore,
   getGbifLoadedRegionId,
   getGbifLoadedQuery,
+  getGbifLoadedRegionIds,
   getGbifPersistTable,
   getGbifSyncedAt,
+  restoreGbifRegionsFromSnapshot,
   setGbifColumnarTable,
   setGbifFeatureCollection,
   setGbifLoadedQuery,
@@ -125,6 +127,7 @@ export async function persistGbifSnapshot() {
     savedAt: new Date().toISOString(),
     syncedAt: getGbifSyncedAt(),
     regionId: getGbifLoadedRegionId(),
+    regionIds: [...getGbifLoadedRegionIds()],
     query: getGbifLoadedQuery(),
     rowCount: table.rowCount,
     table
@@ -194,7 +197,8 @@ export async function hydrateGbifStoreFromPersistence() {
       return null;
     }
 
-    setGbifColumnarTable(snapshot.table, snapshot.regionId ?? null);
+    setGbifColumnarTable(snapshot.table, null);
+    restoreGbifRegionsFromSnapshot(snapshot);
     const restoredQuery = restoreQuery(snapshot);
     applySnapshotMeta(snapshot, restoredQuery);
 
@@ -210,6 +214,7 @@ export async function hydrateGbifStoreFromPersistence() {
   );
 
   setGbifFeatureCollection(collection, snapshot.regionId ?? null);
+  restoreGbifRegionsFromSnapshot(snapshot);
 
   const restoredQuery = restoreQuery(snapshot);
   applySnapshotMeta(snapshot, restoredQuery);

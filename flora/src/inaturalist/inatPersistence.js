@@ -2,8 +2,10 @@ import {
   clearInatStore,
   getInatLoadedQuery,
   getInatLoadedRegionId,
+  getInatLoadedRegionIds,
   getInatPersistTable,
   getInatSyncedAt,
+  restoreInatRegionsFromSnapshot,
   setInatColumnarTable,
   setInatFeatureCollection,
   setInatLoadedQuery,
@@ -127,6 +129,7 @@ export async function persistInatSnapshot() {
     savedAt: new Date().toISOString(),
     syncedAt: getInatSyncedAt(),
     regionId: getInatLoadedRegionId(),
+    regionIds: [...getInatLoadedRegionIds()],
     query: getInatLoadedQuery(),
     rowCount: table.rowCount,
     table
@@ -194,7 +197,8 @@ export async function hydrateInatStoreFromPersistence() {
       return null;
     }
 
-    setInatColumnarTable(snapshot.table, snapshot.regionId ?? null);
+    setInatColumnarTable(snapshot.table, null);
+    restoreInatRegionsFromSnapshot(snapshot);
     const restoredQuery = restoreQuery(snapshot);
     applySnapshotMeta(snapshot, restoredQuery);
 
@@ -210,6 +214,7 @@ export async function hydrateInatStoreFromPersistence() {
   );
 
   setInatFeatureCollection(collection, snapshot.regionId ?? null);
+  restoreInatRegionsFromSnapshot(snapshot);
 
   const restoredQuery = restoreQuery(snapshot);
   applySnapshotMeta(snapshot, restoredQuery);

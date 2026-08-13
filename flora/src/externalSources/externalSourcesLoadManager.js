@@ -8,8 +8,9 @@ import {
 } from "../gbif/gbifLoadSeries";
 import {
   getGbifFeatureCount,
-  getGbifLoadedRegionId,
+  getGbifLoadedRegionIds,
   getGbifSlimMapCollection,
+  removeGbifRegionFromStore,
   setGbifLoadedQuery,
   setGbifSyncedAt,
   upsertGbifFeatures
@@ -28,8 +29,9 @@ import {
 } from "../inaturalist/inatLoadSeries";
 import {
   getInatFeatureCount,
-  getInatLoadedRegionId,
+  getInatLoadedRegionIds,
   getInatSlimMapCollection,
+  removeInatRegionFromStore,
   setInatLoadedQuery,
   setInatSyncedAt,
   upsertInatFeatures
@@ -430,20 +432,34 @@ function resetSourceSnapshot(source) {
  * @returns {Promise<boolean>} true, если набор был удалён
  */
 export async function clearGbifExternalDataset(regionId) {
-  if (!regionId || getGbifLoadedRegionId() !== regionId) {
+  if (!regionId || !getGbifLoadedRegionIds().has(regionId)) {
     return false;
   }
 
   cancelGbifExternalLoad();
-  await clearGbifStoreAndPersistence();
-  setGbifMapUpdatesPaused(false);
-
-  const map = mapRef;
-  if (map) {
-    clearGbifLayer(map);
+  const result = removeGbifRegionFromStore(regionId);
+  if (!result.removed) {
+    return false;
   }
 
-  resetSourceSnapshot("gbif");
+  setGbifMapUpdatesPaused(false);
+  const map = mapRef;
+  if (map) {
+    if (getGbifFeatureCount() === 0) {
+      clearGbifLayer(map);
+    } else {
+      setGbifData(map, getGbifSlimMapCollection());
+    }
+  }
+
+  await persistGbifSnapshot();
+
+  if (getGbifFeatureCount() === 0) {
+    resetSourceSnapshot("gbif");
+  } else {
+    patchSource("gbif", { loaded: getGbifFeatureCount() });
+  }
+
   notifyDataChange();
   return true;
 }
@@ -455,20 +471,54 @@ export async function clearGbifExternalDataset(regionId) {
  * @returns {Promise<boolean>} true, если набор был удалён
  */
 export async function clearInatExternalDataset(regionId) {
-  if (!regionId || getInatLoadedRegionId() !== regionId) {
+  if (!regionId || !getInatLoadedRegionIds().has(regionId)) {
     return false;
   }
 
   cancelInatExternalLoad();
+  const result = removeInatRegionFromStore(regionId);
+  if (!result.removed) {
+    return false;
+  }
+
+  setInatMapUpdatesPaused(false);
+  const map = mapRef;
+  if (map) {
+    if (getInatFeatureCount() === 0) {
+      clearInatLayer(map);
+    } else {
+      setInatData(map, getInatSlimMapCollection());
+    }
+  }
+
+  await persistInatSnapshot();
+
+  if (getInatFeatureCount() === 0) {
+    resetSourceSnapshot("inat");
+  } else {
+    patchSource("inat", { loaded: getInatFeatureCount() });
+  }
+
+  notifyDataChange();
+  return true;
+}
+
+/** Удаляет все локальные наборы GBIF и iNaturalist (память, IndexedDB, слои карты). */
+export async function clearAllExternalDatasets() {
+  cancelGbifExternalLoad();
+  cancelInatExternalLoad();
+  await clearGbifStoreAndPersistence();
   await clearInatStoreAndPersistence();
+  setGbifMapUpdatesPaused(false);
   setInatMapUpdatesPaused(false);
 
   const map = mapRef;
   if (map) {
+    clearGbifLayer(map);
     clearInatLayer(map);
   }
 
+  resetSourceSnapshot("gbif");
   resetSourceSnapshot("inat");
   notifyDataChange();
-  return true;
 }
