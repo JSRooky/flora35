@@ -122,6 +122,28 @@
   background: rgba(0, 122, 255, 0.16);
 }
 
+.module-menu-btn--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.module-menu-btn-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.module-menu-btn-question {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .module-menu-btn--time:hover {
   background: rgba(43, 158, 8, 0.1);
 }
@@ -397,6 +419,17 @@
   .module-menu-btn {
     padding: 7px 10px;
     font-size: 12px;
+  }
+
+  .module-menu-btn--icon {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+  }
+
+  .module-menu-btn-icon {
+    width: 16px;
+    height: 16px;
   }
 
   .module-menu-separator {

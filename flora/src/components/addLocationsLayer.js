@@ -5,16 +5,17 @@ import {
   getPropertyLabel
 } from "./featurePropertyLabels";
 import { getFeatureCollection } from "../locations/loadPoints";
-import { findGbifFeatureByKey, getGbifFeatureCollection } from "../gbif/gbifStore";
+import { findGbifFeatureByKey, getGbifFeatureCount, getGbifFeaturesByIndices, getGbifColumnarTable, getGbifStoreGeneration } from "../gbif/gbifStore";
 import {
-  applyGbifProcessingFilters,
-  createDefaultGbifProcessingFilters
+  createDefaultGbifProcessingFilters,
+  filterGbifTableIndices
 } from "../gbif/gbifProcessingFilters";
-import { findInatFeatureById, getInatFeatureCollection } from "../inaturalist/inatStore";
+import { findInatFeatureById, getInatFeatureCount, getInatFeaturesByIndices, getInatColumnarTable, getInatStoreGeneration } from "../inaturalist/inatStore";
 import {
-  applyInatProcessingFilters,
-  createDefaultInatProcessingFilters
+  createDefaultInatProcessingFilters,
+  filterInatTableIndices
 } from "../inaturalist/inatProcessingFilters";
+import { getOverlayVersion } from "../names/nameRuCache";
 import {
   GBIF_SOURCE_ID,
   getGbifInteractiveLayerIds,
@@ -37,6 +38,15 @@ import {
   getMergedFeatures,
   getMergedInteractiveLayerIds
 } from "./addMergedLayer";
+import {
+  concatFeatures,
+  hashLocationFilters,
+  slimMapFeatures
+} from "./mapPerformance";
+import {
+  SPECIES_SEARCH_FILTER_KEY,
+  featureMatchesSpeciesSearch
+} from "../locations/speciesSearchFilter";
 import {
   applyRedBookLocationsFilter,
   getRedBookFeatures,
@@ -101,6 +111,8 @@ export const WITHIN_FEATURE_FILTER_KEY = "__withinFeature";
 /** Ключ массива стабильных id скрытых точек в объекте filters. */
 export const HIDDEN_FEATURE_KEYS_FILTER_KEY = "__hiddenFeatureKeys";
 
+export { SPECIES_SEARCH_FILTER_KEY } from "../locations/speciesSearchFilter";
+
 const SHARE_PIN_CENTER_COLORS = [
   REGNUM_COLORS.plantae,
   REGNUM_COLORS.animalia,
@@ -136,7 +148,8 @@ const CLUSTER_REGNUM_PROPERTIES = Object.fromEntries(
 
 // Модульное состояние слоя: карта одна, пересборка слоёв идёт через rebuildLocationsLayers.
 let locationsData = null;
-let clusterByRegnum = true;
+/** По умолчанию один clustered-source (дешевле при больших N, чем clusterByRegnum). */
+let clusterByRegnum = false;
 let clusteringEnabled = true;
 let clusterPieChartsEnabled = false;
 /** Режим сверхплотных куч: без Mapbox-кластеризации, только кастомные кластеры ≥10. */
@@ -164,14 +177,31 @@ let externalLayerIncludeFlags = { includeGbif: true, includeInat: true };
 let visibleGbifCache = {
   locationFilters: null,
   processingFilters: null,
-  enrichedRef: null,
+  generation: -1,
+  overlayVersion: -1,
+  filtersHash: null,
   features: null
 };
 /** Кэш видимых iNaturalist после processing + locationFilters. */
 let visibleInatCache = {
   locationFilters: null,
   processingFilters: null,
-  enrichedRef: null,
+  generation: -1,
+  overlayVersion: -1,
+  filtersHash: null,
+  features: null
+};
+/** Processed GBIF/iNat без locationFilters — для инкрементального year scrub. */
+let processedGbifCache = {
+  generation: -1,
+  overlayVersion: -1,
+  processingFilters: null,
+  features: null
+};
+let processedInatCache = {
+  generation: -1,
+  overlayVersion: -1,
+  processingFilters: null,
   features: null
 };
 let currentFilteredFeatures = [];
@@ -596,6 +626,11 @@ function attachClusterPieChartMarkers(map) {
   clusterPieChartRenderHandler = () => updateClusterPieChartMarkers(map);
   map.on("render", clusterPieChartRenderHandler);
   updateClusterPieChartMarkers(map);
+}
+
+/** Переподключает SVG-диаграммы кластеров после смены режима группировки. */
+export function refreshClusterPieChartMarkers(map) {
+  attachClusterPieChartMarkers(map);
 }
 
 /** Добавляет каждой точке URL иконки по полю regnum (растение / животное). */
@@ -1663,13 +1698,13 @@ function syncDensePilesLayers(map, denseClusterFeatures) {
 
 function updateLocationsSourceData(map, filteredFeatures) {
   const { mapFeatures, denseClusterFeatures } = prepareMapFeatures(filteredFeatures);
-  const collection = {
-    type: "FeatureCollection",
-    features: mapFeatures
-  };
+  const slimFeatures = slimMapFeatures(mapFeatures);
 
   if (!isMapboxClusteringActive()) {
-    map.getSource("locations")?.setData(collection);
+    map.getSource("locations")?.setData({
+      type: "FeatureCollection",
+      features: slimFeatures
+    });
     syncDensePilesLayers(map, denseClusterFeatures);
     return;
   }
@@ -1684,7 +1719,7 @@ function updateLocationsSourceData(map, filteredFeatures) {
       const regnumKey = String(regnum).toLowerCase();
       source.setData({
         type: "FeatureCollection",
-        features: mapFeatures.filter(
+        features: slimFeatures.filter(
           (feature) =>
             String(feature.properties?.regnum || "").toLowerCase() === regnumKey
         )
@@ -1694,7 +1729,10 @@ function updateLocationsSourceData(map, filteredFeatures) {
     return;
   }
 
-  map.getSource("locations")?.setData(collection);
+  map.getSource("locations")?.setData({
+    type: "FeatureCollection",
+    features: slimFeatures
+  });
   syncDensePilesLayers(map, denseClusterFeatures);
 }
 
@@ -1734,11 +1772,13 @@ function applyTimelineYearChange(map, prevFilters, nextFilters) {
       found_year: { min: Math.max(prevMax + 1, yearMin), max: nextMax }
     });
     const existingKeys = new Set(currentFilteredFeatures.map(getFeatureKey));
-
-    newFilteredFeatures = [
-      ...currentFilteredFeatures,
-      ...toAdd.filter((feature) => !existingKeys.has(getFeatureKey(feature)))
-    ];
+    newFilteredFeatures = currentFilteredFeatures.slice();
+    for (let i = 0; i < toAdd.length; i += 1) {
+      const feature = toAdd[i];
+      if (!existingKeys.has(getFeatureKey(feature))) {
+        newFilteredFeatures.push(feature);
+      }
+    }
   } else {
     newFilteredFeatures = currentFilteredFeatures.filter((feature) => {
       const year = feature.properties?.found_year;
@@ -1771,7 +1811,7 @@ function applyFoundYearFilterChange(map, nextFilters) {
  * Полностью пересоздаёт источники и слои точек.
  * Вызывается при смене фильтров, режима кластеризации или группировки по regnum.
  */
-function rebuildLocationsLayers(map) {
+function rebuildLocationsLayers(map, { reuseFiltered = false } = {}) {
   if (!locationsData || !map.getStyle()) {
     return;
   }
@@ -1779,19 +1819,24 @@ function rebuildLocationsLayers(map) {
   detachLocationsInteractions(map);
   removeLocationsFromMap(map);
 
-  const filteredFeatures = filterFeatures(
-    enrichFeaturesWithAttribution(locationsData.features, getStablePointKey),
-    currentFilters
-  );
-  setCurrentFilteredFeatures(filteredFeatures);
+  const filteredFeatures = reuseFiltered
+    ? currentFilteredFeatures
+    : filterFeatures(
+        enrichFeaturesWithAttribution(locationsData.features, getStablePointKey),
+        currentFilters
+      );
+  if (!reuseFiltered) {
+    setCurrentFilteredFeatures(filteredFeatures);
+  }
   const { mapFeatures, denseClusterFeatures } = prepareMapFeatures(filteredFeatures);
+  const slimFeatures = slimMapFeatures(mapFeatures);
 
   if (!isMapboxClusteringActive()) {
     map.addSource("locations", {
       type: "geojson",
       data: {
         type: "FeatureCollection",
-        features: mapFeatures
+        features: slimFeatures
       }
     });
 
@@ -1801,7 +1846,7 @@ function rebuildLocationsLayers(map) {
     getRegnumValues().forEach((regnum) => {
       const sourceId = getSourceId(regnum);
       const regnumKey = String(regnum).toLowerCase();
-      const features = mapFeatures.filter(
+      const features = slimFeatures.filter(
         (feature) =>
           String(feature.properties?.regnum || "").toLowerCase() === regnumKey
       );
@@ -1823,7 +1868,7 @@ function rebuildLocationsLayers(map) {
       type: "geojson",
       data: {
         type: "FeatureCollection",
-        features: mapFeatures
+        features: slimFeatures
       },
       cluster: true,
       ...CLUSTER_OPTIONS,
@@ -1847,6 +1892,7 @@ export function filterFeatures(features, filters = {}) {
   const {
     [WITHIN_FEATURE_FILTER_KEY]: withinFeature,
     [HIDDEN_FEATURE_KEYS_FILTER_KEY]: _hiddenFeatureKeys,
+    [SPECIES_SEARCH_FILTER_KEY]: speciesSearch,
     ...propertyFilters
   } = filters;
   const filterEntries = Object.entries(propertyFilters);
@@ -1856,6 +1902,12 @@ export function filterFeatures(features, filters = {}) {
   if (hiddenPointKeysSet.size > 0) {
     result = result.filter(
       (feature) => !hiddenPointKeysSet.has(getStablePointKey(feature))
+    );
+  }
+
+  if (speciesSearch) {
+    result = result.filter((feature) =>
+      featureMatchesSpeciesSearch(feature, speciesSearch)
     );
   }
 
@@ -2028,21 +2080,31 @@ export function getToolFeaturesContext() {
 export function getToolFeatures(filters = {}) {
   const features = [];
 
+  // Нельзя features.push(...huge) — при сотнях тысяч точек падает call stack.
+  const appendFeatures = (items) => {
+    if (!Array.isArray(items) || items.length === 0) {
+      return;
+    }
+    for (let index = 0; index < items.length; index += 1) {
+      features.push(items[index]);
+    }
+  };
+
   if (toolIncludeLocal && locationsData?.features?.length) {
-    features.push(...filterFeatures(locationsData.features, filters));
+    appendFeatures(filterFeatures(locationsData.features, filters));
   }
 
   if (toolIncludeGbif && isGbifLayerVisible()) {
-    features.push(...getVisibleGbifFeatures(filters));
+    appendFeatures(getVisibleGbifFeatures(filters));
   }
 
   if (toolIncludeInat && isInatLayerVisible()) {
-    features.push(...getVisibleInatFeatures(filters));
+    appendFeatures(getVisibleInatFeatures(filters));
   }
 
   if (toolIncludeMerged) {
-    features.push(
-      ...enrichFeaturesWithAttribution(
+    appendFeatures(
+      enrichFeaturesWithAttribution(
         filterFeatures(getMergedFeatures(), filters),
         getStablePointKey
       )
@@ -2050,7 +2112,7 @@ export function getToolFeatures(filters = {}) {
   }
 
   if (toolIncludeRedBook) {
-    features.push(...filterFeatures(getRedBookFeatures(), filters));
+    appendFeatures(filterFeatures(getRedBookFeatures(), filters));
   }
 
   return features;
@@ -2275,42 +2337,131 @@ function invalidateVisibleGbifCache() {
   visibleGbifCache = {
     locationFilters: null,
     processingFilters: null,
-    enrichedRef: null,
+    generation: -1,
+    overlayVersion: -1,
+    filtersHash: null,
+    features: null
+  };
+  processedGbifCache = {
+    generation: -1,
+    overlayVersion: -1,
+    processingFilters: null,
     features: null
   };
 }
 
+function getProcessedGbifFeatures() {
+  const generation = getGbifStoreGeneration();
+  const overlayVersion = getOverlayVersion();
+  if (
+    processedGbifCache.features &&
+    processedGbifCache.generation === generation &&
+    processedGbifCache.overlayVersion === overlayVersion &&
+    processedGbifCache.processingFilters === gbifProcessingFilters
+  ) {
+    return processedGbifCache.features;
+  }
+
+  const table = getGbifColumnarTable();
+  const indices = filterGbifTableIndices(table, gbifProcessingFilters);
+  const features = enrichFeaturesWithAttribution(
+    getGbifFeaturesByIndices(indices),
+    getStablePointKey
+  );
+  processedGbifCache = {
+    generation,
+    overlayVersion,
+    processingFilters: gbifProcessingFilters,
+    features
+  };
+  return features;
+}
+
 /**
  * Видимые GBIF-точки: enrich (cached) → processing filters → locationFilters.
- * Короткий кэш по ссылкам на фильтры и enriched collection.
+ * Кэш по hash фильтров + ссылкам на processing/enriched.
  */
 export function getVisibleGbifFeatures(locationFilters = currentFilters) {
-  const enriched = getGbifFeatureCollection();
-  const enrichedFeatures = enriched.features ?? [];
+  const generation = getGbifStoreGeneration();
+  const overlayVersion = getOverlayVersion();
+  const filtersHash = hashLocationFilters(locationFilters);
 
   if (
     visibleGbifCache.features &&
-    visibleGbifCache.locationFilters === locationFilters &&
+    visibleGbifCache.filtersHash === filtersHash &&
     visibleGbifCache.processingFilters === gbifProcessingFilters &&
-    visibleGbifCache.enrichedRef === enriched
+    visibleGbifCache.generation === generation &&
+    visibleGbifCache.overlayVersion === overlayVersion
   ) {
     return visibleGbifCache.features;
   }
 
-  const processed = applyGbifProcessingFilters(enrichedFeatures, gbifProcessingFilters);
-  const features = filterFeatures(
-    enrichFeaturesWithAttribution(processed, getStablePointKey),
-    locationFilters
-  );
+  const features = filterFeatures(getProcessedGbifFeatures(), locationFilters);
 
   visibleGbifCache = {
     locationFilters,
     processingFilters: gbifProcessingFilters,
-    enrichedRef: enriched,
+    generation,
+    overlayVersion,
+    filtersHash,
     features
   };
 
   return features;
+}
+
+function applyGbifTimelineYearChange(map, prevFilters, nextFilters) {
+  if (externalUnifiedClusteringEnabled) {
+    applyGbifLocationsFilter(map, nextFilters);
+    return;
+  }
+
+  const current = visibleGbifCache.features;
+  if (!current) {
+    applyGbifLocationsFilter(map, nextFilters);
+    return;
+  }
+
+  const prevMax = prevFilters.found_year.max;
+  const nextMax = nextFilters.found_year.max;
+  const yearMin = nextFilters.found_year.min;
+  const baseFilters = { ...nextFilters };
+  delete baseFilters.found_year;
+
+  let nextFeatures;
+  if (nextMax > prevMax) {
+    const toAdd = filterFeatures(getProcessedGbifFeatures(), {
+      ...baseFilters,
+      found_year: { min: Math.max(prevMax + 1, yearMin), max: nextMax }
+    });
+    const existingKeys = new Set(current.map(getFeatureKey));
+    nextFeatures = current.slice();
+    for (let i = 0; i < toAdd.length; i += 1) {
+      const feature = toAdd[i];
+      if (!existingKeys.has(getFeatureKey(feature))) {
+        nextFeatures.push(feature);
+      }
+    }
+  } else {
+    nextFeatures = current.filter((feature) => {
+      const year = feature.properties?.found_year;
+      return typeof year === "number" && year >= yearMin && year <= nextMax;
+    });
+  }
+
+  visibleGbifCache = {
+    locationFilters: nextFilters,
+    processingFilters: gbifProcessingFilters,
+    generation: getGbifStoreGeneration(),
+    overlayVersion: getOverlayVersion(),
+    filtersHash: hashLocationFilters(nextFilters),
+    features: nextFeatures
+  };
+
+  setGbifData(map, {
+    type: "FeatureCollection",
+    features: nextFeatures
+  });
 }
 
 /**
@@ -2368,7 +2519,7 @@ export function refreshExternalUnifiedMapLayers(
   if (includeGbif && includeInat) {
     setGbifData(map, {
       type: "FeatureCollection",
-      features: [...gbifFeatures, ...inatFeatures]
+      features: concatFeatures(gbifFeatures, inatFeatures)
     });
     setInatData(map, {
       type: "FeatureCollection",
@@ -2408,7 +2559,15 @@ function invalidateVisibleInatCache() {
   visibleInatCache = {
     locationFilters: null,
     processingFilters: null,
-    enrichedRef: null,
+    generation: -1,
+    overlayVersion: -1,
+    filtersHash: null,
+    features: null
+  };
+  processedInatCache = {
+    generation: -1,
+    overlayVersion: -1,
+    processingFilters: null,
     features: null
   };
 }
@@ -2419,33 +2578,114 @@ export function invalidateVisibleAttributionCaches() {
   invalidateVisibleInatCache();
 }
 
+function getProcessedInatFeatures() {
+  const generation = getInatStoreGeneration();
+  const overlayVersion = getOverlayVersion();
+  if (
+    processedInatCache.features &&
+    processedInatCache.generation === generation &&
+    processedInatCache.overlayVersion === overlayVersion &&
+    processedInatCache.processingFilters === inatProcessingFilters
+  ) {
+    return processedInatCache.features;
+  }
+
+  const table = getInatColumnarTable();
+  const indices = filterInatTableIndices(table, inatProcessingFilters);
+  const features = enrichFeaturesWithAttribution(
+    getInatFeaturesByIndices(indices),
+    getStablePointKey
+  );
+  processedInatCache = {
+    generation,
+    overlayVersion,
+    processingFilters: inatProcessingFilters,
+    features
+  };
+  return features;
+}
+
 export function getVisibleInatFeatures(locationFilters = currentFilters) {
-  const enriched = getInatFeatureCollection();
-  const enrichedFeatures = enriched.features ?? [];
+  const generation = getInatStoreGeneration();
+  const overlayVersion = getOverlayVersion();
+  const filtersHash = hashLocationFilters(locationFilters);
 
   if (
     visibleInatCache.features &&
-    visibleInatCache.locationFilters === locationFilters &&
+    visibleInatCache.filtersHash === filtersHash &&
     visibleInatCache.processingFilters === inatProcessingFilters &&
-    visibleInatCache.enrichedRef === enriched
+    visibleInatCache.generation === generation &&
+    visibleInatCache.overlayVersion === overlayVersion
   ) {
     return visibleInatCache.features;
   }
 
-  const processed = applyInatProcessingFilters(enrichedFeatures, inatProcessingFilters);
-  const features = filterFeatures(
-    enrichFeaturesWithAttribution(processed, getStablePointKey),
-    locationFilters
-  );
+  const features = filterFeatures(getProcessedInatFeatures(), locationFilters);
 
   visibleInatCache = {
     locationFilters,
     processingFilters: inatProcessingFilters,
-    enrichedRef: enriched,
+    generation,
+    overlayVersion,
+    filtersHash,
     features
   };
 
   return features;
+}
+
+function applyInatTimelineYearChange(map, prevFilters, nextFilters) {
+  if (externalUnifiedClusteringEnabled) {
+    applyInatLocationsFilter(map, nextFilters);
+    return;
+  }
+
+  const current = visibleInatCache.features;
+  if (!current) {
+    applyInatLocationsFilter(map, nextFilters);
+    return;
+  }
+
+  const prevMax = prevFilters.found_year.max;
+  const nextMax = nextFilters.found_year.max;
+  const yearMin = nextFilters.found_year.min;
+  const baseFilters = { ...nextFilters };
+  delete baseFilters.found_year;
+
+  let nextFeatures;
+  if (nextMax > prevMax) {
+    const toAdd = filterFeatures(getProcessedInatFeatures(), {
+      ...baseFilters,
+      found_year: { min: Math.max(prevMax + 1, yearMin), max: nextMax }
+    });
+    const existingKeys = new Set(current.map(getFeatureKey));
+    nextFeatures = current.slice();
+    for (let i = 0; i < toAdd.length; i += 1) {
+      const feature = toAdd[i];
+      if (!existingKeys.has(getFeatureKey(feature))) {
+        nextFeatures.push(feature);
+      }
+    }
+  } else {
+    nextFeatures = current.filter((feature) => {
+      const year = feature.properties?.found_year;
+      return typeof year === "number" && year >= yearMin && year <= nextMax;
+    });
+  }
+
+  visibleInatCache = {
+    locationFilters: nextFilters,
+    processingFilters: inatProcessingFilters,
+    generation: getInatStoreGeneration(),
+    overlayVersion: getOverlayVersion(),
+    filtersHash: hashLocationFilters(nextFilters),
+    features: nextFeatures
+  };
+
+  setInatData(map, {
+    type: "FeatureCollection",
+    features: nextFeatures
+  });
 }
 
 export function applyInatLocationsFilter(map, filters = currentFilters) {
@@ -2487,9 +2727,10 @@ export function applyLocationsFilter(map, filters = {}) {
     locationsSourcesExist(map) &&
     isTimelineYearMaxOnlyChange(currentFilters, filters)
   ) {
-    applyTimelineYearChange(map, currentFilters, filters);
-    applyGbifLocationsFilter(map, filters);
-    applyInatLocationsFilter(map, filters);
+    const prevFilters = currentFilters;
+    applyTimelineYearChange(map, prevFilters, filters);
+    applyGbifTimelineYearChange(map, prevFilters, filters);
+    applyInatTimelineYearChange(map, prevFilters, filters);
     applyRedBookLocationsFilter(map, filters);
     return;
   }
@@ -2527,39 +2768,86 @@ export function applyLocationsFilter(map, filters = {}) {
   }
 }
 
+/** Оценка числа точек, попадающих на карту (для порогов производительности). */
+export function getVisibleMapPointCount() {
+  let total = 0;
+  if (toolIncludeLocal) {
+    total += currentFilteredFeatures.length;
+  }
+  if (toolIncludeGbif) {
+    total += visibleGbifCache.features?.length ?? getGbifFeatureCount();
+  }
+  if (toolIncludeInat) {
+    total += visibleInatCache.features?.length ?? getInatFeatureCount();
+  }
+  return total;
+}
+
 /** Сбрасывает все фильтры точек. */
 /** Сбрасывает все фильтры точек. */
 export function clearLocationsFilter(map) {
   applyLocationsFilter(map, {});
 }
 
-/** Включает/выключает группировку кластеров по regnum и пересобирает слои. */
-export function setClusterByRegnum(map, enabled) {
-  const next = Boolean(enabled);
-  if (clusterByRegnum === next) {
-    return;
+/**
+ * Применяет режимы «Группы точек» одним rebuild (без повторной фильтрации).
+ * Отдельные сеттеры вызывают это, чтобы не гонять Supercluster несколько раз подряд.
+ */
+export function applyLocationsGroupingMode(
+  map,
+  {
+    clusteringEnabled: nextClustering,
+    clusterByRegnum: nextByRegnum,
+    clusterPieCharts: nextPie,
+    denseClustersHighlight: nextDense
+  } = {}
+) {
+  let changed = false;
+
+  if (nextClustering !== undefined && clusteringEnabled !== Boolean(nextClustering)) {
+    clusteringEnabled = Boolean(nextClustering);
+    if (!clusteringEnabled) {
+      expandedCoincidentKeys = new Set();
+    }
+    changed = true;
   }
 
-  clusterByRegnum = next;
-  if (map) {
-    rebuildLocationsLayers(map);
+  if (nextByRegnum !== undefined && clusterByRegnum !== Boolean(nextByRegnum)) {
+    clusterByRegnum = Boolean(nextByRegnum);
+    changed = true;
   }
+
+  if (nextPie !== undefined && clusterPieChartsEnabled !== Boolean(nextPie)) {
+    if (!nextPie) {
+      detachClusterPieChartMarkers(map);
+    }
+    clusterPieChartsEnabled = Boolean(nextPie);
+    changed = true;
+  }
+
+  if (
+    nextDense !== undefined &&
+    denseClustersHighlightEnabled !== Boolean(nextDense)
+  ) {
+    denseClustersHighlightEnabled = Boolean(nextDense);
+    expandedDensePileKeys = new Set();
+    expandedCoincidentKeys = new Set();
+    changed = true;
+  }
+
+  if (changed && map) {
+    rebuildLocationsLayers(map, { reuseFiltered: true });
+  }
+}
+
+/** Включает/выключает группировку кластеров по regnum и пересобирает слои. */
+export function setClusterByRegnum(map, enabled) {
+  applyLocationsGroupingMode(map, { clusterByRegnum: enabled });
 }
 
 /** Включает/выключает кластеризацию точек и пересобирает слои. */
 export function setClusteringEnabled(map, enabled) {
-  const next = Boolean(enabled);
-  if (clusteringEnabled === next) {
-    return;
-  }
-
-  clusteringEnabled = next;
-  if (!next) {
-    expandedCoincidentKeys = new Set();
-  }
-  if (map) {
-    rebuildLocationsLayers(map);
-  }
+  applyLocationsGroupingMode(map, { clusteringEnabled: enabled });
 }
 
 /** Показывает/скрывает маркеры точек и диаграммы кластеров. */
@@ -2585,12 +2873,7 @@ export function isMarkersVisible() {
 
 /** Включает/выключает круговые диаграммы regnum в кластерах и пересобирает слои. */
 export function setClusterPieChartsEnabled(map, enabled) {
-  if (!enabled) {
-    detachClusterPieChartMarkers(map);
-  }
-
-  clusterPieChartsEnabled = enabled;
-  rebuildLocationsLayers(map);
+  applyLocationsGroupingMode(map, { clusterPieCharts: enabled });
 }
 
 /** Включены ли круговые диаграммы regnum в кластерах. */
@@ -2600,17 +2883,7 @@ export function isClusterPieChartsEnabled() {
 
 /** Сверхплотные кластеры: без обычной кластеризации, только кучи ≥порога с одинаковыми координатами. */
 export function setDenseClustersHighlightEnabled(map, enabled) {
-  const next = Boolean(enabled);
-  if (denseClustersHighlightEnabled === next) {
-    return;
-  }
-
-  denseClustersHighlightEnabled = next;
-  expandedDensePileKeys = new Set();
-  expandedCoincidentKeys = new Set();
-  if (map) {
-    rebuildLocationsLayers(map);
-  }
+  applyLocationsGroupingMode(map, { denseClustersHighlight: enabled });
 }
 
 /** Пересчитывает сверхплотные кучи после смены порога (если режим уже включён). */

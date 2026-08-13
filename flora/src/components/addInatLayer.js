@@ -1,6 +1,6 @@
 import {
   findInatFeatureById,
-  getInatFeatureCollection
+  getInatSlimMapCollection
 } from "../inaturalist/inatStore";
 import {
   DEFAULT_CLUSTER_COLOR,
@@ -32,6 +32,7 @@ import {
   removePointHoverPopup,
   showClusterRegnumHover
 } from "./pointHoverTooltips";
+import { slimMapFeatures } from "./mapPerformance";
 import "../styles/GbifPanel.css";
 
 export const INAT_SOURCE_ID = "inat-locations";
@@ -73,7 +74,7 @@ let onPointClickCallback = null;
 /** По умолчанию скрыт — показывается только в режиме «Внешние источники». */
 let layerVisible = false;
 let inatClusteringEnabled = true;
-let inatClusterByRegnum = true;
+let inatClusterByRegnum = false;
 let inatClusterPieChartsEnabled = false;
 let inatDenseClustersHighlightEnabled = false;
 let expandedInatDensePileKeys = new Set();
@@ -85,6 +86,8 @@ let expandedInatCoincidentKeys = new Set();
 let onInatDensePileExpandedCallback = null;
 /** Последняя FeatureCollection, переданная в setInatData (с учётом фильтров). */
 let lastInatInputCollection = EMPTY_FEATURE_COLLECTION;
+/** Пока идёт загрузка датасета — не рисуем точки на карте. */
+let inatMapUpdatesPaused = false;
 /** Ключи точек, скрытых под булавкой выделения / share. */
 let hiddenPointFeatureKeys = [];
 
@@ -485,6 +488,29 @@ function attachInteractions(map) {
   };
 }
 
+function inatSourceLayoutMatchesMode(map) {
+  if (!map?.getSource) {
+    return false;
+  }
+
+  const hasRegnumSource = REGNUM_KEYS.some((regnum) =>
+    Boolean(map.getSource(getInatSourceId(regnum)))
+  );
+  const hasBaseSource = Boolean(map.getSource(INAT_SOURCE_ID));
+
+  if (!isInatMapboxClusteringActive()) {
+    return hasBaseSource && !hasRegnumSource;
+  }
+
+  if (inatClusterByRegnum) {
+    return REGNUM_KEYS.every((regnum) =>
+      Boolean(map.getSource(getInatSourceId(regnum)))
+    );
+  }
+
+  return hasBaseSource && !hasRegnumSource;
+}
+
 function applyVisibility(map) {
   const visibility = layerVisible ? "visible" : "none";
 
@@ -673,22 +699,23 @@ function rebuildInatLayers(map) {
   const collection =
     lastInatInputCollection?.type === "FeatureCollection"
       ? lastInatInputCollection
-      : getInatFeatureCollection();
+      : getInatSlimMapCollection();
   const { mapFeatures, denseClusterFeatures } = prepareMapInatFeatures(
     collection.features ?? []
   );
+  const renderFeatures = slimMapFeatures(excludeInatHiddenPinFeatures(mapFeatures));
   removeInatFromMap(map);
 
   if (!isInatMapboxClusteringActive()) {
     map.addSource(INAT_SOURCE_ID, {
       type: "geojson",
-      data: { type: "FeatureCollection", features: mapFeatures }
+      data: { type: "FeatureCollection", features: renderFeatures }
     });
     addUnclusteredInatLayer(map, INAT_SOURCE_ID, INAT_UNCLUSTERED_LAYER_ID);
   } else if (inatClusterByRegnum) {
     REGNUM_KEYS.forEach((regnum) => {
       const sourceId = getInatSourceId(regnum);
-      const features = mapFeatures.filter(
+      const features = renderFeatures.filter(
         (feature) =>
           String(feature.properties?.regnum || "").toLowerCase() === regnum
       );
@@ -704,7 +731,7 @@ function rebuildInatLayers(map) {
     });
 
     // Точки без regnum — в общий независящий от царства источник.
-    const otherFeatures = mapFeatures.filter(
+    const otherFeatures = renderFeatures.filter(
       (feature) =>
         !REGNUM_KEYS.includes(String(feature.properties?.regnum || "").toLowerCase())
     );
@@ -724,7 +751,7 @@ function rebuildInatLayers(map) {
   } else {
     map.addSource(INAT_SOURCE_ID, {
       type: "geojson",
-      data: { type: "FeatureCollection", features: mapFeatures },
+      data: { type: "FeatureCollection", features: renderFeatures },
       cluster: true,
       ...CLUSTER_OPTIONS,
       clusterProperties: {
@@ -761,7 +788,7 @@ export function addInatLayer(map, { onPointClick } = {}) {
     || map.getSource(INAT_SOURCE_ID);
 
   if (hasAnySource) {
-    setInatData(map, getInatFeatureCollection());
+    setInatData(map, getInatSlimMapCollection());
     if (!interactionHandlers) {
       attachInteractions(map);
     }
@@ -773,9 +800,18 @@ export function addInatLayer(map, { onPointClick } = {}) {
   rebuildInatLayers(map);
 }
 
+/** Пока идёт загрузка — слой не принимает новые точки (кроме явного ignorePause). */
+export function setInatMapUpdatesPaused(paused) {
+  inatMapUpdatesPaused = Boolean(paused);
+}
+
 /** Обновляет GeoJSON источников iNat. */
 export function setInatData(map, collection, options = {}) {
   if (!map) {
+    return;
+  }
+
+  if (inatMapUpdatesPaused && !options.ignorePause) {
     return;
   }
 
@@ -787,14 +823,14 @@ export function setInatData(map, collection, options = {}) {
         denseClusterFeatures: []
       }
     : prepareMapInatFeatures(data.features ?? []);
-  const renderFeatures = options.preview
+  const preparedFeatures = options.preview
     ? mapFeatures
     : excludeInatHiddenPinFeatures(mapFeatures);
-  const hasSource = getInatSourceIds().some((sourceId) => map.getSource(sourceId))
-    || map.getSource(INAT_SOURCE_ID);
+  const renderFeatures = slimMapFeatures(preparedFeatures);
 
-  if (!hasSource) {
-    addInatLayer(map);
+  if (!options.preview && !inatSourceLayoutMatchesMode(map)) {
+    rebuildInatLayers(map);
+    return;
   }
 
   if (!isInatMapboxClusteringActive()) {
@@ -841,7 +877,7 @@ export function setInatData(map, collection, options = {}) {
 
 /** Очищает точки iNat на карте (источник остаётся). */
 export function clearInatLayer(map) {
-  setInatData(map, EMPTY_FEATURE_COLLECTION);
+  setInatData(map, EMPTY_FEATURE_COLLECTION, { ignorePause: true });
 }
 
 /** Показывает или скрывает слой iNat. */
@@ -858,46 +894,64 @@ export function isInatLayerVisible() {
   return layerVisible;
 }
 
-/** Включает/выключает кластеризацию слоя iNat. */
-export function setInatClusteringEnabled(map, enabled) {
-  const next = Boolean(enabled);
-  if (inatClusteringEnabled === next) {
-    return;
+/** Применяет режимы группировки iNat одним rebuild Supercluster. */
+export function applyInatGroupingMode(
+  map,
+  {
+    clusteringEnabled: nextClustering,
+    clusterByRegnum: nextByRegnum,
+    clusterPieCharts: nextPie,
+    denseClustersHighlight: nextDense
+  } = {}
+) {
+  let changed = false;
+
+  if (nextClustering !== undefined && inatClusteringEnabled !== Boolean(nextClustering)) {
+    inatClusteringEnabled = Boolean(nextClustering);
+    if (!inatClusteringEnabled) {
+      expandedInatCoincidentKeys = new Set();
+    }
+    changed = true;
   }
 
-  inatClusteringEnabled = next;
-  if (!next) {
-    expandedInatCoincidentKeys = new Set();
+  if (nextByRegnum !== undefined && inatClusterByRegnum !== Boolean(nextByRegnum)) {
+    inatClusterByRegnum = Boolean(nextByRegnum);
+    changed = true;
   }
-  if (map) {
+
+  if (nextPie !== undefined && inatClusterPieChartsEnabled !== Boolean(nextPie)) {
+    inatClusterPieChartsEnabled = Boolean(nextPie);
+    changed = true;
+  }
+
+  if (
+    nextDense !== undefined &&
+    inatDenseClustersHighlightEnabled !== Boolean(nextDense)
+  ) {
+    inatDenseClustersHighlightEnabled = Boolean(nextDense);
+    expandedInatDensePileKeys = new Set();
+    expandedInatCoincidentKeys = new Set();
+    changed = true;
+  }
+
+  if (changed && map) {
     rebuildInatLayers(map);
   }
+}
+
+/** Включает/выключает кластеризацию слоя iNat. */
+export function setInatClusteringEnabled(map, enabled) {
+  applyInatGroupingMode(map, { clusteringEnabled: enabled });
 }
 
 /** Группировка кластеров iNat по царству (отдельные источники). */
 export function setInatClusterByRegnum(map, enabled) {
-  const next = Boolean(enabled);
-  if (inatClusterByRegnum === next) {
-    return;
-  }
-
-  inatClusterByRegnum = next;
-  if (map && isInatMapboxClusteringActive()) {
-    rebuildInatLayers(map);
-  }
+  applyInatGroupingMode(map, { clusterByRegnum: enabled });
 }
 
 /** Включает/выключает «Кластеры-диаграммы» для слоя iNat (тот же режим, что у локальных точек). */
 export function setInatClusterPieChartsEnabled(map, enabled) {
-  const next = Boolean(enabled);
-  if (inatClusterPieChartsEnabled === next) {
-    return;
-  }
-
-  inatClusterPieChartsEnabled = next;
-  if (map && isInatMapboxClusteringActive()) {
-    rebuildInatLayers(map);
-  }
+  applyInatGroupingMode(map, { clusterPieCharts: enabled });
 }
 
 export function isInatClusteringEnabled() {
@@ -914,17 +968,7 @@ export function isInatClusterPieChartsEnabled() {
 
 /** Сверхплотные кластеры iNat: без обычной кластеризации, только кучи ≥10. */
 export function setInatDenseClustersHighlightEnabled(map, enabled) {
-  const next = Boolean(enabled);
-  if (inatDenseClustersHighlightEnabled === next) {
-    return;
-  }
-
-  inatDenseClustersHighlightEnabled = next;
-  expandedInatDensePileKeys = new Set();
-  expandedInatCoincidentKeys = new Set();
-  if (map) {
-    rebuildInatLayers(map);
-  }
+  applyInatGroupingMode(map, { denseClustersHighlight: enabled });
 }
 
 /** Пересчитывает сверхплотные кучи iNat после смены порога. */

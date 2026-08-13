@@ -4,7 +4,7 @@ import { mapObservationsToFeatures } from "./mapObservationToFeature";
 /** Запросы к API iNaturalist — только загрузка и оценка объёма; карта и инструменты читают inatStore. */
 const INAT_OBSERVATIONS_URL = "https://api.inaturalist.org/v1/observations";
 export const INAT_PAGE_SIZE = 200;
-export const INAT_MAP_UPDATE_PAGES = 4;
+export const INAT_MAP_UPDATE_PAGES = 80;
 /** Пауза между страницами — лимит iNat ~60 req/min. */
 export const INAT_PAGE_DELAY_MS = 1100;
 export const INAT_API_RESULT_LIMIT = 10000;

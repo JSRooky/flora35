@@ -1,36 +1,77 @@
 import { getOverlayEntry, getOverlayVersion } from "../names/nameRuCache";
 import { resolveFeatureRegnum } from "./taxonFilters";
+import {
+  buildGbifIdIndex,
+  compactGbifTable,
+  createEmptyGbifTable,
+  decodeGbifFeatures,
+  encodeGbifFeatures,
+  gbifRowToFeature,
+  gbifRowToSlimFeature,
+  gbifTablePackedBytes,
+  collectGbifRegionIds,
+  fillUniformMissingGbifRegionId,
+  hydrateGbifTable,
+  readGbifKey,
+  readGbifNameLatin,
+  upsertGbifFeaturesIntoTable
+} from "./gbifColumnar";
+import { stampFeatureRegionIds } from "../externalSources/regionVisibility";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
   features: []
 };
 
-let gbifCollection = EMPTY_COLLECTION;
+let table = createEmptyGbifTable();
+let idToIndex = new Map();
 let loadedRegionId = null;
-/** Параметры последней загрузки (для восстановления панели и повторного использования). */
 let loadedQuery = null;
-/** ISO-время последней полной загрузки / обновления (для инкрементального lastInterpreted). */
 let syncedAt = null;
+let storeGeneration = 0;
 
-/** Кэш обогащённой коллекции: не пересчитывать enrich на каждый get. */
+let rawFeaturesCache = null;
 let enrichedCollectionCache = null;
 let enrichedCollectionOverlayVersion = -1;
+let slimMapFeaturesCache = null;
+let slimMapFeaturesOverlayVersion = -1;
 
-function invalidateEnrichedCollectionCache() {
+function bumpGeneration() {
+  storeGeneration += 1;
+  rawFeaturesCache = null;
   enrichedCollectionCache = null;
   enrichedCollectionOverlayVersion = -1;
+  slimMapFeaturesCache = null;
+  slimMapFeaturesOverlayVersion = -1;
 }
 
-function resolveEffectiveNameRu(feature) {
-  const nameLatin = feature?.properties?.name_latin;
+function resolveRowNameRu(rowIndex) {
+  const nameLatin = readGbifNameLatin(table, rowIndex);
   const overlayEntry = nameLatin ? getOverlayEntry(nameLatin) : undefined;
+  return overlayEntry?.nameRu ?? null;
+}
 
-  if (overlayEntry?.nameRu) {
-    return overlayEntry.nameRu;
+function materializeFeature(rowIndex, { raw = false } = {}) {
+  const feature = gbifRowToFeature(table, rowIndex, {
+    nameRu: raw ? null : resolveRowNameRu(rowIndex)
+  });
+
+  if (raw) {
+    return feature;
   }
 
-  return feature?.properties?.name_ru ?? null;
+  const resolvedRegnum = resolveFeatureRegnum(feature.properties);
+  if (resolvedRegnum && resolvedRegnum !== feature.properties.regnum) {
+    return {
+      ...feature,
+      properties: {
+        ...feature.properties,
+        regnum: resolvedRegnum
+      }
+    };
+  }
+
+  return feature;
 }
 
 /** Накладывает overlay русских названий и единый regnum на копию GBIF feature. */
@@ -39,7 +80,9 @@ export function enrichGbifFeature(feature) {
     return feature;
   }
 
-  const effectiveNameRu = resolveEffectiveNameRu(feature);
+  const nameLatin = feature.properties.name_latin;
+  const overlayEntry = nameLatin ? getOverlayEntry(nameLatin) : undefined;
+  const effectiveNameRu = overlayEntry?.nameRu ?? feature.properties.name_ru ?? null;
   const currentNameRu = feature.properties.name_ru ?? null;
   const resolvedRegnum = resolveFeatureRegnum(feature.properties);
   const currentRegnum = feature.properties.regnum ?? null;
@@ -66,21 +109,48 @@ export function enrichGbifFeature(feature) {
   };
 }
 
-function buildEnrichedCollection(collection = gbifCollection) {
-  return {
-    type: "FeatureCollection",
-    features: (collection.features ?? []).map(enrichGbifFeature)
-  };
-}
-
 /** Сбрасывает кэш обогащённой коллекции (после записи store или overlay). */
 export function invalidateGbifEnrichmentCache() {
-  invalidateEnrichedCollectionCache();
+  enrichedCollectionCache = null;
+  enrichedCollectionOverlayVersion = -1;
+  slimMapFeaturesCache = null;
+  slimMapFeaturesOverlayVersion = -1;
 }
 
-/** Raw коллекция GBIF без overlay (для persist и внутренних записей). */
+export function getGbifStoreGeneration() {
+  return storeGeneration;
+}
+
+export function getGbifColumnarTable() {
+  return table;
+}
+
+export function getGbifPackedBytes() {
+  return gbifTablePackedBytes(table);
+}
+
+/** Колоночная таблица, обрезанная по rowCount — для IndexedDB. */
+export function getGbifPersistTable() {
+  if (!table.rowCount) {
+    return null;
+  }
+  return compactGbifTable(table);
+}
+
+/** Raw коллекция GBIF без overlay (для внутренних записей). */
 export function getGbifFeatureCollectionRaw() {
-  return gbifCollection;
+  if (table.rowCount === 0) {
+    return EMPTY_COLLECTION;
+  }
+
+  if (!rawFeaturesCache) {
+    rawFeaturesCache = decodeGbifFeatures(table);
+  }
+
+  return {
+    type: "FeatureCollection",
+    features: rawFeaturesCache
+  };
 }
 
 /** Коллекция GBIF с overlay русских названий (для UI, карты, инструментов). */
@@ -94,28 +164,78 @@ export function getGbifFeatureCollection() {
     return enrichedCollectionCache;
   }
 
-  enrichedCollectionCache = buildEnrichedCollection();
+  const features = new Array(table.rowCount);
+  for (let i = 0; i < table.rowCount; i += 1) {
+    features[i] = materializeFeature(i);
+  }
+
+  enrichedCollectionCache = {
+    type: "FeatureCollection",
+    features
+  };
   enrichedCollectionOverlayVersion = overlayVersion;
   return enrichedCollectionCache;
 }
 
-/** Id региона, для которого загружены данные (или null). */
+/** Урезанные features для Mapbox: без полного GeoJSON store. */
+export function getGbifSlimMapFeatures() {
+  const overlayVersion = getOverlayVersion();
+  if (slimMapFeaturesCache && slimMapFeaturesOverlayVersion === overlayVersion) {
+    return slimMapFeaturesCache;
+  }
+
+  const features = new Array(table.rowCount);
+  for (let i = 0; i < table.rowCount; i += 1) {
+    features[i] = gbifRowToSlimFeature(table, i, {
+      nameRu: resolveRowNameRu(i)
+    });
+  }
+
+  slimMapFeaturesCache = features;
+  slimMapFeaturesOverlayVersion = overlayVersion;
+  return features;
+}
+
+export function getGbifSlimMapCollection() {
+  return {
+    type: "FeatureCollection",
+    features: getGbifSlimMapFeatures()
+  };
+}
+
+export function getGbifFeaturesByIndices(indices) {
+  if (!Array.isArray(indices) || indices.length === 0) {
+    return [];
+  }
+
+  const features = new Array(indices.length);
+  for (let i = 0; i < indices.length; i += 1) {
+    features[i] = materializeFeature(indices[i]);
+  }
+  return features;
+}
+
 export function getGbifLoadedRegionId() {
   return loadedRegionId;
 }
 
-/** Фильтры последней успешной/сохранённой загрузки GBIF. */
+export function getGbifLoadedRegionIds() {
+  const ids = collectGbifRegionIds(table);
+  if (loadedRegionId) {
+    ids.add(loadedRegionId);
+  }
+  return ids;
+}
+
 export function getGbifLoadedQuery() {
   return loadedQuery;
 }
 
-/** Запоминает фильтры загрузки (царство / семейство / таксон и т.п.). */
 export function setGbifLoadedQuery(query) {
   loadedQuery = query && typeof query === "object" ? query : null;
   return loadedQuery;
 }
 
-/** Время последней синхронизации с GBIF. */
 export function getGbifSyncedAt() {
   return syncedAt;
 }
@@ -125,131 +245,99 @@ export function setGbifSyncedAt(value) {
   return syncedAt;
 }
 
-/** Число загруженных точек. */
 export function getGbifFeatureCount() {
-  return gbifCollection.features.length;
+  return table.rowCount;
 }
 
-/** Есть ли локальный набор GBIF, с которым работаем. */
 export function hasGbifDataset() {
-  return gbifCollection.features.length > 0;
+  return table.rowCount > 0;
 }
 
-/** Ищет обогащённый feature в store по gbif_key. */
 export function findGbifFeatureByKey(gbifKey) {
   if (gbifKey == null || gbifKey === "") {
     return null;
   }
 
-  const normalized = String(gbifKey);
-  const feature =
-    gbifCollection.features.find(
-      (item) => String(item.properties?.gbif_key) === normalized
-    ) ?? null;
+  const rowIndex = idToIndex.get(String(gbifKey));
+  if (rowIndex == null) {
+    return null;
+  }
 
-  return feature ? enrichGbifFeature(feature) : null;
+  return materializeFeature(rowIndex);
 }
 
-/** Число загруженных GBIF-точек с тем же латинским именем. */
 export function countGbifFeaturesByNameLatin(nameLatin) {
   if (!nameLatin) {
     return 0;
   }
 
-  return gbifCollection.features.filter(
-    (feature) => feature.properties?.name_latin === nameLatin
-  ).length;
-}
-
-/** Полностью заменяет raw коллекцию. */
-export function setGbifFeatureCollection(collection, regionId = null) {
-  gbifCollection = collection?.type === "FeatureCollection"
-    ? collection
-    : EMPTY_COLLECTION;
-  loadedRegionId = regionId;
-  invalidateEnrichedCollectionCache();
-  return gbifCollection;
-}
-
-/** Добавляет features к текущей raw коллекции. */
-export function appendGbifFeatures(features, regionId = null) {
-  if (!Array.isArray(features) || features.length === 0) {
-    if (regionId != null) {
-      loadedRegionId = regionId;
+  let count = 0;
+  for (let i = 0; i < table.rowCount; i += 1) {
+    if (readGbifNameLatin(table, i) === nameLatin) {
+      count += 1;
     }
-    return getGbifFeatureCollection();
   }
+  return count;
+}
 
-  gbifCollection = {
-    type: "FeatureCollection",
-    features: gbifCollection.features.concat(features)
-  };
-
-  if (regionId != null) {
+function installTable(nextTable, regionId = null) {
+  table = nextTable ?? createEmptyGbifTable();
+  fillUniformMissingGbifRegionId(table, regionId);
+  idToIndex = buildGbifIdIndex(table);
+  if (regionId !== undefined) {
     loadedRegionId = regionId;
   }
-
-  invalidateEnrichedCollectionCache();
-  return getGbifFeatureCollection();
+  bumpGeneration();
 }
 
-/**
- * Вставляет/обновляет точки по gbif_key (инкрементальное обновление набора).
- * @returns {{ collection: object, added: number, updated: number }}
- */
+export function setGbifColumnarTable(nextTable, regionId = null) {
+  installTable(hydrateGbifTable(nextTable), regionId);
+  return getGbifFeatureCollectionRaw();
+}
+
+export function setGbifFeatureCollection(collection, regionId = null) {
+  const features =
+    collection?.type === "FeatureCollection" ? collection.features ?? [] : [];
+  installTable(encodeGbifFeatures(features), regionId);
+  return getGbifFeatureCollectionRaw();
+}
+
+export function appendGbifFeatures(features, regionId = null) {
+  return upsertGbifFeatures(features, regionId).collection;
+}
+
 export function upsertGbifFeatures(features, regionId = null) {
   if (!Array.isArray(features) || features.length === 0) {
     if (regionId != null) {
       loadedRegionId = regionId;
     }
-    return { collection: getGbifFeatureCollection(), added: 0, updated: 0 };
+    return { collection: getGbifFeatureCollectionRaw(), added: 0, updated: 0 };
   }
 
-  const byKey = new Map();
-  for (const feature of gbifCollection.features) {
-    const key = feature.properties?.gbif_key;
-    if (key != null && key !== "") {
-      byKey.set(String(key), feature);
-    }
-  }
-
-  let added = 0;
-  let updated = 0;
-
-  for (const feature of features) {
-    const key = feature.properties?.gbif_key;
-    if (key == null || key === "") {
-      continue;
-    }
-
-    const normalized = String(key);
-    if (byKey.has(normalized)) {
-      updated += 1;
-    } else {
-      added += 1;
-    }
-    byKey.set(normalized, feature);
-  }
-
-  gbifCollection = {
-    type: "FeatureCollection",
-    features: Array.from(byKey.values())
-  };
-
+  stampFeatureRegionIds(features, regionId);
+  const result = upsertGbifFeaturesIntoTable(table, idToIndex, features);
+  table = result.table;
+  idToIndex = result.idToIndex;
   if (regionId != null) {
     loadedRegionId = regionId;
   }
+  bumpGeneration();
 
-  invalidateEnrichedCollectionCache();
-  return { collection: getGbifFeatureCollection(), added, updated };
+  return {
+    collection: getGbifFeatureCollectionRaw(),
+    added: result.added,
+    updated: result.updated
+  };
 }
 
-/** Очищает коллекцию GBIF в памяти. */
 export function clearGbifStore() {
-  gbifCollection = EMPTY_COLLECTION;
+  table = createEmptyGbifTable();
+  idToIndex = new Map();
   loadedRegionId = null;
   loadedQuery = null;
   syncedAt = null;
-  invalidateEnrichedCollectionCache();
-  return gbifCollection;
+  bumpGeneration();
+  return EMPTY_COLLECTION;
 }
+
+export { readGbifKey };

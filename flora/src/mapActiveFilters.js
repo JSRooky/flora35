@@ -1,5 +1,6 @@
 import { MODULE_IDS } from "./components/ModuleMenu";
 import { hasActiveExternalProcessingFilters } from "./externalSources/externalProcessingFilters";
+import { hasHiddenRegionFilter } from "./externalSources/regionVisibility";
 import { TOOL_POINTS_FILTER_MODULES } from "./toolPointsFilterStorage";
 
 /** Идентификаторы источников фильтра карты (по панелям). */
@@ -14,6 +15,8 @@ export const MAP_FILTER_IDS = {
   DENSE: "dense",
   EXTERNAL_PROCESSING: "external-processing",
   HIDDEN_POINTS: "hidden-points",
+  SEARCH: "search",
+  REGION_VISIBILITY: "region-visibility",
   /** @deprecated */
   GBIF_PROCESSING: "external-processing"
 };
@@ -43,14 +46,15 @@ export function collectActiveMapFilters({
   denseClustersHighlight,
   denseProcessingActive,
   externalProcessingFilters,
-  hiddenPointKeys
+  hiddenPointKeys,
+  speciesSearchActive
 }) {
   const entries = [];
 
   if (Object.keys(propertyFilters || {}).length > 0) {
     entries.push({
       id: MAP_FILTER_IDS.FEATURE,
-      label: "Сведения о точке данных"
+      label: "О точке"
     });
   }
 
@@ -64,7 +68,7 @@ export function collectActiveMapFilters({
   if ((statusFilters || []).length > 0) {
     entries.push({
       id: MAP_FILTER_IDS.STATUS,
-      label: "Статус (МСОП)"
+      label: "Статус"
     });
   }
 
@@ -126,11 +130,25 @@ export function collectActiveMapFilters({
     });
   }
 
+  if (hasHiddenRegionFilter(externalProcessingFilters)) {
+    entries.push({
+      id: MAP_FILTER_IDS.REGION_VISIBILITY,
+      label: "Фильтр регионов"
+    });
+  }
+
   const hiddenCount = Array.isArray(hiddenPointKeys) ? hiddenPointKeys.length : 0;
   if (hiddenCount > 0) {
     entries.push({
       id: MAP_FILTER_IDS.HIDDEN_POINTS,
       label: `Скрытые точки (${hiddenCount})`
+    });
+  }
+
+  if (speciesSearchActive) {
+    entries.push({
+      id: MAP_FILTER_IDS.SEARCH,
+      label: "Поиск по виду"
     });
   }
 

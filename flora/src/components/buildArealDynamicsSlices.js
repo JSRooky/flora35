@@ -99,7 +99,10 @@ export function buildArealDynamicsSlices(
   const slices = [];
 
   years.forEach((year) => {
-    cumulativeCoordinates.push(...pointsByYear.get(year));
+    const yearPoints = pointsByYear.get(year) ?? [];
+    for (let i = 0; i < yearPoints.length; i += 1) {
+      cumulativeCoordinates.push(yearPoints[i]);
+    }
 
     const currentHull = buildPolygonFromCoordinates(cumulativeCoordinates, mode);
 

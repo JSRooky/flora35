@@ -24,9 +24,9 @@ function getCollapsedSummary(
     parts.push("плотные группы");
   } else if (clusteringEnabled && markersVisible) {
     if (clusterPieCharts) {
-      parts.push("кластеры-диаграммы");
+      parts.push("диаграммы");
     } else {
-      parts.push(clusterByRegnum ? "кластеризация по царству" : "кластеризация");
+      parts.push(clusterByRegnum ? "по царству" : "кластеризация");
     }
   } else if (markersVisible) {
     parts.push("без кластеризации");
@@ -117,7 +117,7 @@ export default function MapDisplayPanel({
                 ? "Доступно только при включённых маркерах"
                 : denseClustersHighlight
                   ? "Недоступно в режиме плотных групп"
-                  : "Группировать близкие точки в кластеры"
+                  : "Кластеризовать близкие точки"
             }
           >
             <input
@@ -127,7 +127,7 @@ export default function MapDisplayPanel({
               onChange={(e) => onClusteringEnabledChange?.(e.target.checked)}
             />
             <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">Группировать точки</span>
+            <span className="map-display-switch-label">Кластеризовать</span>
           </label>
 
           <label
@@ -142,8 +142,8 @@ export default function MapDisplayPanel({
                   : !clusteringEnabled
                     ? "Доступно только при включённой кластеризации"
                     : clusterPieCharts
-                      ? "Недоступно при включённых кластерах-диаграммах"
-                      : "Группировать в кластеры только точки с одинаковым regnum"
+                      ? "Недоступно при включённых диаграммах"
+                      : "Кластеризовать только точки с одинаковым царством"
             }
           >
             <input
@@ -153,7 +153,7 @@ export default function MapDisplayPanel({
               onChange={(e) => onClusterByRegnumChange?.(e.target.checked)}
             />
             <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">Группировать по царству</span>
+            <span className="map-display-switch-label">По царству</span>
           </label>
 
           <label
@@ -177,7 +177,7 @@ export default function MapDisplayPanel({
               onChange={(e) => onClusterPieChartsChange?.(e.target.checked)}
             />
             <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">Кластеры-диаграммы</span>
+            <span className="map-display-switch-label">Диаграммы</span>
           </label>
 
           <div

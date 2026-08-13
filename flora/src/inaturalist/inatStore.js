@@ -1,33 +1,77 @@
 import { getOverlayEntry, getOverlayVersion } from "../names/nameRuCache";
 import { resolveFeatureRegnum } from "../gbif/taxonFilters";
+import {
+  buildInatIdIndex,
+  compactInatTable,
+  createEmptyInatTable,
+  decodeInatFeatures,
+  encodeInatFeatures,
+  collectInatRegionIds,
+  fillUniformMissingInatRegionId,
+  hydrateInatTable,
+  inatRowToFeature,
+  inatRowToSlimFeature,
+  inatTablePackedBytes,
+  readInatId,
+  readInatNameLatin,
+  upsertInatFeaturesIntoTable
+} from "./inatColumnar";
+import { stampFeatureRegionIds } from "../externalSources/regionVisibility";
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
   features: []
 };
 
-let inatCollection = EMPTY_COLLECTION;
+let table = createEmptyInatTable();
+let idToIndex = new Map();
 let loadedRegionId = null;
 let loadedQuery = null;
 let syncedAt = null;
+let storeGeneration = 0;
 
+let rawFeaturesCache = null;
 let enrichedCollectionCache = null;
 let enrichedCollectionOverlayVersion = -1;
+let slimMapFeaturesCache = null;
+let slimMapFeaturesOverlayVersion = -1;
 
-function invalidateEnrichedCollectionCache() {
+function bumpGeneration() {
+  storeGeneration += 1;
+  rawFeaturesCache = null;
   enrichedCollectionCache = null;
   enrichedCollectionOverlayVersion = -1;
+  slimMapFeaturesCache = null;
+  slimMapFeaturesOverlayVersion = -1;
 }
 
-function resolveEffectiveNameRu(feature) {
-  const nameLatin = feature?.properties?.name_latin;
+function resolveRowNameRu(rowIndex) {
+  const nameLatin = readInatNameLatin(table, rowIndex);
   const overlayEntry = nameLatin ? getOverlayEntry(nameLatin) : undefined;
+  return overlayEntry?.nameRu ?? null;
+}
 
-  if (overlayEntry?.nameRu) {
-    return overlayEntry.nameRu;
+function materializeFeature(rowIndex, { raw = false } = {}) {
+  const feature = inatRowToFeature(table, rowIndex, {
+    nameRu: raw ? null : resolveRowNameRu(rowIndex)
+  });
+
+  if (raw) {
+    return feature;
   }
 
-  return feature?.properties?.name_ru ?? null;
+  const resolvedRegnum = resolveFeatureRegnum(feature.properties);
+  if (resolvedRegnum && resolvedRegnum !== feature.properties.regnum) {
+    return {
+      ...feature,
+      properties: {
+        ...feature.properties,
+        regnum: resolvedRegnum
+      }
+    };
+  }
+
+  return feature;
 }
 
 export function enrichInatFeature(feature) {
@@ -35,7 +79,9 @@ export function enrichInatFeature(feature) {
     return feature;
   }
 
-  const effectiveNameRu = resolveEffectiveNameRu(feature);
+  const nameLatin = feature.properties.name_latin;
+  const overlayEntry = nameLatin ? getOverlayEntry(nameLatin) : undefined;
+  const effectiveNameRu = overlayEntry?.nameRu ?? feature.properties.name_ru ?? null;
   const currentNameRu = feature.properties.name_ru ?? null;
   const resolvedRegnum = resolveFeatureRegnum(feature.properties);
   const currentRegnum = feature.properties.regnum ?? null;
@@ -62,19 +108,45 @@ export function enrichInatFeature(feature) {
   };
 }
 
-function buildEnrichedCollection(collection = inatCollection) {
-  return {
-    type: "FeatureCollection",
-    features: (collection.features ?? []).map(enrichInatFeature)
-  };
+export function invalidateInatEnrichmentCache() {
+  enrichedCollectionCache = null;
+  enrichedCollectionOverlayVersion = -1;
+  slimMapFeaturesCache = null;
+  slimMapFeaturesOverlayVersion = -1;
 }
 
-export function invalidateInatEnrichmentCache() {
-  invalidateEnrichedCollectionCache();
+export function getInatStoreGeneration() {
+  return storeGeneration;
+}
+
+export function getInatColumnarTable() {
+  return table;
+}
+
+export function getInatPackedBytes() {
+  return inatTablePackedBytes(table);
+}
+
+export function getInatPersistTable() {
+  if (!table.rowCount) {
+    return null;
+  }
+  return compactInatTable(table);
 }
 
 export function getInatFeatureCollectionRaw() {
-  return inatCollection;
+  if (table.rowCount === 0) {
+    return EMPTY_COLLECTION;
+  }
+
+  if (!rawFeaturesCache) {
+    rawFeaturesCache = decodeInatFeatures(table);
+  }
+
+  return {
+    type: "FeatureCollection",
+    features: rawFeaturesCache
+  };
 }
 
 export function getInatFeatureCollection() {
@@ -87,13 +159,66 @@ export function getInatFeatureCollection() {
     return enrichedCollectionCache;
   }
 
-  enrichedCollectionCache = buildEnrichedCollection();
+  const features = new Array(table.rowCount);
+  for (let i = 0; i < table.rowCount; i += 1) {
+    features[i] = materializeFeature(i);
+  }
+
+  enrichedCollectionCache = {
+    type: "FeatureCollection",
+    features
+  };
   enrichedCollectionOverlayVersion = overlayVersion;
   return enrichedCollectionCache;
 }
 
+export function getInatSlimMapFeatures() {
+  const overlayVersion = getOverlayVersion();
+  if (slimMapFeaturesCache && slimMapFeaturesOverlayVersion === overlayVersion) {
+    return slimMapFeaturesCache;
+  }
+
+  const features = new Array(table.rowCount);
+  for (let i = 0; i < table.rowCount; i += 1) {
+    features[i] = inatRowToSlimFeature(table, i, {
+      nameRu: resolveRowNameRu(i)
+    });
+  }
+
+  slimMapFeaturesCache = features;
+  slimMapFeaturesOverlayVersion = overlayVersion;
+  return features;
+}
+
+export function getInatSlimMapCollection() {
+  return {
+    type: "FeatureCollection",
+    features: getInatSlimMapFeatures()
+  };
+}
+
+export function getInatFeaturesByIndices(indices) {
+  if (!Array.isArray(indices) || indices.length === 0) {
+    return [];
+  }
+
+  const features = new Array(indices.length);
+  for (let i = 0; i < indices.length; i += 1) {
+    features[i] = materializeFeature(indices[i]);
+  }
+  return features;
+}
+
 export function getInatLoadedRegionId() {
   return loadedRegionId;
+}
+
+export function getInatLoadedRegionIds() {
+  const ids = collectInatRegionIds(table);
+  if (loadedRegionId) {
+    ids.add(loadedRegionId);
+  }
+  return ids;
 }
 
 export function getInatLoadedQuery() {
@@ -115,11 +240,11 @@ export function setInatSyncedAt(value) {
 }
 
 export function getInatFeatureCount() {
-  return inatCollection.features.length;
+  return table.rowCount;
 }
 
 export function hasInatDataset() {
-  return inatCollection.features.length > 0;
+  return table.rowCount > 0;
 }
 
 export function findInatFeatureById(inatId) {
@@ -127,22 +252,34 @@ export function findInatFeatureById(inatId) {
     return null;
   }
 
-  const normalized = String(inatId);
-  const feature =
-    inatCollection.features.find(
-      (item) => String(item.properties?.inat_id) === normalized
-    ) ?? null;
+  const rowIndex = idToIndex.get(String(inatId));
+  if (rowIndex == null) {
+    return null;
+  }
 
-  return feature ? enrichInatFeature(feature) : null;
+  return materializeFeature(rowIndex);
+}
+
+function installTable(nextTable, regionId = null) {
+  table = nextTable ?? createEmptyInatTable();
+  fillUniformMissingInatRegionId(table, regionId);
+  idToIndex = buildInatIdIndex(table);
+  if (regionId !== undefined) {
+    loadedRegionId = regionId;
+  }
+  bumpGeneration();
+}
+
+export function setInatColumnarTable(nextTable, regionId = null) {
+  installTable(hydrateInatTable(nextTable), regionId);
+  return getInatFeatureCollectionRaw();
 }
 
 export function setInatFeatureCollection(collection, regionId = null) {
-  inatCollection = collection?.type === "FeatureCollection"
-    ? collection
-    : EMPTY_COLLECTION;
-  loadedRegionId = regionId;
-  invalidateEnrichedCollectionCache();
-  return inatCollection;
+  const features =
+    collection?.type === "FeatureCollection" ? collection.features ?? [] : [];
+  installTable(encodeInatFeatures(features), regionId);
+  return getInatFeatureCollectionRaw();
 }
 
 export function upsertInatFeatures(features, regionId = null) {
@@ -150,53 +287,33 @@ export function upsertInatFeatures(features, regionId = null) {
     if (regionId != null) {
       loadedRegionId = regionId;
     }
-    return { collection: getInatFeatureCollection(), added: 0, updated: 0 };
+    return { collection: getInatFeatureCollectionRaw(), added: 0, updated: 0 };
   }
 
-  const byKey = new Map();
-  for (const feature of inatCollection.features) {
-    const key = feature.properties?.inat_id;
-    if (key != null && key !== "") {
-      byKey.set(String(key), feature);
-    }
-  }
-
-  let added = 0;
-  let updated = 0;
-
-  for (const feature of features) {
-    const key = feature.properties?.inat_id;
-    if (key == null || key === "") {
-      continue;
-    }
-
-    const normalized = String(key);
-    if (byKey.has(normalized)) {
-      updated += 1;
-    } else {
-      added += 1;
-    }
-    byKey.set(normalized, feature);
-  }
-
-  inatCollection = {
-    type: "FeatureCollection",
-    features: Array.from(byKey.values())
-  };
-
+  stampFeatureRegionIds(features, regionId);
+  const result = upsertInatFeaturesIntoTable(table, idToIndex, features);
+  table = result.table;
+  idToIndex = result.idToIndex;
   if (regionId != null) {
     loadedRegionId = regionId;
   }
+  bumpGeneration();
 
-  invalidateEnrichedCollectionCache();
-  return { collection: getInatFeatureCollection(), added, updated };
+  return {
+    collection: getInatFeatureCollectionRaw(),
+    added: result.added,
+    updated: result.updated
+  };
 }
 
 export function clearInatStore() {
-  inatCollection = EMPTY_COLLECTION;
+  table = createEmptyInatTable();
+  idToIndex = new Map();
   loadedRegionId = null;
   loadedQuery = null;
   syncedAt = null;
-  invalidateEnrichedCollectionCache();
-  return inatCollection;
+  bumpGeneration();
+  return EMPTY_COLLECTION;
 }
+
+export { readInatId };

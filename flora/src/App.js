@@ -13,6 +13,8 @@ import {
 import {
   addLocationsLayer,
   applyLocationsFilter,
+  applyLocationsGroupingMode,
+  refreshClusterPieChartMarkers,
   clearSelectedPointHighlight,
   clearSharedPointPin,
   featureMatchesFilters,
@@ -23,10 +25,6 @@ import {
   setExternalUnifiedClusteringEnabled,
   refreshExternalUnifiedMapLayers,
   reloadLocationsData,
-  setClusterByRegnum,
-  setClusteringEnabled,
-  setClusterPieChartsEnabled,
-  setDenseClustersHighlightEnabled,
   refreshLocationsDensePiles,
   expandDensePileByKey,
   setDensePileExpandedHandler,
@@ -38,13 +36,23 @@ import {
   showSharedPointPopup,
   updateSelectedPointHighlight,
   getToolFeatures,
+  getVisibleMapPointCount,
   getStablePointKey,
   setHiddenPointKeysForFilter,
   setGbifProcessingFilters,
   setInatProcessingFilters,
   WITHIN_FEATURE_FILTER_KEY,
-  HIDDEN_FEATURE_KEYS_FILTER_KEY
+  HIDDEN_FEATURE_KEYS_FILTER_KEY,
+  SPECIES_SEARCH_FILTER_KEY
 } from "./components/addLocationsLayer";
+import {
+  buildSpeciesSearchResults,
+  createSpeciesSearchFilter,
+  SPECIES_SEARCH_MIN_QUERY_LENGTH
+} from "./locations/speciesSearchFilter";
+import {
+  isLargePointCount
+} from "./components/mapPerformance";
 import {
   buildSpeciesSummaryFromDensePile,
   listDensePiles,
@@ -162,6 +170,7 @@ import ArealPopup, { DEFAULT_AREAL_RADIUS_KM } from "./components/ArealPopup";
 import SpeciesPolygonPopup from "./components/SpeciesPolygonPopup";
 import BufferPopup from "./components/BufferPopup";
 import AreaSelectionPopup from "./components/AreaSelectionPopup";
+import SpeciesSearchPanel from "./components/SpeciesSearchPanel";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
 import DataWorkPanel from "./components/DataWorkPanel";
@@ -188,8 +197,8 @@ import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
 import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
-import { addGbifLayer, setGbifVisibility, setGbifClusteringEnabled, setGbifClusterByRegnum, setGbifClusterPieChartsEnabled, setGbifDenseClustersHighlightEnabled, refreshGbifDensePiles, expandGbifDensePileByKey, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
-import { addInatLayer, setInatVisibility, setInatClusteringEnabled, setInatClusterByRegnum, setInatClusterPieChartsEnabled, setInatDenseClustersHighlightEnabled, refreshInatDensePiles, expandInatDensePileByKey, setInatDensePileExpandedHandler } from "./components/addInatLayer";
+import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
+import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatDensePiles, expandInatDensePileByKey, setInatDensePileExpandedHandler } from "./components/addInatLayer";
 import {
   addMergedLayer,
   setMergedData,
@@ -264,6 +273,7 @@ const PANEL_IDS = {
   DATA_SOURCES: "data-sources",
   EXTERNAL_PROCESSING: "external-processing",
   DATA_WORK: "data-work",
+  SEARCH: "search",
   REDBOOK: "redbook",
   /** @deprecated алиасы для taskbar */
   GBIF: "data-sources",
@@ -271,8 +281,10 @@ const PANEL_IDS = {
 };
 
 const DEFAULT_CLUSTERING_ENABLED = true;
-const DEFAULT_CLUSTER_BY_REGNUM = true;
+const DEFAULT_CLUSTER_BY_REGNUM = false;
 const DEFAULT_CLUSTER_PIE_CHARTS = false;
+const LOCATION_FILTERS_DEBOUNCE_MS = 90;
+const SPECIES_SEARCH_DEBOUNCE_MS = 250;
 const DEFAULT_DENSE_CLUSTERS_HIGHLIGHT = false;
 const DEFAULT_MARKERS_VISIBLE = true;
 
@@ -293,6 +305,7 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.DATA_SOURCES,
   PANEL_IDS.EXTERNAL_PROCESSING,
   PANEL_IDS.DATA_WORK,
+  PANEL_IDS.SEARCH,
   PANEL_IDS.REDBOOK
 ];
 
@@ -321,6 +334,9 @@ export default function MapView() {
   const [densePileSpeciesListOpen, setDensePileSpeciesListOpen] = useState(false);
   // Инвалидация списка плотных групп при смене данных в module-store (локальные/GBIF).
   const [pointsDataRevision, setPointsDataRevision] = useState(0);
+  const [speciesSearchInput, setSpeciesSearchInput] = useState("");
+  const [speciesSearchQuery, setSpeciesSearchQuery] = useState("");
+  const [speciesSearchSelectedLatin, setSpeciesSearchSelectedLatin] = useState(null);
   const densePileCameraBeforeRef = useRef(null);
   const nearSpeciesCameraBeforeRef = useRef(null);
   const unattributedCameraBeforeRef = useRef(null);
@@ -1578,6 +1594,10 @@ export default function MapView() {
       ids.push(PANEL_IDS.AREA);
     }
 
+    if (activeModule === MODULE_IDS.SEARCH && !isMin(PANEL_IDS.SEARCH)) {
+      ids.push(PANEL_IDS.SEARCH);
+    }
+
     if (activeModule === MODULE_IDS.OOPT && !isMin(PANEL_IDS.OOPT)) {
       ids.push(PANEL_IDS.OOPT);
     }
@@ -1788,16 +1808,63 @@ export default function MapView() {
       filters[HIDDEN_FEATURE_KEYS_FILTER_KEY] = effectiveHiddenPointKeys;
     }
 
+    const speciesSearch = createSpeciesSearchFilter({
+      query: speciesSearchQuery,
+      nameLatin: speciesSearchSelectedLatin
+    });
+    if (speciesSearch) {
+      filters[SPECIES_SEARCH_FILTER_KEY] = speciesSearch;
+    }
+
     return filters;
   }, [
     baseLocationFilters,
     boundsSpeciesRegnumFilter,
     effectiveWithinFeature,
-    effectiveHiddenPointKeys
+    effectiveHiddenPointKeys,
+    speciesSearchQuery,
+    speciesSearchSelectedLatin
   ]);
 
+  const speciesSearchListFilters = useMemo(() => {
+    const filters = { ...locationFilters };
+    const listSearch = createSpeciesSearchFilter({
+      query: speciesSearchQuery,
+      nameLatin: null
+    });
+    if (listSearch) {
+      filters[SPECIES_SEARCH_FILTER_KEY] = listSearch;
+    } else {
+      delete filters[SPECIES_SEARCH_FILTER_KEY];
+    }
+    return filters;
+  }, [locationFilters, speciesSearchQuery]);
+
+  const speciesSearchResults = useMemo(() => {
+    if (speciesSearchQuery.trim().length < SPECIES_SEARCH_MIN_QUERY_LENGTH) {
+      return [];
+    }
+
+    void pointsDataRevision;
+    void externalProcessingFilters;
+    void dataSourceMode;
+    void mapReady;
+
+    return buildSpeciesSearchResults(getToolFeatures(speciesSearchListFilters));
+  }, [
+    speciesSearchQuery,
+    speciesSearchListFilters,
+    pointsDataRevision,
+    externalProcessingFilters,
+    dataSourceMode,
+    mapReady
+  ]);
+
+  const speciesSearchPending =
+    speciesSearchInput.trim() !== speciesSearchQuery.trim();
+
   const densePilesStats = useMemo(() => {
-    if (!mapReady) {
+    if (!mapReady || !denseProcessingActive) {
       return { piles: [], pileCount: 0, pointCount: 0 };
     }
 
@@ -1819,14 +1886,15 @@ export default function MapView() {
     mapReady,
     externalProcessingFilters,
     densePileMinSize,
-    dataSourceMode
+    dataSourceMode,
+    denseProcessingActive
   ]);
 
   const seasonalityNameLatin = popupData?.properties?.name_latin || null;
   const seasonalityNameRu = popupData?.properties?.name_ru || null;
 
   const seasonalityFeatures = useMemo(() => {
-    if (!seasonalityNameLatin) {
+    if (!seasonalityNameLatin || activeModule !== MODULE_IDS.SEASONALITY) {
       return [];
     }
 
@@ -1843,7 +1911,8 @@ export default function MapView() {
     pointsDataRevision,
     mapReady,
     externalProcessingFilters,
-    dataSourceMode
+    dataSourceMode,
+    activeModule
   ]);
 
   const selectedDensePile = useMemo(
@@ -2655,7 +2724,10 @@ export default function MapView() {
   }, []);
 
   const handleExternalProcessingFiltersReset = useCallback(() => {
-    setExternalProcessingFiltersState(createDefaultExternalProcessingFilters());
+    setExternalProcessingFiltersState((current) => ({
+      ...createDefaultExternalProcessingFilters(),
+      hiddenRegionIds: current.hiddenRegionIds ?? []
+    }));
   }, []);
 
   const handleOpenDataWorkTool = useCallback((toolId) => {
@@ -3210,49 +3282,36 @@ export default function MapView() {
       return;
     }
 
-    setClusteringEnabled(map.current, clusteringEnabled);
-    setGbifClusteringEnabled(map.current, clusteringEnabled);
-    setInatClusteringEnabled(map.current, clusteringEnabled);
-    applyGbifLocationsFilter(map.current, locationFilters);
-    applyInatLocationsFilter(map.current, locationFilters);
-    applyRedBookLocationsFilter(map.current, locationFilters);
-  }, [clusteringEnabled, mapReady, locationFilters]);
+    const grouping = {
+      clusteringEnabled,
+      clusterByRegnum,
+      clusterPieCharts,
+      denseClustersHighlight
+    };
+    applyLocationsGroupingMode(map.current, grouping);
+    applyGbifGroupingMode(map.current, grouping);
+    applyInatGroupingMode(map.current, grouping);
+    refreshClusterPieChartMarkers(map.current);
+  }, [
+    clusteringEnabled,
+    clusterByRegnum,
+    clusterPieCharts,
+    denseClustersHighlight,
+    mapReady
+  ]);
 
   useEffect(() => {
-    if (!map.current || !mapReady || !clusteringEnabled) {
-      return;
-    }
+    const timerId = window.setTimeout(() => {
+      setSpeciesSearchQuery(speciesSearchInput);
+      if (speciesSearchInput.trim().length < SPECIES_SEARCH_MIN_QUERY_LENGTH) {
+        setSpeciesSearchSelectedLatin(null);
+      }
+    }, SPECIES_SEARCH_DEBOUNCE_MS);
 
-    setClusterByRegnum(map.current, clusterByRegnum);
-    setGbifClusterByRegnum(map.current, clusterByRegnum);
-    setInatClusterByRegnum(map.current, clusterByRegnum);
-    applyGbifLocationsFilter(map.current, locationFilters);
-    applyInatLocationsFilter(map.current, locationFilters);
-    applyRedBookLocationsFilter(map.current, locationFilters);
-  }, [clusterByRegnum, clusteringEnabled, mapReady, locationFilters]);
-
-  useEffect(() => {
-    if (!map.current || !mapReady || !clusteringEnabled) {
-      return;
-    }
-
-    setGbifClusterPieChartsEnabled(map.current, clusterPieCharts);
-    setInatClusterPieChartsEnabled(map.current, clusterPieCharts);
-    setClusterPieChartsEnabled(map.current, clusterPieCharts);
-  }, [clusterPieCharts, clusteringEnabled, mapReady]);
-
-  useEffect(() => {
-    if (!map.current || !mapReady) {
-      return;
-    }
-
-    setDenseClustersHighlightEnabled(map.current, denseClustersHighlight);
-    setGbifDenseClustersHighlightEnabled(map.current, denseClustersHighlight);
-    setInatDenseClustersHighlightEnabled(map.current, denseClustersHighlight);
-    applyGbifLocationsFilter(map.current, locationFilters);
-    applyInatLocationsFilter(map.current, locationFilters);
-    applyRedBookLocationsFilter(map.current, locationFilters);
-  }, [denseClustersHighlight, mapReady, locationFilters]);
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [speciesSearchInput]);
 
   useEffect(() => {
     setDensePileMinSize(densePileMinSize);
@@ -3271,7 +3330,16 @@ export default function MapView() {
       return;
     }
 
-    applyLocationsFilter(map.current, locationFilters);
+    const timerId = window.setTimeout(() => {
+      if (!map.current) {
+        return;
+      }
+      applyLocationsFilter(map.current, locationFilters);
+    }, LOCATION_FILTERS_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
   }, [locationFilters]);
 
   useEffect(() => {
@@ -3279,8 +3347,17 @@ export default function MapView() {
       return;
     }
 
-    // Heatmap строится по getToolFeatures (локальные + GBIF).
-    setHeatmapEnabled(map.current, heatmapEnabled, locationFilters);
+    const timerId = window.setTimeout(() => {
+      if (!map.current) {
+        return;
+      }
+      // Heatmap строится по getToolFeatures; coords-only внутри слоя.
+      setHeatmapEnabled(map.current, heatmapEnabled, locationFilters);
+    }, LOCATION_FILTERS_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
   }, [heatmapEnabled, locationFilters]);
 
   useEffect(() => {
@@ -3533,6 +3610,11 @@ export default function MapView() {
   const handleClusteringEnabledChange = (enabled) => {
     if (!enabled) {
       setClusterPieChartsState(false);
+      const pointCount = getVisibleMapPointCount();
+      if (isLargePointCount(pointCount)) {
+        // Без кластеризации при 50k+ точках UI зависнет.
+        return;
+      }
     }
 
     setClusteringEnabledState(enabled);
@@ -3597,7 +3679,13 @@ export default function MapView() {
         denseClustersHighlight,
         denseProcessingActive,
         externalProcessingFilters,
-        hiddenPointKeys
+        hiddenPointKeys,
+        speciesSearchActive: Boolean(
+          createSpeciesSearchFilter({
+            query: speciesSearchQuery,
+            nameLatin: speciesSearchSelectedLatin
+          })
+        )
       }),
     [
       propertyFilters,
@@ -3609,7 +3697,9 @@ export default function MapView() {
       denseClustersHighlight,
       denseProcessingActive,
       externalProcessingFilters,
-      hiddenPointKeys
+      hiddenPointKeys,
+      speciesSearchQuery,
+      speciesSearchSelectedLatin
     ]
   );
 
@@ -3628,6 +3718,9 @@ export default function MapView() {
     densePileCameraBeforeRef.current = null;
     setExternalProcessingFiltersState(createDefaultExternalProcessingFilters());
     setHiddenPointKeys([]);
+    setSpeciesSearchInput("");
+    setSpeciesSearchQuery("");
+    setSpeciesSearchSelectedLatin(null);
     expandPanel(PANEL_IDS.MAP);
   }, [expandPanel]);
 
@@ -3686,12 +3779,30 @@ export default function MapView() {
       }
 
       if (filterId === MAP_FILTER_IDS.EXTERNAL_PROCESSING) {
-        setExternalProcessingFiltersState(createDefaultExternalProcessingFilters());
+        setExternalProcessingFiltersState((current) => ({
+          ...createDefaultExternalProcessingFilters(),
+          hiddenRegionIds: current.hiddenRegionIds ?? []
+        }));
+        return;
+      }
+
+      if (filterId === MAP_FILTER_IDS.REGION_VISIBILITY) {
+        setExternalProcessingFiltersState((current) => ({
+          ...current,
+          hiddenRegionIds: []
+        }));
         return;
       }
 
       if (filterId === MAP_FILTER_IDS.HIDDEN_POINTS) {
         setHiddenPointKeys([]);
+        return;
+      }
+
+      if (filterId === MAP_FILTER_IDS.SEARCH) {
+        setSpeciesSearchInput("");
+        setSpeciesSearchQuery("");
+        setSpeciesSearchSelectedLatin(null);
         return;
       }
 
@@ -3705,6 +3816,21 @@ export default function MapView() {
     },
     [expandPanel]
   );
+
+  const handleSpeciesSearchInputChange = useCallback((value) => {
+    setSpeciesSearchInput(value);
+    setSpeciesSearchSelectedLatin(null);
+  }, []);
+
+  const handleSpeciesSearchSelect = useCallback((species) => {
+    const latin = String(species?.nameLatin ?? "").trim();
+    if (!latin) {
+      return;
+    }
+    setSpeciesSearchSelectedLatin((current) =>
+      current && current.toLowerCase() === latin.toLowerCase() ? null : latin
+    );
+  }, []);
 
   const handleFeatureFiltersReset = useCallback(() => {
     setPropertyFilters({});
@@ -5171,6 +5297,21 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.AREA)}
             />
           )}
+          {activeModule === MODULE_IDS.SEARCH &&
+            !isPanelMinimized(PANEL_IDS.SEARCH) && (
+            <SpeciesSearchPanel
+              query={speciesSearchInput}
+              onQueryChange={handleSpeciesSearchInputChange}
+              species={speciesSearchResults}
+              selectedNameLatin={speciesSearchSelectedLatin}
+              onSpeciesSelect={handleSpeciesSearchSelect}
+              searching={speciesSearchPending}
+              collapsed={isPanelCollapsed(PANEL_IDS.SEARCH)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.SEARCH)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.SEARCH)}
+              onClose={handleClosePanel(PANEL_IDS.SEARCH)}
+            />
+          )}
           {activeModule === MODULE_IDS.DATA_WORK &&
             !isPanelMinimized(PANEL_IDS.DATA_WORK) && (
             <DataWorkPanel
@@ -5286,6 +5427,13 @@ export default function MapView() {
                 onMinimize={handleMinimizePanel(PANEL_IDS.DATA_SOURCES)}
                 onClose={handleClosePanel(PANEL_IDS.DATA_SOURCES)}
                 storeRevision={pointsDataRevision}
+                hiddenRegionIds={externalProcessingFilters.hiddenRegionIds}
+                onHiddenRegionIdsChange={(hiddenRegionIds) =>
+                  setExternalProcessingFiltersState((current) => ({
+                    ...current,
+                    hiddenRegionIds
+                  }))
+                }
               />
               </div>
               {externalProcessingActive &&

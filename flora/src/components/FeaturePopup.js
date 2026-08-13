@@ -524,7 +524,7 @@ export default function FeaturePopup({
     <>
       <div className={`feature-popup ${collapsed ? "feature-popup--collapsed" : ""}`}>
         <div className="feature-popup-header">
-          <h3 className="feature-popup-title">Сведения о точке данных</h3>
+          <h3 className="feature-popup-title">О точке</h3>
           <div className="popup-panel-header-actions">
             <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
             {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}

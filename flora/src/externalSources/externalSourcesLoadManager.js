@@ -1,5 +1,4 @@
 import {
-  GBIF_MAP_UPDATE_PAGES,
   getGbifNetworkErrorMessage,
   isGbifAbortError
 } from "../gbif/gbifClient";
@@ -8,15 +7,18 @@ import {
   loadOccurrencesInSeries
 } from "../gbif/gbifLoadSeries";
 import {
-  getGbifFeatureCollection,
   getGbifFeatureCount,
+  getGbifLoadedRegionId,
+  getGbifSlimMapCollection,
   setGbifLoadedQuery,
   setGbifSyncedAt,
   upsertGbifFeatures
 } from "../gbif/gbifStore";
-import { persistGbifSnapshot } from "../gbif/gbifPersistence";
 import {
-  INAT_MAP_UPDATE_PAGES,
+  clearGbifStoreAndPersistence,
+  persistGbifSnapshot
+} from "../gbif/gbifPersistence";
+import {
   getInatNetworkErrorMessage,
   isInatAbortError
 } from "../inaturalist/inatClient";
@@ -25,15 +27,19 @@ import {
   loadObservationsInSeries
 } from "../inaturalist/inatLoadSeries";
 import {
-  getInatFeatureCollection,
   getInatFeatureCount,
+  getInatLoadedRegionId,
+  getInatSlimMapCollection,
   setInatLoadedQuery,
   setInatSyncedAt,
   upsertInatFeatures
 } from "../inaturalist/inatStore";
-import { persistInatSnapshot } from "../inaturalist/inatPersistence";
-import { setGbifData } from "../components/addGbifLayer";
-import { setInatData } from "../components/addInatLayer";
+import {
+  clearInatStoreAndPersistence,
+  persistInatSnapshot
+} from "../inaturalist/inatPersistence";
+import { clearGbifLayer, setGbifData, setGbifMapUpdatesPaused } from "../components/addGbifLayer";
+import { clearInatLayer, setInatData, setInatMapUpdatesPaused } from "../components/addInatLayer";
 
 /**
  * Долгоживущая оркестрация загрузки GBIF/iNat.
@@ -170,11 +176,9 @@ export async function startGbifExternalLoad({
     return;
   }
 
-  gbifAbort?.abort();
-  const controller = new AbortController();
-  gbifAbort = controller;
-
   const generation = snapshot.gbif.generation + 1;
+  setGbifMapUpdatesPaused(true);
+  clearGbifLayer(map);
   patchSource("gbif", {
     loading: true,
     error: null,
@@ -189,7 +193,10 @@ export async function startGbifExternalLoad({
     generation
   });
 
-  let pagesSinceMapUpdate = 0;
+  gbifAbort?.abort();
+  const controller = new AbortController();
+  gbifAbort = controller;
+
   let addedTotal = 0;
   let fetchedTotal = 0;
   let succeeded = false;
@@ -208,18 +215,13 @@ export async function startGbifExternalLoad({
       },
       onPage: (features) => {
         fetchedTotal += features.length;
-        const { collection, added } = upsertGbifFeatures(features, region.id);
+        const { added } = upsertGbifFeatures(features, region.id);
         addedTotal += added;
         patchSource("gbif", {
           fetched: fetchedTotal,
           added: addedTotal,
-          loaded: collection.features.length
+          loaded: getGbifFeatureCount()
         });
-        pagesSinceMapUpdate += 1;
-        if (pagesSinceMapUpdate >= GBIF_MAP_UPDATE_PAGES) {
-          setGbifData(map, collection);
-          pagesSinceMapUpdate = 0;
-        }
       },
       onProgress: ({ total: nextTotal }) => {
         // Общий «из N» держим по исходному preview региона, не по одной серии.
@@ -229,17 +231,23 @@ export async function startGbifExternalLoad({
       }
     });
 
-    setGbifData(map, getGbifFeatureCollection());
     succeeded = true;
   } catch (err) {
     if (!isGbifAbortError(err, controller.signal)) {
       patchSource("gbif", { error: getGbifNetworkErrorMessage(err) });
-    } else {
-      setGbifData(map, getGbifFeatureCollection());
     }
   } finally {
     if (gbifAbort === controller) {
       gbifAbort = null;
+    }
+
+    if (snapshot.gbif.generation !== generation) {
+      return;
+    }
+
+    setGbifMapUpdatesPaused(false);
+    if (map) {
+      setGbifData(map, getGbifSlimMapCollection());
     }
 
     const nextSyncedAt = succeeded ? new Date().toISOString() : null;
@@ -296,11 +304,9 @@ export async function startInatExternalLoad({
     return;
   }
 
-  inatAbort?.abort();
-  const controller = new AbortController();
-  inatAbort = controller;
-
   const generation = snapshot.inat.generation + 1;
+  setInatMapUpdatesPaused(true);
+  clearInatLayer(map);
   patchSource("inat", {
     loading: true,
     error: null,
@@ -315,7 +321,10 @@ export async function startInatExternalLoad({
     generation
   });
 
-  let pagesSinceMapUpdate = 0;
+  inatAbort?.abort();
+  const controller = new AbortController();
+  inatAbort = controller;
+
   let addedTotal = 0;
   let fetchedTotal = 0;
   let succeeded = false;
@@ -335,18 +344,13 @@ export async function startInatExternalLoad({
       },
       onPage: (features) => {
         fetchedTotal += features.length;
-        const { collection, added } = upsertInatFeatures(features, region.id);
+        const { added } = upsertInatFeatures(features, region.id);
         addedTotal += added;
         patchSource("inat", {
           fetched: fetchedTotal,
           added: addedTotal,
-          loaded: collection.features.length
+          loaded: getInatFeatureCount()
         });
-        pagesSinceMapUpdate += 1;
-        if (pagesSinceMapUpdate >= INAT_MAP_UPDATE_PAGES) {
-          setInatData(map, collection);
-          pagesSinceMapUpdate = 0;
-        }
       },
       onProgress: ({ total: nextTotal }) => {
         if (typeof nextTotal === "number") {
@@ -355,17 +359,23 @@ export async function startInatExternalLoad({
       }
     });
 
-    setInatData(map, getInatFeatureCollection());
     succeeded = true;
   } catch (err) {
     if (!isInatAbortError(err, controller.signal)) {
       patchSource("inat", { error: getInatNetworkErrorMessage(err) });
-    } else {
-      setInatData(map, getInatFeatureCollection());
     }
   } finally {
     if (inatAbort === controller) {
       inatAbort = null;
+    }
+
+    if (snapshot.inat.generation !== generation) {
+      return;
+    }
+
+    setInatMapUpdatesPaused(false);
+    if (map) {
+      setInatData(map, getInatSlimMapCollection());
     }
 
     const nextSyncedAt = succeeded ? new Date().toISOString() : null;
@@ -393,4 +403,72 @@ export async function startInatExternalLoad({
     await persistInatSnapshot();
     notifyDataChange();
   }
+}
+
+function resetSourceSnapshot(source) {
+  patchSource(source, {
+    loading: false,
+    error: null,
+    fetched: 0,
+    added: 0,
+    total: null,
+    loaded: 0,
+    seriesIndex: null,
+    seriesTotal: null,
+    seriesLabel: null,
+    lastSucceededQuery: null,
+    lastSucceededKingdomId: "",
+    lastSucceededQualityGrade: null,
+    lastSucceededSyncedAt: null
+  });
+}
+
+/**
+ * Удаляет локальный набор GBIF (память + IndexedDB + слой карты),
+ * если он относится к указанному региону.
+ * @param {string} regionId
+ * @returns {Promise<boolean>} true, если набор был удалён
+ */
+export async function clearGbifExternalDataset(regionId) {
+  if (!regionId || getGbifLoadedRegionId() !== regionId) {
+    return false;
+  }
+
+  cancelGbifExternalLoad();
+  await clearGbifStoreAndPersistence();
+  setGbifMapUpdatesPaused(false);
+
+  const map = mapRef;
+  if (map) {
+    clearGbifLayer(map);
+  }
+
+  resetSourceSnapshot("gbif");
+  notifyDataChange();
+  return true;
+}
+
+/**
+ * Удаляет локальный набор iNaturalist (память + IndexedDB + слой карты),
+ * если он относится к указанному региону.
+ * @param {string} regionId
+ * @returns {Promise<boolean>} true, если набор был удалён
+ */
+export async function clearInatExternalDataset(regionId) {
+  if (!regionId || getInatLoadedRegionId() !== regionId) {
+    return false;
+  }
+
+  cancelInatExternalLoad();
+  await clearInatStoreAndPersistence();
+  setInatMapUpdatesPaused(false);
+
+  const map = mapRef;
+  if (map) {
+    clearInatLayer(map);
+  }
+
+  resetSourceSnapshot("inat");
+  notifyDataChange();
+  return true;
 }

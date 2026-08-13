@@ -57,7 +57,8 @@ export default function RegionsLoadPopup({
         <h3 className="regions-load-title">Регионы России</h3>
         <p className="regions-load-hint">
           Кликайте по числам царств, чтобы выбрать одно или несколько (пусто —
-          все). Затем «Загрузить» / «Обновить». Источник: GBIF или iNaturalist.
+          все). Затем «Загрузить» / «Обновить». Корзина удаляет локальный набор
+          выбранного региона. Источник: GBIF или iNaturalist.
         </p>
 
         {loading ? (

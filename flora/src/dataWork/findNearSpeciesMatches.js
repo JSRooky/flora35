@@ -111,6 +111,56 @@ function groupByLatinName(features, sourceId) {
 }
 
 /**
+ * Группировка по нормализованной латыни напрямую по колонкам (без FeatureCollection).
+ * @param {{
+ *   rowCount: number,
+ *   getNameLatin: (rowIndex: number) => string|null,
+ *   getLng: (rowIndex: number) => number,
+ *   getLat: (rowIndex: number) => number,
+ *   getFoundYear: (rowIndex: number) => unknown,
+ *   sourceId: string,
+ *   getFeature: (rowIndex: number) => object
+ * }} table
+ * @returns {Map<string, IndexedPoint[]>}
+ */
+export function groupColumnarByLatinName(table) {
+  const groups = new Map();
+  const rowCount = table?.rowCount ?? 0;
+
+  for (let i = 0; i < rowCount; i += 1) {
+    const nameLatinRaw = table.getNameLatin(i);
+    const key = normalizeLatinName(nameLatinRaw);
+    const lng = table.getLng(i);
+    const lat = table.getLat(i);
+
+    if (!key || !Number.isFinite(lng) || !Number.isFinite(lat)) {
+      continue;
+    }
+
+    const nameLatin =
+      typeof nameLatinRaw === "string" ? nameLatinRaw.trim().replace(/\s+/g, " ") : key;
+
+    const point = {
+      key,
+      nameLatin,
+      coordinates: [lng, lat],
+      foundYear: normalizeFoundYear(table.getFoundYear(i)),
+      source: table.sourceId,
+      feature: table.getFeature(i)
+    };
+
+    const list = groups.get(key);
+    if (list) {
+      list.push(point);
+    } else {
+      groups.set(key, [point]);
+    }
+  }
+
+  return groups;
+}
+
+/**
  * @param {IndexedPoint} point
  * @returns {MatchPoint}
  */
@@ -298,6 +348,8 @@ function sortMatches(matches) {
 export function findNearSpeciesMatches({
   leftFeatures,
   rightFeatures,
+  leftColumnar = null,
+  rightColumnar = null,
   thresholdMeters,
   leftSourceId = "gbif",
   rightSourceId = "inaturalist",
@@ -313,8 +365,12 @@ export function findNearSpeciesMatches({
       ? Math.floor(maxMatches)
       : null;
 
-  const leftGroups = groupByLatinName(leftFeatures, leftSourceId);
-  const rightGroups = groupByLatinName(rightFeatures, rightSourceId);
+  const leftGroups = leftColumnar
+    ? groupColumnarByLatinName({ ...leftColumnar, sourceId: leftSourceId })
+    : groupByLatinName(leftFeatures, leftSourceId);
+  const rightGroups = rightColumnar
+    ? groupColumnarByLatinName({ ...rightColumnar, sourceId: rightSourceId })
+    : groupByLatinName(rightFeatures, rightSourceId);
   /** @type {NearSpeciesMatch[]} */
   const matches = [];
 
@@ -373,11 +429,21 @@ export async function findNearSpeciesMatchesAsync(
       ? Math.floor(options.maxMatches)
       : null;
 
-  const leftGroups = groupByLatinName(options.leftFeatures, options.leftSourceId ?? "gbif");
-  const rightGroups = groupByLatinName(
-    options.rightFeatures,
-    options.rightSourceId ?? "inaturalist"
-  );
+  const leftGroups = options.leftColumnar
+    ? groupColumnarByLatinName({
+        ...options.leftColumnar,
+        sourceId: options.leftSourceId ?? "gbif"
+      })
+    : groupByLatinName(options.leftFeatures, options.leftSourceId ?? "gbif");
+  const rightGroups = options.rightColumnar
+    ? groupColumnarByLatinName({
+        ...options.rightColumnar,
+        sourceId: options.rightSourceId ?? "inaturalist"
+      })
+    : groupByLatinName(
+        options.rightFeatures,
+        options.rightSourceId ?? "inaturalist"
+      );
   /** @type {NearSpeciesMatch[]} */
   const matches = [];
   let truncated = false;

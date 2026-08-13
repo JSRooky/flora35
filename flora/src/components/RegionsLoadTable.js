@@ -19,7 +19,9 @@ import {
 import {
   isExternalSourcesLoadActive,
   startGbifExternalLoad,
-  startInatExternalLoad
+  startInatExternalLoad,
+  clearGbifExternalDataset,
+  clearInatExternalDataset
 } from "../externalSources/externalSourcesLoadManager";
 import {
   EXTERNAL_REGIONS,
@@ -71,6 +73,17 @@ function resolveSelectedCount(preview, kingdomIds) {
     }
   }
   return any ? sum : null;
+}
+
+function resolveSelectedBytes(preview, kingdomIds) {
+  if (!preview || preview.status === "unavailable") {
+    return null;
+  }
+  const selectedCount = resolveSelectedCount(preview, kingdomIds);
+  if (selectedCount != null) {
+    return selectedCount * AVG_EXTERNAL_FEATURE_BYTES;
+  }
+  return typeof preview.bytes === "number" ? preview.bytes : null;
 }
 
 function buildInatExtras(kingdomIds) {
@@ -141,6 +154,22 @@ function RefreshIcon({ className = "regions-load-action-icon" }) {
   );
 }
 
+function DeleteIcon({ className = "regions-load-action-icon" }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 /**
  * Таблица регионов России: превью по царствам, объём, загрузка / обновление.
  * Источник переключается: GBIF | iNaturalist.
@@ -160,6 +189,7 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
   });
   const [filter, setFilter] = useState("");
   const [busyRegionId, setBusyRegionId] = useState(null);
+  const [datasetRevision, setDatasetRevision] = useState(0);
   const [previewStatus, setPreviewStatus] = useState("loading");
   const abortRef = useRef(null);
 
@@ -206,6 +236,8 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
   }, [filter]);
 
   const isInat = source === "inat";
+  // Перечитываем store после загрузки/удаления.
+  void datasetRevision;
   const loadedQuery = isInat ? getInatLoadedQuery() : getGbifLoadedQuery();
   const loadedRegionId = isInat
     ? getInatLoadedRegionId() || loadedQuery?.regionId || null
@@ -237,6 +269,58 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
     () => filteredRegions.filter(isRegionAvailable),
     [filteredRegions, isRegionAvailable]
   );
+
+  const columnTotals = useMemo(() => {
+    const kingdomSums = {};
+    for (const kingdom of GBIF_KINGDOMS) {
+      kingdomSums[kingdom.id] = { sum: 0, any: false };
+    }
+
+    let bytesSum = 0;
+    let bytesAny = false;
+
+    for (const region of filteredRegions) {
+      if (!isRegionAvailable(region)) {
+        continue;
+      }
+
+      const preview = previews[region.id];
+      if (!preview || preview.status === "unavailable") {
+        continue;
+      }
+
+      for (const kingdom of GBIF_KINGDOMS) {
+        const value = preview[kingdom.id];
+        if (typeof value === "number") {
+          kingdomSums[kingdom.id].sum += value;
+          kingdomSums[kingdom.id].any = true;
+        }
+      }
+
+      const bytes = resolveSelectedBytes(
+        preview,
+        kingdomsByRegion[region.id] || []
+      );
+      if (bytes != null) {
+        bytesSum += bytes;
+        bytesAny = true;
+      }
+    }
+
+    const kingdomTotals = {};
+    for (const kingdom of GBIF_KINGDOMS) {
+      const entry = kingdomSums[kingdom.id];
+      kingdomTotals[kingdom.id] = entry.any ? entry.sum : null;
+    }
+
+    return {
+      kingdomTotals,
+      totalEstimatedBytes: bytesAny ? bytesSum : null
+    };
+  }, [filteredRegions, isRegionAvailable, previews, kingdomsByRegion]);
+
+  const kingdomTotals = columnTotals.kingdomTotals;
+  const totalEstimatedBytes = columnTotals.totalEstimatedBytes;
 
   const loadOneRegion = useCallback(
     async (region, { incremental }) => {
@@ -333,6 +417,7 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
 
       try {
         await loadOneRegion(region, { incremental });
+        setDatasetRevision((value) => value + 1);
       } catch (error) {
         onLoadError?.(error?.message || "Не удалось выполнить загрузку");
       } finally {
@@ -340,6 +425,41 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
       }
     },
     [busyRegionId, loadOneRegion, map, onLoadError]
+  );
+
+  const clearRegionDataset = useCallback(
+    async (region) => {
+      if (!map || isExternalSourcesLoadActive() || busyRegionId) {
+        return;
+      }
+
+      const sourceLabel = source === "inat" ? "iNaturalist" : "GBIF";
+      const confirmed = window.confirm(
+        `Удалить скачанный набор ${sourceLabel} для региона «${region.label}»?`
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      setBusyRegionId(region.id);
+      onLoadError?.(null);
+
+      try {
+        const cleared =
+          source === "inat"
+            ? await clearInatExternalDataset(region.id)
+            : await clearGbifExternalDataset(region.id);
+        if (!cleared) {
+          onLoadError?.("Для этого региона нет локального набора");
+        }
+        setDatasetRevision((value) => value + 1);
+      } catch (error) {
+        onLoadError?.(error?.message || "Не удалось удалить набор");
+      } finally {
+        setBusyRegionId(null);
+      }
+    },
+    [busyRegionId, map, onLoadError, source]
   );
 
   const runAllLoads = useCallback(
@@ -370,8 +490,10 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
           setBusyRegionId(region.id);
           await loadOneRegion(region, { incremental });
         }
+        setDatasetRevision((value) => value + 1);
       } catch (error) {
         onLoadError?.(error?.message || "Не удалось выполнить загрузку");
+        setDatasetRevision((value) => value + 1);
       } finally {
         setBusyRegionId(null);
       }
@@ -473,10 +595,20 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
 
         <p className="regions-load-table-hint">
           {previewStatus === "loading"
-            ? `Оценка числа точек в ${sourceLabel} по царствам…`
+            ? `Оценка числа точек в ${sourceLabel} по царствам…${
+                totalEstimatedBytes != null
+                  ? ` Суммарный объём (уже прочитанные): ${formatMegabytes(totalEstimatedBytes)}.`
+                  : ""
+              }`
             : previewStatus === "error"
               ? "Не удалось полностью оценить регионы"
-              : `Регионов: ${formatCount(filteredRegions.length)}. Клик по числу — выбрать царство (можно несколько; пусто = все).`}
+              : `Регионов: ${formatCount(filteredRegions.length)}. Точек: ${formatCount(
+                  kingdomTotals.plantae
+                )} / ${formatCount(kingdomTotals.animalia)} / ${formatCount(
+                  kingdomTotals.fungi
+                )} / ${formatCount(kingdomTotals.protozoa)}. Суммарный объём: ${formatMegabytes(
+                  totalEstimatedBytes
+                )}. Клик по числу — выбрать царство (можно несколько; пусто = все).`}
         </p>
       </div>
 
@@ -498,11 +630,7 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
             {filteredRegions.map((region) => {
               const preview = previews[region.id];
               const kingdomIds = kingdomsByRegion[region.id] || [];
-              const selectedCount = resolveSelectedCount(preview, kingdomIds);
-              const selectedBytes =
-                selectedCount != null
-                  ? selectedCount * AVG_EXTERNAL_FEATURE_BYTES
-                  : preview?.bytes;
+              const selectedBytes = resolveSelectedBytes(preview, kingdomIds);
               const isLoaded = loadedRegionId === region.id;
               const rowBusy = busyRegionId === region.id;
               const canUpdate = isLoaded && Boolean(syncedAt);
@@ -617,12 +745,46 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
                       >
                         <RefreshIcon />
                       </button>
+                      <button
+                        type="button"
+                        className="gbif-panel-btn regions-load-action-btn regions-load-action-btn--danger"
+                        disabled={
+                          !map ||
+                          unavailable ||
+                          !isLoaded ||
+                          rowBusy ||
+                          isExternalSourcesLoadActive()
+                        }
+                        aria-label="Удалить набор"
+                        title={
+                          isLoaded
+                            ? "Удалить скачанный набор данных"
+                            : "Нет локального набора для этого региона"
+                        }
+                        onClick={() => clearRegionDataset(region)}
+                      >
+                        <DeleteIcon />
+                      </button>
                     </div>
                   </td>
                 </tr>
               );
             })}
           </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">Всего</th>
+              {GBIF_KINGDOMS.map((kingdom) => (
+                <td key={kingdom.id} className="regions-load-table-num">
+                  {formatCount(kingdomTotals[kingdom.id])}
+                </td>
+              ))}
+              <td className="regions-load-table-num">
+                {formatMegabytes(totalEstimatedBytes)}
+              </td>
+              <td aria-hidden="true" />
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>

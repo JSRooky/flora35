@@ -4,11 +4,12 @@ import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import RegionsLoadPopup from "./RegionsLoadPopup";
-import { getGbifFeatureCollection, getGbifFeatureCount, getGbifLoadedRegionId } from "../gbif/gbifStore";
+import RegionsFilterPopup from "./RegionsFilterPopup";
+import { getGbifFeatureCount, getGbifLoadedRegionIds, getGbifPackedBytes } from "../gbif/gbifStore";
 import {
-  getInatFeatureCollection,
   getInatFeatureCount,
-  getInatLoadedRegionId
+  getInatLoadedRegionIds,
+  getInatPackedBytes
 } from "../inaturalist/inatStore";
 import { EXTERNAL_REGIONS } from "../externalSources/regions";
 import {
@@ -35,24 +36,10 @@ function formatMegabytes(bytes) {
   return `${mb.toFixed(1)} МБ`;
 }
 
-function estimateJsonBytes(value) {
-  try {
-    return new Blob([JSON.stringify(value)]).size;
-  } catch {
-    return 0;
-  }
-}
-
 function getLoadedRegionIds() {
   const ids = new Set();
-  const gbifRegionId = getGbifLoadedRegionId();
-  const inatRegionId = getInatLoadedRegionId();
-  if (gbifRegionId) {
-    ids.add(gbifRegionId);
-  }
-  if (inatRegionId) {
-    ids.add(inatRegionId);
-  }
+  getGbifLoadedRegionIds().forEach((id) => ids.add(id));
+  getInatLoadedRegionIds().forEach((id) => ids.add(id));
   return ids;
 }
 
@@ -60,9 +47,7 @@ function getLoadedDataStats() {
   const gbifCount = getGbifFeatureCount();
   const inatCount = getInatFeatureCount();
   const pointCount = gbifCount + inatCount;
-  const bytes =
-    estimateJsonBytes(getGbifFeatureCollection()) +
-    estimateJsonBytes(getInatFeatureCollection());
+  const bytes = getGbifPackedBytes() + getInatPackedBytes();
 
   return {
     pointCount,
@@ -81,10 +66,13 @@ export default function DataSourcesPanel({
   onCollapsedChange,
   onMinimize,
   onClose,
-  storeRevision = 0
+  storeRevision = 0,
+  hiddenRegionIds = [],
+  onHiddenRegionIdsChange
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [regionsTableOpen, setRegionsTableOpen] = useState(false);
+  const [regionsFilterOpen, setRegionsFilterOpen] = useState(false);
   const [loadSnapshot, setLoadSnapshot] = useState(() => getExternalSourcesLoadSnapshot());
   const [stats, setStats] = useState(() => getLoadedDataStats());
   const [loadError, setLoadError] = useState(null);
@@ -124,6 +112,13 @@ export default function DataSourcesPanel({
       recordCount: pendingRegions.length > 0 ? null : 0
     };
   }, [storeRevision, loadSnapshot.gbif.loaded, loadSnapshot.inat.loaded, stats.pointCount]);
+
+  const loadedRegionIdsForFilter = useMemo(() => getLoadedRegionIds(), [
+    storeRevision,
+    loadSnapshot.gbif.loaded,
+    loadSnapshot.inat.loaded,
+    stats.pointCount
+  ]);
 
   const collapsedSummary = loading
     ? "Загрузка регионов…"
@@ -170,6 +165,14 @@ export default function DataSourcesPanel({
                 }}
               >
                 Загрузить регионы
+              </button>
+              <button
+                type="button"
+                className="gbif-panel-btn gbif-panel-btn--secondary"
+                disabled={!map}
+                onClick={() => setRegionsFilterOpen(true)}
+              >
+                Фильтр регионов
               </button>
             </div>
 
@@ -226,6 +229,13 @@ export default function DataSourcesPanel({
         loadError={loadError}
         onClose={() => setRegionsTableOpen(false)}
         onLoadError={setLoadError}
+      />
+      <RegionsFilterPopup
+        open={regionsFilterOpen}
+        loadedRegionIds={loadedRegionIdsForFilter}
+        hiddenRegionIds={hiddenRegionIds}
+        onHiddenRegionIdsChange={onHiddenRegionIdsChange}
+        onClose={() => setRegionsFilterOpen(false)}
       />
     </>
   );

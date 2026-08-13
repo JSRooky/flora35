@@ -1,21 +1,24 @@
 import {
   clearInatStore,
-  getInatFeatureCollectionRaw,
   getInatLoadedQuery,
   getInatLoadedRegionId,
+  getInatPersistTable,
   getInatSyncedAt,
+  setInatColumnarTable,
   setInatFeatureCollection,
   setInatLoadedQuery,
   setInatSyncedAt
 } from "./inatStore";
+import { INAT_COLUMNAR_VERSION } from "./inatColumnar";
 import { migrateInatNameRuToOverlay } from "./migrateInatNameRuToOverlay";
 import { hydrateNameRuOverlay } from "../names/nameRuCache";
+import { COLUMNAR_FORMAT } from "../externalSources/columnarSnapshot";
 
 const DB_NAME = "flora35-inaturalist";
 const DB_VERSION = 1;
 const STORE_NAME = "snapshots";
 const SNAPSHOT_KEY = "current";
-const SNAPSHOT_VERSION = 1;
+const SNAPSHOT_VERSION = INAT_COLUMNAR_VERSION;
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -58,37 +61,75 @@ function isValidCollection(collection) {
   );
 }
 
+function isColumnarSnapshot(snapshot) {
+  return (
+    snapshot &&
+    snapshot.format === COLUMNAR_FORMAT &&
+    snapshot.version === SNAPSHOT_VERSION &&
+    snapshot.table &&
+    typeof snapshot.rowCount === "number"
+  );
+}
+
+function isLegacyGeoJsonSnapshot(snapshot) {
+  return snapshot && isValidCollection(snapshot.collection) && snapshot.version === 1;
+}
+
 function normalizeSnapshot(snapshot) {
-  if (!snapshot || !isValidCollection(snapshot.collection)) {
-    return null;
+  if (isColumnarSnapshot(snapshot)) {
+    return {
+      ...snapshot,
+      syncedAt: snapshot.syncedAt || snapshot.savedAt || null
+    };
   }
 
-  if (snapshot.version !== SNAPSHOT_VERSION) {
+  if (!isLegacyGeoJsonSnapshot(snapshot)) {
     return null;
   }
 
   return {
     ...snapshot,
-    version: SNAPSHOT_VERSION,
+    format: "geojson",
     syncedAt: snapshot.syncedAt || snapshot.savedAt || null
   };
 }
 
-/** Сохраняет raw iNaturalist store (без overlay) в IndexedDB. */
+function restoreQuery(snapshot) {
+  if (snapshot.query && typeof snapshot.query === "object") {
+    return snapshot.query;
+  }
+
+  return snapshot.regionId
+    ? {
+        regionId: snapshot.regionId,
+        qualityGrade: "research",
+        kingdomId: null
+      }
+    : null;
+}
+
+function applySnapshotMeta(snapshot, restoredQuery) {
+  setInatLoadedQuery(restoredQuery);
+  setInatSyncedAt(snapshot.syncedAt ?? null);
+}
+
+/** Сохраняет колоночный iNaturalist store в IndexedDB. */
 export async function persistInatSnapshot() {
-  const collection = getInatFeatureCollectionRaw();
-  if (!isValidCollection(collection) || collection.features.length === 0) {
+  const table = getInatPersistTable();
+  if (!table || table.rowCount === 0) {
     await clearPersistedInatSnapshot();
     return null;
   }
 
   const snapshot = {
     version: SNAPSHOT_VERSION,
+    format: COLUMNAR_FORMAT,
     savedAt: new Date().toISOString(),
     syncedAt: getInatSyncedAt(),
     regionId: getInatLoadedRegionId(),
     query: getInatLoadedQuery(),
-    collection
+    rowCount: table.rowCount,
+    table
   };
 
   try {
@@ -144,7 +185,23 @@ export async function hydrateInatStoreFromPersistence() {
   await hydrateNameRuOverlay();
 
   const snapshot = await readPersistedInatSnapshot();
-  if (!snapshot || snapshot.collection.features.length === 0) {
+  if (!snapshot) {
+    return null;
+  }
+
+  if (snapshot.format === COLUMNAR_FORMAT) {
+    if (!snapshot.rowCount) {
+      return null;
+    }
+
+    setInatColumnarTable(snapshot.table, snapshot.regionId ?? null);
+    const restoredQuery = restoreQuery(snapshot);
+    applySnapshotMeta(snapshot, restoredQuery);
+
+    return snapshot;
+  }
+
+  if (!snapshot.collection?.features?.length) {
     return null;
   }
 
@@ -154,22 +211,12 @@ export async function hydrateInatStoreFromPersistence() {
 
   setInatFeatureCollection(collection, snapshot.regionId ?? null);
 
-  const restoredQuery =
-    snapshot.query && typeof snapshot.query === "object"
-      ? snapshot.query
-      : snapshot.regionId
-        ? {
-            regionId: snapshot.regionId,
-            qualityGrade: "research",
-            kingdomId: null
-          }
-        : null;
-  setInatLoadedQuery(restoredQuery);
-  setInatSyncedAt(snapshot.syncedAt ?? null);
+  const restoredQuery = restoreQuery(snapshot);
+  applySnapshotMeta(snapshot, restoredQuery);
 
   if (!snapshot.query && restoredQuery) {
     await persistInatSnapshot();
-  } else if (migrated > 0 || stripped > 0) {
+  } else if (migrated > 0 || stripped > 0 || snapshot.format === "geojson") {
     await persistInatSnapshot();
   }
 

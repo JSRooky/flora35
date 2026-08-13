@@ -19,6 +19,8 @@ const SERIES_DELAY_MS = 200;
 const PREVIEW_DELAY_MS = 300;
 const YEAR_FACET_LIMIT = 400;
 const DATASET_FACET_LIMIT = 300;
+/** Parallel datedCount probes for undated dataset planning. */
+export const UNDATED_PROBE_CONCURRENCY = 3;
 
 function wait(ms, signal) {
   return new Promise((resolve, reject) => {
@@ -172,8 +174,9 @@ async function planUndatedDatasetSeries(region, baseExtras, { signal, yearBucket
   }
 
   const planned = [];
+  let cursor = 0;
 
-  for (const bucket of datasetBuckets) {
+  async function probeBucket(bucket) {
     if (signal?.aborted) {
       const abortError = new Error("Aborted");
       abortError.name = "AbortError";
@@ -203,7 +206,7 @@ async function planUndatedDatasetSeries(region, baseExtras, { signal, yearBucket
 
     const undated = Math.max(0, bucket.count - datedCount);
     if (undated <= 0) {
-      continue;
+      return;
     }
 
     if (bucket.count > GBIF_SERIES_SOFT_LIMIT) {
@@ -216,7 +219,7 @@ async function planUndatedDatasetSeries(region, baseExtras, { signal, yearBucket
         });
         if (borBuckets.length > 0) {
           planned.push(...buildBasisSeriesForDataset(baseExtras, bucket.name, borBuckets));
-          continue;
+          return;
         }
       } catch (error) {
         if (error?.name === "AbortError") {
@@ -233,6 +236,17 @@ async function planUndatedDatasetSeries(region, baseExtras, { signal, yearBucket
       })
     );
   }
+
+  async function worker() {
+    while (cursor < datasetBuckets.length) {
+      const index = cursor;
+      cursor += 1;
+      await probeBucket(datasetBuckets[index]);
+    }
+  }
+
+  const workerCount = Math.min(UNDATED_PROBE_CONCURRENCY, datasetBuckets.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
   return planned;
 }

@@ -1,21 +1,24 @@
 import {
   clearGbifStore,
-  getGbifFeatureCollectionRaw,
   getGbifLoadedRegionId,
   getGbifLoadedQuery,
+  getGbifPersistTable,
   getGbifSyncedAt,
+  setGbifColumnarTable,
   setGbifFeatureCollection,
   setGbifLoadedQuery,
   setGbifSyncedAt
 } from "./gbifStore";
+import { GBIF_COLUMNAR_VERSION } from "./gbifColumnar";
 import { migrateGbifNameRuToOverlay } from "./migrateGbifNameRuToOverlay";
 import { hydrateNameRuOverlay } from "../names/nameRuCache";
+import { COLUMNAR_FORMAT } from "../externalSources/columnarSnapshot";
 
 const DB_NAME = "flora35-gbif";
 const DB_VERSION = 1;
 const STORE_NAME = "snapshots";
 const SNAPSHOT_KEY = "current";
-const SNAPSHOT_VERSION = 2;
+const SNAPSHOT_VERSION = GBIF_COLUMNAR_VERSION;
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -58,38 +61,73 @@ function isValidCollection(collection) {
   );
 }
 
+function isColumnarSnapshot(snapshot) {
+  return (
+    snapshot &&
+    snapshot.format === COLUMNAR_FORMAT &&
+    snapshot.version === SNAPSHOT_VERSION &&
+    snapshot.table &&
+    typeof snapshot.rowCount === "number"
+  );
+}
+
+function isLegacyGeoJsonSnapshot(snapshot) {
+  return (
+    snapshot &&
+    isValidCollection(snapshot.collection) &&
+    (snapshot.version === 1 || snapshot.version === 2)
+  );
+}
+
 function normalizeSnapshot(snapshot) {
-  if (!snapshot || !isValidCollection(snapshot.collection)) {
-    return null;
+  if (isColumnarSnapshot(snapshot)) {
+    return {
+      ...snapshot,
+      syncedAt: snapshot.syncedAt || snapshot.savedAt || null
+    };
   }
 
-  // v1 не хранил syncedAt — берём savedAt.
-  if (snapshot.version !== 1 && snapshot.version !== SNAPSHOT_VERSION) {
+  if (!isLegacyGeoJsonSnapshot(snapshot)) {
     return null;
   }
 
   return {
     ...snapshot,
-    version: SNAPSHOT_VERSION,
+    format: "geojson",
     syncedAt: snapshot.syncedAt || snapshot.savedAt || null
   };
 }
 
-/** Сохраняет raw GBIF store (без overlay) в IndexedDB. */
+function restoreQuery(snapshot) {
+  if (snapshot.query && typeof snapshot.query === "object") {
+    return snapshot.query;
+  }
+
+  return snapshot.regionId ? { regionId: snapshot.regionId, kingdomId: null } : null;
+}
+
+function applySnapshotMeta(snapshot, restoredQuery) {
+  setGbifLoadedQuery(restoredQuery);
+  setGbifSyncedAt(snapshot.syncedAt ?? null);
+}
+
+/** Сохраняет колоночный GBIF store в IndexedDB. */
 export async function persistGbifSnapshot() {
-  const collection = getGbifFeatureCollectionRaw();
-  if (!isValidCollection(collection) || collection.features.length === 0) {
+  const table = getGbifPersistTable();
+  if (!table || table.rowCount === 0) {
     await clearPersistedGbifSnapshot();
     return null;
   }
 
   const snapshot = {
     version: SNAPSHOT_VERSION,
+    format: COLUMNAR_FORMAT,
     savedAt: new Date().toISOString(),
     syncedAt: getGbifSyncedAt(),
     regionId: getGbifLoadedRegionId(),
     query: getGbifLoadedQuery(),
-    collection
+    rowCount: table.rowCount,
+    table
   };
 
   try {
@@ -147,7 +185,23 @@ export async function hydrateGbifStoreFromPersistence() {
   await hydrateNameRuOverlay();
 
   const snapshot = await readPersistedGbifSnapshot();
-  if (!snapshot || snapshot.collection.features.length === 0) {
+  if (!snapshot) {
+    return null;
+  }
+
+  if (snapshot.format === COLUMNAR_FORMAT) {
+    if (!snapshot.rowCount) {
+      return null;
+    }
+
+    setGbifColumnarTable(snapshot.table, snapshot.regionId ?? null);
+    const restoredQuery = restoreQuery(snapshot);
+    applySnapshotMeta(snapshot, restoredQuery);
+
+    return snapshot;
+  }
+
+  if (!snapshot.collection?.features?.length) {
     return null;
   }
 
@@ -157,19 +211,12 @@ export async function hydrateGbifStoreFromPersistence() {
 
   setGbifFeatureCollection(collection, snapshot.regionId ?? null);
 
-  const restoredQuery =
-    snapshot.query && typeof snapshot.query === "object"
-      ? snapshot.query
-      : snapshot.regionId
-        ? { regionId: snapshot.regionId, kingdomId: null }
-        : null;
-  setGbifLoadedQuery(restoredQuery);
-  setGbifSyncedAt(snapshot.syncedAt ?? null);
+  const restoredQuery = restoreQuery(snapshot);
+  applySnapshotMeta(snapshot, restoredQuery);
 
-  // Старые снимки без query — допишем синтетический, чтобы «Обновить» работал.
   if (!snapshot.query && restoredQuery) {
     await persistGbifSnapshot();
-  } else if (migrated > 0 || stripped > 0) {
+  } else if (migrated > 0 || stripped > 0 || snapshot.format === "geojson") {
     await persistGbifSnapshot();
   }
 

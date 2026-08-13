@@ -1,13 +1,13 @@
 /** Человекочитаемые названия разделов полной справки (ключ = sectionId). */
 export const HELP_SECTION_LABELS = {
-  feature: "Сведения о точке",
+  feature: "О точке",
   areal: "Радиус",
   polygon: "Полигон",
   buffer: "Буфер",
   area: "Область",
   year: "Год находки",
   "areal-dynamics": "Динамика ареала",
-  status: "Статус МСОП",
+  status: "Статус",
   map: "Группы точек",
   dense: "Обработка плотных групп",
   oopt: "ООПТ",
@@ -16,6 +16,7 @@ export const HELP_SECTION_LABELS = {
   "data-sources": "Источники данных",
   "external-processing": "Обработка внешних данных",
   "data-work": "Работа с данными",
+  search: "Поиск",
   redbook: "Поиск редких видов",
   gbif: "Данные GBIF",
   "gbif-processing": "Обработка данных GBIF"

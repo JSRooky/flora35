@@ -1,6 +1,6 @@
 import {
   findGbifFeatureByKey,
-  getGbifFeatureCollection
+  getGbifSlimMapCollection
 } from "../gbif/gbifStore";
 import { findInatFeatureById } from "../inaturalist/inatStore";
 import {
@@ -33,6 +33,7 @@ import {
   removePointHoverPopup,
   showClusterRegnumHover
 } from "./pointHoverTooltips";
+import { slimMapFeatures } from "./mapPerformance";
 import "../styles/GbifPanel.css";
 
 export const GBIF_SOURCE_ID = "gbif-locations";
@@ -74,7 +75,7 @@ let onPointClickCallback = null;
 /** По умолчанию скрыт — показывается только в режиме «Внешние источники». */
 let layerVisible = false;
 let gbifClusteringEnabled = true;
-let gbifClusterByRegnum = true;
+let gbifClusterByRegnum = false;
 let gbifClusterPieChartsEnabled = false;
 let gbifDenseClustersHighlightEnabled = false;
 let expandedGbifDensePileKeys = new Set();
@@ -86,6 +87,8 @@ let expandedGbifCoincidentKeys = new Set();
 let onGbifDensePileExpandedCallback = null;
 /** Последняя FeatureCollection, переданная в setGbifData (с учётом фильтров). */
 let lastGbifInputCollection = EMPTY_FEATURE_COLLECTION;
+/** Пока идёт загрузка датасета — не рисуем точки на карте. */
+let gbifMapUpdatesPaused = false;
 /** Ключи точек, скрытых под булавкой выделения / share. */
 let hiddenPointFeatureKeys = [];
 
@@ -530,6 +533,29 @@ function attachInteractions(map) {
   };
 }
 
+function gbifSourceLayoutMatchesMode(map) {
+  if (!map?.getSource) {
+    return false;
+  }
+
+  const hasRegnumSource = REGNUM_KEYS.some((regnum) =>
+    Boolean(map.getSource(getGbifSourceId(regnum)))
+  );
+  const hasBaseSource = Boolean(map.getSource(GBIF_SOURCE_ID));
+
+  if (!isGbifMapboxClusteringActive()) {
+    return hasBaseSource && !hasRegnumSource;
+  }
+
+  if (gbifClusterByRegnum) {
+    return REGNUM_KEYS.every((regnum) =>
+      Boolean(map.getSource(getGbifSourceId(regnum)))
+    );
+  }
+
+  return hasBaseSource && !hasRegnumSource;
+}
+
 function applyVisibility(map) {
   const visibility = layerVisible ? "visible" : "none";
 
@@ -718,22 +744,23 @@ function rebuildGbifLayers(map) {
   const collection =
     lastGbifInputCollection?.type === "FeatureCollection"
       ? lastGbifInputCollection
-      : getGbifFeatureCollection();
+      : getGbifSlimMapCollection();
   const { mapFeatures, denseClusterFeatures } = prepareMapGbifFeatures(
     collection.features ?? []
   );
+  const renderFeatures = slimMapFeatures(excludeGbifHiddenPinFeatures(mapFeatures));
   removeGbifFromMap(map);
 
   if (!isGbifMapboxClusteringActive()) {
     map.addSource(GBIF_SOURCE_ID, {
       type: "geojson",
-      data: { type: "FeatureCollection", features: mapFeatures }
+      data: { type: "FeatureCollection", features: renderFeatures }
     });
     addUnclusteredGbifLayer(map, GBIF_SOURCE_ID, GBIF_UNCLUSTERED_LAYER_ID);
   } else if (gbifClusterByRegnum) {
     REGNUM_KEYS.forEach((regnum) => {
       const sourceId = getGbifSourceId(regnum);
-      const features = mapFeatures.filter(
+      const features = renderFeatures.filter(
         (feature) =>
           String(feature.properties?.regnum || "").toLowerCase() === regnum
       );
@@ -749,7 +776,7 @@ function rebuildGbifLayers(map) {
     });
 
     // Точки без regnum — в общий независящий от царства источник.
-    const otherFeatures = mapFeatures.filter(
+    const otherFeatures = renderFeatures.filter(
       (feature) =>
         !REGNUM_KEYS.includes(String(feature.properties?.regnum || "").toLowerCase())
     );
@@ -769,7 +796,7 @@ function rebuildGbifLayers(map) {
   } else {
     map.addSource(GBIF_SOURCE_ID, {
       type: "geojson",
-      data: { type: "FeatureCollection", features: mapFeatures },
+      data: { type: "FeatureCollection", features: renderFeatures },
       cluster: true,
       ...CLUSTER_OPTIONS,
       clusterProperties: {
@@ -806,7 +833,7 @@ export function addGbifLayer(map, { onPointClick } = {}) {
     || map.getSource(GBIF_SOURCE_ID);
 
   if (hasAnySource) {
-    setGbifData(map, getGbifFeatureCollection());
+    setGbifData(map, getGbifSlimMapCollection());
     if (!interactionHandlers) {
       attachInteractions(map);
     }
@@ -818,9 +845,18 @@ export function addGbifLayer(map, { onPointClick } = {}) {
   rebuildGbifLayers(map);
 }
 
+/** Пока идёт загрузка — слой не принимает новые точки (кроме явного ignorePause). */
+export function setGbifMapUpdatesPaused(paused) {
+  gbifMapUpdatesPaused = Boolean(paused);
+}
+
 /** Обновляет GeoJSON источников GBIF. */
 export function setGbifData(map, collection, options = {}) {
   if (!map) {
+    return;
+  }
+
+  if (gbifMapUpdatesPaused && !options.ignorePause) {
     return;
   }
 
@@ -832,14 +868,14 @@ export function setGbifData(map, collection, options = {}) {
         denseClusterFeatures: []
       }
     : prepareMapGbifFeatures(data.features ?? []);
-  const renderFeatures = options.preview
+  const preparedFeatures = options.preview
     ? mapFeatures
     : excludeGbifHiddenPinFeatures(mapFeatures);
-  const hasSource = getGbifSourceIds().some((sourceId) => map.getSource(sourceId))
-    || map.getSource(GBIF_SOURCE_ID);
+  const renderFeatures = slimMapFeatures(preparedFeatures);
 
-  if (!hasSource) {
-    addGbifLayer(map);
+  if (!options.preview && !gbifSourceLayoutMatchesMode(map)) {
+    rebuildGbifLayers(map);
+    return;
   }
 
   if (!isGbifMapboxClusteringActive()) {
@@ -886,7 +922,7 @@ export function setGbifData(map, collection, options = {}) {
 
 /** Очищает точки GBIF на карте (источник остаётся). */
 export function clearGbifLayer(map) {
-  setGbifData(map, EMPTY_FEATURE_COLLECTION);
+  setGbifData(map, EMPTY_FEATURE_COLLECTION, { ignorePause: true });
 }
 
 /** Показывает или скрывает слой GBIF. */
@@ -903,46 +939,64 @@ export function isGbifLayerVisible() {
   return layerVisible;
 }
 
-/** Включает/выключает кластеризацию слоя GBIF. */
-export function setGbifClusteringEnabled(map, enabled) {
-  const next = Boolean(enabled);
-  if (gbifClusteringEnabled === next) {
-    return;
+/** Применяет режимы группировки GBIF одним rebuild Supercluster. */
+export function applyGbifGroupingMode(
+  map,
+  {
+    clusteringEnabled: nextClustering,
+    clusterByRegnum: nextByRegnum,
+    clusterPieCharts: nextPie,
+    denseClustersHighlight: nextDense
+  } = {}
+) {
+  let changed = false;
+
+  if (nextClustering !== undefined && gbifClusteringEnabled !== Boolean(nextClustering)) {
+    gbifClusteringEnabled = Boolean(nextClustering);
+    if (!gbifClusteringEnabled) {
+      expandedGbifCoincidentKeys = new Set();
+    }
+    changed = true;
   }
 
-  gbifClusteringEnabled = next;
-  if (!next) {
-    expandedGbifCoincidentKeys = new Set();
+  if (nextByRegnum !== undefined && gbifClusterByRegnum !== Boolean(nextByRegnum)) {
+    gbifClusterByRegnum = Boolean(nextByRegnum);
+    changed = true;
   }
-  if (map) {
+
+  if (nextPie !== undefined && gbifClusterPieChartsEnabled !== Boolean(nextPie)) {
+    gbifClusterPieChartsEnabled = Boolean(nextPie);
+    changed = true;
+  }
+
+  if (
+    nextDense !== undefined &&
+    gbifDenseClustersHighlightEnabled !== Boolean(nextDense)
+  ) {
+    gbifDenseClustersHighlightEnabled = Boolean(nextDense);
+    expandedGbifDensePileKeys = new Set();
+    expandedGbifCoincidentKeys = new Set();
+    changed = true;
+  }
+
+  if (changed && map) {
     rebuildGbifLayers(map);
   }
+}
+
+/** Включает/выключает кластеризацию слоя GBIF. */
+export function setGbifClusteringEnabled(map, enabled) {
+  applyGbifGroupingMode(map, { clusteringEnabled: enabled });
 }
 
 /** Группировка кластеров GBIF по царству (отдельные источники). */
 export function setGbifClusterByRegnum(map, enabled) {
-  const next = Boolean(enabled);
-  if (gbifClusterByRegnum === next) {
-    return;
-  }
-
-  gbifClusterByRegnum = next;
-  if (map && isGbifMapboxClusteringActive()) {
-    rebuildGbifLayers(map);
-  }
+  applyGbifGroupingMode(map, { clusterByRegnum: enabled });
 }
 
 /** Включает/выключает «Кластеры-диаграммы» для слоя GBIF (тот же режим, что у локальных точек). */
 export function setGbifClusterPieChartsEnabled(map, enabled) {
-  const next = Boolean(enabled);
-  if (gbifClusterPieChartsEnabled === next) {
-    return;
-  }
-
-  gbifClusterPieChartsEnabled = next;
-  if (map && isGbifMapboxClusteringActive()) {
-    rebuildGbifLayers(map);
-  }
+  applyGbifGroupingMode(map, { clusterPieCharts: enabled });
 }
 
 export function isGbifClusteringEnabled() {
@@ -959,17 +1013,7 @@ export function isGbifClusterPieChartsEnabled() {
 
 /** Сверхплотные кластеры GBIF: без обычной кластеризации, только кучи ≥10. */
 export function setGbifDenseClustersHighlightEnabled(map, enabled) {
-  const next = Boolean(enabled);
-  if (gbifDenseClustersHighlightEnabled === next) {
-    return;
-  }
-
-  gbifDenseClustersHighlightEnabled = next;
-  expandedGbifDensePileKeys = new Set();
-  expandedGbifCoincidentKeys = new Set();
-  if (map) {
-    rebuildGbifLayers(map);
-  }
+  applyGbifGroupingMode(map, { denseClustersHighlight: enabled });
 }
 
 /** Пересчитывает сверхплотные кучи GBIF после смены порога. */

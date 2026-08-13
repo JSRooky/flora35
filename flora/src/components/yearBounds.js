@@ -1,6 +1,8 @@
 import { getFeatureCollection, getFeatureCacheVersion } from "../locations/loadPoints";
-import { getGbifFeatureCollection } from "../gbif/gbifStore";
-import { getInatFeatureCollection } from "../inaturalist/inatStore";
+import { getGbifColumnarTable, getGbifFeatureCount } from "../gbif/gbifStore";
+import { getInatColumnarTable, getInatFeatureCount } from "../inaturalist/inatStore";
+import { foldGbifYearBounds } from "../gbif/gbifColumnar";
+import { foldInatYearBounds } from "../inaturalist/inatColumnar";
 import { getMergedFeatures } from "./addMergedLayer";
 import { getRedBookFeatures } from "./addRedBookLayer";
 
@@ -17,17 +19,33 @@ function getFallbackYearBounds() {
   return { min: 1950, max: currentYear };
 }
 
-function collectYears(features) {
-  const years = [];
+/**
+ * Обновляет min/max по found_year без промежуточного массива и без
+ * Math.min(...huge) — иначе при сотнях тысяч точек падает call stack.
+ */
+function foldYearBounds(features, bounds) {
+  let { min, max, any } = bounds;
 
   for (const feature of features ?? []) {
     const year = feature.properties?.found_year;
-    if (typeof year === "number" && Number.isFinite(year)) {
-      years.push(year);
+    if (typeof year !== "number" || !Number.isFinite(year)) {
+      continue;
+    }
+    if (!any) {
+      min = year;
+      max = year;
+      any = true;
+      continue;
+    }
+    if (year < min) {
+      min = year;
+    }
+    if (year > max) {
+      max = year;
     }
   }
 
-  return years;
+  return { min, max, any };
 }
 
 /**
@@ -37,10 +55,12 @@ function collectYears(features) {
  */
 export function getYearBounds() {
   const cacheVersion = getFeatureCacheVersion();
-  const gbifCount = getGbifFeatureCollection().features?.length ?? 0;
-  const inatCount = getInatFeatureCollection().features?.length ?? 0;
-  const mergedCount = getMergedFeatures()?.length ?? 0;
-  const redBookCount = getRedBookFeatures()?.length ?? 0;
+  const gbifCount = getGbifFeatureCount();
+  const inatCount = getInatFeatureCount();
+  const mergedFeatures = getMergedFeatures();
+  const redBookFeatures = getRedBookFeatures();
+  const mergedCount = mergedFeatures?.length ?? 0;
+  const redBookCount = redBookFeatures?.length ?? 0;
 
   if (
     cachedYearBounds &&
@@ -53,22 +73,16 @@ export function getYearBounds() {
     return cachedYearBounds;
   }
 
-  const years = [
-    ...collectYears(getFeatureCollection().features),
-    ...collectYears(getGbifFeatureCollection().features),
-    ...collectYears(getInatFeatureCollection().features),
-    ...collectYears(getMergedFeatures()),
-    ...collectYears(getRedBookFeatures())
-  ];
+  let bounds = { min: null, max: null, any: false };
+  bounds = foldYearBounds(getFeatureCollection().features, bounds);
+  bounds = foldGbifYearBounds(getGbifColumnarTable(), bounds);
+  bounds = foldInatYearBounds(getInatColumnarTable(), bounds);
+  bounds = foldYearBounds(mergedFeatures, bounds);
+  bounds = foldYearBounds(redBookFeatures, bounds);
 
-  if (years.length === 0) {
-    cachedYearBounds = getFallbackYearBounds();
-  } else {
-    cachedYearBounds = {
-      min: Math.min(...years),
-      max: Math.max(...years)
-    };
-  }
+  cachedYearBounds = bounds.any
+    ? { min: bounds.min, max: bounds.max }
+    : getFallbackYearBounds();
 
   cachedYearBoundsVersion = cacheVersion;
   cachedYearBoundsGbifCount = gbifCount;

@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { setGbifData } from "./addGbifLayer";
+import { clearGbifLayer, setGbifData, setGbifMapUpdatesPaused } from "./addGbifLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import {
-  GBIF_MAP_UPDATE_PAGES,
   GBIF_PAGE_SIZE,
   getGbifNetworkErrorMessage,
   isGbifAbortError,
@@ -14,10 +13,10 @@ import {
   withUpdateSinceExtras
 } from "../gbif/gbifClient";
 import {
-  getGbifFeatureCollection,
   getGbifFeatureCount,
   getGbifLoadedQuery,
   getGbifLoadedRegionId,
+  getGbifSlimMapCollection,
   getGbifSyncedAt,
   setGbifLoadedQuery,
   setGbifSyncedAt,
@@ -249,7 +248,9 @@ export default function GbifPanel({
     setUpdateAdded(0);
     setUpdateFetched(0);
 
-    let pagesSinceMapUpdate = 0;
+    setGbifMapUpdatesPaused(true);
+    clearGbifLayer(map);
+
     let addedTotal = 0;
     let fetchedTotal = 0;
 
@@ -257,20 +258,14 @@ export default function GbifPanel({
       await loadOccurrencesForRegion(region, {
         signal: controller.signal,
         extras: requestExtras,
-        onPage: (features, meta) => {
+        onPage: (features) => {
           fetchedTotal += features.length;
           setUpdateFetched(fetchedTotal);
 
-          const { collection, added } = upsertGbifFeatures(features, region.id);
+          const { added } = upsertGbifFeatures(features, region.id);
           addedTotal += added;
           setUpdateAdded(addedTotal);
-          setLoaded(collection.features.length);
-          pagesSinceMapUpdate += 1;
-
-          if (meta.endOfRecords || pagesSinceMapUpdate >= GBIF_MAP_UPDATE_PAGES) {
-            setGbifData(map, collection);
-            pagesSinceMapUpdate = 0;
-          }
+          setLoaded(getGbifFeatureCount());
         },
         onProgress: ({ total: nextTotal }) => {
           if (typeof nextTotal === "number") {
@@ -278,11 +273,8 @@ export default function GbifPanel({
           }
         }
       });
-
-      setGbifData(map, getGbifFeatureCollection());
     } catch (err) {
       if (isGbifAbortError(err, controller.signal)) {
-        setGbifData(map, getGbifFeatureCollection());
         setError(null);
       } else {
         setError(getGbifNetworkErrorMessage(err));
@@ -291,6 +283,8 @@ export default function GbifPanel({
       if (abortRef.current === controller) {
         abortRef.current = null;
       }
+      setGbifMapUpdatesPaused(false);
+      setGbifData(map, getGbifSlimMapCollection());
       const nextSyncedAt = new Date().toISOString();
       setLoading(false);
       setLoaded(getGbifFeatureCount());

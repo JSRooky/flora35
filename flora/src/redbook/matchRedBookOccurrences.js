@@ -1,6 +1,8 @@
 import { normalizeLatinName } from "../dataWork/normalizeLatinName";
-import { getGbifFeatureCollection } from "../gbif/gbifStore";
-import { getInatFeatureCollection } from "../inaturalist/inatStore";
+import { getGbifColumnarTable, getGbifFeaturesByIndices } from "../gbif/gbifStore";
+import { readGbifNameLatin } from "../gbif/gbifColumnar";
+import { getInatColumnarTable, getInatFeaturesByIndices } from "../inaturalist/inatStore";
+import { readInatNameLatin } from "../inaturalist/inatColumnar";
 import { RED_BOOK_STATUS_NONE } from "./constants";
 
 /**
@@ -121,8 +123,28 @@ export function matchRedBookOccurrences(list) {
     }
   };
 
-  scan(getGbifFeatureCollection()?.features, "gbif");
-  scan(getInatFeatureCollection()?.features, "inaturalist");
+  const scanTable = (table, readNameLatin, getFeaturesByIndices, originSource) => {
+    const rowCount = table?.rowCount ?? 0;
+    const matchedIndices = [];
+
+    for (let i = 0; i < rowCount; i += 1) {
+      const norm = normalizeLatinName(readNameLatin(table, i));
+      if (norm && statusByNorm.has(norm)) {
+        matchedIndices.push(i);
+      }
+    }
+
+    const features = getFeaturesByIndices(matchedIndices);
+    scan(features, originSource);
+  };
+
+  scanTable(getGbifColumnarTable(), readGbifNameLatin, getGbifFeaturesByIndices, "gbif");
+  scanTable(
+    getInatColumnarTable(),
+    readInatNameLatin,
+    getInatFeaturesByIndices,
+    "inaturalist"
+  );
 
   let gbifPointCount = 0;
   let inatPointCount = 0;

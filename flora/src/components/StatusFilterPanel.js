@@ -38,7 +38,7 @@ export default function StatusFilterPanel({
       className={`status-filter-panel ${collapsed ? "status-filter-panel--collapsed" : ""}`}
     >
       <div className="status-filter-panel-header">
-        <h3 className="status-filter-panel-title">Статус (МСОП)</h3>
+        <h3 className="status-filter-panel-title">Статус</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
           {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}

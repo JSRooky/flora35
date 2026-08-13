@@ -98,9 +98,13 @@ export function partitionFeaturesByDensePiles(
       // Ключ мог быть раскрыт на другом источнике (локальные/GBIF) —
       // тогда показываем и эти точки, даже если их < minSize.
       if (isExpanded) {
-        expandedDenseFeatures.push(...group.members);
+        for (let i = 0; i < group.members.length; i += 1) {
+          expandedDenseFeatures.push(group.members[i]);
+        }
       } else {
-        otherFeatures.push(...group.members);
+        for (let i = 0; i < group.members.length; i += 1) {
+          otherFeatures.push(group.members[i]);
+        }
       }
       return;
     }
@@ -109,7 +113,9 @@ export function partitionFeaturesByDensePiles(
     densePileMembersById.set(clusterId, group.members);
 
     if (isExpanded) {
-      expandedDenseFeatures.push(...group.members);
+      for (let i = 0; i < group.members.length; i += 1) {
+        expandedDenseFeatures.push(group.members[i]);
+      }
       return;
     }
 
@@ -233,7 +239,10 @@ export function mergeDensePileLists(pileLists) {
         return;
       }
 
-      existing.items.push(...(pile.items ?? []));
+      const extraItems = pile.items ?? [];
+      for (let i = 0; i < extraItems.length; i += 1) {
+        existing.items.push(extraItems[i]);
+      }
     });
   });
 
