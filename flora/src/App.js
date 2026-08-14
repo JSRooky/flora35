@@ -93,6 +93,7 @@ import {
 import {
   setDataSourceFilter,
   DATA_SOURCE_MODES,
+  DEFAULT_DATA_SOURCE_MODE,
   findFeatureByFindingId,
   isFindingInDataSource,
   initLocationsFromFirestore
@@ -407,7 +408,7 @@ export default function MapView() {
   const [areaGeometry, setAreaGeometry] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
-  const [dataSourceMode, setDataSourceModeState] = useState(DATA_SOURCE_MODES.NONE);
+  const [dataSourceMode, setDataSourceModeState] = useState(DEFAULT_DATA_SOURCE_MODE);
   const localDataActive =
     dataSourceMode === DATA_SOURCE_MODES.ALL ||
     dataSourceMode === DATA_SOURCE_MODES.POINTS ||
