@@ -1,0 +1,915 @@
+[
+  {
+    "id": "altay",
+    "label": "Алтайский край",
+    "labelEn": "Altay",
+    "gbif": {
+      "gadmGid": "RUS.2_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "amur",
+    "label": "Амурская область",
+    "labelEn": "Amur",
+    "gbif": {
+      "gadmGid": "RUS.3_1"
+    },
+    "inaturalist": {
+      "placeId": 134597
+    }
+  },
+  {
+    "id": "arkhangel-sk",
+    "label": "Архангельская область",
+    "labelEn": "Arkhangel'sk",
+    "gbif": {
+      "gadmGid": "RUS.4_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "astrakhan",
+    "label": "Астраханская область",
+    "labelEn": "Astrakhan'",
+    "gbif": {
+      "gadmGid": "RUS.5_1"
+    },
+    "inaturalist": {
+      "placeId": 134598
+    }
+  },
+  {
+    "id": "belgorod",
+    "label": "Белгородская область",
+    "labelEn": "Belgorod",
+    "gbif": {
+      "gadmGid": "RUS.7_1"
+    },
+    "inaturalist": {
+      "placeId": 134599
+    }
+  },
+  {
+    "id": "bryansk",
+    "label": "Брянская область",
+    "labelEn": "Bryansk",
+    "gbif": {
+      "gadmGid": "RUS.8_1"
+    },
+    "inaturalist": {
+      "placeId": 134600
+    }
+  },
+  {
+    "id": "vladimir",
+    "label": "Владимирская область",
+    "labelEn": "Vladimir",
+    "gbif": {
+      "gadmGid": "RUS.76_1"
+    },
+    "inaturalist": {
+      "placeId": 134602
+    }
+  },
+  {
+    "id": "volgograd",
+    "label": "Волгоградская область",
+    "labelEn": "Volgograd",
+    "gbif": {
+      "gadmGid": "RUS.77_1"
+    },
+    "inaturalist": {
+      "placeId": 134603
+    }
+  },
+  {
+    "id": "vologda",
+    "label": "Вологодская область",
+    "labelEn": "Vologda",
+    "gbif": {
+      "gadmGid": "RUS.78_1"
+    },
+    "inaturalist": {
+      "placeId": 134604
+    }
+  },
+  {
+    "id": "voronezh",
+    "label": "Воронежская область",
+    "labelEn": "Voronezh",
+    "gbif": {
+      "gadmGid": "RUS.79_1"
+    },
+    "inaturalist": {
+      "placeId": 134605
+    }
+  },
+  {
+    "id": "zabaykal-ye",
+    "label": "Забайкальский край",
+    "labelEn": "Zabaykal'ye",
+    "gbif": {
+      "gadmGid": "RUS.83_1"
+    },
+    "inaturalist": {
+      "placeId": 134611
+    }
+  },
+  {
+    "id": "ivanovo",
+    "label": "Ивановская область",
+    "labelEn": "Ivanovo",
+    "gbif": {
+      "gadmGid": "RUS.19_1"
+    },
+    "inaturalist": {
+      "placeId": 134612
+    }
+  },
+  {
+    "id": "irkutsk",
+    "label": "Иркутская область",
+    "labelEn": "Irkutsk",
+    "gbif": {
+      "gadmGid": "RUS.18_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "kabardin-balkar",
+    "label": "Кабардино-Балкарская Республика",
+    "labelEn": "Kabardin-Balkar",
+    "gbif": {
+      "gadmGid": "RUS.20_1"
+    },
+    "inaturalist": {
+      "placeId": 134615
+    }
+  },
+  {
+    "id": "kaliningrad",
+    "label": "Калининградская область",
+    "labelEn": "Kaliningrad",
+    "gbif": {
+      "gadmGid": "RUS.21_1"
+    },
+    "inaturalist": {
+      "placeId": 134616
+    }
+  },
+  {
+    "id": "kaluga",
+    "label": "Калужская область",
+    "labelEn": "Kaluga",
+    "gbif": {
+      "gadmGid": "RUS.23_1"
+    },
+    "inaturalist": {
+      "placeId": 134617
+    }
+  },
+  {
+    "id": "kamchatka",
+    "label": "Камчатская край",
+    "labelEn": "Kamchatka",
+    "gbif": {
+      "gadmGid": "RUS.24_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "karachay-cherkess",
+    "label": "Карачаево-Черкессия Республика",
+    "labelEn": "Karachay-Cherkess",
+    "gbif": {
+      "gadmGid": "RUS.25_1"
+    },
+    "inaturalist": {
+      "placeId": 134619
+    }
+  },
+  {
+    "id": "kemerovo",
+    "label": "Кемеровская область",
+    "labelEn": "Kemerovo",
+    "gbif": {
+      "gadmGid": "RUS.27_1"
+    },
+    "inaturalist": {
+      "placeId": 134620
+    }
+  },
+  {
+    "id": "kirov",
+    "label": "Кировская область",
+    "labelEn": "Kirov",
+    "gbif": {
+      "gadmGid": "RUS.31_1"
+    },
+    "inaturalist": {
+      "placeId": 134697
+    }
+  },
+  {
+    "id": "kostroma",
+    "label": "Костромская область",
+    "labelEn": "Kostroma",
+    "gbif": {
+      "gadmGid": "RUS.33_1"
+    },
+    "inaturalist": {
+      "placeId": 134698
+    }
+  },
+  {
+    "id": "krasnodar",
+    "label": "Краснодарский край",
+    "labelEn": "Krasnodar",
+    "gbif": {
+      "gadmGid": "RUS.34_1"
+    },
+    "inaturalist": {
+      "placeId": 134699
+    }
+  },
+  {
+    "id": "krasnoyarsk",
+    "label": "Красноярский край",
+    "labelEn": "Krasnoyarsk",
+    "gbif": {
+      "gadmGid": "RUS.35_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "kurgan",
+    "label": "Курганская область",
+    "labelEn": "Kurgan",
+    "gbif": {
+      "gadmGid": "RUS.36_1"
+    },
+    "inaturalist": {
+      "placeId": 134700
+    }
+  },
+  {
+    "id": "kursk",
+    "label": "Курская область",
+    "labelEn": "Kursk",
+    "gbif": {
+      "gadmGid": "RUS.37_1"
+    },
+    "inaturalist": {
+      "placeId": 134701
+    }
+  },
+  {
+    "id": "leningrad",
+    "label": "Ленинградская область",
+    "labelEn": "Leningrad",
+    "gbif": {
+      "gadmGid": "RUS.38_1"
+    },
+    "inaturalist": {
+      "placeId": 134702
+    }
+  },
+  {
+    "id": "lipetsk",
+    "label": "Липецкая область",
+    "labelEn": "Lipetsk",
+    "gbif": {
+      "gadmGid": "RUS.39_1"
+    },
+    "inaturalist": {
+      "placeId": 134703
+    }
+  },
+  {
+    "id": "magadan",
+    "label": "Магадан|Магаданская область",
+    "labelEn": "Magadan",
+    "gbif": {
+      "gadmGid": "RUS.40_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "moskva",
+    "label": "Московская область",
+    "labelEn": "Moskva",
+    "gbif": {
+      "gadmGid": "RUS.44_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "murmansk",
+    "label": "Мурманская область",
+    "labelEn": "Murmansk",
+    "gbif": {
+      "gadmGid": "RUS.45_1"
+    },
+    "inaturalist": {
+      "placeId": 134704
+    }
+  },
+  {
+    "id": "nenets",
+    "label": "Ненецкий АОк",
+    "labelEn": "Nenets",
+    "gbif": {
+      "gadmGid": "RUS.46_1"
+    },
+    "inaturalist": {
+      "placeId": 134705
+    }
+  },
+  {
+    "id": "nizhegorod",
+    "label": "Нижегородская область",
+    "labelEn": "Nizhegorod",
+    "gbif": {
+      "gadmGid": "RUS.47_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "novgorod",
+    "label": "Новгородская область",
+    "labelEn": "Novgorod",
+    "gbif": {
+      "gadmGid": "RUS.49_1"
+    },
+    "inaturalist": {
+      "placeId": 134706
+    }
+  },
+  {
+    "id": "novosibirsk",
+    "label": "Новосибирская область",
+    "labelEn": "Novosibirsk",
+    "gbif": {
+      "gadmGid": "RUS.50_1"
+    },
+    "inaturalist": {
+      "placeId": 139356
+    }
+  },
+  {
+    "id": "omsk",
+    "label": "Омская область",
+    "labelEn": "Omsk",
+    "gbif": {
+      "gadmGid": "RUS.51_1"
+    },
+    "inaturalist": {
+      "placeId": 139357
+    }
+  },
+  {
+    "id": "orenburg",
+    "label": "Оренбургская область",
+    "labelEn": "Orenburg",
+    "gbif": {
+      "gadmGid": "RUS.53_1"
+    },
+    "inaturalist": {
+      "placeId": 139358
+    }
+  },
+  {
+    "id": "orel",
+    "label": "Орловская область",
+    "labelEn": "Orel",
+    "gbif": {
+      "gadmGid": "RUS.52_1"
+    },
+    "inaturalist": {
+      "placeId": 139359
+    }
+  },
+  {
+    "id": "penza",
+    "label": "Пензенская область",
+    "labelEn": "Penza",
+    "gbif": {
+      "gadmGid": "RUS.54_1"
+    },
+    "inaturalist": {
+      "placeId": 139360
+    }
+  },
+  {
+    "id": "perm",
+    "label": "Пермская край",
+    "labelEn": "Perm'",
+    "gbif": {
+      "gadmGid": "RUS.55_1"
+    },
+    "inaturalist": {
+      "placeId": 139361
+    }
+  },
+  {
+    "id": "primor-ye",
+    "label": "Приморский край",
+    "labelEn": "Primor'ye",
+    "gbif": {
+      "gadmGid": "RUS.56_1"
+    },
+    "inaturalist": {
+      "placeId": 139362
+    }
+  },
+  {
+    "id": "pskov",
+    "label": "Псковская область",
+    "labelEn": "Pskov",
+    "gbif": {
+      "gadmGid": "RUS.57_1"
+    },
+    "inaturalist": {
+      "placeId": 139363
+    }
+  },
+  {
+    "id": "adygey",
+    "label": "Республика Адыгея",
+    "labelEn": "Adygey",
+    "gbif": {
+      "gadmGid": "RUS.1_1"
+    },
+    "inaturalist": {
+      "placeId": 134707
+    }
+  },
+  {
+    "id": "gorno-altay",
+    "label": "Республика Алтай",
+    "labelEn": "Gorno-Altay",
+    "gbif": {
+      "gadmGid": "RUS.16_1"
+    },
+    "inaturalist": {
+      "placeId": 139364
+    }
+  },
+  {
+    "id": "bashkortostan",
+    "label": "Республика Башкортостан",
+    "labelEn": "Bashkortostan",
+    "gbif": {
+      "gadmGid": "RUS.6_1"
+    },
+    "inaturalist": {
+      "placeId": 139365
+    }
+  },
+  {
+    "id": "buryat",
+    "label": "Республика Бурятия",
+    "labelEn": "Buryat",
+    "gbif": {
+      "gadmGid": "RUS.9_1"
+    },
+    "inaturalist": {
+      "placeId": 134601
+    }
+  },
+  {
+    "id": "dagestan",
+    "label": "Республика Дагестан",
+    "labelEn": "Dagestan",
+    "gbif": {
+      "gadmGid": "RUS.15_1"
+    },
+    "inaturalist": {
+      "placeId": 139496
+    }
+  },
+  {
+    "id": "ingush",
+    "label": "Респу́блика Ингуше́тия",
+    "labelEn": "Ingush",
+    "gbif": {
+      "gadmGid": "RUS.17_1"
+    },
+    "inaturalist": {
+      "placeId": 134613
+    }
+  },
+  {
+    "id": "kalmyk",
+    "label": "Республика Калмыкия",
+    "labelEn": "Kalmyk",
+    "gbif": {
+      "gadmGid": "RUS.22_1"
+    },
+    "inaturalist": {
+      "placeId": 139497
+    }
+  },
+  {
+    "id": "karelia",
+    "label": "Республика Карелия",
+    "labelEn": "Karelia",
+    "gbif": {
+      "gadmGid": "RUS.26_1"
+    },
+    "inaturalist": {
+      "placeId": 139498
+    }
+  },
+  {
+    "id": "komi",
+    "label": "Республика Коми",
+    "labelEn": "Komi",
+    "gbif": {
+      "gadmGid": "RUS.32_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "mariy-el",
+    "label": "Республика Марий Эл",
+    "labelEn": "Mariy-El",
+    "gbif": {
+      "gadmGid": "RUS.41_1"
+    },
+    "inaturalist": {
+      "placeId": 134585
+    }
+  },
+  {
+    "id": "mordovia",
+    "label": "Республика Мордовия",
+    "labelEn": "Mordovia",
+    "gbif": {
+      "gadmGid": "RUS.42_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "sakha",
+    "label": "Республика Саха",
+    "labelEn": "Sakha",
+    "gbif": {
+      "gadmGid": "RUS.60_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "northossetia",
+    "label": "Республика Северная Осетия-Алани",
+    "labelEn": "NorthOssetia",
+    "gbif": {
+      "gadmGid": "RUS.48_1"
+    },
+    "inaturalist": {
+      "placeId": 139499
+    }
+  },
+  {
+    "id": "tatarstan",
+    "label": "Республика Татарстан",
+    "labelEn": "Tatarstan",
+    "gbif": {
+      "gadmGid": "RUS.68_1"
+    },
+    "inaturalist": {
+      "placeId": 134586
+    }
+  },
+  {
+    "id": "tuva",
+    "label": "Республика Тыва",
+    "labelEn": "Tuva",
+    "gbif": {
+      "gadmGid": "RUS.71_1"
+    },
+    "inaturalist": {
+      "placeId": 139500
+    }
+  },
+  {
+    "id": "khakass",
+    "label": "Республика Хакасия",
+    "labelEn": "Khakass",
+    "gbif": {
+      "gadmGid": "RUS.29_1"
+    },
+    "inaturalist": {
+      "placeId": 139502
+    }
+  },
+  {
+    "id": "chechnya",
+    "label": "Республика Чечено-Ингушская",
+    "labelEn": "Chechnya",
+    "gbif": {
+      "gadmGid": "RUS.10_1"
+    },
+    "inaturalist": {
+      "placeId": 139503
+    }
+  },
+  {
+    "id": "rostov",
+    "label": "Ростовская область",
+    "labelEn": "Rostov",
+    "gbif": {
+      "gadmGid": "RUS.58_1"
+    },
+    "inaturalist": {
+      "placeId": 139369
+    }
+  },
+  {
+    "id": "ryazan",
+    "label": "Рязанская область",
+    "labelEn": "Ryazan'",
+    "gbif": {
+      "gadmGid": "RUS.59_1"
+    },
+    "inaturalist": {
+      "placeId": 139370
+    }
+  },
+  {
+    "id": "samara",
+    "label": "Самарская область",
+    "labelEn": "Samara",
+    "gbif": {
+      "gadmGid": "RUS.62_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "cityofst-petersburg",
+    "label": "Санкт-Петербург(горсовет)",
+    "labelEn": "CityofSt.Petersburg",
+    "gbif": {
+      "gadmGid": "RUS.14_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "saratov",
+    "label": "Саратовская область",
+    "labelEn": "Saratov",
+    "gbif": {
+      "gadmGid": "RUS.63_1"
+    },
+    "inaturalist": {
+      "placeId": 139489
+    }
+  },
+  {
+    "id": "sakhalin",
+    "label": "Сахалинская область",
+    "labelEn": "Sakhalin",
+    "gbif": {
+      "gadmGid": "RUS.61_1"
+    },
+    "inaturalist": {
+      "placeId": 139504
+    }
+  },
+  {
+    "id": "sverdlovsk",
+    "label": "Свердловская область",
+    "labelEn": "Sverdlovsk",
+    "gbif": {
+      "gadmGid": "RUS.66_1"
+    },
+    "inaturalist": {
+      "placeId": 139490
+    }
+  },
+  {
+    "id": "smolensk",
+    "label": "Смоленская область",
+    "labelEn": "Smolensk",
+    "gbif": {
+      "gadmGid": "RUS.64_1"
+    },
+    "inaturalist": {
+      "placeId": 139491
+    }
+  },
+  {
+    "id": "stavropol",
+    "label": "Ставропольский край",
+    "labelEn": "Stavropol'",
+    "gbif": {
+      "gadmGid": "RUS.65_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "tambov",
+    "label": "Тамбовская область",
+    "labelEn": "Tambov",
+    "gbif": {
+      "gadmGid": "RUS.67_1"
+    },
+    "inaturalist": {
+      "placeId": 139367
+    }
+  },
+  {
+    "id": "tver",
+    "label": "Тверская область",
+    "labelEn": "Tver'",
+    "gbif": {
+      "gadmGid": "RUS.72_1"
+    },
+    "inaturalist": {
+      "placeId": 139368
+    }
+  },
+  {
+    "id": "tomsk",
+    "label": "Томская область",
+    "labelEn": "Tomsk",
+    "gbif": {
+      "gadmGid": "RUS.69_1"
+    },
+    "inaturalist": {
+      "placeId": 139492
+    }
+  },
+  {
+    "id": "tula",
+    "label": "Тульская область",
+    "labelEn": "Tula",
+    "gbif": {
+      "gadmGid": "RUS.70_1"
+    },
+    "inaturalist": {
+      "placeId": 139366
+    }
+  },
+  {
+    "id": "tyumen",
+    "label": "Тюменская область",
+    "labelEn": "Tyumen'",
+    "gbif": {
+      "gadmGid": "RUS.73_1"
+    },
+    "inaturalist": {
+      "placeId": 139505
+    }
+  },
+  {
+    "id": "udmurt",
+    "label": "Удмуртская Республика",
+    "labelEn": "Udmurt",
+    "gbif": {
+      "gadmGid": "RUS.74_1"
+    },
+    "inaturalist": {
+      "placeId": 143642
+    }
+  },
+  {
+    "id": "ul-yanovsk",
+    "label": "Ульяновская область",
+    "labelEn": "Ul'yanovsk",
+    "gbif": {
+      "gadmGid": "RUS.75_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "khabarovsk",
+    "label": "Хабаровский край",
+    "labelEn": "Khabarovsk",
+    "gbif": {
+      "gadmGid": "RUS.28_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "khanty-mansiy",
+    "label": "Ханты-Мансийский АОк",
+    "labelEn": "Khanty-Mansiy",
+    "gbif": {
+      "gadmGid": "RUS.30_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "chelyabinsk",
+    "label": "Челябинская область",
+    "labelEn": "Chelyabinsk",
+    "gbif": {
+      "gadmGid": "RUS.11_1"
+    },
+    "inaturalist": {
+      "placeId": 139506
+    }
+  },
+  {
+    "id": "chuvash",
+    "label": "Чувашская Республика",
+    "labelEn": "Chuvash",
+    "gbif": {
+      "gadmGid": "RUS.13_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "chukot",
+    "label": "Чукотский АОк",
+    "labelEn": "Chukot",
+    "gbif": {
+      "gadmGid": "RUS.12_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "yamal-nenets",
+    "label": "Ямало-Ненецкий АОк",
+    "labelEn": "Yamal-Nenets",
+    "gbif": {
+      "gadmGid": "RUS.80_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  },
+  {
+    "id": "yaroslavl",
+    "label": "Ярославская область",
+    "labelEn": "Yaroslavl'",
+    "gbif": {
+      "gadmGid": "RUS.81_1"
+    },
+    "inaturalist": {
+      "placeId": 139493
+    }
+  },
+  {
+    "id": "yevrey",
+    "label": "Eврейская АОб",
+    "labelEn": "Yevrey",
+    "gbif": {
+      "gadmGid": "RUS.82_1"
+    },
+    "inaturalist": {
+      "placeId": 134610
+    }
+  },
+  {
+    "id": "moscowcity",
+    "label": "NA",
+    "labelEn": "MoscowCity",
+    "gbif": {
+      "gadmGid": "RUS.43_1"
+    },
+    "inaturalist": {
+      "placeId": null
+    }
+  }
+]

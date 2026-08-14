@@ -1,0 +1,152 @@
+.russian-name-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.russian-name-picker-dialog {
+  position: relative;
+  background: rgba(255, 255, 255, 0.98);
+  padding: 18px 16px 14px;
+  border-radius: 10px;
+  max-width: 420px;
+  width: calc(100% - 32px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.russian-name-picker-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: #444;
+  line-height: 1;
+}
+
+.russian-name-picker-title {
+  margin: 0 28px 6px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #222;
+}
+
+.russian-name-picker-latin {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-style: italic;
+  color: #666;
+}
+
+.russian-name-picker-list {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: min(50vh, 320px);
+  overflow: auto;
+}
+
+.russian-name-picker-legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.russian-name-picker-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #d8dee6;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #fff;
+}
+
+.russian-name-picker-option:hover {
+  border-color: #007bff;
+  background: rgba(0, 123, 255, 0.04);
+}
+
+.russian-name-picker-option:has(input:checked) {
+  border-color: #007bff;
+  background: rgba(0, 123, 255, 0.08);
+}
+
+.russian-name-picker-option input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.russian-name-picker-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.russian-name-picker-option-name {
+  font-size: 14px;
+  color: #222;
+  line-height: 1.3;
+}
+
+.russian-name-picker-option-source {
+  font-size: 12px;
+  color: #777;
+}
+
+.russian-name-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.russian-name-picker-btn {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.russian-name-picker-btn--secondary {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.russian-name-picker-btn--secondary:hover {
+  background: #e5e7eb;
+}
+
+.russian-name-picker-btn--primary {
+  background: #007bff;
+  color: #fff;
+}
+
+.russian-name-picker-btn--primary:hover:not(:disabled) {
+  background: #0069d9;
+}
+
+.russian-name-picker-btn--primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

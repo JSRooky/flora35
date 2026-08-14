@@ -12,6 +12,8 @@ import CoordinatesListPopup from "./CoordinatesListPopup";
 import MultiSpeciesEntryMenu from "./MultiSpeciesEntryMenu";
 import MultiSpeciesPopup from "./MultiSpeciesPopup";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
+import PanelCloseButton from "./PanelCloseButton";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import SubmissionAutocompleteField from "./SubmissionAutocompleteField";
 import SubmissionFieldLabel from "./SubmissionFieldLabel";
 import { STATUS_OPTIONS } from "./StatusFilterPanel";
@@ -21,7 +23,8 @@ import "../styles/UserSubmissionPanel.css";
 const REGNUM_OPTIONS = [
   { value: "plantae", label: "Растения" },
   { value: "animalia", label: "Животные" },
-  { value: "fungi", label: "Грибы" }
+  { value: "fungi", label: "Грибы" },
+  { value: "protozoa", label: "Простейшие" }
 ];
 
 const EMPTY_FORM = {
@@ -128,6 +131,8 @@ export default function UserSubmissionPanel({
   submissionMapPickHandlerRef,
   collapsed: collapsedProp,
   onCollapsedChange,
+  onMinimize,
+  onClose,
   onSaved,
   onReset,
   onCoordinatesReset
@@ -423,6 +428,7 @@ export default function UserSubmissionPanel({
           <h3 className="user-submission-panel-title">Новая находка</h3>
           <div className="popup-panel-header-actions">
             <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+            {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
             <button
               type="button"
               className="user-submission-panel-toggle"
@@ -433,6 +439,7 @@ export default function UserSubmissionPanel({
             >
               {collapsed ? "▾" : "▴"}
             </button>
+            {onClose ? <PanelCloseButton onClick={onClose} /> : null}
           </div>
         </div>
 

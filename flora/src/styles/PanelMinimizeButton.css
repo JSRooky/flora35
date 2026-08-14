@@ -1,0 +1,9 @@
+.panel-minimize-btn {
+  color: inherit;
+}
+
+.panel-minimize-btn-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
+}

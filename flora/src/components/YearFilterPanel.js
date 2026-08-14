@@ -1,9 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/YearFilterPanel.css";
 
 function getRangeProgress(value, min, max) {
+  if (max <= min) {
+    return 0;
+  }
+
   return ((value - min) / (max - min)) * 100;
 }
 
@@ -19,6 +25,10 @@ function getCollapsedSummary(enabled, range, lockedByPropertyFilter) {
   return `${range.min} — ${range.max}`;
 }
 
+function rangesEqual(a, b) {
+  return a?.min === b?.min && a?.max === b?.max;
+}
+
 /** Панель фильтра точек по диапазону годов с двойным ползунком. */
 export default function YearFilterPanel({
   enabled = false,
@@ -28,7 +38,9 @@ export default function YearFilterPanel({
   onRangeChange,
   lockedByPropertyFilter = false,
   collapsed: collapsedProp,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize,
+  onClose
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(true);
   const isControlled = collapsedProp !== undefined;
@@ -36,106 +48,57 @@ export default function YearFilterPanel({
   const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
   const [draftRange, setDraftRange] = useState(range);
   const [activeThumb, setActiveThumb] = useState(null);
-  // Актуальное значение draftRange для обработчиков без пересоздания при каждом рендере.
   const draftRangeRef = useRef(draftRange);
-  // Пока идёт перетаскивание, не даём внешнему range перезаписать локальный черновик.
-  const isDraggingRef = useRef(false);
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## year в docs/moduleHelp.md
   const { min: minYear, max: maxYear } = yearBounds;
 
   useEffect(() => {
-    if (isDraggingRef.current) {
-      return;
-    }
-
-    setDraftRange((prev) =>
-      prev.min === range.min && prev.max === range.max ? prev : range
-    );
+    setDraftRange((prev) => (rangesEqual(prev, range) ? prev : range));
   }, [range]);
 
   useEffect(() => {
     draftRangeRef.current = draftRange;
   }, [draftRange]);
 
-  const commitRange = () => {
-    const next = draftRangeRef.current;
-    onRangeChange?.({ min: next.min, max: next.max });
-    setActiveThumb(null);
-  };
-
-  const handlePointerDown = (thumb) => (event) => {
-    isDraggingRef.current = true;
-    setActiveThumb(thumb);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handlePointerUp = (event) => {
-    if (!isDraggingRef.current) {
-      return;
-    }
-
-    isDraggingRef.current = false;
-
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-
-    commitRange();
-  };
-
-  const handlePointerCancel = () => {
-    if (!isDraggingRef.current) {
-      return;
-    }
-
-    isDraggingRef.current = false;
-    setDraftRange(range);
-    draftRangeRef.current = range;
-    setActiveThumb(null);
-  };
-
-  const handleKeyUp = (event) => {
-    if (
-      !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(
-        event.key
-      )
-    ) {
-      return;
-    }
-
-    commitRange();
+  const emitRange = (next) => {
+    draftRangeRef.current = next;
+    setDraftRange(next);
+    onRangeChange?.(next);
   };
 
   const handleStartChange = (event) => {
     const nextMin = Number(event.target.value);
-    setDraftRange((prev) => ({
-      min: Math.min(nextMin, prev.max),
-      max: prev.max
-    }));
+    const { max } = draftRangeRef.current;
+    emitRange({
+      min: Math.min(nextMin, max),
+      max
+    });
   };
 
   const handleEndChange = (event) => {
     const nextMax = Number(event.target.value);
-    setDraftRange((prev) => ({
-      min: prev.min,
-      max: Math.max(nextMax, prev.min)
-    }));
+    const { min } = draftRangeRef.current;
+    emitRange({
+      min,
+      max: Math.max(nextMax, min)
+    });
   };
 
-  const sliderInteractionHandlers = {
-    onPointerUp: handlePointerUp,
-    onPointerCancel: handlePointerCancel,
-    onKeyUp: handleKeyUp
+  const clearActiveThumb = () => {
+    setActiveThumb(null);
+  };
+
+  const handlePointerDown = (thumb) => () => {
+    setActiveThumb(thumb);
   };
 
   const isFullRange = draftRange.min === minYear && draftRange.max === maxYear;
 
   const handleResetRange = () => {
     const fullRange = { min: minYear, max: maxYear };
-    setDraftRange(fullRange);
-    draftRangeRef.current = fullRange;
-    onRangeChange?.(fullRange);
+    emitRange(fullRange);
+    setActiveThumb(null);
   };
 
   return (
@@ -144,6 +107,7 @@ export default function YearFilterPanel({
         <h3 className="year-filter-panel-title">Год находки</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="year-filter-panel-toggle"
@@ -154,6 +118,7 @@ export default function YearFilterPanel({
           >
             {collapsed ? "▾" : "▴"}
           </button>
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 
@@ -225,7 +190,9 @@ export default function YearFilterPanel({
                 aria-label="Начальный год"
                 onChange={handleStartChange}
                 onPointerDown={handlePointerDown("start")}
-                {...sliderInteractionHandlers}
+                onPointerUp={clearActiveThumb}
+                onPointerCancel={clearActiveThumb}
+                onBlur={clearActiveThumb}
               />
               <input
                 type="range"
@@ -240,7 +207,9 @@ export default function YearFilterPanel({
                 aria-label="Конечный год"
                 onChange={handleEndChange}
                 onPointerDown={handlePointerDown("end")}
-                {...sliderInteractionHandlers}
+                onPointerUp={clearActiveThumb}
+                onPointerCancel={clearActiveThumb}
+                onBlur={clearActiveThumb}
               />
             </div>
 

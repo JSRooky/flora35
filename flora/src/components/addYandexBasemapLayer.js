@@ -19,7 +19,12 @@ function captureMapboxBasemapLayers(map) {
     return;
   }
 
-  state.layerIds = map.getStyle().layers.map((layer) => layer.id);
+  const layers = map.getStyle()?.layers;
+  if (!layers?.length) {
+    return;
+  }
+
+  state.layerIds = layers.map((layer) => layer.id);
   state.layerIds.forEach((id) => {
     state.visibility.set(id, map.getLayoutProperty(id, "visibility") ?? "visible");
   });
@@ -65,6 +70,10 @@ export function isYandexMapsApiKeyConfigured() {
 
 /** Добавляет растровый слой Яндекс Карт вниз стека (по умолчанию скрыт). */
 export function addYandexBasemapLayer(map) {
+  if (!map?.getSource) {
+    return;
+  }
+
   const tileUrl = getYandexTileUrl();
   if (!tileUrl) {
     return;
@@ -80,7 +89,7 @@ export function addYandexBasemapLayer(map) {
       attribution: "© Яндекс"
     });
 
-    const firstLayerId = map.getStyle().layers[0]?.id;
+    const firstLayerId = map.getStyle()?.layers?.[0]?.id;
 
     map.addLayer(
       {
@@ -101,7 +110,7 @@ export function addYandexBasemapLayer(map) {
 
 /** Переключает подложку Яндекс Карт, скрывая/восстанавливая слои Mapbox-стиля. */
 export function setYandexBasemapEnabled(map, enabled) {
-  if (!isYandexMapsApiKeyConfigured()) {
+  if (!map?.getLayer || !isYandexMapsApiKeyConfigured()) {
     return;
   }
 

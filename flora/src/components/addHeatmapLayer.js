@@ -1,5 +1,5 @@
-import { getFeatureCollection } from "../locations/loadPoints";
-import { filterFeatures, getFirstLocationsLayerId } from "./addLocationsLayer";
+import { getToolFeatures, getFirstLocationsLayerId } from "./addLocationsLayer";
+import { toHeatmapFeatures } from "./mapPerformance";
 
 const SOURCE_ID = "heatmap";
 const LAYER_ID = "heatmap";
@@ -9,11 +9,11 @@ const EMPTY_COLLECTION = {
   features: []
 };
 
-/** Формирует GeoJSON для тепловой карты с учётом активных фильтров. */
+/** Формирует GeoJSON для тепловой карты (только координаты). */
 function buildHeatmapData(filters = {}) {
   return {
     type: "FeatureCollection",
-    features: filterFeatures(getFeatureCollection().features, filters)
+    features: toHeatmapFeatures(getToolFeatures(filters))
   };
 }
 
@@ -111,4 +111,16 @@ export function updateHeatmapData(map, filters = {}) {
   if (source) {
     source.setData(buildHeatmapData(filters));
   }
+}
+
+/** Временно подменяет данные тепловой карты заданным набором точек. */
+export function setHeatmapFeatures(map, features = []) {
+  if (!map?.getSource?.(SOURCE_ID)) {
+    return;
+  }
+
+  map.getSource(SOURCE_ID).setData({
+    type: "FeatureCollection",
+    features: toHeatmapFeatures(Array.isArray(features) ? features : [])
+  });
 }

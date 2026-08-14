@@ -128,3 +128,47 @@
 .map-display-switch--disabled .map-display-switch-slider {
   background: #ddd;
 }
+
+.map-display-dense-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.map-display-dense-row .map-display-switch {
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
+}
+
+.map-display-dense-row .map-display-switch-label {
+  white-space: nowrap;
+}
+
+.map-display-dense-row--disabled {
+  opacity: 0.5;
+}
+
+.map-display-dense-process-btn {
+  appearance: none;
+  flex-shrink: 0;
+  border: 1px solid var(--map-tool-accent-border-soft);
+  background: #fff;
+  color: var(--map-tool-accent-dark);
+  border-radius: 5px;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.map-display-dense-process-btn:hover:not(:disabled) {
+  background: var(--map-tool-accent-soft);
+  border-color: var(--map-tool-accent);
+}
+
+.map-display-dense-process-btn:disabled {
+  cursor: not-allowed;
+}

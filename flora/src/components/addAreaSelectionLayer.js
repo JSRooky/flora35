@@ -7,7 +7,7 @@ import {
   polygon,
   union
 } from "@turf/turf";
-import { getFilteredFeatures } from "./addLocationsLayer";
+import { getToolFeatures } from "./addLocationsLayer";
 
 const SOURCE_ID = "area-selection";
 const PREVIEW_SOURCE_ID = "area-selection-preview";
@@ -287,7 +287,8 @@ export function getPointsWithinArea(areaGeometry, filters = {}) {
 
   const areaFeature = geometryToFeature(areaGeometry);
 
-  return getFilteredFeatures(filters).filter((feature) => {
+  // Точки инструментов: локальные + GBIF.
+  return getToolFeatures(filters).filter((feature) => {
     const coordinates = feature.geometry?.coordinates;
     if (!coordinates) {
       return false;
@@ -297,7 +298,7 @@ export function getPointsWithinArea(areaGeometry, filters = {}) {
   });
 }
 
-/** Сводка по точкам внутри области: количество и отсортированный список. */
+/** Сводка по точкам внутри области: точки и уникальные виды. */
 export function getAreaContainedPointsSummary(areaGeometry, filters = {}) {
   const points = getPointsWithinArea(areaGeometry, filters).sort((a, b) => {
     const nameA = a.properties?.name_ru ?? "";
@@ -305,9 +306,39 @@ export function getAreaContainedPointsSummary(areaGeometry, filters = {}) {
     return nameA.localeCompare(nameB, "ru");
   });
 
+  const speciesByKey = new Map();
+
+  points.forEach((feature) => {
+    const nameLatin = feature.properties?.name_latin;
+    const speciesKey = nameLatin || feature.properties?.name_ru;
+    if (!speciesKey) {
+      return;
+    }
+
+    const existing = speciesByKey.get(speciesKey);
+    if (existing) {
+      existing.count += 1;
+      return;
+    }
+
+    speciesByKey.set(speciesKey, {
+      nameRu: feature.properties?.name_ru || "Без названия",
+      nameLatin: nameLatin || "",
+      regnum: feature.properties?.regnum || "",
+      count: 1,
+      point: feature
+    });
+  });
+
+  const species = [...speciesByKey.values()].sort((left, right) =>
+    left.nameRu.localeCompare(right.nameRu, "ru")
+  );
+
   return {
     count: points.length,
-    points
+    points,
+    speciesCount: species.length,
+    species
   };
 }
 

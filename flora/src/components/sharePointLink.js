@@ -1,3 +1,5 @@
+import { getFeatureCoordinates } from "./spreadCoincidentPoints";
+
 export const SHARE_POINT_PARAM = "point";
 export const SHARE_ZOOM_PARAM = "z";
 export const DEFAULT_SHARE_ZOOM = 10;
@@ -31,7 +33,7 @@ export function buildSharePointUrl(feature) {
     return null;
   }
 
-  const [lng, lat] = feature.geometry?.coordinates ?? [];
+  const [lng, lat] = getFeatureCoordinates(feature) ?? [];
   const url = new URL(window.location.href);
 
   url.search = "";
@@ -79,7 +81,7 @@ export async function copySharePointLink(feature) {
 
 /** Перемещает карту к точке из shared-ссылки. */
 export function focusMapOnSharedPoint(map, feature, { zoom = DEFAULT_SHARE_ZOOM } = {}) {
-  const coordinates = feature?.geometry?.coordinates;
+  const coordinates = getFeatureCoordinates(feature);
 
   if (!map || !coordinates) {
     return;

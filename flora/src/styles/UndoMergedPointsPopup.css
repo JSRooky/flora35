@@ -1,0 +1,202 @@
+.undo-merged-points-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.undo-merged-points-dialog {
+  --undo-merged-accent: var(--map-tool-accent, #2f6f4e);
+  --undo-merged-accent-border: rgba(47, 111, 78, 0.35);
+
+  position: relative;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  min-width: min(760px, calc(100vw - 32px));
+  max-height: min(90vh, 720px);
+  overflow: auto;
+  padding: 16px 20px 20px;
+  border: 1px solid var(--undo-merged-accent-border);
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.undo-merged-points-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #666;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.undo-merged-points-close:hover {
+  color: #222;
+}
+
+.undo-merged-points-title {
+  margin: 0 28px 0 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.undo-merged-points-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #555;
+}
+
+.undo-merged-points-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.undo-merged-points-count {
+  font-size: 13px;
+  color: #444;
+}
+
+.undo-merged-points-refresh {
+  appearance: none;
+  border: 1px solid rgba(47, 111, 78, 0.35);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--undo-merged-accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.undo-merged-points-refresh:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.undo-merged-points-status {
+  margin: 0;
+  font-size: 13px;
+  color: #333;
+}
+
+.undo-merged-points-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.undo-merged-points-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.undo-merged-points-table th,
+.undo-merged-points-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  vertical-align: middle;
+}
+
+.undo-merged-points-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(245, 245, 245, 0.98);
+  font-weight: 600;
+  color: #333;
+}
+
+.undo-merged-points-table tbody tr:nth-child(even) td {
+  background: rgba(47, 111, 78, 0.04);
+}
+
+.undo-merged-points-table-name {
+  font-style: italic;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.undo-merged-points-table-coords {
+  font-variant-numeric: tabular-nums;
+}
+
+.undo-merged-points-table-empty {
+  text-align: center;
+  color: #777;
+  padding: 18px 8px !important;
+}
+
+.undo-merged-points-actions-col,
+.undo-merged-points-row-action {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.undo-merged-points-row-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.undo-merged-points-show-button,
+.undo-merged-points-undo-button {
+  appearance: none;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.undo-merged-points-show-button {
+  border: 1px solid rgba(47, 111, 78, 0.35);
+  color: var(--undo-merged-accent);
+  background: transparent;
+}
+
+.undo-merged-points-undo-button {
+  border: 0;
+  color: #fff;
+  background: var(--undo-merged-accent);
+}
+
+.undo-merged-points-show-button:disabled,
+.undo-merged-points-undo-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.undo-merged-points-show-button:focus-visible,
+.undo-merged-points-undo-button:focus-visible,
+.undo-merged-points-refresh:focus-visible,
+.undo-merged-points-close:focus-visible {
+  outline: 2px solid var(--undo-merged-accent);
+  outline-offset: 2px;
+}

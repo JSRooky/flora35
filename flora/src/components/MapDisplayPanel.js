@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/MapDisplayPanel.css";
 
 /** Краткое описание текущих настроек карты для свёрнутой панели. */
@@ -9,7 +11,8 @@ function getCollapsedSummary(
   heatmapEnabled,
   clusteringEnabled,
   clusterByRegnum,
-  clusterPieCharts
+  clusterPieCharts,
+  denseClustersHighlight
 ) {
   const parts = [];
 
@@ -17,11 +20,13 @@ function getCollapsedSummary(
     parts.push("маркеры скрыты");
   }
 
-  if (clusteringEnabled && markersVisible) {
+  if (markersVisible && denseClustersHighlight) {
+    parts.push("плотные группы");
+  } else if (clusteringEnabled && markersVisible) {
     if (clusterPieCharts) {
-      parts.push("кластеры-диаграммы");
+      parts.push("диаграммы");
     } else {
-      parts.push(clusterByRegnum ? "кластеризация по царству" : "кластеризация");
+      parts.push(clusterByRegnum ? "по царству" : "кластеризация");
     }
   } else if (markersVisible) {
     parts.push("без кластеризации");
@@ -46,8 +51,15 @@ export default function MapDisplayPanel({
   onClusterByRegnumChange,
   clusterPieCharts = false,
   onClusterPieChartsChange,
+  denseClustersHighlight = false,
+  onDenseClustersHighlightChange,
+  onDenseProcessingOpen,
+  mergedPointsVisible = true,
+  onMergedPointsVisibleChange,
   collapsed: collapsedProp,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize,
+  onClose
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(true);
   const isControlled = collapsedProp !== undefined;
@@ -56,10 +68,11 @@ export default function MapDisplayPanel({
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## map в docs/moduleHelp.md
   // Кластеризация имеет смысл только когда маркеры видны.
-  const clusteringDisabled = !markersVisible;
+  const clusteringDisabled = !markersVisible || denseClustersHighlight;
   const clusterPieChartsDisabled = clusteringDisabled || !clusteringEnabled;
   const clusterByRegnumDisabled =
     clusteringDisabled || !clusteringEnabled || clusterPieCharts;
+  const denseClustersHighlightDisabled = !markersVisible;
 
   return (
     <aside className={`map-display-panel ${collapsed ? "map-display-panel--collapsed" : ""}`}>
@@ -67,6 +80,7 @@ export default function MapDisplayPanel({
         <h3 className="map-display-panel-title">Группы точек</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="map-display-panel-toggle"
@@ -77,6 +91,7 @@ export default function MapDisplayPanel({
           >
             {collapsed ? "▾" : "▴"}
           </button>
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 
@@ -87,7 +102,8 @@ export default function MapDisplayPanel({
             heatmapEnabled,
             clusteringEnabled,
             clusterByRegnum,
-            clusterPieCharts
+            clusterPieCharts,
+            denseClustersHighlight
           )}
         </p>
       ) : (
@@ -97,19 +113,21 @@ export default function MapDisplayPanel({
           <label
             className={`map-display-switch${clusteringDisabled ? " map-display-switch--disabled" : ""}`}
             title={
-              clusteringDisabled
+              !markersVisible
                 ? "Доступно только при включённых маркерах"
-                : "Группировать близкие точки в кластеры"
+                : denseClustersHighlight
+                  ? "Недоступно в режиме плотных групп"
+                  : "Кластеризовать близкие точки"
             }
           >
             <input
               type="checkbox"
-              checked={clusteringEnabled}
+              checked={clusteringEnabled && !denseClustersHighlight}
               disabled={clusteringDisabled}
               onChange={(e) => onClusteringEnabledChange?.(e.target.checked)}
             />
             <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">Группировать точки</span>
+            <span className="map-display-switch-label">Кластеризовать</span>
           </label>
 
           <label
@@ -117,13 +135,15 @@ export default function MapDisplayPanel({
               clusterByRegnumDisabled ? " map-display-switch--disabled" : ""
             }`}
             title={
-              clusteringDisabled
+              !markersVisible
                 ? "Доступно только при включённых маркерах"
-                : !clusteringEnabled
-                  ? "Доступно только при включённой кластеризации"
-                  : clusterPieCharts
-                    ? "Недоступно при включённых кластерах-диаграммах"
-                    : "Группировать в кластеры только точки с одинаковым regnum"
+                : denseClustersHighlight
+                  ? "Недоступно в режиме плотных групп"
+                  : !clusteringEnabled
+                    ? "Доступно только при включённой кластеризации"
+                    : clusterPieCharts
+                      ? "Недоступно при включённых диаграммах"
+                      : "Кластеризовать только точки с одинаковым царством"
             }
           >
             <input
@@ -133,7 +153,7 @@ export default function MapDisplayPanel({
               onChange={(e) => onClusterByRegnumChange?.(e.target.checked)}
             />
             <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">Группировать по царству</span>
+            <span className="map-display-switch-label">По царству</span>
           </label>
 
           <label
@@ -141,11 +161,13 @@ export default function MapDisplayPanel({
               clusterPieChartsDisabled ? " map-display-switch--disabled" : ""
             }`}
             title={
-              clusteringDisabled
+              !markersVisible
                 ? "Доступно только при включённых маркерах"
-                : !clusteringEnabled
-                  ? "Доступно только при включённой кластеризации"
-                  : "Показывать состав кластера секторной диаграммой; отключает группировку по царству"
+                : denseClustersHighlight
+                  ? "Недоступно в режиме плотных групп"
+                  : !clusteringEnabled
+                    ? "Доступно только при включённой кластеризации"
+                    : "Показывать состав кластера секторной диаграммой; отключает группировку по царству"
             }
           >
             <input
@@ -155,8 +177,43 @@ export default function MapDisplayPanel({
               onChange={(e) => onClusterPieChartsChange?.(e.target.checked)}
             />
             <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">Кластеры-диаграммы</span>
+            <span className="map-display-switch-label">Диаграммы</span>
           </label>
+
+          <div
+            className={`map-display-dense-row${
+              denseClustersHighlightDisabled ? " map-display-dense-row--disabled" : ""
+            }`}
+          >
+            <label
+              className={`map-display-switch${
+                denseClustersHighlightDisabled ? " map-display-switch--disabled" : ""
+              }`}
+              title={
+                denseClustersHighlightDisabled
+                  ? "Доступно только при включённых маркерах"
+                  : "Отключить обычную кластеризацию и показать только группы ≥10 точек с полностью одинаковыми координатами; остальные точки скрыть"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={denseClustersHighlight}
+                disabled={denseClustersHighlightDisabled}
+                onChange={(e) => onDenseClustersHighlightChange?.(e.target.checked)}
+              />
+              <span className="map-display-switch-slider" />
+              <span className="map-display-switch-label">Плотные группы</span>
+            </label>
+            <button
+              type="button"
+              className="map-display-dense-process-btn"
+              disabled={denseClustersHighlightDisabled}
+              onClick={() => onDenseProcessingOpen?.()}
+              title="Открыть панель обработки плотных групп"
+            >
+              Обработка
+            </button>
+          </div>
 
           <hr />
 
@@ -170,6 +227,19 @@ export default function MapDisplayPanel({
             <span className="map-display-switch-label">Скрыть точки</span>
           </label>
 
+          <label
+            className="map-display-switch"
+            title="Показать или скрыть слой точек, полученных слиянием дубликатов"
+          >
+            <input
+              type="checkbox"
+              checked={mergedPointsVisible}
+              onChange={(e) => onMergedPointsVisibleChange?.(e.target.checked)}
+            />
+            <span className="map-display-switch-slider" />
+            <span className="map-display-switch-label">Слитые точки</span>
+          </label>
+
           <label className="map-display-switch" title="Показать тепловую карту по всем точкам">
             <input
               type="checkbox"
@@ -181,6 +251,7 @@ export default function MapDisplayPanel({
           </label>
         </div>
       )}
+
       <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.MAP} open={helpOpen} />
     </aside>
   );

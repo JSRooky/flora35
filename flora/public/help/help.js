@@ -1,15 +1,26 @@
 const HELP_SECTION_LABELS = {
-  feature: "Сведения о точке",
+  feature: "О точке",
   areal: "Радиус",
   polygon: "Полигон",
   buffer: "Буфер",
   area: "Область",
+  search: "Поиск",
   year: "Год находки",
-  status: "Статус МСОП",
+  seasonality: "Сезонность",
+  "areal-dynamics": "Динамика ареала",
+  status: "Статус",
+  regnum: "Царство",
   map: "Группы точек",
+  dense: "Обработка плотных групп",
   oopt: "ООПТ",
   "oopt-feature": "Сведения об ООПТ",
-  submit: "Ввод данных о находке"
+  submit: "Новая находка",
+  "data-sources": "Источники данных",
+  "external-processing": "Обработка внешних данных",
+  "data-work": "Работа с данными",
+  redbook: "Красная книга",
+  gbif: "Данные GBIF",
+  "gbif-processing": "Обработка данных GBIF"
 };
 
 const HELP_SECTION_IDS = Object.keys(HELP_SECTION_LABELS);

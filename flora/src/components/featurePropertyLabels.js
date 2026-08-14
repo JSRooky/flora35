@@ -7,7 +7,20 @@ export const PROPERTY_LABELS = {
   found_by: "Обнаружил",
   identified_by: "Определил",
   found_year: "Год находки",
-  status: "Статус"
+  status: "Статус",
+  distance_meters: "Расстояние исходников, м",
+  basisOfRecord: "Тип записи",
+  datasetKey: "Набор данных",
+  gbif_key: "GBIF ID",
+  gbif_url: "Ссылка GBIF",
+  inat_id: "iNaturalist ID",
+  inat_url: "Ссылка iNaturalist",
+  quality_grade: "Качество наблюдения",
+  place_guess: "Место (текст)",
+  license_code: "Лицензия",
+  obscured: "Координаты скрыты",
+  taxon_id: "Taxon ID",
+  source: "Источник"
 };
 
 /** Предпочтительный порядок полей в панели «Сведения о точке». */
@@ -18,17 +31,21 @@ export const PROPERTY_DISPLAY_ORDER = [
   "family",
   "found_year",
   "found_by",
-  "identified_by"
+  "identified_by",
+  "basisOfRecord",
+  "gbif_key",
+  "datasetKey"
 ];
 
 const REGNUM_LABELS = {
   plantae: "Растения",
   animalia: "Животные",
-  fungi: "Грибы"
+  fungi: "Грибы",
+  protozoa: "Простейшие"
 };
 
 /** Порядок отображения царств в списках и деревьях видов. */
-export const REGNUM_ORDER = ["plantae", "animalia", "fungi"];
+export const REGNUM_ORDER = ["plantae", "animalia", "fungi", "protozoa"];
 
 /** Подпись царства для UI; для неизвестных значений возвращает исходное значение. */
 export function getRegnumLabel(value) {
@@ -36,7 +53,8 @@ export function getRegnumLabel(value) {
     return "Без царства";
   }
 
-  return REGNUM_LABELS[value] ?? String(value);
+  const key = String(value).toLowerCase();
+  return REGNUM_LABELS[key] ?? String(value);
 }
 
 /** Подпись семейства для UI (используется как есть, без словаря). */
@@ -53,7 +71,9 @@ export function groupByRegnum(items, getRegnum = (item) => item.regnum) {
   const groups = new Map();
 
   items.forEach((item) => {
-    const key = getRegnum(item) || "";
+    const raw = getRegnum(item) || "";
+    const normalized = String(raw).toLowerCase();
+    const key = REGNUM_LABELS[normalized] ? normalized : raw;
     if (!groups.has(key)) {
       groups.set(key, []);
     }
@@ -96,7 +116,19 @@ export function buildSpeciesRegnumFamilyTree(species) {
       .map(([family, familyItems]) => ({
         family,
         label: getFamilyLabel(family),
-        species: [...familyItems].sort((left, right) => left.nameRu.localeCompare(right.nameRu, "ru"))
+        species: [...familyItems].sort((left, right) => {
+          const leftRu = String(left.nameRu || "").trim();
+          const rightRu = String(right.nameRu || "").trim();
+          const leftLabel =
+            leftRu && leftRu !== "Без названия"
+              ? leftRu
+              : String(left.nameLatin || "").trim();
+          const rightLabel =
+            rightRu && rightRu !== "Без названия"
+              ? rightRu
+              : String(right.nameLatin || "").trim();
+          return leftLabel.localeCompare(rightLabel, "ru");
+        })
       }));
 
     return {
@@ -116,7 +148,7 @@ export function getPropertyLabel(key) {
 /** Человекочитаемое значение поля свойства точки. */
 export function formatPropertyValue(key, value) {
   if (key === "regnum") {
-    return REGNUM_LABELS[value] ?? String(value);
+    return getRegnumLabel(value);
   }
 
   return String(value);

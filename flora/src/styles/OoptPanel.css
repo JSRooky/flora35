@@ -156,17 +156,55 @@
 
 .oopt-panel-object-item {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
 }
 
 .oopt-panel-checkbox {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   cursor: pointer;
   user-select: none;
   flex-shrink: 0;
-  padding-top: 4px;
+  padding-top: 0;
+}
+
+.oopt-panel-species-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 28px;
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid var(--map-tool-accent-border-soft, rgba(42, 157, 143, 0.45));
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--map-tool-accent-text, #1a6b62);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.oopt-panel-species-btn:hover {
+  background: var(--map-tool-accent-soft, rgba(42, 157, 143, 0.12));
+}
+
+.oopt-panel-species-btn--active {
+  background: var(--map-tool-accent, #2a9d8f);
+  border-color: var(--map-tool-accent, #2a9d8f);
+  color: #fff;
+}
+
+.oopt-panel-species-btn--active:hover {
+  background: var(--map-tool-accent, #2a9d8f);
+  color: #fff;
+}
+
+.oopt-panel-species-btn-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 
 .oopt-panel-switch {

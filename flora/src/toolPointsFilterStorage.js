@@ -13,24 +13,24 @@ export const TOOL_POINTS_FILTER_MODULES = [
 ];
 
 // Состояние по умолчанию — все переключатели выключены.
-function createDefaultState() {
+export function createDefaultToolPointsFilterState() {
   return Object.fromEntries(TOOL_POINTS_FILTER_MODULES.map((moduleId) => [moduleId, false]));
 }
 
 /** Загружает сохранённые переключатели «Только эти» для инструментов карты. */
 export function loadToolPointsFilterState() {
   if (typeof window === "undefined") {
-    return createDefaultState();
+    return createDefaultToolPointsFilterState();
   }
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return createDefaultState();
+      return createDefaultToolPointsFilterState();
     }
 
     const parsed = JSON.parse(raw);
-    const state = createDefaultState();
+    const state = createDefaultToolPointsFilterState();
 
     TOOL_POINTS_FILTER_MODULES.forEach((moduleId) => {
       if (typeof parsed[moduleId] === "boolean") {
@@ -40,7 +40,7 @@ export function loadToolPointsFilterState() {
 
     return state;
   } catch {
-    return createDefaultState();
+    return createDefaultToolPointsFilterState();
   }
 }
 
@@ -50,7 +50,7 @@ export function saveToolPointsFilterState(state) {
     return;
   }
 
-  const payload = createDefaultState();
+  const payload = createDefaultToolPointsFilterState();
   TOOL_POINTS_FILTER_MODULES.forEach((moduleId) => {
     payload[moduleId] = Boolean(state[moduleId]);
   });

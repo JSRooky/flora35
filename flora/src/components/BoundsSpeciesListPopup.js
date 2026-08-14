@@ -3,35 +3,70 @@ import {
   buildSpeciesRegnumFamilyTree,
   formatSpeciesCount
 } from "./featurePropertyLabels";
+import PanelCloseButton from "./PanelCloseButton";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/FeaturePopup.css";
 import "../styles/ArealPopup.css";
 import "../styles/BoundsSpeciesListPopup.css";
 
-// Добавляем латинское название, если русское имя повторяется среди видов списка.
-function getSpeciesLabel(species, speciesList) {
-  const hasDuplicateName = speciesList.filter((item) => item.nameRu === species.nameRu).length > 1;
-
-  if (hasDuplicateName && species.nameLatin) {
-    return `${species.nameRu} (${species.nameLatin})`;
+// Русское имя, если есть; иначе латынь. Плейсхолдер «Без названия» не показываем.
+function getSpeciesPrimaryName(species) {
+  const nameRu = String(species?.nameRu ?? "").trim();
+  if (nameRu && nameRu !== "Без названия") {
+    return nameRu;
   }
 
-  return species.nameRu;
+  return String(species?.nameLatin ?? "").trim();
+}
+
+// Добавляем латинское название, если русское имя повторяется среди видов списка.
+function getSpeciesLabel(species, speciesList) {
+  const nameRu = String(species?.nameRu ?? "").trim();
+  const nameLatin = String(species?.nameLatin ?? "").trim();
+  const hasRealRu = Boolean(nameRu && nameRu !== "Без названия");
+
+  if (!hasRealRu) {
+    return nameLatin;
+  }
+
+  const hasDuplicateName =
+    speciesList.filter((item) => {
+      const otherRu = String(item?.nameRu ?? "").trim();
+      return otherRu && otherRu !== "Без названия" && otherRu === nameRu;
+    }).length > 1;
+
+  if (hasDuplicateName && nameLatin) {
+    return `${nameRu} (${nameLatin})`;
+  }
+
+  return nameRu;
 }
 
 function SpeciesList({ species, onSpeciesSelect }) {
   return (
     <ul className="areal-contained-points-list bounds-species-list-popup-list">
-      {species.map((entry) => (
-        <li key={entry.nameLatin || entry.nameRu}>
-          <button
-            type="button"
-            className="areal-contained-points-item"
-            onClick={() => onSpeciesSelect?.(entry.point)}
-          >
-            {getSpeciesLabel(entry, species)}
-          </button>
-        </li>
-      ))}
+      {species.map((entry) => {
+        const label = getSpeciesLabel(entry, species);
+        if (!label) {
+          return null;
+        }
+
+        return (
+          <li key={entry.nameLatin || entry.nameRu}>
+            <button
+              type="button"
+              className="areal-contained-points-item"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onSpeciesSelect?.(entry.point);
+              }}
+            >
+              {label}
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -176,6 +211,7 @@ function SpeciesRegnumFamilyTree({
               level="regnum"
               onToggle={() => onToggleNode(regnumKey)}
               visibilitySwitch={
+                onRegnumVisibilityChange ? (
                 <button
                   type="button"
                   className={`bounds-species-tree-eye-btn${
@@ -195,6 +231,7 @@ function SpeciesRegnumFamilyTree({
                 >
                   <EyeIcon hidden={!markersVisible} />
                 </button>
+                ) : null
               }
             />
 
@@ -219,20 +256,31 @@ function SpeciesRegnumFamilyTree({
 
                       {familyExpanded ? (
                         <ul className="bounds-species-tree-children bounds-species-tree-species-list">
-                          {species.map((entry) => (
-                            <li
-                              key={entry.nameLatin || entry.nameRu}
-                              className="bounds-species-tree-node bounds-species-tree-node--species"
-                            >
-                              <button
-                                type="button"
-                                className="bounds-species-tree-species-btn"
-                                onClick={() => onSpeciesSelect?.(entry.point)}
+                          {species.map((entry) => {
+                            const label = getSpeciesLabel(entry, species);
+                            if (!label) {
+                              return null;
+                            }
+
+                            return (
+                              <li
+                                key={entry.nameLatin || entry.nameRu}
+                                className="bounds-species-tree-node bounds-species-tree-node--species"
                               >
-                                {getSpeciesLabel(entry, species)}
-                              </button>
-                            </li>
-                          ))}
+                                <button
+                                  type="button"
+                                  className="bounds-species-tree-species-btn"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    onSpeciesSelect?.(entry.point);
+                                  }}
+                                >
+                                  {label}
+                                </button>
+                              </li>
+                            );
+                          })}
                         </ul>
                       ) : null}
                     </li>
@@ -247,21 +295,28 @@ function SpeciesRegnumFamilyTree({
   );
 }
 
-/** Плавающее окно со списком видов внутри полигона ООПТ или заповедника. */
+/** Плавающее окно со списком видов (ООПТ, плотная группа и т.п.). */
 export default function BoundsSpeciesListPopup({
   open = false,
   onClose,
+  onMinimize,
+  title = "Виды внутри выбранной ООПТ",
+  ariaLabel = null,
   territoryHeading = null,
   speciesSummary = null,
   onSpeciesSelect,
-  onRegnumVisibilityChange
+  onRegnumVisibilityChange = null
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [groupByRegnumEnabled, setGroupByRegnumEnabled] = useState(true);
   const [expandedNodes, setExpandedNodes] = useState(() => new Set());
   const [regnumVisibility, setRegnumVisibility] = useState({});
 
-  const species = useMemo(() => speciesSummary?.species ?? [], [speciesSummary?.species]);
+  const species = useMemo(
+    () =>
+      (speciesSummary?.species ?? []).filter((entry) => Boolean(getSpeciesPrimaryName(entry))),
+    [speciesSummary?.species]
+  );
   const hasSpecies = species.length > 0;
   const speciesTree = useMemo(
     () => (groupByRegnumEnabled ? buildSpeciesRegnumFamilyTree(species) : []),
@@ -350,9 +405,8 @@ export default function BoundsSpeciesListPopup({
     return null;
   }
 
-  const closeLabel = "Закрыть";
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
-  const speciesCount = speciesSummary?.count ?? 0;
+  const speciesCount = species.length;
   const territoryCategory = territoryHeading?.category ?? "";
   const territoryTitle = territoryHeading?.title ?? "";
   const hasTerritoryHeading = Boolean(territoryCategory || territoryTitle);
@@ -370,12 +424,13 @@ export default function BoundsSpeciesListPopup({
         className={`feature-popup bounds-species-list-popup${
           collapsed ? " feature-popup--collapsed bounds-species-list-popup--collapsed" : ""
         }`}
-        aria-label="Виды внутри выбранной ООПТ"
+        aria-label={ariaLabel || title}
         role="dialog"
       >
         <div className="feature-popup-header">
-          <h3 className="feature-popup-title">Виды внутри выбранной ООПТ</h3>
+          <h3 className="feature-popup-title">{title}</h3>
           <div className="popup-panel-header-actions">
+            {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
             <button
               type="button"
               className="popup-panel-toggle"
@@ -386,15 +441,7 @@ export default function BoundsSpeciesListPopup({
             >
               {collapsed ? "▾" : "▴"}
             </button>
-            <button
-              type="button"
-              className="popup-panel-toggle"
-              onClick={onClose}
-              aria-label={closeLabel}
-              title={closeLabel}
-            >
-              ×
-            </button>
+            {onClose ? <PanelCloseButton onClick={onClose} /> : null}
           </div>
         </div>
 
@@ -447,7 +494,9 @@ export default function BoundsSpeciesListPopup({
                       expandedNodes={expandedNodes}
                       onToggleNode={handleToggleNode}
                       regnumVisibility={regnumVisibility}
-                      onRegnumVisibilityChange={handleRegnumVisibilityChange}
+                      onRegnumVisibilityChange={
+                        onRegnumVisibilityChange ? handleRegnumVisibilityChange : null
+                      }
                     />
                   </div>
                 ) : (

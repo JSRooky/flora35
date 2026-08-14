@@ -20,7 +20,12 @@ function captureMapboxBasemapLayers(map) {
     return;
   }
 
-  state.layerIds = map.getStyle().layers.map((layer) => layer.id);
+  const layers = map.getStyle()?.layers;
+  if (!layers?.length) {
+    return;
+  }
+
+  state.layerIds = layers.map((layer) => layer.id);
   state.layerIds.forEach((id) => {
     state.visibility.set(id, map.getLayoutProperty(id, "visibility") ?? "visible");
   });
@@ -28,7 +33,7 @@ function captureMapboxBasemapLayers(map) {
 
 /** Добавляет растровый слой OSM вниз стека (по умолчанию скрыт). */
 export function addOsmBasemapLayer(map) {
-  if (map.getSource(SOURCE_ID)) {
+  if (!map?.getSource || map.getSource(SOURCE_ID)) {
     return;
   }
 
@@ -41,7 +46,7 @@ export function addOsmBasemapLayer(map) {
     attribution: "© OpenStreetMap contributors"
   });
 
-  const firstLayerId = map.getStyle().layers[0]?.id;
+  const firstLayerId = map.getStyle()?.layers?.[0]?.id;
 
   map.addLayer(
     {
@@ -74,8 +79,16 @@ function setMapboxBasemapVisible(map, visible) {
 
 /** Переключает подложку OpenStreetMap, скрывая/восстанавливая слои Mapbox-стиля. */
 export function setOsmBasemapEnabled(map, enabled) {
+  if (!map?.getLayer) {
+    return;
+  }
+
   if (!map.getLayer(LAYER_ID)) {
     addOsmBasemapLayer(map);
+  }
+
+  if (!map.getLayer(LAYER_ID)) {
+    return;
   }
 
   setMapboxBasemapVisible(map, !enabled);

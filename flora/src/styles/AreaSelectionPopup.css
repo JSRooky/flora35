@@ -222,7 +222,10 @@
 }
 
 .area-selection-contained-points-item {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   width: 100%;
   margin: 0;
   padding: 4px 0;
@@ -241,4 +244,11 @@
 .area-selection-contained-points-item:hover {
   color: var(--map-tool-accent-dark);
   text-decoration-color: currentColor;
+}
+
+.area-selection-contained-points-count {
+  flex-shrink: 0;
+  color: #888;
+  font-size: 12px;
+  text-decoration: none;
 }

@@ -9,8 +9,7 @@ import {
 
 /**
  * Загружает точки карты из Firestore:
- * - findings → проверенные данные;
- * - user_submissions → пользовательские данные.
+ * findings (dataset=points) — проверенные, user_submissions — пользовательские.
  */
 export async function loadLocationsFromFirestore() {
   if (!isFirebaseConfigured()) {
@@ -29,7 +28,10 @@ export async function loadLocationsFromFirestore() {
   ]);
 
   return {
-    points: findingDocsToSpeciesCollection(findingsSnapshot.docs, LOCATION_DATASETS.POINTS),
+    points: findingDocsToSpeciesCollection(
+      findingsSnapshot.docs,
+      LOCATION_DATASETS.POINTS
+    ),
     userpoints: submissionDocsToSpeciesCollection(submissionsSnapshot.docs)
   };
 }

@@ -10,7 +10,16 @@
   pointer-events: none;
 }
 
+.map-corner-controls-footer {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+
 .map-corner-controls-bar {
+  position: relative;
   display: inline-flex;
   align-items: center;
   padding: 4px 6px;
@@ -25,6 +34,104 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.75);
   pointer-events: auto;
   transition: background-color 0.2s ease;
+}
+
+.map-corner-filters-popover {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - 40px));
+  padding: 10px 10px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.14),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+  color: #1c1c1e;
+}
+
+.map-corner-filters-popover-title {
+  margin: 0 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #636366;
+}
+
+.map-corner-filters-popover-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.map-corner-filters-popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 4px 4px 8px;
+  border-radius: 6px;
+}
+
+.map-corner-filters-popover-item-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.map-corner-filters-popover-trash {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8e8e93;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.map-corner-filters-popover-trash:hover {
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+}
+
+.map-corner-filters-popover-trash-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.map-corner-filters-popover-reset-all {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 6px;
+  background: var(--map-tool-accent-soft, rgba(42, 157, 143, 0.12));
+  color: var(--map-tool-accent-text, #1a6b62);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.map-corner-filters-popover-reset-all:hover {
+  background: rgba(42, 157, 143, 0.2);
 }
 
 .map-corner-controls-bar:hover {
@@ -87,6 +194,10 @@
   .map-corner-controls {
     left: 10px;
     bottom: 40px;
+    gap: 6px;
+  }
+
+  .map-corner-controls-footer {
     gap: 6px;
   }
 

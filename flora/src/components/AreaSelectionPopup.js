@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-import { getArealPointKey } from "./addArealLayer";
 import { AREA_DRAW_MODES, AREA_OPERATION_MODES } from "./addAreaSelectionLayer";
+import { formatPointCount, formatSpeciesCount } from "./featurePropertyLabels";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
+import PanelCloseButton from "./PanelCloseButton";
+import PanelMinimizeButton from "./PanelMinimizeButton";
 import { ReactComponent as DrawFreeIcon } from "../images/draw-free.svg";
 import { ReactComponent as DrawRectIcon } from "../images/draw-rect.svg";
 import { ReactComponent as DrawPolyIcon } from "../images/draw-poly.svg";
@@ -30,34 +32,21 @@ const DRAW_TOOL_LABELS = {
   [AREA_DRAW_MODES.POLYGON]: "полигон"
 };
 
-/** Склонение «точка/точки/точек» для русского интерфейса. */
-function formatContainedPointsCount(count) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
+// Добавляем латинское название, если русское имя вида повторяется в списке.
+function getSpeciesLabel(species, speciesList) {
+  const nameRu = species.nameRu || "Без названия";
+  const hasDuplicateName =
+    speciesList.filter((item) => item.nameRu === species.nameRu).length > 1;
 
-  if (mod10 === 1 && mod100 !== 11) {
-    return `${count} точка`;
-  }
-
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-    return `${count} точки`;
-  }
-
-  return `${count} точек`;
-}
-
-// Добавляем латинское название, если русское имя точки повторяется в списке.
-function getPointLabel(feature, points) {
-  const nameRu = feature.properties?.name_ru || "Без названия";
-  const hasDuplicateName = points.filter(
-    (point) => point.properties?.name_ru === feature.properties?.name_ru
-  ).length > 1;
-
-  if (hasDuplicateName && feature.properties?.name_latin) {
-    return `${nameRu} (${feature.properties.name_latin})`;
+  if (hasDuplicateName && species.nameLatin) {
+    return `${nameRu} (${species.nameLatin})`;
   }
 
   return nameRu;
+}
+
+function getSpeciesKey(species) {
+  return species.nameLatin || species.nameRu || species.point?.id || "species";
 }
 
 // Текст подсказки зависит от активного инструмента рисования и режима сложения/вычитания области.
@@ -103,15 +92,18 @@ function getCollapsedSummary(drawTool, operationMode, drawingActive, hasArea, co
     return "Область не выделена";
   }
 
-  if (containedPoints?.count > 0) {
-    return `В области: ${formatContainedPointsCount(containedPoints.count)}`;
+  const pointsCount = containedPoints?.count ?? 0;
+  const speciesCount = containedPoints?.speciesCount ?? 0;
+
+  if (pointsCount > 0) {
+    return `В области: ${formatPointCount(pointsCount)}, ${formatSpeciesCount(speciesCount)}`;
   }
 
   return "В области нет точек";
 }
 
 /**
- * Панель модуля «Область»: рисование контура на карте и список точек внутри выделения.
+ * Панель модуля «Область»: рисование контура на карте и список видов внутри выделения.
  */
 export default function AreaSelectionPopup({
   drawTool = AREA_DRAW_MODES.FREEHAND,
@@ -124,11 +116,14 @@ export default function AreaSelectionPopup({
   onPointSelect,
   onReset,
   collapsed = false,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize,
+  onClose
 }) {
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false);
-  const hasContainedPoints = containedPoints?.count > 0;
+  const speciesList = containedPoints?.species ?? [];
+  const hasContainedSpecies = speciesList.length > 0;
 
   return (
     <div className={`area-selection-popup ${collapsed ? "area-selection-popup--collapsed" : ""}`}>
@@ -136,6 +131,7 @@ export default function AreaSelectionPopup({
         <h3 className="area-selection-popup-title">Область</h3>
         <div className="popup-panel-header-actions">
           <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
             className="popup-panel-toggle"
@@ -146,6 +142,7 @@ export default function AreaSelectionPopup({
           >
             {collapsed ? "▾" : "▴"}
           </button>
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 
@@ -227,19 +224,26 @@ export default function AreaSelectionPopup({
               <div className="area-selection-contained-points">
                 <p className="area-selection-contained-points-title">
                   В области:{" "}
-                  <strong>{formatContainedPointsCount(containedPoints?.count ?? 0)}</strong>
+                  <strong>{formatPointCount(containedPoints?.count ?? 0)}</strong>
+                  {", "}
+                  <strong>{formatSpeciesCount(containedPoints?.speciesCount ?? 0)}</strong>
                 </p>
 
-                {hasContainedPoints ? (
+                {hasContainedSpecies ? (
                   <ul className="area-selection-contained-points-list">
-                    {containedPoints.points.map((feature) => (
-                      <li key={getArealPointKey(feature)}>
+                    {speciesList.map((species) => (
+                      <li key={getSpeciesKey(species)}>
                         <button
                           type="button"
                           className="area-selection-contained-points-item"
-                          onClick={() => onPointSelect?.(feature)}
+                          onClick={() => onPointSelect?.(species.point)}
                         >
-                          {getPointLabel(feature, containedPoints.points)}
+                          <span>{getSpeciesLabel(species, speciesList)}</span>
+                          {species.count > 1 ? (
+                            <span className="area-selection-contained-points-count">
+                              — {species.count}
+                            </span>
+                          ) : null}
                         </button>
                       </li>
                     ))}

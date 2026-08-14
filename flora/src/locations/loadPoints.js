@@ -1,31 +1,69 @@
 import { isFirebaseConfigured } from "../firebase/config";
 import { loadLocationsFromFirestore } from "../firebase/loadLocationsFromFirestore";
+import { findGbifFeatureByKey } from "../gbif/gbifStore";
+import { findInatFeatureById } from "../inaturalist/inatStore";
+import { getMergedFeatures } from "../components/addMergedLayer";
+import { getRedBookFeatures } from "../components/addRedBookLayer";
 import { expandFindingsToFeatures } from "./expandFindings";
 import { mergeSpeciesCollections } from "./mergeSpeciesCollections";
+import localPointsCollection from "./points.json";
+import localUserpointsCollection from "./userpoints.json";
 
 export const DATA_SOURCE_MODES = {
+  NONE: "none",
   ALL: "all",
   POINTS: "points",
-  USERPOINTS: "userpoints"
+  USERPOINTS: "userpoints",
+  EXTERNAL: "external",
+  MERGED: "merged",
+  REDBOOK: "redbook",
+  /** @deprecated Используйте EXTERNAL */
+  GBIF: "external"
 };
 
 export const DATA_SOURCE_OPTIONS = [
   {
-    value: DATA_SOURCE_MODES.ALL,
-    label: "Все",
-    title: "Проверенные и пользовательские данные"
+    value: DATA_SOURCE_MODES.NONE,
+    label: "Не выбран",
+    title: "Карта без слоя данных"
   },
   {
     value: DATA_SOURCE_MODES.POINTS,
     label: "Проверенные",
-    title: "Только проверенные данные"
+    title: "Проверенные находки (findings)"
   },
   {
     value: DATA_SOURCE_MODES.USERPOINTS,
     label: "Пользовательские",
-    title: "Только пользовательские данные"
+    title: "Пользовательские находки (user_submissions)"
+  },
+  {
+    value: DATA_SOURCE_MODES.EXTERNAL,
+    label: "Внешние источники",
+    title: "Данные GBIF и iNaturalist"
+  },
+  {
+    value: DATA_SOURCE_MODES.MERGED,
+    label: "Слитые точки",
+    title: "Объединённые точки (merged_points)"
+  },
+  {
+    value: DATA_SOURCE_MODES.REDBOOK,
+    label: "Красная книга",
+    title: "Совпадения списка редких видов (GBIF / iNat)"
+  },
+  {
+    value: DATA_SOURCE_MODES.ALL,
+    label: "Все локальные",
+    title: "Проверенные и пользовательские данные",
+    hidden: true
   }
 ];
+
+/** Опции для селектора «Слой данных» в меню (скрытые режимы не показываются). */
+export const VISIBLE_DATA_SOURCE_OPTIONS = DATA_SOURCE_OPTIONS.filter(
+  (option) => !option.hidden
+);
 
 const EMPTY_SPECIES_COLLECTION = {
   type: "SpeciesCollection",
@@ -34,7 +72,7 @@ const EMPTY_SPECIES_COLLECTION = {
 
 let pointsCollection = EMPTY_SPECIES_COLLECTION;
 let userpointsCollection = EMPTY_SPECIES_COLLECTION;
-let dataSourceFilter = DATA_SOURCE_MODES.ALL;
+let dataSourceFilter = DATA_SOURCE_MODES.NONE;
 let locationsInitPromise = null;
 
 let cachedFeatureCollection = null;
@@ -82,6 +120,13 @@ function applyFirestoreCollections({ points, userpoints }) {
   invalidateFeatureCaches();
 }
 
+/** Локальный JSON — запасной источник, если Firebase не настроен. */
+function applyLocalJsonCollections() {
+  pointsCollection = localPointsCollection;
+  userpointsCollection = localUserpointsCollection;
+  invalidateFeatureCaches();
+}
+
 /** Задаёт, какие источники данных показывать на карте. */
 export function setDataSourceFilter(mode) {
   if (dataSourceFilter === mode) {
@@ -101,12 +146,17 @@ export function getDataSourceFilter() {
 }
 
 /**
- * Загружает проверенные точки (findings) и пользовательские (user_submissions) из Firestore.
+ * Загружает проверенные (findings) и пользовательские (user_submissions)
+ * точки из Firestore. Без Firebase — подставляет локальные JSON.
  * @returns {Promise<boolean>}
  */
 export function initLocationsFromFirestore() {
   if (!isFirebaseConfigured()) {
-    console.warn("Firebase is not configured — location data will be empty.");
+    console.warn(
+      "Firebase is not configured — using local points.json and userpoints.json. " +
+        "Add REACT_APP_FIREBASE_* to flora/.env.local to load from Firestore."
+    );
+    applyLocalJsonCollections();
     return Promise.resolve(false);
   }
 
@@ -119,6 +169,8 @@ export function initLocationsFromFirestore() {
       .catch((error) => {
         locationsInitPromise = null;
         console.warn("Failed to load locations from Firestore:", error);
+        console.warn("Falling back to local points.json and userpoints.json.");
+        applyLocalJsonCollections();
         return false;
       });
   }
@@ -129,6 +181,7 @@ export function initLocationsFromFirestore() {
 /** Повторно загружает коллекции из Firestore (например, после новой отправки). */
 export function refreshLocationsFromFirestore() {
   if (!isFirebaseConfigured()) {
+    applyLocalJsonCollections();
     return Promise.resolve(false);
   }
 
@@ -143,7 +196,7 @@ export function refreshLocationsFromFirestore() {
     });
 }
 
-/** Всегда возвращает объединённую коллекцию (для подсказок при вводе). */
+/** Всегда возвращает объединённую локальную коллекцию (для подсказок при вводе). */
 export function getAllSpeciesCollection() {
   return mergeSpeciesCollections(pointsCollection, userpointsCollection);
 }
@@ -155,6 +208,13 @@ export function getSpeciesCollection() {
       return pointsCollection;
     case DATA_SOURCE_MODES.USERPOINTS:
       return userpointsCollection;
+    case DATA_SOURCE_MODES.NONE:
+    case DATA_SOURCE_MODES.EXTERNAL:
+    case DATA_SOURCE_MODES.MERGED:
+    case DATA_SOURCE_MODES.REDBOOK:
+    case DATA_SOURCE_MODES.GBIF:
+      return EMPTY_SPECIES_COLLECTION;
+    case DATA_SOURCE_MODES.ALL:
     default:
       return getAllSpeciesCollection();
   }
@@ -201,17 +261,70 @@ function featureMatchesFindingId(feature, findingId) {
   );
 }
 
+function resolveGbifKeyFromFindingId(findingId) {
+  const normalizedId = String(findingId);
+  if (normalizedId.startsWith("gbif-")) {
+    return normalizedId.slice("gbif-".length);
+  }
+  return normalizedId;
+}
+
+function resolveInatIdFromFindingId(findingId) {
+  const normalizedId = String(findingId);
+  if (normalizedId.startsWith("inat-")) {
+    return normalizedId.slice("inat-".length);
+  }
+  return normalizedId;
+}
+
 /** Ищет точку по идентификатору находки во всех источниках данных. */
 export function findFeatureByFindingId(findingId) {
   if (findingId == null || findingId === "") {
     return null;
   }
 
-  return (
+  const localFeature =
     getAllFeatureCollection().features.find((feature) =>
       featureMatchesFindingId(feature, findingId)
-    ) ?? null
-  );
+    ) ?? null;
+
+  if (localFeature) {
+    return localFeature;
+  }
+
+  const normalizedId = String(findingId);
+
+  if (normalizedId.startsWith("rb-") || normalizedId.startsWith("redbook")) {
+    const redBookFeature =
+      getRedBookFeatures().find(
+        (feature) =>
+          String(feature.id ?? "") === normalizedId ||
+          String(feature.properties?.redbook_match_id ?? "") === normalizedId ||
+          featureMatchesFindingId(feature, findingId)
+      ) ?? null;
+    if (redBookFeature) {
+      return redBookFeature;
+    }
+  }
+
+  if (normalizedId.startsWith("merged") || normalizedId.startsWith("merged__")) {
+    const mergedFeature =
+      getMergedFeatures().find(
+        (feature) =>
+          String(feature.id ?? "") === normalizedId ||
+          String(feature.properties?.merged_id ?? "") === normalizedId ||
+          featureMatchesFindingId(feature, findingId)
+      ) ?? null;
+    if (mergedFeature) {
+      return mergedFeature;
+    }
+  }
+
+  if (normalizedId.startsWith("inat-")) {
+    return findInatFeatureById(resolveInatIdFromFindingId(findingId));
+  }
+
+  return findGbifFeatureByKey(resolveGbifKeyFromFindingId(findingId));
 }
 
 /** Проверяет, попадает ли находка в выбранный источник данных. */
@@ -220,21 +333,45 @@ export function isFindingInDataSource(findingId, mode) {
     return false;
   }
 
-  let collection;
+  const normalizedId = String(findingId);
+  const gbifFeature = findGbifFeatureByKey(resolveGbifKeyFromFindingId(findingId));
+  const inatFeature = findInatFeatureById(resolveInatIdFromFindingId(findingId));
 
   switch (mode) {
+    case DATA_SOURCE_MODES.NONE:
+      return false;
     case DATA_SOURCE_MODES.POINTS:
-      collection = pointsCollection;
-      break;
+      return expandFindingsToFeatures(pointsCollection).features.some((feature) =>
+        featureMatchesFindingId(feature, findingId)
+      );
     case DATA_SOURCE_MODES.USERPOINTS:
-      collection = userpointsCollection;
-      break;
+      return expandFindingsToFeatures(userpointsCollection).features.some((feature) =>
+        featureMatchesFindingId(feature, findingId)
+      );
+    case DATA_SOURCE_MODES.EXTERNAL:
+    case DATA_SOURCE_MODES.GBIF:
+      return Boolean(gbifFeature || inatFeature);
+    case DATA_SOURCE_MODES.MERGED:
+      return (
+        normalizedId.startsWith("merged") ||
+        normalizedId.startsWith("merged__")
+      );
+    case DATA_SOURCE_MODES.REDBOOK:
+      return (
+        normalizedId.startsWith("rb-") ||
+        normalizedId.startsWith("redbook") ||
+        getRedBookFeatures().some(
+          (feature) =>
+            String(feature.id ?? "") === normalizedId ||
+            String(feature.properties?.redbook_match_id ?? "") === normalizedId ||
+            featureMatchesFindingId(feature, findingId)
+        )
+      );
+    case DATA_SOURCE_MODES.ALL:
     default:
-      collection = getAllSpeciesCollection();
-      break;
+      // «Все локальные» — только проверенные и пользовательские точки.
+      return expandFindingsToFeatures(getAllSpeciesCollection()).features.some((feature) =>
+        featureMatchesFindingId(feature, findingId)
+      );
   }
-
-  return expandFindingsToFeatures(collection).features.some((feature) =>
-    featureMatchesFindingId(feature, findingId)
-  );
 }
