@@ -50,6 +50,11 @@
   overflow-y: auto;
 }
 
+/* Flex-элементы иначе перекрывают HTML hidden без !important. */
+.module-panel-stack [hidden] {
+  display: none !important;
+}
+
 
 /* Перемещаем атрибуцию внутрь карты */
 .mapboxgl-ctrl-attrib {
