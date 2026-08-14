@@ -498,19 +498,9 @@ export default function MapView() {
       const next = prev.filter((panelId) => !idSet.has(panelId));
       return next.length === prev.length ? prev : next;
     });
-    setPanelMinimized((prev) => {
-      const next = { ...prev };
-      let changed = false;
-
-      panelIds.forEach((panelId) => {
-        if (next[panelId]) {
-          next[panelId] = false;
-          changed = true;
-        }
-      });
-
-      return changed ? next : prev;
-    });
+    // Не сбрасываем panelMinimized: для «Источники данных» видимость —
+    // EXTERNAL && !minimized. Сброс флага сразу после закрытия снова
+    // монтирует панель.
   }, []);
 
   const minimizePanel = useCallback(
