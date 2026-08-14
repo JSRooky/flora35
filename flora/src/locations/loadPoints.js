@@ -65,6 +65,9 @@ export const VISIBLE_DATA_SOURCE_OPTIONS = DATA_SOURCE_OPTIONS.filter(
   (option) => !option.hidden
 );
 
+/** Слой данных при открытии карты. */
+export const DEFAULT_DATA_SOURCE_MODE = DATA_SOURCE_MODES.POINTS;
+
 const EMPTY_SPECIES_COLLECTION = {
   type: "SpeciesCollection",
   species: []
@@ -72,7 +75,7 @@ const EMPTY_SPECIES_COLLECTION = {
 
 let pointsCollection = EMPTY_SPECIES_COLLECTION;
 let userpointsCollection = EMPTY_SPECIES_COLLECTION;
-let dataSourceFilter = DATA_SOURCE_MODES.NONE;
+let dataSourceFilter = DEFAULT_DATA_SOURCE_MODE;
 let locationsInitPromise = null;
 
 let cachedFeatureCollection = null;
