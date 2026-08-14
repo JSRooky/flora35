@@ -34,8 +34,8 @@ import {
   setInatData,
   setInatHiddenPointFeatureKeys
 } from "./addInatLayer";
-import { getVisibleTempLayerFeatures } from "../tempLayers/tempLayerStore";
-import { isTempLayersVisible, getTempLayersInteractiveLayerIds } from "./addTempLayersLayer";
+import { getTempLayerFeatureGroups, getVisibleTempLayerFeatures } from "../tempLayers/tempLayerStore";
+import { isTempLayersVisible, getTempLayersInteractiveLayerIds, getTempLayersClusterSourceIds, isTempLayersClusterPieChartsEnabled, getTempLayerPieSegments, setTempLayersHiddenPointFeatureKeys, setTempLayersData, setTempLayersLocationFeatureFilter } from "./addTempLayersLayer";
 import {
   getMergedFeatures,
   getMergedInteractiveLayerIds
@@ -77,6 +77,9 @@ import {
   DENSE_PILES_COUNT_LAYER_ID,
   DENSE_PILES_SOURCE_ID,
   ensureDensePilesLayers,
+  getDensePileMinSize,
+  listDensePiles,
+  mergeDensePileLists,
   partitionFeaturesByDensePiles,
   removeDensePilesLayers,
   setDensePilesData
@@ -435,13 +438,25 @@ function donutSegment(start, end, radius, innerRadius, color) {
 }
 
 function getClusterPieChartSignature(props) {
+  const tempSegments = getTempLayerPieSegments(props);
+  if (tempSegments) {
+    return `temp:${tempSegments.map((segment) => segment.count).join(":")}`;
+  }
   return CLUSTER_REGNUM_KEYS.map((key) => Number(props[key]) || 0).join(":");
 }
 
-/** SVG-пончик: доли plantae / animalia / fungi / protozoa и общее число точек в центре. */
+/** SVG-пончик: доли по царству или по временным слоям и общее число точек в центре. */
 function createClusterPieChartElement(props) {
-  const counts = CLUSTER_REGNUM_KEYS.map((key) => Number(props[key]) || 0);
-  const total = Number(props.point_count) || counts.reduce((sum, count) => sum + count, 0);
+  const tempSegments = getTempLayerPieSegments(props);
+  const segments = tempSegments
+    ? tempSegments
+    : CLUSTER_REGNUM_KEYS.map((key) => ({
+        count: Number(props[key]) || 0,
+        color: REGNUM_COLORS[key]
+      }));
+  const total =
+    Number(props.point_count) ||
+    segments.reduce((sum, segment) => sum + segment.count, 0);
 
   if (total <= 0) {
     return null;
@@ -453,24 +468,24 @@ function createClusterPieChartElement(props) {
   const offsets = [];
   let runningTotal = 0;
 
-  counts.forEach((count) => {
+  segments.forEach((segment) => {
     offsets.push(runningTotal);
-    runningTotal += count;
+    runningTotal += segment.count;
   });
 
   let segmentsHtml = "";
 
-  counts.forEach((count, index) => {
-    if (count <= 0) {
+  segments.forEach((segment, index) => {
+    if (segment.count <= 0) {
       return;
     }
 
     segmentsHtml += donutSegment(
       offsets[index] / total,
-      (offsets[index] + count) / total,
+      (offsets[index] + segment.count) / total,
       radius,
       innerRadius,
-      REGNUM_COLORS[CLUSTER_REGNUM_KEYS[index]]
+      segment.color
     );
   });
 
@@ -550,6 +565,12 @@ function getVisibleClusterFeatures(map) {
     collectFromSource(INAT_SOURCE_ID, "inat");
   }
 
+  if (isTempLayersVisible() && isTempLayersClusterPieChartsEnabled()) {
+    getTempLayersClusterSourceIds().forEach((sourceId) => {
+      collectFromSource(sourceId, `temp:${sourceId}`);
+    });
+  }
+
   return clustersById;
 }
 
@@ -557,12 +578,13 @@ function updateClusterPieChartMarkers(map) {
   const showLocations = markersVisible;
   const showGbif = isGbifLayerVisible() && isGbifClusterPieChartsEnabled();
   const showInat = isInatLayerVisible() && isInatClusterPieChartsEnabled();
+  const showTemp = isTempLayersVisible() && isTempLayersClusterPieChartsEnabled();
 
   if (
     !clusterPieChartsEnabled ||
     !isMapboxClusteringActive() ||
     clusterByRegnum ||
-    (!showLocations && !showGbif && !showInat)
+    (!showLocations && !showGbif && !showInat && !showTemp)
   ) {
     removeAllClusterPieChartMarkers();
     removeOrphanedClusterPieChartMarkers(map);
@@ -777,6 +799,10 @@ function applyUnclusteredLayerFilters(map) {
     selectedPointPinFeatureKey
   ]);
   setRedBookHiddenPointFeatureKeys(map, [
+    sharedPointPinFeatureKey,
+    selectedPointPinFeatureKey
+  ]);
+  setTempLayersHiddenPointFeatureKeys(map, [
     sharedPointPinFeatureKey,
     selectedPointPinFeatureKey
   ]);
@@ -1056,7 +1082,9 @@ export function updateSelectedPointHighlight(map, feature) {
 
   removeSelectedPointPinMarker(map);
   selectedPointPinFeatureKey = featureKey;
-  const centerColor = getPointColorForRegnum(feature.properties?.regnum);
+  const centerColor =
+    feature.properties?.temp_marker_color ||
+    getPointColorForRegnum(feature.properties?.regnum);
 
   applyUnclusteredLayerFilters(map);
 
@@ -1938,7 +1966,8 @@ export function filterFeatures(features, filters = {}) {
           if (
             key === "status" &&
             (feature.properties?.source === "gbif" ||
-              feature.properties?.source === "inaturalist")
+              feature.properties?.source === "inaturalist" ||
+              feature.properties?.temp_layer_id)
           ) {
             return true;
           }
@@ -2126,6 +2155,51 @@ export function getToolFeatures(filters = {}) {
   }
 
   return features;
+}
+
+/** Плотные группы по источникам отдельно, затем слияние по координатам (без фантомных куч). */
+export function listToolDensePiles(filters = {}, { minSize = getDensePileMinSize() } = {}) {
+  const options = { minSize };
+  const lists = [];
+
+  if (toolIncludeLocal && locationsData?.features?.length) {
+    lists.push(listDensePiles(filterFeatures(locationsData.features, filters), options));
+  }
+
+  if (toolIncludeGbif && isGbifLayerVisible()) {
+    lists.push(listDensePiles(getVisibleGbifFeatures(filters), options));
+  }
+
+  if (toolIncludeInat && isInatLayerVisible()) {
+    lists.push(listDensePiles(getVisibleInatFeatures(filters), options));
+  }
+
+  if (toolIncludeMerged) {
+    lists.push(
+      listDensePiles(
+        enrichFeaturesWithAttribution(filterFeatures(getMergedFeatures(), filters), getStablePointKey),
+        options
+      )
+    );
+  }
+
+  if (toolIncludeRedBook) {
+    lists.push(listDensePiles(filterFeatures(getRedBookFeatures(), filters), options));
+  }
+
+  if (isTempLayersVisible()) {
+    const tempGroups = getTempLayerFeatureGroups();
+    tempGroups.forEach((group) => {
+      lists.push(listDensePiles(filterFeatures(group.features, filters), options));
+    });
+    if (tempGroups.length > 1) {
+      lists.push(
+        listDensePiles(filterFeatures(getVisibleTempLayerFeatures(), filters), options)
+      );
+    }
+  }
+
+  return mergeDensePileLists(lists);
 }
 
 /** Сводка по точкам внутри GeoJSON-объекта с учётом фильтров (без within-фильтра в base). */
@@ -2742,6 +2816,7 @@ export function applyLocationsFilter(map, filters = {}) {
     applyGbifTimelineYearChange(map, prevFilters, filters);
     applyInatTimelineYearChange(map, prevFilters, filters);
     applyRedBookLocationsFilter(map, filters);
+    applyTempLayersLocationsFilter(map, filters);
     return;
   }
 
@@ -2750,6 +2825,7 @@ export function applyLocationsFilter(map, filters = {}) {
     applyGbifLocationsFilter(map, filters);
     applyInatLocationsFilter(map, filters);
     applyRedBookLocationsFilter(map, filters);
+    applyTempLayersLocationsFilter(map, filters);
     return;
   }
 
@@ -2760,6 +2836,7 @@ export function applyLocationsFilter(map, filters = {}) {
       applyGbifLocationsFilter(map, filters);
       applyInatLocationsFilter(map, filters);
       applyRedBookLocationsFilter(map, filters);
+      applyTempLayersLocationsFilter(map, filters);
     }
     return;
   }
@@ -2775,7 +2852,17 @@ export function applyLocationsFilter(map, filters = {}) {
     applyGbifLocationsFilter(map, filters);
     applyInatLocationsFilter(map, filters);
     applyRedBookLocationsFilter(map, filters);
+    applyTempLayersLocationsFilter(map, filters);
   }
+}
+
+function applyTempLayersLocationsFilter(map, filters = currentFilters) {
+  if (!map) {
+    return;
+  }
+
+  setTempLayersLocationFeatureFilter((features) => filterFeatures(features, filters));
+  setTempLayersData(map);
 }
 
 /** Оценка числа точек, попадающих на карту (для порогов производительности). */
@@ -2906,6 +2993,12 @@ export function refreshLocationsDensePiles(map) {
 
 export function isDenseClustersHighlightEnabled() {
   return denseClustersHighlightEnabled;
+}
+
+/** Сворачивает раскрытые плотные группы обратно в кластеры. */
+export function collapseExpandedDensePiles(map) {
+  expandedDensePileKeys = new Set();
+  refreshLocationsDensePiles(map);
 }
 
 /**

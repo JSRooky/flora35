@@ -11,6 +11,8 @@ function getCollapsedSummary(
   heatmapEnabled,
   clusteringEnabled,
   clusterByRegnum,
+  clusterByTempLayers,
+  hasTempLayers,
   clusterPieCharts,
   denseClustersHighlight
 ) {
@@ -25,8 +27,14 @@ function getCollapsedSummary(
   } else if (clusteringEnabled && markersVisible) {
     if (clusterPieCharts) {
       parts.push("диаграммы");
+    } else if (clusterByRegnum && hasTempLayers && clusterByTempLayers) {
+      parts.push("по царству, по слоям");
+    } else if (clusterByRegnum) {
+      parts.push("по царству");
+    } else if (hasTempLayers && clusterByTempLayers) {
+      parts.push("по слоям");
     } else {
-      parts.push(clusterByRegnum ? "по царству" : "кластеризация");
+      parts.push("кластеризация");
     }
   } else if (markersVisible) {
     parts.push("без кластеризации");
@@ -49,6 +57,9 @@ export default function MapDisplayPanel({
   onClusteringEnabledChange,
   clusterByRegnum = true,
   onClusterByRegnumChange,
+  clusterByTempLayers = true,
+  onClusterByTempLayersChange,
+  hasTempLayers = false,
   clusterPieCharts = false,
   onClusterPieChartsChange,
   denseClustersHighlight = false,
@@ -71,6 +82,8 @@ export default function MapDisplayPanel({
   const clusteringDisabled = !markersVisible || denseClustersHighlight;
   const clusterPieChartsDisabled = clusteringDisabled || !clusteringEnabled;
   const clusterByRegnumDisabled =
+    clusteringDisabled || !clusteringEnabled || clusterPieCharts;
+  const clusterByTempLayersDisabled =
     clusteringDisabled || !clusteringEnabled || clusterPieCharts;
   const denseClustersHighlightDisabled = !markersVisible;
 
@@ -102,6 +115,8 @@ export default function MapDisplayPanel({
             heatmapEnabled,
             clusteringEnabled,
             clusterByRegnum,
+            clusterByTempLayers,
+            hasTempLayers,
             clusterPieCharts,
             denseClustersHighlight
           )}
@@ -156,6 +171,34 @@ export default function MapDisplayPanel({
             <span className="map-display-switch-label">По царству</span>
           </label>
 
+          {hasTempLayers ? (
+            <label
+              className={`map-display-switch${
+                clusterByTempLayersDisabled ? " map-display-switch--disabled" : ""
+              }`}
+              title={
+                !markersVisible
+                  ? "Доступно только при включённых маркерах"
+                  : denseClustersHighlight
+                    ? "Недоступно в режиме плотных групп"
+                    : !clusteringEnabled
+                      ? "Доступно только при включённой кластеризации"
+                      : clusterPieCharts
+                        ? "Недоступно при включённых диаграммах"
+                        : "Кластеризовать каждый временный слой отдельно"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={clusterByTempLayers}
+                disabled={clusterByTempLayersDisabled}
+                onChange={(e) => onClusterByTempLayersChange?.(e.target.checked)}
+              />
+              <span className="map-display-switch-slider" />
+              <span className="map-display-switch-label">По слоям</span>
+            </label>
+          ) : null}
+
           <label
             className={`map-display-switch${
               clusterPieChartsDisabled ? " map-display-switch--disabled" : ""
@@ -167,7 +210,7 @@ export default function MapDisplayPanel({
                   ? "Недоступно в режиме плотных групп"
                   : !clusteringEnabled
                     ? "Доступно только при включённой кластеризации"
-                    : "Показывать состав кластера секторной диаграммой; отключает группировку по царству"
+                    : "Показывать состав кластера секторной диаграммой; отключает группировку по царству и по слоям"
             }
           >
             <input

@@ -114,6 +114,10 @@ export function buildSeasonalityCoordinateBounds(features, nameLatin) {
       return;
     }
 
+    if (getFoundMonth(feature) == null) {
+      return;
+    }
+
     const coords = getFeatureLonLat(feature);
     if (!coords) {
       return;
@@ -184,13 +188,13 @@ export function buildSeasonalityStats(features, nameLatin, geoFilter = null) {
       }
     }
 
-    total += 1;
     const month = getFoundMonth(feature);
     if (month == null) {
       unknownMonth += 1;
       return;
     }
 
+    total += 1;
     byMonth[month - 1] += 1;
     withMonth += 1;
   });

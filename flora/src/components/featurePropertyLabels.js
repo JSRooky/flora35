@@ -7,6 +7,7 @@ export const PROPERTY_LABELS = {
   found_by: "Обнаружил",
   identified_by: "Определил",
   found_year: "Год находки",
+  found_month: "Месяц",
   status: "Статус",
   distance_meters: "Расстояние исходников, м",
   basisOfRecord: "Тип записи",
@@ -20,7 +21,8 @@ export const PROPERTY_LABELS = {
   license_code: "Лицензия",
   obscured: "Координаты скрыты",
   taxon_id: "Taxon ID",
-  source: "Источник"
+  source: "Источник",
+  region_id: "Регион"
 };
 
 /** Предпочтительный порядок полей в панели «Сведения о точке». */
@@ -30,6 +32,7 @@ export const PROPERTY_DISPLAY_ORDER = [
   "regnum",
   "family",
   "found_year",
+  "found_month",
   "found_by",
   "identified_by",
   "basisOfRecord",
@@ -145,10 +148,38 @@ export function getPropertyLabel(key) {
   return PROPERTY_LABELS[key] ?? key;
 }
 
+const MONTH_LABELS = [
+  "январь",
+  "февраль",
+  "март",
+  "апрель",
+  "май",
+  "июнь",
+  "июль",
+  "август",
+  "сентябрь",
+  "октябрь",
+  "ноябрь",
+  "декабрь"
+];
+
+function getMonthLabel(value) {
+  const month = Number(value);
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    return String(value);
+  }
+
+  return MONTH_LABELS[month - 1];
+}
+
 /** Человекочитаемое значение поля свойства точки. */
 export function formatPropertyValue(key, value) {
   if (key === "regnum") {
     return getRegnumLabel(value);
+  }
+
+  if (key === "found_month") {
+    return getMonthLabel(value);
   }
 
   return String(value);

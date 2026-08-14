@@ -664,7 +664,9 @@ export default function SeasonalityPanel({
 
               {stats && stats.total === 0 ? (
                 <p className="seasonality-panel-empty">
-                  Нет точек этого вида в текущей выборке карты.
+                  {stats.unknownMonth > 0
+                    ? "Нет точек этого вида с указанным месяцем находки."
+                    : "Нет точек этого вида в текущей выборке карты."}
                 </p>
               ) : null}
 

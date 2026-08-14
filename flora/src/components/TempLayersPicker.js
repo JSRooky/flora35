@@ -1,9 +1,83 @@
 import React, { useEffect, useRef, useState } from "react";
-import { getTempLayers } from "../tempLayers/tempLayerStore";
+import {
+  getTempLayers,
+  TEMP_LAYER_MARKER_PALETTE
+} from "../tempLayers/tempLayerStore";
 import "../styles/ExternalLayersPicker.css";
 import "../styles/TempLayersPicker.css";
 
 const HOVER_CLOSE_DELAY_MS = 160;
+
+function TrashIcon() {
+  return (
+    <svg
+      className="temp-layers-picker-delete-icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <polyline
+        points="3 6 5 6 21 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <line
+        x1="10"
+        y1="11"
+        x2="10"
+        y2="17"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <line
+        x1="14"
+        y1="11"
+        x2="14"
+        y2="17"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function formatLayerMeta(layer) {
+  const points = new Intl.NumberFormat("ru-RU").format(layer.features?.length ?? 0);
+  const regionCount = Array.isArray(layer.regionIds) ? layer.regionIds.length : 0;
+  const regionPart =
+    regionCount === 1 ? "1 рег." : regionCount > 1 ? `${regionCount} рег.` : null;
+  return regionPart ? `${regionPart} · ${points} т.` : `${points} т.`;
+}
+
+function layerRowStyle(layer) {
+  if (!layer.markerColor) {
+    return undefined;
+  }
+  return { "--temp-layer-color": layer.markerColor };
+}
+
+function layerTitle(layer) {
+  const source = layer.source === "inat" ? "iNaturalist" : "GBIF";
+  if (layer.taxonName) {
+    return `${source} · ${layer.taxonName}`;
+  }
+  return layer.label || source;
+}
 
 function ClockLayersIcon() {
   return (
@@ -33,12 +107,79 @@ function ClockLayersIcon() {
   );
 }
 
+function LayerColorButton({ layer, open, tabIndex, onToggle, onSelect, onReset }) {
+  const current = layer.markerColor || "";
+
+  return (
+    <div className="temp-layers-picker-color">
+      <button
+        type="button"
+        className={`temp-layers-picker-color-btn${
+          current ? " temp-layers-picker-color-btn--custom" : ""
+        }`}
+        tabIndex={tabIndex}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={
+          current
+            ? `Цвет маркеров «${layer.label}»: ${current}`
+            : `Цвет маркеров «${layer.label}»: по царству`
+        }
+        title={current ? "Цвет маркеров" : "Цвет маркеров (по царству)"}
+        style={current ? { backgroundColor: current } : undefined}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
+      />
+      {open ? (
+        <div
+          className="temp-layers-picker-palette"
+          role="listbox"
+          aria-label={`Палитра цвета для «${layer.label}»`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            className={`temp-layers-picker-palette-swatch temp-layers-picker-palette-swatch--auto${
+              !current ? " temp-layers-picker-palette-swatch--selected" : ""
+            }`}
+            role="option"
+            aria-selected={!current}
+            title="По царству"
+            onClick={() => onReset()}
+          />
+          <div className="temp-layers-picker-palette-grid">
+            {TEMP_LAYER_MARKER_PALETTE.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`temp-layers-picker-palette-swatch${
+                  current === color ? " temp-layers-picker-palette-swatch--selected" : ""
+                }`}
+                role="option"
+                aria-selected={current === color}
+                aria-label={color}
+                title={color}
+                style={{ backgroundColor: color }}
+                onClick={() => onSelect(color)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function TempLayersPicker({
   dataRevision = 0,
   onToggleLayer,
-  onDeleteLayer
+  onDeleteLayer,
+  onColorChange
 }) {
   const [open, setOpen] = useState(false);
+  const [colorMenuLayerId, setColorMenuLayerId] = useState(null);
   const rootRef = useRef(null);
   const closeTimerRef = useRef(null);
   void dataRevision;
@@ -58,7 +199,10 @@ export default function TempLayersPicker({
 
   const handleClose = () => {
     clearCloseTimer();
-    closeTimerRef.current = setTimeout(() => setOpen(false), HOVER_CLOSE_DELAY_MS);
+    closeTimerRef.current = setTimeout(() => {
+      setOpen(false);
+      setColorMenuLayerId(null);
+    }, HOVER_CLOSE_DELAY_MS);
   };
 
   useEffect(() => {
@@ -68,13 +212,17 @@ export default function TempLayersPicker({
 
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
+        if (colorMenuLayerId) {
+          setColorMenuLayerId(null);
+          return;
+        }
         setOpen(false);
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open]);
+  }, [open, colorMenuLayerId]);
 
   useEffect(() => () => clearCloseTimer(), []);
 
@@ -90,6 +238,7 @@ export default function TempLayersPicker({
       onBlur={(event) => {
         if (!rootRef.current?.contains(event.relatedTarget)) {
           setOpen(false);
+          setColorMenuLayerId(null);
         }
       }}
     >
@@ -100,7 +249,9 @@ export default function TempLayersPicker({
         aria-hidden={!open}
       >
         <div
-          className="external-layers-picker-panel temp-layers-picker-panel"
+          className={`external-layers-picker-panel temp-layers-picker-panel${
+            colorMenuLayerId ? " temp-layers-picker-panel--palette-open" : ""
+          }`}
           role="listbox"
           aria-label="Временные слои"
           aria-multiselectable="true"
@@ -115,7 +266,14 @@ export default function TempLayersPicker({
                 key={layer.id}
                 className={`temp-layers-picker-row${
                   layer.visible ? " temp-layers-picker-row--selected" : ""
+                }${
+                  layer.markerColor ? " temp-layers-picker-row--tinted" : ""
+                }${
+                  colorMenuLayerId === layer.id
+                    ? " temp-layers-picker-row--palette-open"
+                    : ""
                 }`}
+                style={layerRowStyle(layer)}
               >
                 <button
                   type="button"
@@ -146,12 +304,28 @@ export default function TempLayersPicker({
                     ) : null}
                   </span>
                   <span className="temp-layers-picker-option-text">
-                    <span className="external-layers-picker-option-label">{layer.label}</span>
-                    <span className="temp-layers-picker-option-meta">
-                      {new Intl.NumberFormat("ru-RU").format(layer.features?.length ?? 0)} т.
-                    </span>
+                    <span className="external-layers-picker-option-label">{layerTitle(layer)}</span>
+                    <span className="temp-layers-picker-option-meta">{formatLayerMeta(layer)}</span>
                   </span>
                 </button>
+                <LayerColorButton
+                  layer={layer}
+                  open={colorMenuLayerId === layer.id}
+                  tabIndex={open ? 0 : -1}
+                  onToggle={() =>
+                    setColorMenuLayerId((current) =>
+                      current === layer.id ? null : layer.id
+                    )
+                  }
+                  onSelect={(color) => {
+                    onColorChange?.(layer.id, color);
+                    setColorMenuLayerId(null);
+                  }}
+                  onReset={() => {
+                    onColorChange?.(layer.id, null);
+                    setColorMenuLayerId(null);
+                  }}
+                />
                 <button
                   type="button"
                   className="temp-layers-picker-delete"
@@ -160,7 +334,7 @@ export default function TempLayersPicker({
                   title="Удалить"
                   onClick={() => onDeleteLayer?.(layer.id)}
                 >
-                  Удалить
+                  <TrashIcon />
                 </button>
               </div>
             ))

@@ -38,13 +38,15 @@ const INTERNAL_PROPERTIES = new Set([
   "inat_id",
   "redbook_match_id",
   // Дублирует regnum; единая категория «Царство» — только regnum.
-  "kingdom"
+  "kingdom",
+  "temp_layer_id",
+  "temp_marker_color"
 ]);
 
 /** Поля GBIF, которые уводим в раскрывающийся блок «Информация из GBIF». */
-const GBIF_META_PROPERTIES = new Set(["basisOfRecord", "gbif_key", "datasetKey"]);
+const GBIF_META_PROPERTIES = new Set(["basisOfRecord", "gbif_key", "datasetKey", "region_id"]);
 
-const GBIF_META_DISPLAY_ORDER = ["basisOfRecord", "gbif_key", "datasetKey"];
+const GBIF_META_DISPLAY_ORDER = ["basisOfRecord", "gbif_key", "datasetKey", "region_id"];
 
 function isGbifFeature(feature) {
   return feature?.properties?.source === "gbif";
@@ -60,7 +62,8 @@ const INAT_META_PROPERTIES = new Set([
   "inat_id",
   "place_guess",
   "license_code",
-  "obscured"
+  "obscured",
+  "region_id"
 ]);
 
 const INAT_META_DISPLAY_ORDER = [
@@ -68,7 +71,8 @@ const INAT_META_DISPLAY_ORDER = [
   "place_guess",
   "license_code",
   "obscured",
-  "inat_id"
+  "inat_id",
+  "region_id"
 ];
 
 function isInatFeature(feature) {

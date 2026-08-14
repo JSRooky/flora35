@@ -33,6 +33,35 @@ function createEmptyStaging() {
 }
 
 let staging = createEmptyStaging();
+export const TEMP_LAYER_MARKER_PALETTE = [
+  "#e11d48",
+  "#ea580c",
+  "#ca8a04",
+  "#16a34a",
+  "#0d9488",
+  "#2563eb",
+  "#7c3aed",
+  "#db2777",
+  "#b91c1c",
+  "#c2410c",
+  "#4d7c0f",
+  "#0f766e",
+  "#1e3a8a",
+  "#6d28d9",
+  "#78716c",
+  "#111827"
+];
+
+const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{6})$/;
+
+export function normalizeTempLayerMarkerColor(color) {
+  if (typeof color !== "string") {
+    return null;
+  }
+  const value = color.trim();
+  return HEX_COLOR_RE.test(value) ? value.toLowerCase() : null;
+}
+
 /** @type {Array<{
  *   id: string,
  *   label: string,
@@ -41,6 +70,7 @@ let staging = createEmptyStaging();
  *   regionIds: string[],
  *   createdAt: string,
  *   visible: boolean,
+ *   markerColor: string | null,
  *   features: object[]
  * }>} */
 let layers = [];
@@ -173,6 +203,7 @@ export function commitTempLayerStaging() {
     regionIds: [...staging.regionIds],
     createdAt: new Date().toISOString(),
     visible: true,
+    markerColor: null,
     features: cloneFeatures(staging.features)
   };
 
@@ -189,44 +220,72 @@ export function setTempLayerVisible(layerId, visible) {
   emit();
 }
 
+export function setTempLayerMarkerColor(layerId, color) {
+  const markerColor = normalizeTempLayerMarkerColor(color);
+  layers = layers.map((layer) =>
+    layer.id === layerId ? { ...layer, markerColor } : layer
+  );
+  emit();
+}
+
 export function deleteTempLayer(layerId) {
   layers = layers.filter((layer) => layer.id !== layerId);
   emit();
 }
 
 export function replaceTempLayers(nextLayers) {
-  layers = Array.isArray(nextLayers) ? nextLayers : [];
+  layers = Array.isArray(nextLayers)
+    ? nextLayers.map((layer) => ({
+        ...layer,
+        markerColor: normalizeTempLayerMarkerColor(layer?.markerColor)
+      }))
+    : [];
   emit();
 }
 
-export function getVisibleTempLayerFeatures() {
-  const features = [];
-
-  staging.features.forEach((feature) => {
-    features.push({
+function stampGroupFeatures(rawFeatures, layerId, markerColor) {
+  return (rawFeatures ?? []).map((feature) => {
+    const properties = {
+      ...feature.properties,
+      temp_layer_id: layerId
+    };
+    if (markerColor) {
+      properties.temp_marker_color = markerColor;
+    }
+    return {
       ...feature,
-      properties: {
-        ...feature.properties,
-        temp_layer_id: "staging"
-      }
-    });
+      properties
+    };
   });
+}
+
+export function getTempLayerFeatureGroups() {
+  const groups = [];
+
+  if (staging.features.length > 0) {
+    groups.push({
+      id: "staging",
+      markerColor: null,
+      features: stampGroupFeatures(staging.features, "staging", null)
+    });
+  }
 
   layers.forEach((layer) => {
-    if (!layer.visible || !Array.isArray(layer.features)) {
+    if (!layer.visible || !Array.isArray(layer.features) || layer.features.length === 0) {
       return;
     }
-    layer.features.forEach((feature) => {
-      features.push({
-        ...feature,
-        properties: {
-          ...feature.properties,
-          temp_layer_id: layer.id
-        }
-      });
+    groups.push({
+      id: layer.id,
+      markerColor: layer.markerColor ?? null,
+      features: stampGroupFeatures(layer.features, layer.id, layer.markerColor)
     });
   });
-  return features;
+
+  return groups;
+}
+
+export function getVisibleTempLayerFeatures() {
+  return getTempLayerFeatureGroups().flatMap((group) => group.features);
 }
 
 export function serializeTempLayers() {
@@ -238,6 +297,7 @@ export function serializeTempLayers() {
     regionIds: layer.regionIds,
     createdAt: layer.createdAt,
     visible: layer.visible,
+    markerColor: layer.markerColor ?? null,
     features: layer.features
   }));
 }

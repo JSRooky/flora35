@@ -1,8 +1,14 @@
 .temp-layers-picker-panel {
-  min-width: 280px;
-  max-width: min(380px, calc(100vw - 48px));
+  position: relative;
+  isolation: isolate;
+  min-width: 240px;
+  max-width: min(340px, calc(100vw - 48px));
   max-height: min(420px, 56vh);
   overflow-y: auto;
+}
+
+.temp-layers-picker-panel--palette-open {
+  overflow: visible;
 }
 
 .temp-layers-picker-empty {
@@ -15,11 +21,12 @@
 
 .temp-layers-picker-row {
   box-sizing: border-box;
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
-  padding: 6px 8px 6px 6px;
+  padding: 4px 6px 4px 4px;
   border: 1px solid rgba(255, 255, 255, 0.65);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.75);
@@ -57,14 +64,40 @@
   background: rgba(42, 157, 143, 0.14);
 }
 
+.temp-layers-picker-row--tinted {
+  border-color: color-mix(in srgb, var(--temp-layer-color) 55%, rgba(255, 255, 255, 0.35));
+  background: color-mix(in srgb, var(--temp-layer-color) 28%, rgba(255, 255, 255, 0.72));
+}
+
+.temp-layers-picker-row--tinted:hover {
+  background: color-mix(in srgb, var(--temp-layer-color) 38%, rgba(255, 255, 255, 0.7));
+}
+
+.temp-layers-picker-row--tinted .temp-layers-picker-toggle {
+  color: color-mix(in srgb, var(--temp-layer-color) 72%, #111827);
+}
+
+.temp-layers-picker-row--tinted .temp-layers-picker-option-meta {
+  color: color-mix(in srgb, var(--temp-layer-color) 45%, #4b5563);
+}
+
+.temp-layers-picker-row--tinted .external-layers-picker-check--checked {
+  border-color: var(--temp-layer-color);
+  background: var(--temp-layer-color);
+}
+
+.temp-layers-picker-row--palette-open {
+  z-index: 8;
+}
+
 .temp-layers-picker-toggle {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
-  padding: 4px 4px 4px 6px;
+  padding: 2px 2px 2px 4px;
   border: 0;
   background: transparent;
   color: #1c1c1e;
@@ -79,6 +112,11 @@
   color: #1a6b62;
 }
 
+.temp-layers-picker-row--tinted .temp-layers-picker-toggle,
+.temp-layers-picker-row--tinted.temp-layers-picker-row--selected .temp-layers-picker-toggle {
+  color: color-mix(in srgb, var(--temp-layer-color) 72%, #111827);
+}
+
 .temp-layers-picker-option-text {
   display: flex;
   flex-direction: column;
@@ -87,24 +125,121 @@
   min-width: 0;
 }
 
+.temp-layers-picker-option-text .external-layers-picker-option-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .temp-layers-picker-option-meta {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: #6b7280;
+  white-space: nowrap;
+}
+
+.temp-layers-picker-color {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.temp-layers-picker-color-btn {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid rgba(17, 24, 39, 0.22);
+  border-radius: 4px;
+  background:
+    conic-gradient(
+      #588f38 0deg 90deg,
+      #c98263 90deg 180deg,
+      #7a5d8f 180deg 270deg,
+      #2a8f9e 270deg 360deg
+    );
+  cursor: pointer;
+}
+
+.temp-layers-picker-color-btn--custom {
+  background: #4a90e2;
+}
+
+.temp-layers-picker-color-btn:hover {
+  transform: scale(1.08);
+}
+
+.temp-layers-picker-palette {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14);
+}
+
+.temp-layers-picker-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 18px);
+  grid-template-rows: repeat(4, 18px);
+  gap: 5px;
+}
+
+.temp-layers-picker-palette-swatch {
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(17, 24, 39, 0.18);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.temp-layers-picker-palette-swatch--auto {
+  width: 100%;
+  height: 18px;
+  background:
+    conic-gradient(
+      #588f38 0deg 90deg,
+      #c98263 90deg 180deg,
+      #7a5d8f 180deg 270deg,
+      #2a8f9e 270deg 360deg
+    );
+}
+
+.temp-layers-picker-palette-swatch--selected {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px #1a6b62;
 }
 
 .temp-layers-picker-delete {
   flex: 0 0 auto;
-  padding: 5px 8px;
-  border: 1px solid rgba(185, 28, 28, 0.22);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
   border-radius: 6px;
-  background: rgba(254, 226, 226, 0.72);
-  color: #b91c1c;
-  font-size: 11px;
-  font-weight: 600;
+  background: transparent;
+  color: #8e8e93;
   cursor: pointer;
 }
 
 .temp-layers-picker-delete:hover {
-  background: #fecaca;
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+}
+
+.temp-layers-picker-delete-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
 }

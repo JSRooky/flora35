@@ -69,6 +69,7 @@ export default function MapCornerControls({
   tempLayersDataRevision = 0,
   onTempLayerToggle,
   onTempLayerDelete,
+  onTempLayerColorChange,
   regnumFilters = [],
   onRegnumFilterChange
 }) {
@@ -219,6 +220,7 @@ export default function MapCornerControls({
           dataRevision={tempLayersDataRevision}
           onToggleLayer={onTempLayerToggle}
           onDeleteLayer={onTempLayerDelete}
+          onColorChange={onTempLayerColorChange}
         />
         <ExternalLayersPicker
           visible={externalLayersVisible}

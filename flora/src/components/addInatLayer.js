@@ -983,6 +983,12 @@ export function isInatDenseClustersHighlightEnabled() {
   return inatDenseClustersHighlightEnabled;
 }
 
+/** Сворачивает раскрытые плотные группы iNat обратно в кластеры. */
+export function collapseInatExpandedDensePiles(map) {
+  expandedInatDensePileKeys = new Set();
+  refreshInatDensePiles(map);
+}
+
 /**
  * Раскрывает плотную группу iNat по ключу координат и зумирует к разведённым точкам.
  */

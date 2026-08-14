@@ -27,6 +27,7 @@ import {
   reloadLocationsData,
   refreshLocationsDensePiles,
   expandDensePileByKey,
+  collapseExpandedDensePiles,
   setDensePileExpandedHandler,
   setMarkersVisible,
   setHoverTooltipsEnabled,
@@ -36,6 +37,7 @@ import {
   showSharedPointPopup,
   updateSelectedPointHighlight,
   getToolFeatures,
+  listToolDensePiles,
   getVisibleMapPointCount,
   getStablePointKey,
   setHiddenPointKeysForFilter,
@@ -55,7 +57,6 @@ import {
 } from "./components/mapPerformance";
 import {
   buildSpeciesSummaryFromDensePile,
-  listDensePiles,
   MIN_DENSE_PILE_SIZE,
   setDensePileMinSize
 } from "./components/densePiles";
@@ -199,9 +200,10 @@ import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
 import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
-import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
-import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility } from "./components/addTempLayersLayer";
-import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatDensePiles, expandInatDensePileByKey, setInatDensePileExpandedHandler } from "./components/addInatLayer";
+import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
+import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles } from "./components/addTempLayersLayer";
+import { deleteTempLayer, getTempLayers, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
+import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatDensePiles, expandInatDensePileByKey, collapseInatExpandedDensePiles, setInatDensePileExpandedHandler } from "./components/addInatLayer";
 import {
   addMergedLayer,
   setMergedData,
@@ -224,7 +226,6 @@ import { loadPointAttributionsFromFirestore } from "./firebase/loadPointAttribut
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
 import { hydrateInatStoreFromPersistence } from "./inaturalist/inatPersistence";
 import { hydrateTempLayersFromPersistence, persistTempLayers } from "./tempLayers/tempLayerPersistence";
-import { deleteTempLayer, setTempLayerVisible } from "./tempLayers/tempLayerStore";
 import { findGbifFeatureByKey } from "./gbif/gbifStore";
 import { findInatFeatureById } from "./inaturalist/inatStore";
 import {
@@ -327,6 +328,7 @@ export default function MapView() {
   const [statusFilters, setStatusFilters] = useState([]);
   const [regnumFilters, setRegnumFilters] = useState([]);
   const [clusterByRegnum, setClusterByRegnumState] = useState(DEFAULT_CLUSTER_BY_REGNUM);
+  const [clusterByTempLayers, setClusterByTempLayersState] = useState(true);
   const [clusteringEnabled, setClusteringEnabledState] = useState(DEFAULT_CLUSTERING_ENABLED);
   const [clusterPieCharts, setClusterPieChartsState] = useState(DEFAULT_CLUSTER_PIE_CHARTS);
   const [denseClustersHighlight, setDenseClustersHighlightState] = useState(
@@ -1169,6 +1171,15 @@ export default function MapView() {
     bumpPointsDataRevision();
   }, [bumpPointsDataRevision]);
 
+  const handleTempLayerColorChange = useCallback((layerId, color) => {
+    setTempLayerMarkerColor(layerId, color);
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
+    if (map.current) {
+      setTempLayersData(map.current);
+    }
+  }, []);
+
   const handleTempLayersChange = useCallback(() => {
     setTempLayersRevision((value) => value + 1);
     if (map.current) {
@@ -1906,7 +1917,7 @@ export default function MapView() {
     void externalProcessingFilters;
     void dataSourceMode;
 
-    const piles = listDensePiles(getToolFeatures(locationFilters), {
+    const piles = listToolDensePiles(locationFilters, {
       minSize: densePileMinSize
     });
     const pileCount = piles.length;
@@ -2018,6 +2029,12 @@ export default function MapView() {
       animateCamera: false,
       notify: false
     });
+    expandTempDensePileByKey(map.current, key, {
+      coordinates,
+      pointCount,
+      animateCamera: false,
+      notify: false
+    });
 
     setSelectedDensePileKey(key);
 
@@ -2033,11 +2050,13 @@ export default function MapView() {
     setDensePileExpandedHandler(handleDensePileExpanded);
     setGbifDensePileExpandedHandler(handleDensePileExpanded);
     setInatDensePileExpandedHandler(handleDensePileExpanded);
+    setTempDensePileExpandedHandler(handleDensePileExpanded);
 
     return () => {
       setDensePileExpandedHandler(null);
       setGbifDensePileExpandedHandler(null);
       setInatDensePileExpandedHandler(null);
+      setTempDensePileExpandedHandler(null);
     };
   }, [handleDensePileExpanded]);
 
@@ -2064,6 +2083,12 @@ export default function MapView() {
       animateCamera: false,
       notify: false
     });
+    expandTempDensePileByKey(map.current, pile.key, {
+      coordinates: pile.coordinates,
+      pointCount: pile.pointCount,
+      animateCamera: false,
+      notify: false
+    });
   }, []);
 
   const handleDensePileZoomBack = useCallback(() => {
@@ -2073,6 +2098,13 @@ export default function MapView() {
         ...previous,
         duration: 900
       });
+    }
+
+    if (map.current) {
+      collapseExpandedDensePiles(map.current);
+      collapseGbifExpandedDensePiles(map.current);
+      collapseInatExpandedDensePiles(map.current);
+      collapseTempExpandedDensePiles(map.current);
     }
 
     densePileCameraBeforeRef.current = null;
@@ -3328,10 +3360,17 @@ export default function MapView() {
     applyLocationsGroupingMode(map.current, grouping);
     applyGbifGroupingMode(map.current, grouping);
     applyInatGroupingMode(map.current, grouping);
+    applyTempLayersGroupingMode(map.current, {
+      clusterByTempLayers,
+      clusterPieCharts,
+      clusteringEnabled,
+      denseClustersHighlight
+    });
     refreshClusterPieChartMarkers(map.current);
   }, [
     clusteringEnabled,
     clusterByRegnum,
+    clusterByTempLayers,
     clusterPieCharts,
     denseClustersHighlight,
     mapReady
@@ -3359,6 +3398,7 @@ export default function MapView() {
     refreshLocationsDensePiles(map.current);
     refreshGbifDensePiles(map.current);
     refreshInatDensePiles(map.current);
+    refreshTempLayersDensePiles(map.current);
   }, [densePileMinSize, denseClustersHighlight, mapReady]);
 
   // После режимов кластеризации: иначе rebuild*Layers мог вернуть полную выборку.
@@ -3665,9 +3705,17 @@ export default function MapView() {
     setClusterByRegnumState(enabled);
   };
 
+  const handleClusterByTempLayersChange = (enabled) => {
+    if (enabled) {
+      setClusterPieChartsState(false);
+    }
+    setClusterByTempLayersState(enabled);
+  };
+
   const handleClusterPieChartsChange = (enabled) => {
     if (enabled) {
       setClusterByRegnumState(false);
+      setClusterByTempLayersState(false);
     }
 
     setClusterPieChartsState(enabled);
@@ -5255,6 +5303,9 @@ export default function MapView() {
               onClusteringEnabledChange={handleClusteringEnabledChange}
               clusterByRegnum={clusterByRegnum}
               onClusterByRegnumChange={handleClusterByRegnumChange}
+              clusterByTempLayers={clusterByTempLayers}
+              onClusterByTempLayersChange={handleClusterByTempLayersChange}
+              hasTempLayers={getTempLayers().length > 0}
               clusterPieCharts={clusterPieCharts}
               onClusterPieChartsChange={handleClusterPieChartsChange}
               denseClustersHighlight={denseClustersHighlight}
@@ -5644,6 +5695,7 @@ export default function MapView() {
         tempLayersDataRevision={tempLayersRevision}
         onTempLayerToggle={handleTempLayerToggle}
         onTempLayerDelete={handleTempLayerDelete}
+        onTempLayerColorChange={handleTempLayerColorChange}
         regnumFilters={regnumFilters}
         onRegnumFilterChange={handleRegnumFilterChange}
       />
