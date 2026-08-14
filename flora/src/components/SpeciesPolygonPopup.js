@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getArealPointKey } from "./addArealLayer";
-import { getPointsForSpecies, POLYGON_BUILD_MODES } from "./addSpeciesPolygonLayer";
+import { getPointsForSpecies, getUniqueCoordinateCountForSpecies, POLYGON_BUILD_MODES, canBuildAllPointsPolygon } from "./addSpeciesPolygonLayer";
 import { formatPointCount } from "./featurePropertyLabels";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
@@ -253,6 +253,7 @@ export default function SpeciesPolygonPopup({
   addMode = false,
   containedSpecies = null,
   onBuild,
+  onBuildExtremePoints,
   onBuildAllPoints,
   onResetAll,
   onResetOne,
@@ -289,15 +290,19 @@ export default function SpeciesPolygonPopup({
     feature?.properties?.name_latin ||
     "Вид не определён";
   const speciesLatin = feature?.properties?.name_latin;
-  const pointCount = feature ? getPointsForSpecies(feature).length : 0;
-  const canBuild = Boolean(feature) && pointCount > 0;
-  // Оболочку (all points) можно построить только минимум по 3 точкам.
-  const canBuildAllPoints = canBuild && pointCount >= 3;
   const currentSpeciesEntry = speciesLatin
     ? builtPolygons.find((entry) => entry.nameLatin === speciesLatin)
     : null;
+  const pointCount = feature ? getPointsForSpecies(feature).length : 0;
+  const uniquePointCount = feature
+    ? currentSpeciesEntry?.uniquePointCount ?? getUniqueCoordinateCountForSpecies(feature)
+    : 0;
+  const canBuild = Boolean(feature) && pointCount > 0;
+  const canBuildAllPoints = canBuild && canBuildAllPointsPolygon(uniquePointCount);
   const isAllPointsMode =
     currentSpeciesEntry?.mode === POLYGON_BUILD_MODES.ALL_POINTS;
+  const isExtremePointsMode =
+    currentSpeciesEntry?.mode === POLYGON_BUILD_MODES.EXTREME_POINTS;
   const showContainedSpecies = visibleBuiltPolygons.length === 1;
   const hasContainedSpecies = showContainedSpecies && builtPolygons.length > 0;
   const hasSpeciesInPolygon = containedSpecies?.count > 0;
@@ -395,13 +400,30 @@ export default function SpeciesPolygonPopup({
               </button>
               <button
                 type="button"
+                className={`species-polygon-build-btn species-polygon-build-btn--secondary${
+                  isExtremePointsMode ? " species-polygon-build-btn--active" : ""
+                }`}
+                onClick={onBuildExtremePoints}
+                disabled={!canBuild}
+                title="Граница выборки: соединяет все крайние точки, без внутренних"
+              >
+                По крайним точкам
+              </button>
+              <button
+                type="button"
                 className={`species-polygon-icon-btn species-polygon-mode-btn${
                   isAllPointsMode ? " species-polygon-mode-btn--active" : ""
                 }`}
                 onClick={onBuildAllPoints}
                 disabled={!canBuildAllPoints && !isAllPointsMode}
-                aria-label={isAllPointsMode ? "Оболочка" : "Все точки"}
-                title={isAllPointsMode ? "Оболочка" : "Все точки"}
+                aria-label={isAllPointsMode ? "По крайним точкам" : "Все точки"}
+                title={
+                  !canBuildAllPoints && !isAllPointsMode
+                    ? "Слишком много уникальных точек — постройте полигон по крайним точкам"
+                    : isAllPointsMode
+                      ? "По крайним точкам"
+                      : "Все точки"
+                }
               >
                 <PolygonModeIcon allPoints={isAllPointsMode} className="species-polygon-icon-svg" />
               </button>
@@ -432,9 +454,14 @@ export default function SpeciesPolygonPopup({
                     const isHidden = entry.hidden;
                     const arealLabel = getArealLabel(entry, builtPolygons);
 
+                    const uniqueCount = entry.uniquePointCount ?? entry.pointCount;
                     const isAllPointsMode = entry.mode === POLYGON_BUILD_MODES.ALL_POINTS;
-                    const canToggleAllPoints = entry.pointCount >= 3;
-                    const modeTooltip = isAllPointsMode ? "Оболочка" : "Все точки";
+                    const canToggleAllPoints = canBuildAllPointsPolygon(uniqueCount);
+                    const modeTooltip = !canToggleAllPoints && !isAllPointsMode
+                      ? "Слишком много уникальных точек — постройте полигон по крайним точкам"
+                      : isAllPointsMode
+                        ? "По крайним точкам"
+                        : "Все точки";
 
                     return (
                       <li

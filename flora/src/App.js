@@ -118,7 +118,8 @@ import {
   toggleSpeciesPolygonBuildMode,
   updateSpeciesPolygonIntersectionLayer,
   upsertSpeciesPolygon,
-  getPointsForSpecies,
+  getUniqueCoordinateCountForSpecies,
+  canBuildAllPointsPolygon,
   POLYGON_BUILD_MODES
 } from "./components/addSpeciesPolygonLayer";
 import {
@@ -199,6 +200,7 @@ import MapCornerControls from "./components/MapCornerControls";
 import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
 import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
+import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility } from "./components/addTempLayersLayer";
 import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatDensePiles, expandInatDensePileByKey, setInatDensePileExpandedHandler } from "./components/addInatLayer";
 import {
   addMergedLayer,
@@ -221,6 +223,8 @@ import { deleteMergedPoint } from "./firebase/deleteMergedPoint";
 import { loadPointAttributionsFromFirestore } from "./firebase/loadPointAttributionsFromFirestore";
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
 import { hydrateInatStoreFromPersistence } from "./inaturalist/inatPersistence";
+import { hydrateTempLayersFromPersistence, persistTempLayers } from "./tempLayers/tempLayerPersistence";
+import { deleteTempLayer, setTempLayerVisible } from "./tempLayers/tempLayerStore";
 import { findGbifFeatureByKey } from "./gbif/gbifStore";
 import { findInatFeatureById } from "./inaturalist/inatStore";
 import {
@@ -420,6 +424,7 @@ export default function MapView() {
     [EXTERNAL_LAYER_IDS.GBIF]: true,
     [EXTERNAL_LAYER_IDS.INATURALIST]: true
   });
+  const [tempLayersRevision, setTempLayersRevision] = useState(0);
   const [externalProcessingActive, setExternalProcessingActive] = useState(false);
   const [nearSpeciesMatchesActive, setNearSpeciesMatchesActive] = useState(false);
   const [unattributedPointsActive, setUnattributedPointsActive] = useState(false);
@@ -1143,6 +1148,34 @@ export default function MapView() {
     },
     []
   );
+
+  const handleTempLayerToggle = useCallback((layerId, visible) => {
+    setTempLayerVisible(layerId, visible);
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
+    if (map.current) {
+      setTempLayersData(map.current);
+    }
+    bumpPointsDataRevision();
+  }, [bumpPointsDataRevision]);
+
+  const handleTempLayerDelete = useCallback((layerId) => {
+    deleteTempLayer(layerId);
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
+    if (map.current) {
+      setTempLayersData(map.current);
+    }
+    bumpPointsDataRevision();
+  }, [bumpPointsDataRevision]);
+
+  const handleTempLayersChange = useCallback(() => {
+    setTempLayersRevision((value) => value + 1);
+    if (map.current) {
+      setTempLayersData(map.current);
+    }
+    bumpPointsDataRevision();
+  }, [bumpPointsDataRevision]);
 
   const handleExternalLayerToggle = useCallback((layerId, enabled) => {
     setExternalLayersEnabled((prev) => {
@@ -3146,6 +3179,7 @@ export default function MapView() {
 
     applyGbifLocationsFilter(map.current, locationFilters);
     applyInatLocationsFilter(map.current, locationFilters);
+    setTempLayersData(map.current);
     updateHeatmapData(map.current, locationFilters);
     refreshAreal();
   }, [mapReady, locationFilters, refreshAreal, syncYearBounds, bumpPointsDataRevision]);
@@ -3167,6 +3201,7 @@ export default function MapView() {
       const showInat = externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST];
       setGbifVisibility(map.current, showGbif);
       setInatVisibility(map.current, showInat);
+      setTempLayersVisibility(map.current, externalOnly);
     }
 
     prevExternalOnlyRef.current = externalOnly;
@@ -3255,6 +3290,8 @@ export default function MapView() {
         });
       }
     }
+
+    setTempLayersVisibility(map.current, externalOnly && mapMarkersVisible);
 
     setMergedVisibility(
       map.current,
@@ -3912,15 +3949,7 @@ export default function MapView() {
     }
   }, []);
 
-  const handleArealDynamicsBuildModeToggle = useCallback(() => {
-    setArealDynamicsBuildMode((mode) =>
-      mode === POLYGON_BUILD_MODES.ALL_POINTS
-        ? POLYGON_BUILD_MODES.CONVEX
-        : POLYGON_BUILD_MODES.ALL_POINTS
-    );
-  }, []);
-
-  const arealDynamicsPointCount = useMemo(() => {
+  const arealDynamicsUniquePointCount = useMemo(() => {
     if (!arealDynamicsFeature) {
       return 0;
     }
@@ -3928,8 +3957,20 @@ export default function MapView() {
     void pointsDataRevision;
     void dataSourceMode;
 
-    return getPointsForSpecies(arealDynamicsFeature).length;
+    return getUniqueCoordinateCountForSpecies(arealDynamicsFeature);
   }, [arealDynamicsFeature, pointsDataRevision, dataSourceMode]);
+
+  const handleArealDynamicsBuildModeToggle = useCallback(() => {
+    setArealDynamicsBuildMode((mode) => {
+      if (mode === POLYGON_BUILD_MODES.ALL_POINTS) {
+        return POLYGON_BUILD_MODES.CONVEX;
+      }
+      if (!canBuildAllPointsPolygon(arealDynamicsUniquePointCount)) {
+        return POLYGON_BUILD_MODES.CONVEX;
+      }
+      return POLYGON_BUILD_MODES.ALL_POINTS;
+    });
+  }, [arealDynamicsUniquePointCount]);
 
   const handleArealDynamicsYearSelect = useCallback((year) => {
     setTimelineYear(year);
@@ -3974,6 +4015,14 @@ export default function MapView() {
     applySpeciesPolygonBuild(popupData, POLYGON_BUILD_MODES.CONVEX);
   }, [popupData, applySpeciesPolygonBuild]);
 
+  const handleSpeciesPolygonBuildExtremePoints = useCallback(() => {
+    if (!popupData) {
+      return;
+    }
+
+    applySpeciesPolygonBuild(popupData, POLYGON_BUILD_MODES.EXTREME_POINTS);
+  }, [popupData, applySpeciesPolygonBuild]);
+
   const handleSpeciesPolygonBuildAllPoints = useCallback(() => {
     if (!popupData) {
       return;
@@ -3983,6 +4032,13 @@ export default function MapView() {
     const existing = speciesPolygons.find((entry) => entry.nameLatin === selectedSpecies);
     const isAllPointsActive =
       existing?.built && existing.mode === POLYGON_BUILD_MODES.ALL_POINTS;
+    const uniqueCount =
+      existing?.uniquePointCount ?? getUniqueCoordinateCountForSpecies(popupData);
+
+    if (!isAllPointsActive && !canBuildAllPointsPolygon(uniqueCount)) {
+      applySpeciesPolygonBuild(popupData, POLYGON_BUILD_MODES.EXTREME_POINTS);
+      return;
+    }
 
     applySpeciesPolygonBuild(
       popupData,
@@ -4482,6 +4538,7 @@ export default function MapView() {
         await initLocationsFromFirestore();
         await hydrateGbifStoreFromPersistence();
         await hydrateInatStoreFromPersistence();
+        await hydrateTempLayersFromPersistence();
         hydrateRedBookStoreFromPersistence();
 
         // Cleanup (HMR / размонтирование) мог уничтожить карту, пока ждали hydrate.
@@ -4699,6 +4756,30 @@ export default function MapView() {
               setPolygonAddMode(false);
             }
 
+            setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
+          }
+        });
+        addTempLayersLayer(mapInstance, {
+          onPointClick: (feature) => {
+            if (isAreaDrawingActive()) {
+              return;
+            }
+
+            if (
+              submissionStateRef.current.active &&
+              submissionStateRef.current.pickingLocation
+            ) {
+              const coords = feature?.geometry?.coordinates;
+              if (coords) {
+                submissionStateRef.current.setCoordinates(coords);
+              }
+              return;
+            }
+
+            dismissArealPointHintOnPointClick(feature);
+            clearSharedPointPin(map.current);
+            setPopupData(feature);
+            updateSelectedPointHighlight(map.current, feature);
             setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
           }
         });
@@ -5234,6 +5315,7 @@ export default function MapView() {
               addMode={polygonAddMode}
               containedSpecies={speciesPolygonContainedSpecies}
               onBuild={handleSpeciesPolygonBuild}
+              onBuildExtremePoints={handleSpeciesPolygonBuildExtremePoints}
               onBuildAllPoints={handleSpeciesPolygonBuildAllPoints}
               onResetAll={handleSpeciesPolygonResetAll}
               onResetOne={handleSpeciesPolygonResetOne}
@@ -5434,6 +5516,7 @@ export default function MapView() {
                     hiddenRegionIds
                   }))
                 }
+                onTempLayersChange={handleTempLayersChange}
               />
             )}
           {dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
@@ -5474,7 +5557,7 @@ export default function MapView() {
           computing={arealDynamicsComputing}
           buildMode={arealDynamicsBuildMode}
           onBuildModeToggle={handleArealDynamicsBuildModeToggle}
-          canToggleAllPoints={arealDynamicsPointCount >= 3}
+          canToggleAllPoints={canBuildAllPointsPolygon(arealDynamicsUniquePointCount)}
         />
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
@@ -5558,6 +5641,9 @@ export default function MapView() {
         externalLayersDataRevision={pointsDataRevision}
         onExternalLayerToggle={handleExternalLayerToggle}
         onExternalLayerRequestLoad={handleExternalLayerRequestLoad}
+        tempLayersDataRevision={tempLayersRevision}
+        onTempLayerToggle={handleTempLayerToggle}
+        onTempLayerDelete={handleTempLayerDelete}
         regnumFilters={regnumFilters}
         onRegnumFilterChange={handleRegnumFilterChange}
       />

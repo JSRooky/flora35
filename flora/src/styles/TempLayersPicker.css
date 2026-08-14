@@ -1,0 +1,110 @@
+.temp-layers-picker-panel {
+  min-width: 280px;
+  max-width: min(380px, calc(100vw - 48px));
+  max-height: min(420px, 56vh);
+  overflow-y: auto;
+}
+
+.temp-layers-picker-empty {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #555;
+}
+
+.temp-layers-picker-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 8px 6px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.external-layers-picker-panel-wrap--open .temp-layers-picker-row {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.external-layers-picker-panel-wrap--open .temp-layers-picker-row:nth-child(1) {
+  transition-delay: 0.04s;
+}
+
+.external-layers-picker-panel-wrap--open .temp-layers-picker-row:nth-child(2) {
+  transition-delay: 0.08s;
+}
+
+.temp-layers-picker-row:hover {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.temp-layers-picker-row--selected {
+  border-color: rgba(42, 157, 143, 0.45);
+  background: rgba(42, 157, 143, 0.14);
+}
+
+.temp-layers-picker-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 4px 4px 6px;
+  border: 0;
+  background: transparent;
+  color: #1c1c1e;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.temp-layers-picker-row--selected .temp-layers-picker-toggle {
+  color: #1a6b62;
+}
+
+.temp-layers-picker-option-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+}
+
+.temp-layers-picker-option-meta {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.temp-layers-picker-delete {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid rgba(185, 28, 28, 0.22);
+  border-radius: 6px;
+  background: rgba(254, 226, 226, 0.72);
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.temp-layers-picker-delete:hover {
+  background: #fecaca;
+}

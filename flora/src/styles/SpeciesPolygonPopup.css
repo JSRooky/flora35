@@ -140,10 +140,26 @@
 
 .species-polygon-actions {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+}
+
+.species-polygon-build-btn--secondary {
+  flex: 1 1 auto;
+  border-color: var(--map-tool-accent);
+  background: #fff;
+  color: var(--map-tool-accent);
+}
+
+.species-polygon-build-btn--secondary:hover:not(:disabled) {
+  background: var(--map-tool-accent-soft, rgba(13, 148, 136, 0.12));
+  border-color: var(--map-tool-accent);
+}
+
+.species-polygon-build-btn--active {
+  background: var(--map-tool-accent-soft, rgba(13, 148, 136, 0.16));
 }
 
 .species-polygon-build-btn {

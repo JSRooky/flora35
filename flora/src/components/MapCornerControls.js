@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ReactComponent as FilterIcon } from "../images/filter_icon.svg";
 import ExternalLayersPicker from "./ExternalLayersPicker";
+import TempLayersPicker from "./TempLayersPicker";
 import RegnumFilterPicker from "./RegnumFilterPicker";
 import FeedbackWidget from "./FeedbackWidget";
 import "../styles/MapCornerControls.css";
@@ -65,6 +66,9 @@ export default function MapCornerControls({
   externalLayersDataRevision = 0,
   onExternalLayerToggle,
   onExternalLayerRequestLoad,
+  tempLayersDataRevision = 0,
+  onTempLayerToggle,
+  onTempLayerDelete,
   regnumFilters = [],
   onRegnumFilterChange
 }) {
@@ -210,6 +214,11 @@ export default function MapCornerControls({
         <RegnumFilterPicker
           activeRegnumFilters={regnumFilters}
           onRegnumFilterChange={onRegnumFilterChange}
+        />
+        <TempLayersPicker
+          dataRevision={tempLayersDataRevision}
+          onToggleLayer={onTempLayerToggle}
+          onDeleteLayer={onTempLayerDelete}
         />
         <ExternalLayersPicker
           visible={externalLayersVisible}

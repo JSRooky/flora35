@@ -34,6 +34,8 @@ import {
   setInatData,
   setInatHiddenPointFeatureKeys
 } from "./addInatLayer";
+import { getVisibleTempLayerFeatures } from "../tempLayers/tempLayerStore";
+import { isTempLayersVisible, getTempLayersInteractiveLayerIds } from "./addTempLayersLayer";
 import {
   getMergedFeatures,
   getMergedInteractiveLayerIds
@@ -1380,12 +1382,16 @@ function attachLocationsInteractions(map) {
     const inatLayerIds = getInatInteractiveLayerIds(map);
     const mergedLayerIds = getMergedInteractiveLayerIds(map);
     const redBookLayerIds = getRedBookInteractiveLayerIds(map);
+    const tempLayerIds = getTempLayersInteractiveLayerIds().filter((layerId) =>
+      map.getLayer(layerId)
+    );
     const hitLayerIds = [
       ...locationLayerIds,
       ...gbifLayerIds,
       ...inatLayerIds,
       ...mergedLayerIds,
-      ...redBookLayerIds
+      ...redBookLayerIds,
+      ...tempLayerIds
     ];
 
     if (hitLayerIds.length > 0) {
@@ -2113,6 +2119,10 @@ export function getToolFeatures(filters = {}) {
 
   if (toolIncludeRedBook) {
     appendFeatures(filterFeatures(getRedBookFeatures(), filters));
+  }
+
+  if (isTempLayersVisible()) {
+    appendFeatures(filterFeatures(getVisibleTempLayerFeatures(), filters));
   }
 
   return features;

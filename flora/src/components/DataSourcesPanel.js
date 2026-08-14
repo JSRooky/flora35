@@ -5,6 +5,7 @@ import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import RegionsLoadPopup from "./RegionsLoadPopup";
 import RegionsFilterPopup from "./RegionsFilterPopup";
+import SelectiveLoadPopup from "./SelectiveLoadPopup";
 import { getGbifFeatureCount, getGbifLoadedRegionIds, getGbifPackedBytes } from "../gbif/gbifStore";
 import {
   getInatFeatureCount,
@@ -90,10 +91,12 @@ export default function DataSourcesPanel({
   onClose,
   storeRevision = 0,
   hiddenRegionIds = [],
-  onHiddenRegionIdsChange
+  onHiddenRegionIdsChange,
+  onTempLayersChange
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [regionsTableOpen, setRegionsTableOpen] = useState(false);
+  const [selectiveTableOpen, setSelectiveTableOpen] = useState(false);
   const [regionsFilterOpen, setRegionsFilterOpen] = useState(false);
   const [loadSnapshot, setLoadSnapshot] = useState(() => getExternalSourcesLoadSnapshot());
   const [stats, setStats] = useState(() => getLoadedDataStats());
@@ -235,6 +238,17 @@ export default function DataSourcesPanel({
                   )}
                 </button>
               </div>
+              <button
+                type="button"
+                className="gbif-panel-btn gbif-panel-btn--secondary data-sources-selective-btn"
+                disabled={!map}
+                onClick={() => {
+                  setLoadError(null);
+                  setSelectiveTableOpen(true);
+                }}
+              >
+                Выборочная загрузка
+              </button>
             </section>
 
             {loading ? (
@@ -247,7 +261,7 @@ export default function DataSourcesPanel({
               </p>
             ) : null}
 
-            {loadError && !regionsTableOpen ? (
+            {loadError && !regionsTableOpen && !selectiveTableOpen ? (
               <p className="gbif-panel-error">{loadError}</p>
             ) : null}
 
@@ -290,6 +304,16 @@ export default function DataSourcesPanel({
         loadError={loadError}
         onClose={() => setRegionsTableOpen(false)}
         onLoadError={setLoadError}
+      />
+      <SelectiveLoadPopup
+        open={selectiveTableOpen}
+        map={map}
+        loading={loading}
+        loadSnapshot={loadSnapshot}
+        loadError={loadError}
+        onClose={() => setSelectiveTableOpen(false)}
+        onLoadError={setLoadError}
+        onTempLayersChange={onTempLayersChange}
       />
       <RegionsFilterPopup
         open={regionsFilterOpen}

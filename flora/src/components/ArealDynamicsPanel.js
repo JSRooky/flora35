@@ -183,8 +183,14 @@ export default function ArealDynamicsPanel({
             }`}
             onClick={onBuildModeToggle}
             disabled={!canToggleAllPoints && !isAllPointsMode}
-            aria-label={isAllPointsMode ? "Оболочка" : "Все точки"}
-            title={isAllPointsMode ? "Оболочка" : "Все точки"}
+            aria-label={isAllPointsMode ? "По крайним точкам" : "Все точки"}
+            title={
+              !canToggleAllPoints && !isAllPointsMode
+                ? "Слишком много уникальных точек — постройте полигон по крайним точкам"
+                : isAllPointsMode
+                  ? "По крайним точкам"
+                  : "Все точки"
+            }
           >
             <PolygonModeIcon allPoints={isAllPointsMode} className="areal-dynamics-mode-icon" />
           </button>

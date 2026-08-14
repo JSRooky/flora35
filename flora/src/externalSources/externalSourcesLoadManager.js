@@ -42,6 +42,11 @@ import {
 } from "../inaturalist/inatPersistence";
 import { clearGbifLayer, setGbifData, setGbifMapUpdatesPaused } from "../components/addGbifLayer";
 import { clearInatLayer, setInatData, setInatMapUpdatesPaused } from "../components/addInatLayer";
+import { setTempLayersData } from "../components/addTempLayersLayer";
+import {
+  prepareTempLayerStaging,
+  upsertTempLayerStagingFeatures
+} from "../tempLayers/tempLayerStore";
 
 /**
  * Долгоживущая оркестрация загрузки GBIF/iNat.
@@ -171,7 +176,9 @@ export async function startGbifExternalLoad({
   kingdomId = "",
   extras = {},
   query,
-  previewCount = null
+  previewCount = null,
+  intoTempStaging = false,
+  taxon = null
 } = {}) {
   const map = mapRef;
   if (!map || !region) {
@@ -179,8 +186,12 @@ export async function startGbifExternalLoad({
   }
 
   const generation = snapshot.gbif.generation + 1;
-  setGbifMapUpdatesPaused(true);
-  clearGbifLayer(map);
+  if (intoTempStaging) {
+    prepareTempLayerStaging({ source: "gbif", taxon });
+  } else {
+    setGbifMapUpdatesPaused(true);
+    clearGbifLayer(map);
+  }
   patchSource("gbif", {
     loading: true,
     error: null,
@@ -217,12 +228,14 @@ export async function startGbifExternalLoad({
       },
       onPage: (features) => {
         fetchedTotal += features.length;
-        const { added } = upsertGbifFeatures(features, region.id);
+        const { added } = intoTempStaging
+          ? upsertTempLayerStagingFeatures(features, region.id)
+          : upsertGbifFeatures(features, region.id);
         addedTotal += added;
         patchSource("gbif", {
           fetched: fetchedTotal,
           added: addedTotal,
-          loaded: getGbifFeatureCount()
+          loaded: intoTempStaging ? addedTotal : getGbifFeatureCount()
         });
       },
       onProgress: ({ total: nextTotal }) => {
@@ -247,9 +260,13 @@ export async function startGbifExternalLoad({
       return;
     }
 
-    setGbifMapUpdatesPaused(false);
-    if (map) {
-      setGbifData(map, getGbifSlimMapCollection());
+    if (!intoTempStaging) {
+      setGbifMapUpdatesPaused(false);
+      if (map) {
+        setGbifData(map, getGbifSlimMapCollection());
+      }
+    } else if (map) {
+      setTempLayersData(map);
     }
 
     const nextSyncedAt = succeeded ? new Date().toISOString() : null;
@@ -258,7 +275,7 @@ export async function startGbifExternalLoad({
         ? query
         : { regionId: region.id, kingdomId: kingdomId || null };
 
-    if (succeeded) {
+    if (succeeded && !intoTempStaging) {
       setGbifLoadedQuery(resolvedQuery);
       setGbifSyncedAt(nextSyncedAt);
     }
@@ -268,8 +285,8 @@ export async function startGbifExternalLoad({
       seriesIndex: null,
       seriesTotal: null,
       seriesLabel: null,
-      loaded: getGbifFeatureCount(),
-      ...(succeeded
+      loaded: intoTempStaging ? addedTotal : getGbifFeatureCount(),
+      ...(succeeded && !intoTempStaging
         ? {
             lastSucceededQuery: resolvedQuery,
             lastSucceededKingdomId: kingdomId || "",
@@ -278,7 +295,9 @@ export async function startGbifExternalLoad({
         : {})
     });
 
-    await persistGbifSnapshot();
+    if (!intoTempStaging) {
+      await persistGbifSnapshot();
+    }
     notifyDataChange();
   }
 }
@@ -299,7 +318,9 @@ export async function startInatExternalLoad({
   qualityGrade,
   extras = {},
   query,
-  previewCount = null
+  previewCount = null,
+  intoTempStaging = false,
+  taxon = null
 } = {}) {
   const map = mapRef;
   if (!map || !region) {
@@ -307,8 +328,12 @@ export async function startInatExternalLoad({
   }
 
   const generation = snapshot.inat.generation + 1;
-  setInatMapUpdatesPaused(true);
-  clearInatLayer(map);
+  if (intoTempStaging) {
+    prepareTempLayerStaging({ source: "inat", taxon });
+  } else {
+    setInatMapUpdatesPaused(true);
+    clearInatLayer(map);
+  }
   patchSource("inat", {
     loading: true,
     error: null,
@@ -346,12 +371,14 @@ export async function startInatExternalLoad({
       },
       onPage: (features) => {
         fetchedTotal += features.length;
-        const { added } = upsertInatFeatures(features, region.id);
+        const { added } = intoTempStaging
+          ? upsertTempLayerStagingFeatures(features, region.id)
+          : upsertInatFeatures(features, region.id);
         addedTotal += added;
         patchSource("inat", {
           fetched: fetchedTotal,
           added: addedTotal,
-          loaded: getInatFeatureCount()
+          loaded: intoTempStaging ? addedTotal : getInatFeatureCount()
         });
       },
       onProgress: ({ total: nextTotal }) => {
@@ -375,13 +402,17 @@ export async function startInatExternalLoad({
       return;
     }
 
-    setInatMapUpdatesPaused(false);
-    if (map) {
-      setInatData(map, getInatSlimMapCollection());
+    if (!intoTempStaging) {
+      setInatMapUpdatesPaused(false);
+      if (map) {
+        setInatData(map, getInatSlimMapCollection());
+      }
+    } else if (map) {
+      setTempLayersData(map);
     }
 
     const nextSyncedAt = succeeded ? new Date().toISOString() : null;
-    if (succeeded) {
+    if (succeeded && !intoTempStaging) {
       setInatLoadedQuery(query);
       setInatSyncedAt(nextSyncedAt);
     }
@@ -391,8 +422,8 @@ export async function startInatExternalLoad({
       seriesIndex: null,
       seriesTotal: null,
       seriesLabel: null,
-      loaded: getInatFeatureCount(),
-      ...(succeeded
+      loaded: intoTempStaging ? addedTotal : getInatFeatureCount(),
+      ...(succeeded && !intoTempStaging
         ? {
             lastSucceededQuery: query,
             lastSucceededKingdomId: kingdomId || "",
@@ -402,7 +433,9 @@ export async function startInatExternalLoad({
         : {})
     });
 
-    await persistInatSnapshot();
+    if (!intoTempStaging) {
+      await persistInatSnapshot();
+    }
     notifyDataChange();
   }
 }

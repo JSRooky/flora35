@@ -64,6 +64,7 @@ export default function SubmissionAutocompleteInput({
   suggestions = [],
   getSuggestionLabel,
   getSuggestionKey,
+  renderSuggestion,
   className = "",
   wrapClassName = "submission-autocomplete-wrap",
   listClassName = "submission-autocomplete-suggestions",
@@ -136,8 +137,8 @@ export default function SubmissionAutocompleteInput({
   };
 
   const handleSelect = (suggestion) => {
-    onSuggestionSelect?.(suggestion);
     onChange(getLabel(suggestion));
+    onSuggestionSelect?.(suggestion);
     setOpen(false);
   };
 
@@ -195,7 +196,9 @@ export default function SubmissionAutocompleteInput({
           onMouseEnter={() => setActiveIndex(index)}
           onClick={() => handleSelect(suggestion)}
         >
-          {getLabel(suggestion)}
+          {renderSuggestion
+            ? renderSuggestion(suggestion)
+            : getLabel(suggestion)}
         </li>
       ))}
     </ul>
