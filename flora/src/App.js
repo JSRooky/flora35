@@ -5457,9 +5457,8 @@ export default function MapView() {
               />
             </Suspense>
           )}
-          {dataSourceMode === DATA_SOURCE_MODES.EXTERNAL && (
-            <>
-              <div hidden={isPanelMinimized(PANEL_IDS.DATA_SOURCES)}>
+          {dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
+            !isPanelMinimized(PANEL_IDS.DATA_SOURCES) && (
               <DataSourcesPanel
                 map={map.current}
                 collapsed={isPanelCollapsed(PANEL_IDS.DATA_SOURCES)}
@@ -5475,9 +5474,10 @@ export default function MapView() {
                   }))
                 }
               />
-              </div>
-              {externalProcessingActive &&
-                !isPanelMinimized(PANEL_IDS.EXTERNAL_PROCESSING) && (
+            )}
+          {dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
+            externalProcessingActive &&
+            !isPanelMinimized(PANEL_IDS.EXTERNAL_PROCESSING) && (
                 <ExternalProcessingPanel
                   filters={externalProcessingFilters}
                   onFiltersChange={handleExternalProcessingFiltersChange}
@@ -5488,8 +5488,6 @@ export default function MapView() {
                   onClose={handleClosePanel(PANEL_IDS.EXTERNAL_PROCESSING)}
                 />
               )}
-            </>
-          )}
             </>
           )}
         </div>
