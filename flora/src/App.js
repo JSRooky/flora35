@@ -435,6 +435,8 @@ export default function MapView() {
   const [panelCollapsed, setPanelCollapsed] = useState({});
   /** Панели, убранные в нижнюю «панель задач» (модуль при этом остаётся активным). */
   const [panelMinimized, setPanelMinimized] = useState({});
+  /** Отдельный флаг: panelMinimized для этой панели сбрасывают другие обработчики. */
+  const [dataSourcesPanelOpen, setDataSourcesPanelOpen] = useState(false);
   /** Порядок иконок в taskbar (открытая панель остаётся в ряду и подсвечивается). */
   const [panelTaskbarOrder, setPanelTaskbarOrder] = useState([]);
   /** Актуальный stashVisiblePanelsToTaskbar — вызывается из ранних колбэков. */
@@ -506,6 +508,12 @@ export default function MapView() {
 
   const minimizePanel = useCallback(
     (panelId) => {
+      if (
+        panelId === PANEL_IDS.DATA_SOURCES ||
+        panelId === PANEL_IDS.GBIF
+      ) {
+        setDataSourcesPanelOpen(false);
+      }
       setPanelMinimized((prev) => ({ ...prev, [panelId]: true }));
       pinPanelsToTaskbar([panelId]);
     },
@@ -535,6 +543,7 @@ export default function MapView() {
         break;
       case TASKBAR_PANEL_IDS.DATA_SOURCES:
       case TASKBAR_PANEL_IDS.GBIF:
+        setDataSourcesPanelOpen(true);
         setDataSourceModeState(DATA_SOURCE_MODES.EXTERNAL);
         setActiveModule(null);
         setPanelCollapsed((prev) => ({
@@ -703,6 +712,7 @@ export default function MapView() {
 
   // Данные GBIF развёрнуты — обработку сворачиваем (не закрываем).
   const expandGbifDataPanel = useCallback(() => {
+    setDataSourcesPanelOpen(true);
     setPanelMinimized((prev) => ({
       ...prev,
       [PANEL_IDS.GBIF]: false
@@ -1127,6 +1137,7 @@ export default function MapView() {
           [PANEL_IDS.DATA_SOURCES]: true
         }));
       } else {
+        setDataSourcesPanelOpen(false);
         setExternalProcessingActive(false);
         setPanelMinimized((prev) => ({
           ...prev,
@@ -1626,14 +1637,16 @@ export default function MapView() {
       ids.push(TASKBAR_PANEL_IDS.OOPT_SPECIES);
     }
 
-    if (dataSourceMode === DATA_SOURCE_MODES.EXTERNAL) {
-      if (!isMin(PANEL_IDS.DATA_SOURCES)) {
-        ids.push(PANEL_IDS.DATA_SOURCES);
-      }
+    if (dataSourcesPanelOpen) {
+      ids.push(PANEL_IDS.DATA_SOURCES);
+    }
 
-      if (externalProcessingActive && !isMin(PANEL_IDS.EXTERNAL_PROCESSING)) {
-        ids.push(PANEL_IDS.EXTERNAL_PROCESSING);
-      }
+    if (
+      dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
+      externalProcessingActive &&
+      !isMin(PANEL_IDS.EXTERNAL_PROCESSING)
+    ) {
+      ids.push(PANEL_IDS.EXTERNAL_PROCESSING);
     }
 
     return ids;
@@ -1643,6 +1656,7 @@ export default function MapView() {
     boundsSpeciesListOpen,
     bufferDockedWithFeature,
     dataSourceMode,
+    dataSourcesPanelOpen,
     densePileSpeciesListOpen,
     denseProcessingActive,
     externalProcessingActive,
@@ -1724,15 +1738,12 @@ export default function MapView() {
   }, [dataSourceMode, handleDataSourceModeChange, restorePanel]);
 
   const handleDataSourcesPanelToggle = useCallback(() => {
-    const panelOpen =
-      dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
-      !isPanelMinimized(PANEL_IDS.DATA_SOURCES);
-
-    if (panelOpen) {
+    if (dataSourcesPanelOpen) {
       if (isExternalSourcesLoadActive()) {
         minimizePanel(PANEL_IDS.DATA_SOURCES);
         return;
       }
+      setDataSourcesPanelOpen(false);
       setExternalProcessingActive(false);
       setPanelMinimized((prev) => ({
         ...prev,
@@ -1748,9 +1759,8 @@ export default function MapView() {
 
     handleOpenExternalLoadPanel();
   }, [
-    dataSourceMode,
+    dataSourcesPanelOpen,
     handleOpenExternalLoadPanel,
-    isPanelMinimized,
     minimizePanel,
     unpinPanelsFromTaskbar
   ]);
@@ -4306,6 +4316,7 @@ export default function MapView() {
             minimizePanel(PANEL_IDS.DATA_SOURCES);
             break;
           }
+          setDataSourcesPanelOpen(false);
           setExternalProcessingActive(false);
           setPanelMinimized((prev) => ({
             ...prev,
@@ -5039,6 +5050,7 @@ export default function MapView() {
   const showModulePanelStack =
     (activeModule !== null && activeModule !== MODULE_IDS.TIMELINE) ||
     (showOoptFeaturePanel && activeModule !== MODULE_IDS.TIMELINE) ||
+    dataSourcesPanelOpen ||
     dataSourceMode === DATA_SOURCE_MODES.EXTERNAL ||
     denseProcessingActive;
 
@@ -5054,10 +5066,7 @@ export default function MapView() {
         onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
         dataSourceMode={dataSourceMode}
         onDataSourceModeChange={handleDataSourceModeChange}
-        dataSourcesPanelOpen={
-          dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
-          !isPanelMinimized(PANEL_IDS.DATA_SOURCES)
-        }
+        dataSourcesPanelOpen={dataSourcesPanelOpen}
         onDataSourcesPanelToggle={handleDataSourcesPanelToggle}
       />
       <div
@@ -5446,8 +5455,7 @@ export default function MapView() {
               />
             </Suspense>
           )}
-          {dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
-            !isPanelMinimized(PANEL_IDS.DATA_SOURCES) && (
+          {dataSourcesPanelOpen && (
               <DataSourcesPanel
                 map={map.current}
                 collapsed={isPanelCollapsed(PANEL_IDS.DATA_SOURCES)}
