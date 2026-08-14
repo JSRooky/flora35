@@ -211,7 +211,6 @@ import {
   addRedBookLayer,
   setRedBookData,
   setRedBookVisibility,
-  applyRedBookLocationsFilter,
   upsertRedBookFeatures
 } from "./components/addRedBookLayer";
 import RedBookSearchPanel from "./components/RedBookSearchPanel";

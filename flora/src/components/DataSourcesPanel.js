@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
@@ -149,26 +149,14 @@ export default function DataSourcesPanel({
     }
   }, [clearing, loading, onHiddenRegionIdsChange, stats.pointCount]);
 
-  const updates = useMemo(() => {
-    void storeRevision;
-    void loadSnapshot.gbif.loaded;
-    void loadSnapshot.inat.loaded;
-    void stats.pointCount;
-
-    const loadedIds = getLoadedRegionIds();
-    const pendingRegions = EXTERNAL_REGIONS.filter((region) => !loadedIds.has(region.id));
-    return {
-      regionCount: pendingRegions.length,
-      recordCount: pendingRegions.length > 0 ? null : 0
-    };
-  }, [storeRevision, loadSnapshot.gbif.loaded, loadSnapshot.inat.loaded, stats.pointCount]);
-
-  const loadedRegionIdsForFilter = useMemo(() => getLoadedRegionIds(), [
-    storeRevision,
-    loadSnapshot.gbif.loaded,
-    loadSnapshot.inat.loaded,
-    stats.pointCount
-  ]);
+  const loadedRegionIdsForFilter = getLoadedRegionIds();
+  const pendingRegionCount = EXTERNAL_REGIONS.filter(
+    (region) => !loadedRegionIdsForFilter.has(region.id)
+  ).length;
+  const updates = {
+    regionCount: pendingRegionCount,
+    recordCount: pendingRegionCount > 0 ? null : 0
+  };
 
   const collapsedSummary = loading
     ? "Загрузка регионов…"
