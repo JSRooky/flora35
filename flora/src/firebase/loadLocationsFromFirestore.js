@@ -1,17 +1,15 @@
 import { getFirebaseApp, isFirebaseConfigured } from "./config";
 import {
+  FINDINGS_COLLECTION,
+  LOCATION_DATASETS,
   SUBMISSIONS_COLLECTION,
+  findingDocsToSpeciesCollection,
   submissionDocsToSpeciesCollection
 } from "./speciesCollectionFirestore";
 
-const EMPTY_SPECIES_COLLECTION = {
-  type: "SpeciesCollection",
-  species: []
-};
-
 /**
- * Загружает точки карты из Firestore.
- * Проверенные (findings) пока не подключаем — только user_submissions.
+ * Загружает точки карты из Firestore:
+ * findings (dataset=points) — проверенные, user_submissions — пользовательские.
  */
 export async function loadLocationsFromFirestore() {
   if (!isFirebaseConfigured()) {
@@ -24,12 +22,16 @@ export async function loadLocationsFromFirestore() {
   ]);
 
   const db = getFirestore(app);
-  const submissionsSnapshot = await getDocs(
-    collection(db, SUBMISSIONS_COLLECTION)
-  );
+  const [findingsSnapshot, submissionsSnapshot] = await Promise.all([
+    getDocs(collection(db, FINDINGS_COLLECTION)),
+    getDocs(collection(db, SUBMISSIONS_COLLECTION))
+  ]);
 
   return {
-    points: EMPTY_SPECIES_COLLECTION,
+    points: findingDocsToSpeciesCollection(
+      findingsSnapshot.docs,
+      LOCATION_DATASETS.POINTS
+    ),
     userpoints: submissionDocsToSpeciesCollection(submissionsSnapshot.docs)
   };
 }

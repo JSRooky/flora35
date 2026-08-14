@@ -4431,13 +4431,16 @@ export default function MapView() {
         handleDataSourceModeChange(DATA_SOURCE_MODES.REDBOOK);
       } else if (isExternalFinding && dataSourceMode !== DATA_SOURCE_MODES.EXTERNAL) {
         handleDataSourceModeChange(DATA_SOURCE_MODES.EXTERNAL);
-      } else if (
-        !isExternalFinding &&
-        !isMergedFinding &&
-        !isRedBookFinding &&
-        dataSourceMode !== DATA_SOURCE_MODES.USERPOINTS
-      ) {
-        handleDataSourceModeChange(DATA_SOURCE_MODES.USERPOINTS);
+      } else if (!isExternalFinding && !isMergedFinding && !isRedBookFinding) {
+        const targetMode = isFindingInDataSource(findingId, DATA_SOURCE_MODES.POINTS)
+          ? DATA_SOURCE_MODES.POINTS
+          : DATA_SOURCE_MODES.USERPOINTS;
+
+        if (dataSourceMode !== targetMode) {
+          handleDataSourceModeChange(targetMode);
+        } else {
+          pendingSharePointRef.current = null;
+        }
       } else {
         pendingSharePointRef.current = null;
       }

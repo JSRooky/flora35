@@ -5,6 +5,8 @@ import { findInatFeatureById } from "../inaturalist/inatStore";
 import { getMergedFeatures } from "../components/addMergedLayer";
 import { getRedBookFeatures } from "../components/addRedBookLayer";
 import { expandFindingsToFeatures } from "./expandFindings";
+import { mergeSpeciesCollections } from "./mergeSpeciesCollections";
+import localPointsCollection from "./points.json";
 import localUserpointsCollection from "./userpoints.json";
 
 export const DATA_SOURCE_MODES = {
@@ -28,8 +30,7 @@ export const DATA_SOURCE_OPTIONS = [
   {
     value: DATA_SOURCE_MODES.POINTS,
     label: "Проверенные",
-    title: "Проверенные находки (findings)",
-    hidden: true
+    title: "Проверенные находки (findings)"
   },
   {
     value: DATA_SOURCE_MODES.USERPOINTS,
@@ -114,17 +115,14 @@ export function getFeatureCacheVersion() {
 }
 
 function applyFirestoreCollections({ points, userpoints }) {
-  // Проверенные (findings) пока не подключаем к карте.
-  void points;
-  pointsCollection = EMPTY_SPECIES_COLLECTION;
+  pointsCollection = points;
   userpointsCollection = userpoints;
   invalidateFeatureCaches();
 }
 
-/** Локальный JSON — запасной источник пользовательских точек, если Firebase не настроен. */
+/** Локальный JSON — запасной источник, если Firebase не настроен. */
 function applyLocalJsonCollections() {
-  // Проверенные (points/findings) пока не подключаем к карте.
-  pointsCollection = EMPTY_SPECIES_COLLECTION;
+  pointsCollection = localPointsCollection;
   userpointsCollection = localUserpointsCollection;
   invalidateFeatureCaches();
 }
@@ -148,15 +146,14 @@ export function getDataSourceFilter() {
 }
 
 /**
- * Загружает пользовательские точки (user_submissions) из Firestore.
- * Проверенные (findings) пока не загружаются.
- * Без Firebase — подставляет локальный userpoints.json.
+ * Загружает проверенные (findings) и пользовательские (user_submissions)
+ * точки из Firestore. Без Firebase — подставляет локальные JSON.
  * @returns {Promise<boolean>}
  */
 export function initLocationsFromFirestore() {
   if (!isFirebaseConfigured()) {
     console.warn(
-      "Firebase is not configured — using local userpoints.json. " +
+      "Firebase is not configured — using local points.json and userpoints.json. " +
         "Add REACT_APP_FIREBASE_* to flora/.env.local to load from Firestore."
     );
     applyLocalJsonCollections();
@@ -172,7 +169,7 @@ export function initLocationsFromFirestore() {
       .catch((error) => {
         locationsInitPromise = null;
         console.warn("Failed to load locations from Firestore:", error);
-        console.warn("Falling back to local userpoints.json.");
+        console.warn("Falling back to local points.json and userpoints.json.");
         applyLocalJsonCollections();
         return false;
       });
@@ -199,12 +196,9 @@ export function refreshLocationsFromFirestore() {
     });
 }
 
-/** Всегда возвращает доступную локальную коллекцию (для подсказок при вводе). */
+/** Всегда возвращает объединённую локальную коллекцию (для подсказок при вводе). */
 export function getAllSpeciesCollection() {
-  // Проверенные пока отключены — только пользовательские.
-  return userpointsCollection?.type === "SpeciesCollection"
-    ? userpointsCollection
-    : EMPTY_SPECIES_COLLECTION;
+  return mergeSpeciesCollections(pointsCollection, userpointsCollection);
 }
 
 /** Возвращает коллекцию с учётом текущего фильтра источника данных. */
