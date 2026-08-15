@@ -27,6 +27,17 @@ export function setDensePileMinSize(value) {
   return densePileMinSize;
 }
 
+let hiddenDensePileKeys = new Set();
+
+/** Ключи плотных групп, скрытых с карты из списка обработки. */
+export function setHiddenDensePileKeys(keys) {
+  hiddenDensePileKeys = new Set((keys ?? []).map(String).filter(Boolean));
+}
+
+export function isDensePileHidden(key) {
+  return Boolean(key) && hiddenDensePileKeys.has(String(key));
+}
+
 export const DENSE_HIGHLIGHT_COLOR = "#ea580c";
 export const DENSE_HIGHLIGHT_STROKE_COLOR = "#9a3412";
 
@@ -97,6 +108,11 @@ export function partitionFeaturesByDensePiles(
   groups.forEach((group) => {
     const isDense = group.members.length >= minSize;
     const isExpanded = expandedPileKeys?.has(group.key);
+    const isHidden = hiddenDensePileKeys.has(group.key);
+
+    if (isHidden) {
+      return;
+    }
 
     if (!isDense) {
       // Ключ мог быть раскрыт на другом источнике (локальные/GBIF) —

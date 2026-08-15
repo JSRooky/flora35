@@ -34,6 +34,7 @@ import {
   createEmptyRegionPreviewMap,
   fetchRegionKingdomPreviews
 } from "../externalSources/fetchRegionKingdomPreviews";
+import { DownloadIcon, RefreshIcon, TrashIcon } from "../images/buttons";
 
 function formatCount(value) {
   if (value == null || Number.isNaN(Number(value))) {
@@ -120,54 +121,6 @@ function formatLoadedKingdoms(query) {
     return query.kingdomIds.join(", ");
   }
   return query.kingdomId || "";
-}
-
-function DownloadIcon({ className = "regions-load-action-icon" }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function RefreshIcon({ className = "regions-load-action-icon" }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function DeleteIcon({ className = "regions-load-action-icon" }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
-        fill="currentColor"
-      />
-    </svg>
-  );
 }
 
 /**
@@ -716,7 +669,7 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
                             …
                           </span>
                         ) : (
-                          <DownloadIcon />
+                          <DownloadIcon className="regions-load-action-icon" aria-hidden="true" focusable="false" />
                         )}
                       </button>
                       <button
@@ -741,7 +694,7 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
                           runRegionLoad(region, { incremental: true })
                         }
                       >
-                        <RefreshIcon />
+                        <RefreshIcon className="regions-load-action-icon" aria-hidden="true" focusable="false" />
                       </button>
                       <button
                         type="button"
@@ -761,7 +714,7 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
                         }
                         onClick={() => clearRegionDataset(region)}
                       >
-                        <DeleteIcon />
+                        <TrashIcon className="regions-load-action-icon" aria-hidden="true" focusable="false" />
                       </button>
                     </div>
                   </td>

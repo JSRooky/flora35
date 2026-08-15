@@ -19,6 +19,7 @@ import SubmissionFieldLabel from "./SubmissionFieldLabel";
 import { STATUS_OPTIONS } from "./StatusFilterPanel";
 import { MODULE_IDS } from "./ModuleMenu";
 import "../styles/UserSubmissionPanel.css";
+import { TrashIcon } from "../images/buttons";
 
 const REGNUM_OPTIONS = [
   { value: "plantae", label: "Растения" },
@@ -75,52 +76,6 @@ function isSubmissionFormComplete(form, coordinates, listCoordinates) {
   const foundYear = Number(form.found_year);
   // Разумный диапазон года находки, чтобы отсечь опечатки.
   return Number.isInteger(foundYear) && foundYear >= 1500 && foundYear <= 2100;
-}
-
-function TrashIcon() {
-  return (
-    <svg
-      className="user-submission-location-reset-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <polyline
-        points="3 6 5 6 21 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <line
-        x1="10"
-        y1="11"
-        x2="10"
-        y2="17"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <line
-        x1="14"
-        y1="11"
-        x2="14"
-        y2="17"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
 }
 
 /** Панель формы добавления новой находки (модуль «Новая находка»): одиночный ввод и переход к вводу нескольких видов. */
@@ -557,7 +512,7 @@ export default function UserSubmissionPanel({
                           aria-label="Сбросить место находки"
                           title="Сбросить место"
                         >
-                          <TrashIcon />
+                          <TrashIcon className="user-submission-location-reset-icon" aria-hidden="true" focusable="false" />
                         </button>
                       </div>
                       <button
@@ -632,7 +587,7 @@ export default function UserSubmissionPanel({
                     aria-label="Сброс"
                     title="Сброс"
                   >
-                    <TrashIcon />
+                    <TrashIcon className="user-submission-location-reset-icon" aria-hidden="true" focusable="false" />
                   </button>
                 </div>
                 <MultiSpeciesEntryMenu

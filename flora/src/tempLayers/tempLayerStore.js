@@ -34,22 +34,31 @@ function createEmptyStaging() {
 
 let staging = createEmptyStaging();
 export const TEMP_LAYER_MARKER_PALETTE = [
-  "#e11d48",
-  "#ea580c",
-  "#ca8a04",
-  "#16a34a",
-  "#0d9488",
-  "#2563eb",
-  "#7c3aed",
-  "#db2777",
-  "#b91c1c",
-  "#c2410c",
-  "#4d7c0f",
-  "#0f766e",
-  "#1e3a8a",
-  "#6d28d9",
-  "#78716c",
-  "#111827"
+  "#d5254c",
+  "#d85a1c",
+  "#c18b14",
+  "#20a04c",
+  "#16958a",
+  "#3267e0",
+  "#7e43e3",
+  "#d02e7a",
+  "#ae2222",
+  "#ba4318",
+  "#4d7b15",
+  "#16756f",
+  "#233c85",
+  "#6f2ed3",
+  "#78716d",
+  "#e84763",
+  "#ed751e",
+  "#e1b316",
+  "#2dc160",
+  "#1eb6a6",
+  "#4584ec",
+  "#8f62ed",
+  "#e44e9c",
+  "#d02c2c",
+  "#64a016"
 ];
 
 const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{6})$/;

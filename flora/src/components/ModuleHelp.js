@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { HelpIcon } from "../images/buttons";
 import { loadModuleHelpSection } from "../docs/loadModuleHelp";
 import {
   getModuleHelpPageUrl,
@@ -19,7 +20,7 @@ export function ModuleHelpButton({ open, onClick, className = "", mapToolAccent 
       aria-label="Помощь"
       title="Помощь"
     >
-      ?
+      <HelpIcon className="module-help-btn-icon" aria-hidden="true" focusable="false" />
     </button>
   );
 }

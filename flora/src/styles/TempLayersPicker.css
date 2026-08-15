@@ -1,10 +1,16 @@
+.temp-layers-picker .external-layers-picker-panel-wrap {
+  max-width: min(400px, calc(100vw - 40px));
+}
+
 .temp-layers-picker-panel {
   position: relative;
   isolation: isolate;
-  min-width: 240px;
-  max-width: min(340px, calc(100vw - 48px));
+  min-width: 300px;
+  max-width: min(400px, calc(100vw - 48px));
   max-height: min(420px, 56vh);
   overflow-y: auto;
+  gap: 10px;
+  padding: 2px 4px 4px;
 }
 
 .temp-layers-picker-panel--palette-open {
@@ -26,19 +32,40 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
-  padding: 4px 6px 4px 4px;
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  min-height: 48px;
+  padding: 8px 8px 8px 24px;
+  overflow: visible;
+  border: none;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.08);
   opacity: 0;
   transform: translateY(6px);
   transition:
     opacity 0.24s ease,
     transform 0.24s ease,
-    background-color 0.2s ease,
-    border-color 0.2s ease;
+    box-shadow 0.2s ease;
+}
+
+.temp-layers-picker-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  border-radius: 12px 0 0 12px;
+  background:
+    var(
+      --temp-layer-color,
+      conic-gradient(
+        #588f38 0deg 90deg,
+        #c98263 90deg 180deg,
+        #7a5d8f 180deg 270deg,
+        #2a8f9e 270deg 360deg
+      )
+    );
+  pointer-events: none;
 }
 
 .external-layers-picker-panel-wrap--open .temp-layers-picker-row {
@@ -56,38 +83,57 @@
 }
 
 .temp-layers-picker-row:hover {
-  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16), 0 1px 4px rgba(15, 23, 42, 0.08);
 }
 
-.temp-layers-picker-row--selected {
-  border-color: rgba(42, 157, 143, 0.45);
-  background: rgba(42, 157, 143, 0.14);
+.temp-layers-picker-row--hidden {
+  opacity: 0.62;
 }
 
-.temp-layers-picker-row--tinted {
-  border-color: color-mix(in srgb, var(--temp-layer-color) 55%, rgba(255, 255, 255, 0.35));
-  background: color-mix(in srgb, var(--temp-layer-color) 28%, rgba(255, 255, 255, 0.72));
-}
-
-.temp-layers-picker-row--tinted:hover {
-  background: color-mix(in srgb, var(--temp-layer-color) 38%, rgba(255, 255, 255, 0.7));
-}
-
-.temp-layers-picker-row--tinted .temp-layers-picker-toggle {
-  color: color-mix(in srgb, var(--temp-layer-color) 72%, #111827);
-}
-
-.temp-layers-picker-row--tinted .temp-layers-picker-option-meta {
-  color: color-mix(in srgb, var(--temp-layer-color) 45%, #4b5563);
-}
-
-.temp-layers-picker-row--tinted .external-layers-picker-check--checked {
-  border-color: var(--temp-layer-color);
-  background: var(--temp-layer-color);
+.external-layers-picker-panel-wrap--open .temp-layers-picker-row--hidden {
+  opacity: 0.62;
 }
 
 .temp-layers-picker-row--palette-open {
   z-index: 8;
+}
+
+.temp-layers-picker-color {
+  position: relative;
+  flex: 0 0 auto;
+  z-index: 1;
+}
+
+.temp-layers-picker-color-btn {
+  box-sizing: border-box;
+  display: block;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0 2px 0 0;
+  padding: 0;
+  border: 1px solid rgba(17, 24, 39, 0.18);
+  outline: none;
+  box-shadow: none;
+  border-radius: 50%;
+  background:
+    conic-gradient(
+      #588f38 0deg 90deg,
+      #c98263 90deg 180deg,
+      #7a5d8f 180deg 270deg,
+      #2a8f9e 270deg 360deg
+    );
+  cursor: pointer;
+}
+
+.temp-layers-picker-color-btn--custom {
+  background: var(--temp-layer-color);
+  border-color: color-mix(in srgb, var(--temp-layer-color) 55%, #111827);
+}
+
+.temp-layers-picker-color-btn:hover {
+  transform: scale(1.08);
 }
 
 .temp-layers-picker-toggle {
@@ -97,7 +143,7 @@
   align-items: center;
   gap: 6px;
   margin: 0;
-  padding: 2px 2px 2px 4px;
+  padding: 2px 4px 2px 2px;
   border: 0;
   background: transparent;
   color: #1c1c1e;
@@ -106,15 +152,6 @@
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-}
-
-.temp-layers-picker-row--selected .temp-layers-picker-toggle {
-  color: #1a6b62;
-}
-
-.temp-layers-picker-row--tinted .temp-layers-picker-toggle,
-.temp-layers-picker-row--tinted.temp-layers-picker-row--selected .temp-layers-picker-toggle {
-  color: color-mix(in srgb, var(--temp-layer-color) 72%, #111827);
 }
 
 .temp-layers-picker-option-text {
@@ -139,36 +176,6 @@
   white-space: nowrap;
 }
 
-.temp-layers-picker-color {
-  position: relative;
-  flex: 0 0 auto;
-}
-
-.temp-layers-picker-color-btn {
-  box-sizing: border-box;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: 1px solid rgba(17, 24, 39, 0.22);
-  border-radius: 4px;
-  background:
-    conic-gradient(
-      #588f38 0deg 90deg,
-      #c98263 90deg 180deg,
-      #7a5d8f 180deg 270deg,
-      #2a8f9e 270deg 360deg
-    );
-  cursor: pointer;
-}
-
-.temp-layers-picker-color-btn--custom {
-  background: #4a90e2;
-}
-
-.temp-layers-picker-color-btn:hover {
-  transform: scale(1.08);
-}
-
 .temp-layers-picker-palette {
   position: absolute;
   right: 0;
@@ -187,8 +194,8 @@
 
 .temp-layers-picker-palette-grid {
   display: grid;
-  grid-template-columns: repeat(4, 18px);
-  grid-template-rows: repeat(4, 18px);
+  grid-template-columns: repeat(5, 18px);
+  grid-template-rows: repeat(5, 18px);
   gap: 5px;
 }
 
@@ -204,30 +211,33 @@
 
 .temp-layers-picker-palette-swatch--auto {
   width: 100%;
-  height: 18px;
-  background:
-    conic-gradient(
-      #588f38 0deg 90deg,
-      #c98263 90deg 180deg,
-      #7a5d8f 180deg 270deg,
-      #2a8f9e 270deg 360deg
-    );
+  height: auto;
+  min-height: 24px;
+  padding: 4px 6px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .temp-layers-picker-palette-swatch--selected {
   box-shadow: 0 0 0 2px #fff, 0 0 0 3px #1a6b62;
 }
 
-.temp-layers-picker-delete {
+.temp-layers-picker-delete,
+.temp-layers-picker-hide {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: #8e8e93;
   cursor: pointer;
@@ -238,8 +248,15 @@
   color: #ff3b30;
 }
 
-.temp-layers-picker-delete-icon {
+.temp-layers-picker-hide:hover,
+.temp-layers-picker-hide--off {
+  background: rgba(0, 0, 0, 0.06);
+  color: #4b5563;
+}
+
+.temp-layers-picker-delete-icon,
+.temp-layers-picker-hide-icon {
   display: block;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }

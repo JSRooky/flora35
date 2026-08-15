@@ -31,31 +31,13 @@ import {
   commitTempLayerStaging
 } from "../tempLayers/tempLayerStore";
 import { persistTempLayers } from "../tempLayers/tempLayerPersistence";
+import { DownloadIcon, SearchIcon } from "../images/buttons";
 
 function formatCount(value) {
   if (value == null || Number.isNaN(Number(value))) {
     return "—";
   }
   return new Intl.NumberFormat("ru-RU").format(Number(value));
-}
-
-function DownloadIcon({ className = "regions-load-action-icon" }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor" />
-    </svg>
-  );
-}
-
-function SearchIcon({ className = "regions-load-action-icon" }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path
-        d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
-        fill="currentColor"
-      />
-    </svg>
-  );
 }
 
 function buildLoadQuery(regionId, taxon) {
@@ -409,7 +391,7 @@ export default function SelectiveLoadPopup({
             title="Поиск"
             onClick={runSearch}
           >
-            {searching ? <span aria-hidden="true">…</span> : <SearchIcon />}
+            {searching ? <span aria-hidden="true">…</span> : <SearchIcon className="regions-load-action-icon" aria-hidden="true" focusable="false" />}
           </button>
         </div>
 
@@ -490,7 +472,7 @@ export default function SelectiveLoadPopup({
                                 …
                               </span>
                             ) : (
-                              <DownloadIcon />
+                              <DownloadIcon className="regions-load-action-icon" aria-hidden="true" focusable="false" />
                             )}
                           </button>
                         </td>

@@ -17,6 +17,7 @@ import { resolveFeatureRegnum } from "../gbif/taxonFilters";
 import { buildSharePointUrl, copyTextToClipboard } from "./sharePointLink";
 import { getOverlayEntry, getOverlayRussianName } from "../names/nameRuCache";
 import "../styles/FeaturePopup.css";
+import { CheckIcon, CopyIcon, ShareIcon, TrashIcon } from "../images/buttons";
 
 // Служебные поля, добавленные слоем карты; не показываем в списке свойств.
 const INTERNAL_PROPERTIES = new Set([
@@ -161,102 +162,6 @@ function sortGbifMetaEntries(entries) {
 function getImages(properties) {
   if (properties.images?.length > 0) return properties.images;
   return [];
-}
-
-function ShareIcon() {
-  return (
-    <svg
-      className="feature-popup-action-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7a3.27 3.27 0 0 0 0-1.39l7.05-4.11A2.991 2.991 0 1 0 14.05 6l-7.05 4.11a3 3 0 1 0 0 4.78l7.05 4.11a2.995 2.995 0 1 0 .9-1.92z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function CopyIcon() {
-  return (
-    <svg
-      className="feature-popup-action-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg
-      className="feature-popup-action-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg
-      className="feature-popup-action-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <polyline
-        points="3 6 5 6 21 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <line
-        x1="10"
-        y1="11"
-        x2="10"
-        y2="17"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <line
-        x1="14"
-        y1="11"
-        x2="14"
-        y2="17"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
 }
 
 /** Панель со сведениями о выбранной точке данных: свойства, фильтры, иллюстрации, доп. инструменты. */
@@ -637,7 +542,7 @@ export default function FeaturePopup({
                               aria-label="Удалить"
                               title="Удалить"
                             >
-                              <TrashIcon />
+                              <TrashIcon className="feature-popup-action-icon" aria-hidden="true" focusable="false" />
                             </button>
                             <label className="property-switch" title="Показать маркеры с этим свойством">
                               <input
@@ -849,7 +754,7 @@ export default function FeaturePopup({
                       title="Поделиться точкой"
                       disabled={!shareUrl}
                     >
-                      <ShareIcon />
+                      <ShareIcon className="feature-popup-action-icon" aria-hidden="true" focusable="false" />
                     </button>
                   </div>
                 )}
@@ -879,7 +784,7 @@ export default function FeaturePopup({
               aria-label={shareCopied ? "Ссылка скопирована" : "Скопировать ссылку"}
               title={shareCopied ? "Ссылка скопирована" : "Скопировать ссылку"}
             >
-              {shareCopied ? <CheckIcon /> : <CopyIcon />}
+              {shareCopied ? <CheckIcon className="feature-popup-action-icon" aria-hidden="true" focusable="false" /> : <CopyIcon className="feature-popup-action-icon" aria-hidden="true" focusable="false" />}
             </button>
           </div>
         </div>

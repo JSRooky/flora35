@@ -1,5 +1,5 @@
 import React from "react";
-import { ReactComponent as UserAccountIcon } from "../images/user_account.svg";
+import { UserAccountIcon } from "../images/buttons";
 import "../styles/UserAccountControl.css";
 
 /**

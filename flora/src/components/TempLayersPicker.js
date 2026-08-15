@@ -5,56 +5,9 @@ import {
 } from "../tempLayers/tempLayerStore";
 import "../styles/ExternalLayersPicker.css";
 import "../styles/TempLayersPicker.css";
+import { ClockIcon, EyeIcon, EyeOffIcon, TrashIcon } from "../images/buttons";
 
 const HOVER_CLOSE_DELAY_MS = 160;
-
-function TrashIcon() {
-  return (
-    <svg
-      className="temp-layers-picker-delete-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <polyline
-        points="3 6 5 6 21 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <line
-        x1="10"
-        y1="11"
-        x2="10"
-        y2="17"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <line
-        x1="14"
-        y1="11"
-        x2="14"
-        y2="17"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 function formatLayerMeta(layer) {
   const points = new Intl.NumberFormat("ru-RU").format(layer.features?.length ?? 0);
@@ -77,34 +30,6 @@ function layerTitle(layer) {
     return `${source} · ${layer.taxonName}`;
   }
   return layer.label || source;
-}
-
-function ClockLayersIcon() {
-  return (
-    <svg
-      className="external-layers-picker-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <circle
-        cx="12"
-        cy="12"
-        r="8.2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M12 8.2v4.1l2.6 1.6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
 }
 
 function LayerColorButton({ layer, open, tabIndex, onToggle, onSelect, onReset }) {
@@ -146,9 +71,11 @@ function LayerColorButton({ layer, open, tabIndex, onToggle, onSelect, onReset }
             }`}
             role="option"
             aria-selected={!current}
-            title="По царству"
+            title="По умолчанию"
             onClick={() => onReset()}
-          />
+          >
+            По умолчанию
+          </button>
           <div className="temp-layers-picker-palette-grid">
             {TEMP_LAYER_MARKER_PALETTE.map((color) => (
               <button
@@ -265,9 +192,7 @@ export default function TempLayersPicker({
               <div
                 key={layer.id}
                 className={`temp-layers-picker-row${
-                  layer.visible ? " temp-layers-picker-row--selected" : ""
-                }${
-                  layer.markerColor ? " temp-layers-picker-row--tinted" : ""
+                  layer.visible ? "" : " temp-layers-picker-row--hidden"
                 }${
                   colorMenuLayerId === layer.id
                     ? " temp-layers-picker-row--palette-open"
@@ -284,29 +209,39 @@ export default function TempLayersPicker({
                   title={layer.visible ? `Скрыть «${layer.label}»` : `Показать «${layer.label}»`}
                   onClick={() => onToggleLayer?.(layer.id, !layer.visible)}
                 >
-                  <span
-                    className={`external-layers-picker-check${
-                      layer.visible ? " external-layers-picker-check--checked" : ""
-                    }`}
-                    aria-hidden="true"
-                  >
-                    {layer.visible ? (
-                      <svg viewBox="0 0 16 16" className="external-layers-picker-check-icon">
-                        <path
-                          d="M3.5 8.2 6.4 11.1 12.5 4.8"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    ) : null}
-                  </span>
                   <span className="temp-layers-picker-option-text">
                     <span className="external-layers-picker-option-label">{layerTitle(layer)}</span>
                     <span className="temp-layers-picker-option-meta">{formatLayerMeta(layer)}</span>
                   </span>
+                </button>
+                <button
+                  type="button"
+                  className="temp-layers-picker-delete"
+                  tabIndex={open ? 0 : -1}
+                  aria-label={`Удалить слой «${layer.label}»`}
+                  title="Удалить"
+                  onClick={() => onDeleteLayer?.(layer.id)}
+                >
+                  <TrashIcon className="temp-layers-picker-delete-icon" aria-hidden="true" focusable="false" />
+                </button>
+                <button
+                  type="button"
+                  className={`temp-layers-picker-hide${
+                    layer.visible ? "" : " temp-layers-picker-hide--off"
+                  }`}
+                  tabIndex={open ? 0 : -1}
+                  aria-pressed={!layer.visible}
+                  aria-label={
+                    layer.visible ? `Скрыть «${layer.label}»` : `Показать «${layer.label}»`
+                  }
+                  title={layer.visible ? "Скрыть слой" : "Показать слой"}
+                  onClick={() => onToggleLayer?.(layer.id, !layer.visible)}
+                >
+                  {layer.visible ? (
+                    <EyeIcon className="temp-layers-picker-hide-icon" aria-hidden="true" focusable="false" />
+                  ) : (
+                    <EyeOffIcon className="temp-layers-picker-hide-icon" aria-hidden="true" focusable="false" />
+                  )}
                 </button>
                 <LayerColorButton
                   layer={layer}
@@ -326,16 +261,6 @@ export default function TempLayersPicker({
                     setColorMenuLayerId(null);
                   }}
                 />
-                <button
-                  type="button"
-                  className="temp-layers-picker-delete"
-                  tabIndex={open ? 0 : -1}
-                  aria-label={`Удалить слой «${layer.label}»`}
-                  title="Удалить"
-                  onClick={() => onDeleteLayer?.(layer.id)}
-                >
-                  <TrashIcon />
-                </button>
               </div>
             ))
           )}
@@ -353,7 +278,7 @@ export default function TempLayersPicker({
           aria-label="Временные слои"
           title="Временные слои"
         >
-          <ClockLayersIcon />
+          <ClockIcon className="external-layers-picker-icon" aria-hidden="true" focusable="false" />
           {activeCount > 0 ? (
             <span className="external-layers-picker-count">{activeCount}</span>
           ) : null}

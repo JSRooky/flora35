@@ -1,5 +1,9 @@
 .panel-close-btn {
-  font-size: 20px;
-  font-weight: 500;
-  line-height: 1;
+  color: inherit;
+}
+
+.panel-close-btn-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
 }

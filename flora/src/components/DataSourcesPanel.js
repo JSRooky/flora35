@@ -20,6 +20,7 @@ import {
   isExternalSourcesLoadActive
 } from "../externalSources/externalSourcesLoadManager";
 import "../styles/GbifPanel.css";
+import { DownloadIcon, FilterIcon, TrashIcon } from "../images/buttons";
 
 function formatCount(value) {
   if (value == null || Number.isNaN(Number(value))) {
@@ -39,25 +40,6 @@ function formatMegabytes(bytes) {
   return `${mb.toFixed(1)} МБ`;
 }
 
-function ActionIcon({ path }) {
-  return (
-    <svg
-      className="data-sources-action-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d={path} fill="currentColor" />
-    </svg>
-  );
-}
-
-const DOWNLOAD_ICON =
-  "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z";
-const FILTER_ICON =
-  "M3 5h18l-7 8v5l-4 2v-7L3 5z";
-const DELETE_ICON =
-  "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z";
 
 function getLoadedRegionIds() {
   const ids = new Set();
@@ -209,7 +191,7 @@ export default function DataSourcesPanel({
                     setRegionsTableOpen(true);
                   }}
                 >
-                  <ActionIcon path={DOWNLOAD_ICON} />
+                  <DownloadIcon className="data-sources-action-icon" aria-hidden="true" focusable="false" />
                 </button>
                 <button
                   type="button"
@@ -219,7 +201,7 @@ export default function DataSourcesPanel({
                   aria-label="Фильтр"
                   onClick={() => setRegionsFilterOpen(true)}
                 >
-                  <ActionIcon path={FILTER_ICON} />
+                  <FilterIcon className="data-sources-action-icon" aria-hidden="true" focusable="false" />
                 </button>
                 <button
                   type="button"
@@ -234,7 +216,7 @@ export default function DataSourcesPanel({
                       …
                     </span>
                   ) : (
-                    <ActionIcon path={DELETE_ICON} />
+                    <TrashIcon className="data-sources-action-icon" aria-hidden="true" focusable="false" />
                   )}
                 </button>
               </div>

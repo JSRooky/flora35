@@ -5,9 +5,7 @@ import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
-import { ReactComponent as DrawFreeIcon } from "../images/draw-free.svg";
-import { ReactComponent as DrawRectIcon } from "../images/draw-rect.svg";
-import { ReactComponent as DrawPolyIcon } from "../images/draw-poly.svg";
+import { DrawFreeIcon, DrawPolyIcon, DrawRectIcon } from "../images/buttons";
 import "../styles/AreaSelectionPopup.css";
 
 const DRAW_TOOL_OPTIONS = [

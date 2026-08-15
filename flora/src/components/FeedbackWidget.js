@@ -1,7 +1,6 @@
 import React from "react";
 import { getFeedbackChannels } from "../feedbackLinks";
-import { ReactComponent as MaxIcon } from "../images/max_icon.svg";
-import { ReactComponent as TelegramIcon } from "../images/telegram_icon.svg";
+import { MaxIcon, TelegramIcon } from "../images/buttons";
 import "../styles/FeedbackWidget.css";
 
 const CHANNEL_ICONS = {

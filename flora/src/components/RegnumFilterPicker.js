@@ -5,23 +5,9 @@ import {
 import { getPointColorForRegnum } from "./pointColors";
 import "../styles/ExternalLayersPicker.css";
 import "../styles/RegnumFilterPicker.css";
+import { CheckSmallIcon, ClustersIcon } from "../images/buttons";
 
 const HOVER_CLOSE_DELAY_MS = 160;
-
-function RegnumIcon() {
-  return (
-    <svg
-      className="external-layers-picker-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <circle cx="8" cy="9" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
-      <circle cx="16.5" cy="8" r="2.4" fill="none" stroke="currentColor" strokeWidth="1.7" />
-      <circle cx="14" cy="16" r="3" fill="none" stroke="currentColor" strokeWidth="1.7" />
-    </svg>
-  );
-}
 
 /**
  * Фильтр точек по царству — виджет внизу слева рядом со «Слои внешних источников».
@@ -126,16 +112,7 @@ export default function RegnumFilterPicker({
                   aria-hidden="true"
                 >
                   {selected ? (
-                    <svg viewBox="0 0 16 16" className="external-layers-picker-check-icon">
-                      <path
-                        d="M3.5 8.2 6.4 11.1 12.5 4.8"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                    <CheckSmallIcon className="external-layers-picker-check-icon" aria-hidden="true" focusable="false" />
                   ) : null}
                 </span>
                 <span
@@ -169,7 +146,7 @@ export default function RegnumFilterPicker({
               : "Царство: все"
           }
         >
-          <RegnumIcon />
+          <ClustersIcon className="external-layers-picker-icon" aria-hidden="true" focusable="false" />
           {isFiltered ? (
             <span className="external-layers-picker-count">{activeCount}</span>
           ) : null}

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ReactComponent as MainLogo } from "../images/main_logo.svg";
+import { DatabaseIcon } from "../images/buttons";
 import { DATA_SOURCE_OPTIONS, VISIBLE_DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
 import UserAccountControl from "./UserAccountControl";
 import "../styles/ModuleMenu.css";
@@ -101,31 +102,7 @@ function isToolModuleActive(activeModule) {
 const DISABLED_POINT_REQUIRED_TITLE = "Выберите точку";
 const DISABLED_AREAL_BY_BUFFER_TITLE = 'Сначала сбросьте инструмент «Буфер»';
 const DISABLED_BUFFER_BY_AREAL_TITLE = 'Сначала сбросьте инструмент «Радиус»';
-
-function DatabaseIcon() {
-  return (
-    <svg
-      className="module-menu-btn-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <ellipse cx="12" cy="6" rx="7" ry="3" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path
-        d="M5 6v8c0 1.7 3.1 3 7 3s7-1.3 7-3V6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-      <path
-        d="M5 10c0 1.7 3.1 3 7 3s7-1.3 7-3"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-    </svg>
-  );
-}
+
 
 function ModuleMenuButton({
   id,
@@ -399,7 +376,7 @@ export default function ModuleMenu({
             <ModuleMenuButton
               id={DATA_SOURCES_MODULE_ITEM.id}
               label={DATA_SOURCES_MODULE_ITEM.label}
-              icon={<DatabaseIcon />}
+              icon={<DatabaseIcon className="module-menu-btn-icon" aria-hidden="true" focusable="false" />}
               activeModule={
                 dataSourcesPanelOpen ? MODULE_IDS.DATA_SOURCES : activeModule
               }

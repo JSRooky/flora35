@@ -1,17 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import { BASEMAP_MODES, BASEMAP_OPTIONS } from "../config/basemapOptions";
 import { isYandexMapsApiKeyConfigured } from "./addYandexBasemapLayer";
-import { ReactComponent as MapboxIcon } from "../images/map_mb_map_icon.svg";
-import { ReactComponent as OsmIcon } from "../images/map_os_map_icon.svg";
-import { ReactComponent as YandexIcon } from "../images/map_ya_map_icon.svg";
+import { BasemapMapboxIcon, BasemapOsmIcon, BasemapYandexIcon } from "../images/buttons";
 import "../styles/BasemapPicker.css";
 
 const HOVER_CLOSE_DELAY_MS = 160;
 
 const BASEMAP_ICONS = {
-  [BASEMAP_MODES.MAPBOX]: MapboxIcon,
-  [BASEMAP_MODES.OSM]: OsmIcon,
-  [BASEMAP_MODES.YANDEX]: YandexIcon
+  [BASEMAP_MODES.MAPBOX]: BasemapMapboxIcon,
+  [BASEMAP_MODES.OSM]: BasemapOsmIcon,
+  [BASEMAP_MODES.YANDEX]: BasemapYandexIcon
 };
 
 function BasemapIconGradientDefs() {

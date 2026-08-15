@@ -9,6 +9,7 @@ import { STATUS_OPTIONS } from "./StatusFilterPanel";
 import { getRegnumLabel, REGNUM_ORDER } from "./featurePropertyLabels";
 import SubmissionAutocompleteInput from "./SubmissionAutocompleteInput";
 import "../styles/SubmissionAutocomplete.css";
+import { EditIcon, MapPickIcon, PlusIcon, TrashIcon } from "../images/buttons";
 
 function TableHeaderLabel({ children, required = false }) {
   return (
@@ -94,82 +95,6 @@ function TableCell({
   );
 }
 
-function PlusIcon() {
-  return (
-    <svg
-      className="multi-species-row-action-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M12 5v14M5 12h14"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg
-      className="multi-species-row-action-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <polyline
-        points="3 6 5 6 21 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <line x1="10" y1="11" x2="10" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <line x1="14" y1="11" x2="14" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function EditIcon() {
-  return (
-    <svg
-      className="multi-species-row-edit-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M12 20h9"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function TableRegnumCell({ editing, regnum, index, disabled, invalid = false, onRowChange }) {
   if (editing) {
     return (
@@ -243,27 +168,6 @@ function RegnumMarker({ regnum }) {
   );
 }
 
-function MapPickIcon() {
-  return (
-    <svg
-      className="multi-species-coords-pick-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M12 21s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="11" r="2.5" fill="currentColor" />
-    </svg>
-  );
-}
-
 function TableCoordsCells({
   index,
   lat,
@@ -315,7 +219,7 @@ function TableCoordsCells({
               title="Указать на карте"
               aria-label={`Указать координаты на карте, строка ${index + 1}`}
             >
-              <MapPickIcon />
+              <MapPickIcon className="multi-species-coords-pick-icon" aria-hidden="true" focusable="false" />
             </button>
           </div>
         </td>
@@ -663,7 +567,7 @@ export default function MultiSpeciesConfirmTable({
                       }
                       title={isEditing ? "Готово" : "Редактировать"}
                     >
-                      <EditIcon />
+                      <EditIcon className="multi-species-row-edit-icon" aria-hidden="true" focusable="false" />
                     </button>
                   </td>
                 ) : null}
@@ -699,7 +603,7 @@ export default function MultiSpeciesConfirmTable({
                         aria-label={`Добавить строку после ${index + 1}`}
                         title="Добавить строку"
                       >
-                        <PlusIcon />
+                        <PlusIcon className="multi-species-row-action-icon" aria-hidden="true" focusable="false" />
                       </button>
                     ) : (
                       <button
@@ -710,7 +614,7 @@ export default function MultiSpeciesConfirmTable({
                         aria-label={`Удалить строку ${index + 1}`}
                         title="Удалить строку"
                       >
-                        <TrashIcon />
+                        <TrashIcon className="multi-species-row-action-icon" aria-hidden="true" focusable="false" />
                       </button>
                     )}
                   </td>

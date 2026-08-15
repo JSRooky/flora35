@@ -58,7 +58,8 @@ import {
 import {
   buildSpeciesSummaryFromDensePile,
   MIN_DENSE_PILE_SIZE,
-  setDensePileMinSize
+  setDensePileMinSize,
+  setHiddenDensePileKeys
 } from "./components/densePiles";
 import DenseClustersPanel from "./components/DenseClustersPanel";
 import {
@@ -336,6 +337,8 @@ export default function MapView() {
   );
   const [densePileMinSize, setDensePileMinSizeState] = useState(MIN_DENSE_PILE_SIZE);
   const [denseProcessingActive, setDenseProcessingActive] = useState(false);
+  const [denseGroupsHidden, setDenseGroupsHidden] = useState(false);
+  const [hiddenDensePileKeys, setHiddenDensePileKeysState] = useState([]);
   const [selectedDensePileKey, setSelectedDensePileKey] = useState(null);
   const [densePileSpeciesListOpen, setDensePileSpeciesListOpen] = useState(false);
   // Инвалидация списка плотных групп при смене данных в module-store (локальные/GBIF).
@@ -2041,6 +2044,7 @@ export default function MapView() {
     // Клик по плотной группе на карте открывает панель обработки, если она скрыта.
     setMarkersVisibleState(true);
     setDenseClustersHighlightState(true);
+    setDenseGroupsHidden(false);
     setDenseProcessingActive(true);
     setActiveModule(MODULE_IDS.MAP);
     expandDenseProcessingPanel();
@@ -2063,6 +2067,33 @@ export default function MapView() {
   const handleDensePileSelect = useCallback((pile) => {
     if (!map.current || !pile?.key) {
       return;
+    }
+
+    if (hiddenDensePileKeys.some((key) => String(key) === String(pile.key))) {
+      const next = hiddenDensePileKeys.filter((key) => String(key) !== String(pile.key));
+      setHiddenDensePileKeysState(next);
+      setHiddenDensePileKeys(next);
+    }
+
+    if (denseGroupsHidden) {
+      setDenseGroupsHidden(false);
+      setMarkersVisibleState(true);
+      setDenseClustersHighlightState(true);
+      const grouping = {
+        clusteringEnabled,
+        clusterByRegnum,
+        clusterPieCharts,
+        denseClustersHighlight: true
+      };
+      applyLocationsGroupingMode(map.current, grouping);
+      applyGbifGroupingMode(map.current, grouping);
+      applyInatGroupingMode(map.current, grouping);
+      applyTempLayersGroupingMode(map.current, {
+        clusterByTempLayers,
+        clusterPieCharts,
+        clusteringEnabled,
+        denseClustersHighlight: true
+      });
     }
 
     expandDensePileByKey(map.current, pile.key, {
@@ -2089,7 +2120,14 @@ export default function MapView() {
       animateCamera: false,
       notify: false
     });
-  }, []);
+  }, [
+    clusterByRegnum,
+    clusterByTempLayers,
+    clusterPieCharts,
+    clusteringEnabled,
+    denseGroupsHidden,
+    hiddenDensePileKeys
+  ]);
 
   const handleDensePileZoomBack = useCallback(() => {
     const previous = densePileCameraBeforeRef.current;
@@ -2111,6 +2149,28 @@ export default function MapView() {
     setSelectedDensePileKey(null);
     setDensePileSpeciesListOpen(false);
   }, []);
+
+  const handleToggleDensePileHidden = useCallback((pile) => {
+    if (!pile?.key) {
+      return;
+    }
+
+    const pileKey = String(pile.key);
+    const alreadyHidden = hiddenDensePileKeys.some((key) => String(key) === pileKey);
+    const next = alreadyHidden
+      ? hiddenDensePileKeys.filter((key) => String(key) !== pileKey)
+      : [...hiddenDensePileKeys, pileKey];
+
+    setHiddenDensePileKeysState(next);
+    setHiddenDensePileKeys(next);
+
+    if (
+      !alreadyHidden &&
+      String(selectedDensePileKeyRef.current) === pileKey
+    ) {
+      handleDensePileZoomBack();
+    }
+  }, [handleDensePileZoomBack, hiddenDensePileKeys]);
 
   const handleDensePileSpeciesListToggle = useCallback((pile) => {
     if (!pile?.key) {
@@ -3391,6 +3451,7 @@ export default function MapView() {
 
   useEffect(() => {
     setDensePileMinSize(densePileMinSize);
+    setHiddenDensePileKeys(hiddenDensePileKeys);
     if (!map.current || !mapReady || !denseClustersHighlight) {
       return;
     }
@@ -3399,7 +3460,7 @@ export default function MapView() {
     refreshGbifDensePiles(map.current);
     refreshInatDensePiles(map.current);
     refreshTempLayersDensePiles(map.current);
-  }, [densePileMinSize, denseClustersHighlight, mapReady]);
+  }, [densePileMinSize, hiddenDensePileKeys, denseClustersHighlight, mapReady]);
 
   // После режимов кластеризации: иначе rebuild*Layers мог вернуть полную выборку.
   useEffect(() => {
@@ -3724,8 +3785,12 @@ export default function MapView() {
   const handleDenseClustersHighlightChange = (enabled) => {
     if (enabled) {
       setMarkersVisibleState(true);
+      setDenseGroupsHidden(false);
     } else {
       setDenseProcessingActive(false);
+      setDenseGroupsHidden(false);
+      setHiddenDensePileKeysState([]);
+      setHiddenDensePileKeys([]);
       setSelectedDensePileKey(null);
       setDensePileSpeciesListOpen(false);
       densePileCameraBeforeRef.current = null;
@@ -3734,10 +3799,34 @@ export default function MapView() {
     setDenseClustersHighlightState(enabled);
   };
 
+  const handleDenseGroupsHiddenToggle = useCallback(() => {
+    if (denseGroupsHidden) {
+      setDenseGroupsHidden(false);
+      setMarkersVisibleState(true);
+      setDenseClustersHighlightState(true);
+      return;
+    }
+
+    setDenseGroupsHidden(true);
+    setSelectedDensePileKey(null);
+    setDensePileSpeciesListOpen(false);
+    densePileCameraBeforeRef.current = null;
+    if (map.current) {
+      collapseExpandedDensePiles(map.current);
+      collapseGbifExpandedDensePiles(map.current);
+      collapseInatExpandedDensePiles(map.current);
+      collapseTempExpandedDensePiles(map.current);
+    }
+    setDenseClustersHighlightState(false);
+  }, [denseGroupsHidden]);
+
   const handleDenseProcessingOpen = useCallback(() => {
     stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DENSE);
     setMarkersVisibleState(true);
     setDenseClustersHighlightState(true);
+    setDenseGroupsHidden(false);
+    setHiddenDensePileKeysState([]);
+    setHiddenDensePileKeys([]);
     setDenseProcessingActive(true);
     setActiveModule(MODULE_IDS.MAP);
     expandDenseProcessingPanel();
@@ -3745,6 +3834,9 @@ export default function MapView() {
 
   const handleDenseProcessingClose = useCallback(() => {
     setDenseProcessingActive(false);
+    setDenseGroupsHidden(false);
+    setHiddenDensePileKeysState([]);
+    setHiddenDensePileKeys([]);
     setSelectedDensePileKey(null);
     setDensePileSpeciesListOpen(false);
     densePileCameraBeforeRef.current = null;
@@ -3856,6 +3948,9 @@ export default function MapView() {
 
       if (filterId === MAP_FILTER_IDS.DENSE) {
         setDenseProcessingActive(false);
+        setDenseGroupsHidden(false);
+        setHiddenDensePileKeysState([]);
+        setHiddenDensePileKeys([]);
         setSelectedDensePileKey(null);
         setDensePileSpeciesListOpen(false);
         densePileCameraBeforeRef.current = null;
@@ -5219,6 +5314,8 @@ export default function MapView() {
                 selectedPileKey={selectedDensePileKey}
                 canZoomBack={Boolean(selectedDensePileKey)}
                 speciesListOpen={densePileSpeciesListOpen}
+                groupsHidden={denseGroupsHidden}
+                hiddenPileKeys={hiddenDensePileKeys}
                 minPileSize={densePileMinSize}
                 onMinPileSizeChange={(value) => {
                   setDensePileMinSizeState(setDensePileMinSize(value));
@@ -5226,6 +5323,8 @@ export default function MapView() {
                 onSelectPile={handleDensePileSelect}
                 onZoomBack={handleDensePileZoomBack}
                 onToggleSpeciesList={handleDensePileSpeciesListToggle}
+                onTogglePileHidden={handleToggleDensePileHidden}
+                onToggleGroupsHidden={handleDenseGroupsHiddenToggle}
                 onClose={handleDenseProcessingClose}
                 collapsed={isPanelCollapsed(PANEL_IDS.DENSE)}
                 onCollapsedChange={handleDensePanelCollapsedChange}
