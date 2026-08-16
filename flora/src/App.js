@@ -216,6 +216,7 @@ import {
   addMergedLayer,
   setMergedData,
   setMergedVisibility,
+  applyMergedGroupingMode,
   upsertMergedFeature,
   removeMergedFeature
 } from "./components/addMergedLayer";
@@ -2200,6 +2201,7 @@ export default function MapView() {
       applyLocationsGroupingMode(map.current, grouping);
       applyGbifGroupingMode(map.current, grouping);
       applyInatGroupingMode(map.current, grouping);
+      applyMergedGroupingMode(map.current, grouping);
       applyTempLayersGroupingMode(map.current, {
         clusterByTempLayers,
         clusterByTempSublayers,
@@ -3561,6 +3563,7 @@ export default function MapView() {
     applyLocationsGroupingMode(map.current, grouping);
     applyGbifGroupingMode(map.current, grouping);
     applyInatGroupingMode(map.current, grouping);
+    applyMergedGroupingMode(map.current, grouping);
     applyTempLayersGroupingMode(map.current, {
       clusterByTempLayers,
       clusterByTempSublayers,

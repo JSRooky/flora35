@@ -1,4 +1,5 @@
 import {
+  DEFAULT_CLUSTER_COLOR,
   DEFAULT_POINT_COLOR,
   REGNUM_COLORS
 } from "./pointColors";
@@ -7,6 +8,19 @@ import pairedPinUrl from "../images/paired_pin.svg";
 
 export const MERGED_SOURCE_ID = "merged-locations";
 export const MERGED_UNCLUSTERED_LAYER_ID = "merged-unclustered";
+export const MERGED_CLUSTER_LAYER_ID = "merged-clusters";
+export const MERGED_CLUSTER_COUNT_LAYER_ID = "merged-cluster-count";
+
+const CLUSTER_OPTIONS = {
+  clusterMaxZoom: 14,
+  clusterRadius: 50
+};
+
+const MERGED_LAYER_IDS = [
+  MERGED_CLUSTER_LAYER_ID,
+  MERGED_CLUSTER_COUNT_LAYER_ID,
+  MERGED_UNCLUSTERED_LAYER_ID
+];
 
 const EMPTY_FEATURE_COLLECTION = {
   type: "FeatureCollection",
@@ -28,6 +42,7 @@ const MERGED_PIN_IMAGE_IDS = {
 /** @type {GeoJSON.FeatureCollection} */
 let mergedCollection = EMPTY_FEATURE_COLLECTION;
 let layerVisible = true;
+let mergedClusteringEnabled = true;
 let onPointClickCallback = null;
 let interactionHandlers = null;
 /** @type {Promise<string>|null} */
@@ -35,16 +50,22 @@ let pairedPinSvgTemplatePromise = null;
 /** @type {WeakMap<object, boolean>} */
 const styleImageMissingAttached = new WeakMap();
 
-function applyVisibility(map) {
-  if (!map?.getLayer?.(MERGED_UNCLUSTERED_LAYER_ID)) {
-    return;
-  }
+function isMergedMapboxClusteringActive() {
+  return mergedClusteringEnabled;
+}
 
-  map.setLayoutProperty(
-    MERGED_UNCLUSTERED_LAYER_ID,
-    "visibility",
-    layerVisible ? "visible" : "none"
-  );
+function applyVisibility(map) {
+  MERGED_LAYER_IDS.forEach((layerId) => {
+    if (!map?.getLayer?.(layerId)) {
+      return;
+    }
+
+    map.setLayoutProperty(
+      layerId,
+      "visibility",
+      layerVisible ? "visible" : "none"
+    );
+  });
 }
 
 function detachInteractions(map) {
@@ -56,6 +77,14 @@ function detachInteractions(map) {
     map.off("click", MERGED_UNCLUSTERED_LAYER_ID, interactionHandlers.click);
     map.off("mouseenter", MERGED_UNCLUSTERED_LAYER_ID, interactionHandlers.enter);
     map.off("mouseleave", MERGED_UNCLUSTERED_LAYER_ID, interactionHandlers.leave);
+    if (interactionHandlers.clusterClick) {
+      map.off("click", MERGED_CLUSTER_LAYER_ID, interactionHandlers.clusterClick);
+      map.off("mouseenter", MERGED_CLUSTER_LAYER_ID, interactionHandlers.clusterEnter);
+      map.off("mouseleave", MERGED_CLUSTER_LAYER_ID, interactionHandlers.clusterLeave);
+      map.off("click", MERGED_CLUSTER_COUNT_LAYER_ID, interactionHandlers.clusterClick);
+      map.off("mouseenter", MERGED_CLUSTER_COUNT_LAYER_ID, interactionHandlers.clusterEnter);
+      map.off("mouseleave", MERGED_CLUSTER_COUNT_LAYER_ID, interactionHandlers.clusterLeave);
+    }
   }
 
   interactionHandlers = null;
@@ -93,14 +122,56 @@ function attachInteractions(map) {
     map.getCanvas().style.cursor = "";
   };
 
+  const clusterClick = (event) => {
+    const feature =
+      event.features?.[0] ??
+      safeQueryRenderedFeatures(map, event.point, {
+        layers: [MERGED_CLUSTER_LAYER_ID]
+      })?.[0];
+    const clusterId = feature?.properties?.cluster_id;
+    const source = map.getSource(MERGED_SOURCE_ID);
+
+    if (clusterId == null || !source?.getClusterExpansionZoom) {
+      return;
+    }
+
+    event.preventDefault?.();
+    event.originalEvent?.stopPropagation?.();
+
+    source.getClusterExpansionZoom(clusterId, (error, zoom) => {
+      if (error) {
+        return;
+      }
+
+      map.easeTo({
+        center: feature.geometry.coordinates,
+        zoom
+      });
+    });
+  };
+
   map.on("click", MERGED_UNCLUSTERED_LAYER_ID, handleClick);
   map.on("mouseenter", MERGED_UNCLUSTERED_LAYER_ID, handleEnter);
   map.on("mouseleave", MERGED_UNCLUSTERED_LAYER_ID, handleLeave);
 
+  if (map.getLayer(MERGED_CLUSTER_LAYER_ID)) {
+    map.on("click", MERGED_CLUSTER_LAYER_ID, clusterClick);
+    map.on("mouseenter", MERGED_CLUSTER_LAYER_ID, handleEnter);
+    map.on("mouseleave", MERGED_CLUSTER_LAYER_ID, handleLeave);
+  }
+  if (map.getLayer(MERGED_CLUSTER_COUNT_LAYER_ID)) {
+    map.on("click", MERGED_CLUSTER_COUNT_LAYER_ID, clusterClick);
+    map.on("mouseenter", MERGED_CLUSTER_COUNT_LAYER_ID, handleEnter);
+    map.on("mouseleave", MERGED_CLUSTER_COUNT_LAYER_ID, handleLeave);
+  }
+
   interactionHandlers = {
     click: handleClick,
     enter: handleEnter,
-    leave: handleLeave
+    leave: handleLeave,
+    clusterClick,
+    clusterEnter: handleEnter,
+    clusterLeave: handleLeave
   };
 }
 
@@ -227,9 +298,14 @@ function addMergedSymbolLayer(map) {
     return;
   }
 
+  const unclusteredFilter = isMergedMapboxClusteringActive()
+    ? ["!", ["has", "point_count"]]
+    : null;
+
   if (map.getLayer(MERGED_UNCLUSTERED_LAYER_ID)) {
     map.setLayoutProperty(MERGED_UNCLUSTERED_LAYER_ID, "icon-anchor", "center");
     map.setLayoutProperty(MERGED_UNCLUSTERED_LAYER_ID, "icon-overlap", "always");
+    map.setFilter(MERGED_UNCLUSTERED_LAYER_ID, unclusteredFilter);
     return;
   }
 
@@ -237,6 +313,7 @@ function addMergedSymbolLayer(map) {
     id: MERGED_UNCLUSTERED_LAYER_ID,
     type: "symbol",
     source: MERGED_SOURCE_ID,
+    ...(unclusteredFilter ? { filter: unclusteredFilter } : {}),
     layout: {
       "icon-image": getMergedPinIconImageExpression(),
       "icon-size": 1,
@@ -250,8 +327,98 @@ function addMergedSymbolLayer(map) {
   });
 }
 
+function addMergedClusterLayers(map) {
+  if (!map || !isMergedMapboxClusteringActive()) {
+    return;
+  }
+
+  if (!map.getLayer(MERGED_CLUSTER_LAYER_ID)) {
+    map.addLayer({
+      id: MERGED_CLUSTER_LAYER_ID,
+      type: "circle",
+      source: MERGED_SOURCE_ID,
+      filter: ["has", "point_count"],
+      paint: {
+        "circle-color": DEFAULT_CLUSTER_COLOR,
+        "circle-radius": ["step", ["get", "point_count"], 16, 50, 20, 200, 26],
+        "circle-stroke-width": 1.5,
+        "circle-stroke-color": "#ffffff"
+      }
+    });
+  }
+
+  if (!map.getLayer(MERGED_CLUSTER_COUNT_LAYER_ID)) {
+    map.addLayer({
+      id: MERGED_CLUSTER_COUNT_LAYER_ID,
+      type: "symbol",
+      source: MERGED_SOURCE_ID,
+      filter: ["has", "point_count"],
+      layout: {
+        "text-field": ["get", "point_count_abbreviated"],
+        "text-size": 12
+      },
+      paint: {
+        "text-color": "#ffffff"
+      }
+    });
+  }
+}
+
+function addMergedSource(map) {
+  if (!map || map.getSource(MERGED_SOURCE_ID)) {
+    return;
+  }
+
+  map.addSource(MERGED_SOURCE_ID, {
+    type: "geojson",
+    data: mergedCollection,
+    ...(isMergedMapboxClusteringActive()
+      ? { cluster: true, ...CLUSTER_OPTIONS }
+      : {})
+  });
+}
+
+function removeMergedLayersAndSource(map) {
+  if (!map) {
+    return;
+  }
+
+  detachInteractions(map);
+  MERGED_LAYER_IDS.forEach((layerId) => {
+    if (map.getLayer(layerId)) {
+      map.removeLayer(layerId);
+    }
+  });
+  if (map.getSource(MERGED_SOURCE_ID)) {
+    map.removeSource(MERGED_SOURCE_ID);
+  }
+}
+
+function mountMergedLayers(map) {
+  addMergedSource(map);
+  addMergedClusterLayers(map);
+  addMergedSymbolLayer(map);
+  attachInteractions(map);
+  applyVisibility(map);
+}
+
+function rebuildMergedLayers(map) {
+  if (!map) {
+    return;
+  }
+
+  removeMergedLayersAndSource(map);
+  ensureMergedPinImages(map)
+    .then(() => {
+      mountMergedLayers(map);
+    })
+    .catch(() => {
+      mountMergedLayers(map);
+    });
+}
+
 /**
- * Создаёт слой слитых точек (без кластеризации).
+ * Создаёт слой слитых точек (кластеризация как у остальных точек карты).
  * @param {import("mapbox-gl").Map} map
  * @param {{ onPointClick?: Function }} [options]
  */
@@ -268,30 +435,22 @@ export function addMergedLayer(map, { onPointClick } = {}) {
 
   if (map.getSource(MERGED_SOURCE_ID)) {
     setMergedData(map, mergedCollection);
-    ensureMergedPinImages(map).then(() => {
-      addMergedSymbolLayer(map);
-      attachInteractions(map);
-      applyVisibility(map);
-    });
+    ensureMergedPinImages(map)
+      .then(() => {
+        mountMergedLayers(map);
+      })
+      .catch(() => {
+        mountMergedLayers(map);
+      });
     return;
   }
 
-  map.addSource(MERGED_SOURCE_ID, {
-    type: "geojson",
-    data: mergedCollection
-  });
-
   ensureMergedPinImages(map)
     .then(() => {
-      addMergedSymbolLayer(map);
-      attachInteractions(map);
-      applyVisibility(map);
+      mountMergedLayers(map);
     })
     .catch(() => {
-      // Без иконок слой появится через styleimagemissing, когда шаблон загрузится.
-      addMergedSymbolLayer(map);
-      attachInteractions(map);
-      applyVisibility(map);
+      mountMergedLayers(map);
     });
 }
 
@@ -322,6 +481,7 @@ export function setMergedData(map, collectionOrFeatures, options = {}) {
 
   if (!map.getSource(MERGED_SOURCE_ID)) {
     addMergedLayer(map);
+    return;
   }
 
   map.getSource(MERGED_SOURCE_ID)?.setData(nextCollection);
@@ -387,12 +547,27 @@ export function isMergedLayerVisible() {
   return layerVisible;
 }
 
+export function applyMergedGroupingMode(map, { clusteringEnabled: nextClustering } = {}) {
+  if (nextClustering === undefined) {
+    return;
+  }
+
+  const enabled = Boolean(nextClustering);
+  if (mergedClusteringEnabled === enabled) {
+    return;
+  }
+
+  mergedClusteringEnabled = enabled;
+  if (map) {
+    rebuildMergedLayers(map);
+  }
+}
+
 /** Id интерактивных слоёв слитых точек (для проверки hit при клике по карте). */
 export function getMergedInteractiveLayerIds(map) {
-  if (!map?.getLayer?.(MERGED_UNCLUSTERED_LAYER_ID)) {
-    return [];
-  }
-  return [MERGED_UNCLUSTERED_LAYER_ID];
+  return [MERGED_UNCLUSTERED_LAYER_ID, MERGED_CLUSTER_LAYER_ID, MERGED_CLUSTER_COUNT_LAYER_ID].filter((layerId) =>
+    map?.getLayer?.(layerId)
+  );
 }
 
 export function getMergedFeatures() {

@@ -16,6 +16,7 @@ import {
   LayersIcon,
   TrashIcon
 } from "../images/buttons";
+import { ReactComponent as LayersArchiveIcon } from "../images/layers-archive.svg";
 
 const HOVER_CLOSE_DELAY_MS = 160;
 
@@ -422,7 +423,7 @@ export default function TempLayersPicker({
                   title="В архив"
                   onClick={() => onArchiveLayer?.(primary.id)}
                 >
-                  <LayersIcon className="temp-layers-picker-delete-icon" aria-hidden="true" focusable="false" />
+                  <LayersArchiveIcon className="temp-layers-picker-delete-icon" aria-hidden="true" focusable="false" />
                 </button>
                 <button
                   type="button"
