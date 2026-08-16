@@ -25,7 +25,9 @@ export function initMap(container) {
     container,
     style: "mapbox://styles/epoxyde/cmrj0xcli00b501si30ge42bj",
     center: [40.65, 59.21],
-    zoom: 6.2
+    zoom: 6.2,
+    // Подписи Mapbox Streets: русский, иначе локальное имя объекта.
+    language: "ru"
   });
 
   // Внутренние mousemove/click Mapbox тоже зовут queryRenderedFeatures —
