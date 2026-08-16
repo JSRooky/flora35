@@ -9,7 +9,13 @@ import {
 } from "../tempLayers/tempLayerStore";
 import "../styles/ExternalLayersPicker.css";
 import "../styles/TempLayersPicker.css";
-import { ClockIcon, EyeIcon, EyeOffIcon, TrashIcon } from "../images/buttons";
+import {
+  ClockIcon,
+  EyeIcon,
+  EyeOffIcon,
+  LayersIcon,
+  TrashIcon
+} from "../images/buttons";
 
 const HOVER_CLOSE_DELAY_MS = 160;
 
@@ -139,6 +145,8 @@ export default function TempLayersPicker({
   dataRevision = 0,
   onToggleLayer,
   onDeleteLayer,
+  onArchiveLayer,
+  onOpenArchive,
   onColorChange,
   onHeatmapChange,
   onHeatmapAllChange
@@ -163,7 +171,37 @@ export default function TempLayersPicker({
     setOpen(true);
   };
 
-  const handleClose = () => {
+  const isPointerInsidePicker = (event) => {
+    const root = rootRef.current;
+    if (!root) {
+      return false;
+    }
+
+    if (event.relatedTarget instanceof Node && root.contains(event.relatedTarget)) {
+      return true;
+    }
+
+    const x = event.clientX;
+    const y = event.clientY;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return false;
+    }
+
+    const wrap = root.querySelector(".external-layers-picker-panel-wrap");
+    return [root, wrap].some((node) => {
+      if (!node) {
+        return false;
+      }
+      const rect = node.getBoundingClientRect();
+      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    });
+  };
+
+  const handleClose = (event) => {
+    if (event && isPointerInsidePicker(event)) {
+      return;
+    }
+
     clearCloseTimer();
     closeTimerRef.current = setTimeout(() => {
       setOpen(false);
@@ -227,12 +265,34 @@ export default function TempLayersPicker({
           aria-multiselectable="true"
         >
           {layers.length === 0 ? (
-            <p className="temp-layers-picker-empty">
-              Пока нет временных слоёв. Сохраните выборку кнопкой «Во временный слой».
-            </p>
+            <>
+              <div className="temp-layers-picker-toolbar">
+                <button
+                  type="button"
+                  className="temp-layers-picker-archive-open"
+                  tabIndex={open ? 0 : -1}
+                  onClick={() => onOpenArchive?.()}
+                >
+                  <LayersIcon className="temp-layers-picker-heatmap-icon" />
+                  <span>Архив</span>
+                </button>
+              </div>
+              <p className="temp-layers-picker-empty">
+                Пока нет временных слоёв. Сохраните выборку кнопкой «Во временный слой».
+              </p>
+            </>
           ) : (
             <>
               <div className="temp-layers-picker-toolbar">
+                <button
+                  type="button"
+                  className="temp-layers-picker-archive-open"
+                  tabIndex={open ? 0 : -1}
+                  onClick={() => onOpenArchive?.()}
+                >
+                  <LayersIcon className="temp-layers-picker-heatmap-icon" />
+                  <span>Архив</span>
+                </button>
                 <button
                   type="button"
                   className={`temp-layers-picker-heatmap-all${
@@ -240,11 +300,6 @@ export default function TempLayersPicker({
                   }`}
                   tabIndex={open ? 0 : -1}
                   aria-pressed={allHeatmapsOn}
-                  title={
-                    allHeatmapsOn
-                      ? "Выключить тепловые карты всех слоёв"
-                      : "Тепловая карта по всем временным слоям"
-                  }
                   onClick={() => onHeatmapAllChange?.(!allHeatmapsOn)}
                 >
                   <HeatmapIcon className="temp-layers-picker-heatmap-icon" />
@@ -363,8 +418,18 @@ export default function TempLayersPicker({
                   type="button"
                   className="temp-layers-picker-delete"
                   tabIndex={open ? 0 : -1}
+                  aria-label={`В архив «${title}»`}
+                  title="В архив"
+                  onClick={() => onArchiveLayer?.(primary.id)}
+                >
+                  <LayersIcon className="temp-layers-picker-delete-icon" aria-hidden="true" focusable="false" />
+                </button>
+                <button
+                  type="button"
+                  className="temp-layers-picker-delete"
+                  tabIndex={open ? 0 : -1}
                   aria-label={`Удалить слой «${title}»`}
-                  title="Удалить"
+                  title="Удалить навсегда"
                   onClick={() => onDeleteLayer?.(primary.id)}
                 >
                   <TrashIcon className="temp-layers-picker-delete-icon" aria-hidden="true" focusable="false" />

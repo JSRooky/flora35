@@ -1,8 +1,14 @@
-import { replaceTempLayers, serializeTempLayers } from "./tempLayerStore";
+import {
+  replaceTempLayerArchiveIndex,
+  replaceTempLayers,
+  serializeTempLayers,
+  toArchiveIndexEntry
+} from "./tempLayerStore";
 
 const DB_NAME = "flora35-temp-layers";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "layers";
+const ARCHIVE_STORE = "archive";
 const SNAPSHOT_KEY = "all";
 
 function openDb() {
@@ -22,6 +28,9 @@ function openDb() {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME);
+      }
+      if (!db.objectStoreNames.contains(ARCHIVE_STORE)) {
+        db.createObjectStore(ARCHIVE_STORE, { keyPath: "archiveId" });
       }
     };
 
@@ -48,8 +57,82 @@ export async function persistTempLayers() {
   }
 }
 
+export async function putTempLayerArchiveRecord(record) {
+  if (!record?.archiveId) {
+    throw new Error("Archive record has no archiveId");
+  }
+
+  const db = await openDb();
+  try {
+    const tx = db.transaction(ARCHIVE_STORE, "readwrite");
+    await idbRequest(tx.objectStore(ARCHIVE_STORE).put(record));
+  } finally {
+    db.close();
+  }
+}
+
+export async function deleteTempLayerArchiveRecord(archiveId) {
+  const id = String(archiveId ?? "").trim();
+  if (!id) {
+    return;
+  }
+
+  const db = await openDb();
+  try {
+    const tx = db.transaction(ARCHIVE_STORE, "readwrite");
+    await idbRequest(tx.objectStore(ARCHIVE_STORE).delete(id));
+  } finally {
+    db.close();
+  }
+}
+
+export async function getTempLayerArchiveRecord(archiveId) {
+  const id = String(archiveId ?? "").trim();
+  if (!id) {
+    return null;
+  }
+
+  const db = await openDb();
+  try {
+    const tx = db.transaction(ARCHIVE_STORE, "readonly");
+    const record = await idbRequest(tx.objectStore(ARCHIVE_STORE).get(id));
+    return record || null;
+  } finally {
+    db.close();
+  }
+}
+
+async function loadArchiveIndex(db) {
+  if (!db.objectStoreNames.contains(ARCHIVE_STORE)) {
+    replaceTempLayerArchiveIndex([]);
+    return [];
+  }
+
+  const tx = db.transaction(ARCHIVE_STORE, "readonly");
+  const records = await idbRequest(tx.objectStore(ARCHIVE_STORE).getAll());
+  const index = (Array.isArray(records) ? records : [])
+    .filter((record) => record?.archiveId)
+    .map((record) => toArchiveIndexEntry(record))
+    .sort((left, right) =>
+      String(right.archivedAt || "").localeCompare(String(left.archivedAt || ""))
+    );
+  replaceTempLayerArchiveIndex(index);
+  return index;
+}
+
+export async function refreshTempLayerArchiveIndex() {
+  const db = await openDb();
+  try {
+    return await loadArchiveIndex(db);
+  } finally {
+    db.close();
+  }
+}
+
 export async function hydrateTempLayersFromPersistence() {
   if (typeof indexedDB === "undefined") {
+    replaceTempLayers([]);
+    replaceTempLayerArchiveIndex([]);
     return [];
   }
 
@@ -60,12 +143,14 @@ export async function hydrateTempLayersFromPersistence() {
       const snapshot = await idbRequest(tx.objectStore(STORE_NAME).get(SNAPSHOT_KEY));
       const layers = Array.isArray(snapshot) ? snapshot : [];
       replaceTempLayers(layers);
+      await loadArchiveIndex(db);
       return layers;
     } finally {
       db.close();
     }
   } catch {
     replaceTempLayers([]);
+    replaceTempLayerArchiveIndex([]);
     return [];
   }
 }

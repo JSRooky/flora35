@@ -183,6 +183,7 @@ import MapDisplayPanel from "./components/MapDisplayPanel";
 import HeatmapSettingsPanel from "./components/HeatmapSettingsPanel";
 import { loadHeatmapSettingsFromStorage, saveHeatmapSettingsToStorage } from "./components/heatmapSettings";
 import DataWorkPanel from "./components/DataWorkPanel";
+import TempLayerArchivePanel from "./components/TempLayerArchivePanel";
 import NearSpeciesMatchesPopup from "./components/NearSpeciesMatchesPopup";
 import UnattributedPointsPopup from "./components/UnattributedPointsPopup";
 import UndoMergedPointsPopup from "./components/UndoMergedPointsPopup";
@@ -233,6 +234,12 @@ import { loadPointAttributionsFromFirestore } from "./firebase/loadPointAttribut
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
 import { hydrateInatStoreFromPersistence } from "./inaturalist/inatPersistence";
 import { hydrateTempLayersFromPersistence, persistTempLayers } from "./tempLayers/tempLayerPersistence";
+import {
+  archiveWorkingPlaque,
+  deleteArchivedPlaque,
+  exportArchivedPlaque,
+  restoreArchivedPlaque
+} from "./tempLayers/tempLayerArchive";
 import { findGbifFeatureByKey } from "./gbif/gbifStore";
 import { findInatFeatureById } from "./inaturalist/inatStore";
 import {
@@ -287,6 +294,7 @@ const PANEL_IDS = {
   DATA_WORK: "data-work",
   SEARCH: "search",
   REDBOOK: "redbook",
+  TEMP_ARCHIVE: "temp-archive",
   /** @deprecated алиасы для taskbar */
   GBIF: "data-sources",
   GBIF_PROCESSING: "external-processing"
@@ -318,7 +326,8 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.EXTERNAL_PROCESSING,
   PANEL_IDS.DATA_WORK,
   PANEL_IDS.SEARCH,
-  PANEL_IDS.REDBOOK
+  PANEL_IDS.REDBOOK,
+  PANEL_IDS.TEMP_ARCHIVE
 ];
 
 function isPanelExpandedInState(collapsedState, panelId) {
@@ -459,6 +468,8 @@ export default function MapView() {
   const [panelMinimized, setPanelMinimized] = useState({});
   /** Отдельный флаг: panelMinimized для этой панели сбрасывают другие обработчики. */
   const [dataSourcesPanelOpen, setDataSourcesPanelOpen] = useState(false);
+  const [tempArchivePanelOpen, setTempArchivePanelOpen] = useState(false);
+  const [tempArchiveStatus, setTempArchiveStatus] = useState("");
   /** Порядок иконок в taskbar (открытая панель остаётся в ряду и подсвечивается). */
   const [panelTaskbarOrder, setPanelTaskbarOrder] = useState([]);
   /** Актуальный stashVisiblePanelsToTaskbar — вызывается из ранних колбэков. */
@@ -600,6 +611,9 @@ export default function MapView() {
       case TASKBAR_PANEL_IDS.MAP:
         setDenseProcessingActive(false);
         setActiveModule(MODULE_IDS.MAP);
+        break;
+      case TASKBAR_PANEL_IDS.TEMP_ARCHIVE:
+        setTempArchivePanelOpen(true);
         break;
       default: {
         const moduleId = PANEL_TASKBAR_MODULE_ID[panelId];
@@ -1187,6 +1201,74 @@ export default function MapView() {
     bumpPointsDataRevision();
   }, [bumpPointsDataRevision]);
 
+  const refreshTempLayersUi = useCallback(() => {
+    setTempLayersRevision((value) => value + 1);
+    if (map.current) {
+      setTempLayersData(map.current);
+    }
+    bumpPointsDataRevision();
+  }, [bumpPointsDataRevision]);
+
+  const handleOpenTempArchive = useCallback(() => {
+    setTempArchiveStatus("");
+    setTempArchivePanelOpen(true);
+    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.TEMP_ARCHIVE]: false }));
+    pinPanelsToTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
+  }, [pinPanelsToTaskbar]);
+
+  const handleTempLayerArchive = useCallback(
+    async (layerId) => {
+      setTempArchiveStatus("");
+      const result = await archiveWorkingPlaque(layerId).catch(() => ({
+        ok: false,
+        reason: "persist"
+      }));
+      refreshTempLayersUi();
+      if (!result?.ok) {
+        setTempArchiveStatus("Не удалось убрать слой в архив.");
+        handleOpenTempArchive();
+        return;
+      }
+      handleOpenTempArchive();
+    },
+    [handleOpenTempArchive, refreshTempLayersUi]
+  );
+
+  const handleTempArchiveRestore = useCallback(
+    async (archiveId) => {
+      const result = await restoreArchivedPlaque(archiveId).catch(() => ({
+        ok: false,
+        reason: "persist"
+      }));
+      refreshTempLayersUi();
+      if (result?.reason === "group-conflict") {
+        setTempArchiveStatus(
+          "Такой слой уже есть во временных. Уберите его в архив или удалите, затем верните этот."
+        );
+        return;
+      }
+      if (!result?.ok) {
+        setTempArchiveStatus("Не удалось вернуть слой из архива.");
+        return;
+      }
+      setTempArchiveStatus("");
+    },
+    [refreshTempLayersUi]
+  );
+
+  const handleTempArchiveExport = useCallback(async (archiveId, format) => {
+    const result = await exportArchivedPlaque(archiveId, format).catch(() => ({
+      ok: false
+    }));
+    if (!result?.ok) {
+      setTempArchiveStatus("Не удалось экспортировать слой.");
+    }
+  }, []);
+
+  const handleTempArchiveDelete = useCallback(async (archiveId) => {
+    await deleteArchivedPlaque(archiveId).catch(() => {});
+  }, []);
+
   const handleTempLayerColorChange = useCallback((layerId, color) => {
     setTempLayerMarkerColor(layerId, color);
     persistTempLayers().catch(() => {});
@@ -1708,6 +1790,10 @@ export default function MapView() {
       ids.push(PANEL_IDS.DATA_SOURCES);
     }
 
+    if (tempArchivePanelOpen && !isMin(PANEL_IDS.TEMP_ARCHIVE)) {
+      ids.push(PANEL_IDS.TEMP_ARCHIVE);
+    }
+
     if (
       dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
       externalProcessingActive &&
@@ -1724,6 +1810,7 @@ export default function MapView() {
     bufferDockedWithFeature,
     dataSourceMode,
     dataSourcesPanelOpen,
+    tempArchivePanelOpen,
     densePileSpeciesListOpen,
     denseProcessingActive,
     externalProcessingActive,
@@ -2883,6 +2970,11 @@ export default function MapView() {
   }, []);
 
   const handleOpenDataWorkTool = useCallback((toolId) => {
+    const closeArchive = () => {
+      setTempArchivePanelOpen(false);
+      unpinPanelsFromTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
+    };
+
     if (toolId === DATA_WORK_TOOL_IDS.NEAR_SPECIES_MATCHES) {
       if (map.current) {
         restoreUnattributedMapLayers(map.current, locationFilters);
@@ -2890,6 +2982,7 @@ export default function MapView() {
       unattributedCameraBeforeRef.current = null;
       setUnattributedPointsActive(false);
       setUndoMergedPointsActive(false);
+      closeArchive();
       setNearSpeciesMatchesActive(true);
     } else if (toolId === DATA_WORK_TOOL_IDS.UNATTRIBUTED_POINTS) {
       if (map.current) {
@@ -2898,6 +2991,7 @@ export default function MapView() {
       nearSpeciesCameraBeforeRef.current = null;
       setNearSpeciesMatchesActive(false);
       setUndoMergedPointsActive(false);
+      closeArchive();
       setUnattributedPointsActive(true);
     } else if (toolId === DATA_WORK_TOOL_IDS.UNDO_MERGED_POINTS) {
       if (map.current) {
@@ -2908,9 +3002,21 @@ export default function MapView() {
       unattributedCameraBeforeRef.current = null;
       setNearSpeciesMatchesActive(false);
       setUnattributedPointsActive(false);
+      closeArchive();
       setUndoMergedPointsActive(true);
+    } else if (toolId === DATA_WORK_TOOL_IDS.TEMP_ARCHIVE) {
+      if (map.current) {
+        restoreNearSpeciesMapLayers(map.current, locationFilters);
+        restoreUnattributedMapLayers(map.current, locationFilters);
+      }
+      nearSpeciesCameraBeforeRef.current = null;
+      unattributedCameraBeforeRef.current = null;
+      setNearSpeciesMatchesActive(false);
+      setUnattributedPointsActive(false);
+      setUndoMergedPointsActive(false);
+      handleOpenTempArchive();
     }
-  }, [locationFilters]);
+  }, [handleOpenTempArchive, locationFilters, unpinPanelsFromTaskbar]);
 
   const handleCloseNearSpeciesMatches = useCallback(() => {
     if (map.current) {
@@ -4582,13 +4688,19 @@ export default function MapView() {
           unpinPanelsFromTaskbar([PANEL_IDS.EXTERNAL_PROCESSING]);
           break;
         }
+        case PANEL_IDS.TEMP_ARCHIVE: {
+          setTempArchivePanelOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
+          break;
+        }
         case PANEL_IDS.DATA_WORK: {
           // Сначала восстанавливаем слои (как в handleCloseNearSpeciesMatches),
           // иначе setNearSpeciesMatchesActive(false) опередит cleanup-effect.
           handleCloseNearSpeciesMatches();
           handleCloseUnattributedPoints();
           handleCloseUndoMergedPoints();
-          unpinPanelsFromTaskbar([PANEL_IDS.DATA_WORK]);
+          setTempArchivePanelOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.DATA_WORK, PANEL_IDS.TEMP_ARCHIVE]);
           setActiveModule((current) =>
             current === MODULE_IDS.DATA_WORK ? null : current
           );
@@ -5291,6 +5403,7 @@ export default function MapView() {
     (activeModule !== null && activeModule !== MODULE_IDS.TIMELINE) ||
     (showOoptFeaturePanel && activeModule !== MODULE_IDS.TIMELINE) ||
     dataSourcesPanelOpen ||
+    tempArchivePanelOpen ||
     dataSourceMode === DATA_SOURCE_MODES.EXTERNAL ||
     denseProcessingActive;
 
@@ -5330,6 +5443,18 @@ export default function MapView() {
       <BasemapPicker basemapMode={basemapMode} onBasemapModeChange={setBasemapMode} />
       {showModulePanelStack && (
         <div className="module-panel-stack">
+          {tempArchivePanelOpen && !isPanelMinimized(PANEL_IDS.TEMP_ARCHIVE) && (
+            <TempLayerArchivePanel
+              collapsed={isPanelCollapsed(PANEL_IDS.TEMP_ARCHIVE)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.TEMP_ARCHIVE)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.TEMP_ARCHIVE)}
+              onClose={handleClosePanel(PANEL_IDS.TEMP_ARCHIVE)}
+              onRestore={handleTempArchiveRestore}
+              onExport={handleTempArchiveExport}
+              onDelete={handleTempArchiveDelete}
+              statusMessage={tempArchiveStatus}
+            />
+          )}
           {denseProcessingExclusive ? (
             <>
               {activeModule === MODULE_IDS.FEATURE &&
@@ -5617,7 +5742,9 @@ export default function MapView() {
                     ? DATA_WORK_TOOL_IDS.UNATTRIBUTED_POINTS
                     : undoMergedPointsActive
                       ? DATA_WORK_TOOL_IDS.UNDO_MERGED_POINTS
-                      : null
+                      : tempArchivePanelOpen
+                        ? DATA_WORK_TOOL_IDS.TEMP_ARCHIVE
+                        : null
               }
             />
           )}
@@ -5851,6 +5978,8 @@ export default function MapView() {
         tempLayersDataRevision={tempLayersRevision}
         onTempLayerToggle={handleTempLayerToggle}
         onTempLayerDelete={handleTempLayerDelete}
+        onTempLayerArchive={handleTempLayerArchive}
+        onOpenTempArchive={handleOpenTempArchive}
         onTempLayerColorChange={handleTempLayerColorChange}
         onTempLayerHeatmapChange={handleTempLayerHeatmapChange}
         onTempLayersHeatmapAllChange={handleTempLayersHeatmapAllChange}

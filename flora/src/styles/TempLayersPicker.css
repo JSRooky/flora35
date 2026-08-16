@@ -336,6 +336,7 @@
   display: flex;
   align-items: stretch;
   margin: 0 0 2px;
+  pointer-events: auto;
 }
 
 .temp-layers-picker-heatmap-all {
@@ -360,6 +361,28 @@
   border-color: rgba(194, 65, 12, 0.28);
   background: rgba(194, 65, 12, 0.08);
   color: #9a3412;
+}
+
+.temp-layers-picker-archive-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 6px;
+  padding: 6px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.temp-layers-picker-archive-open:hover {
+  border-color: rgba(47, 111, 78, 0.28);
+  background: rgba(47, 111, 78, 0.08);
+  color: #2f6f4e;
 }
 
 .temp-layers-picker-heatmap-icon {

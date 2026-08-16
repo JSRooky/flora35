@@ -21,6 +21,7 @@ export const TASKBAR_PANEL_IDS = {
   DATA_WORK: "data-work",
   SEARCH: "search",
   REDBOOK: "redbook",
+  TEMP_ARCHIVE: "temp-archive",
   OOPT_SPECIES: "oopt-species",
   DENSE_SPECIES: "dense-species"
 };
@@ -54,6 +55,7 @@ export const PANEL_TASKBAR_META = {
   [TASKBAR_PANEL_IDS.DATA_WORK]: { title: "Работа с данными", icon: "dataWork" },
   [TASKBAR_PANEL_IDS.SEARCH]: { title: "Поиск", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.REDBOOK]: { title: "Поиск редких видов", icon: "status" },
+  [TASKBAR_PANEL_IDS.TEMP_ARCHIVE]: { title: "Архив слоёв", icon: "clock" },
   [TASKBAR_PANEL_IDS.OOPT_SPECIES]: { title: "Виды внутри выбранной ООПТ", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.DENSE_SPECIES]: { title: "Виды в плотной группе", icon: "speciesList" }
 };
@@ -84,6 +86,7 @@ export const PANEL_TASKBAR_MODULE_ID = {
   [TASKBAR_PANEL_IDS.DATA_WORK]: "data-work",
   [TASKBAR_PANEL_IDS.SEARCH]: "search",
   [TASKBAR_PANEL_IDS.REDBOOK]: "redbook",
+  [TASKBAR_PANEL_IDS.TEMP_ARCHIVE]: null,
   [TASKBAR_PANEL_IDS.OOPT_SPECIES]: null,
   [TASKBAR_PANEL_IDS.DENSE_SPECIES]: null
 };

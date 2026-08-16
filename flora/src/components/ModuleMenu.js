@@ -102,7 +102,8 @@ function isToolModuleActive(activeModule) {
 const DISABLED_POINT_REQUIRED_TITLE = "Выберите точку";
 const DISABLED_AREAL_BY_BUFFER_TITLE = 'Сначала сбросьте инструмент «Буфер»';
 const DISABLED_BUFFER_BY_AREAL_TITLE = 'Сначала сбросьте инструмент «Радиус»';
-
+
+
 
 function ModuleMenuButton({
   id,

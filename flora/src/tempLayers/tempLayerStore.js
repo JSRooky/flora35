@@ -371,6 +371,7 @@ export function commitTempLayerStaging() {
       groupKey,
       source,
       markerColor,
+      archiveId: sameSource.archiveId ?? sibling?.archiveId ?? null,
       regionIds,
       features,
       label: buildLayerLabel({ source, taxonName: taxonFields.taxonName, regionIds })
@@ -393,6 +394,7 @@ export function commitTempLayerStaging() {
     visible: true,
     heatmapEnabled: sibling ? Boolean(sibling.heatmapEnabled) : false,
     markerColor,
+    archiveId: sameSource?.archiveId ?? sibling?.archiveId ?? null,
     features: cloneFeatures(staging.features)
   };
 
@@ -472,7 +474,8 @@ function normalizePersistedLayer(layer) {
     familyKey: layer?.familyKey ?? null,
     inatTaxonId: layer?.inatTaxonId ?? null,
     heatmapEnabled: Boolean(layer?.heatmapEnabled),
-    markerColor: normalizeTempLayerMarkerColor(layer?.markerColor)
+    markerColor: normalizeTempLayerMarkerColor(layer?.markerColor),
+    archiveId: layer?.archiveId ? String(layer.archiveId) : null
   };
 }
 
@@ -640,7 +643,67 @@ export function listTempLayerPlaques() {
 }
 
 export function serializeTempLayers() {
-  return layers.map((layer) => ({
+  return layers.map((layer) => serializeLayer(layer));
+}
+
+/** @type {Array<object>} */
+let archiveIndex = [];
+
+export function getTempLayerArchiveIndex() {
+  return archiveIndex;
+}
+
+export function replaceTempLayerArchiveIndex(entries) {
+  archiveIndex = Array.isArray(entries) ? entries : [];
+  emit();
+}
+
+export function getTempLayerGroupKey(layer) {
+  return layerGroupKey(layer);
+}
+
+export function getWorkingPlaqueLayers(layerId) {
+  const target = layers.find((layer) => layer.id === layerId);
+  if (!target) {
+    return [];
+  }
+  const key = layerGroupKey(target);
+  return layers.filter((layer) => layerGroupKey(layer) === key);
+}
+
+export function removeWorkingPlaque(layerId) {
+  const plaqueLayers = getWorkingPlaqueLayers(layerId);
+  if (plaqueLayers.length === 0) {
+    return [];
+  }
+  const ids = new Set(plaqueLayers.map((layer) => layer.id));
+  layers = layers.filter((layer) => !ids.has(layer.id));
+  emit();
+  return plaqueLayers;
+}
+
+export function restorePlaqueLayers(nextLayers) {
+  const incoming = Array.isArray(nextLayers) ? nextLayers.map(normalizePersistedLayer) : [];
+  if (incoming.length === 0) {
+    return { ok: false, reason: "empty" };
+  }
+
+  const incomingKeys = new Set(incoming.map((layer) => layerGroupKey(layer)));
+  const conflict = layers.some((layer) => incomingKeys.has(layerGroupKey(layer)));
+  if (conflict) {
+    return { ok: false, reason: "group-conflict" };
+  }
+
+  layers = [
+    ...incoming.map((layer) => ({ ...layer, visible: true })),
+    ...layers
+  ];
+  emit();
+  return { ok: true };
+}
+
+function serializeLayer(layer) {
+  return {
     id: layer.id,
     label: layer.label,
     source: normalizeTempSource(layer.source),
@@ -655,6 +718,64 @@ export function serializeTempLayers() {
     visible: layer.visible,
     heatmapEnabled: Boolean(layer.heatmapEnabled),
     markerColor: layer.markerColor ?? null,
+    archiveId: layer.archiveId ?? null,
     features: layer.features
-  }));
+  };
+}
+
+export function buildArchiveRecordFromLayerId(layerId) {
+  const plaqueLayers = getWorkingPlaqueLayers(layerId);
+  if (plaqueLayers.length === 0) {
+    return null;
+  }
+
+  const now = new Date().toISOString();
+  const archiveId =
+    plaqueLayers.find((layer) => layer.archiveId)?.archiveId || createLayerId();
+  const createdAt =
+    plaqueLayers
+      .map((layer) => layer.createdAt)
+      .filter(Boolean)
+      .sort()[0] || now;
+  const title =
+    plaqueLayers.find((layer) => layer.taxonName)?.taxonName ||
+    plaqueLayers[0].label ||
+    "Временный слой";
+
+  return {
+    archiveId,
+    groupKey: layerGroupKey(plaqueLayers[0]),
+    title,
+    markerColor: plaqueLayers[0].markerColor ?? null,
+    createdAt,
+    archivedAt: now,
+    updatedAt: now,
+    layers: plaqueLayers.map((layer) => ({
+      ...serializeLayer(layer),
+      archiveId
+    }))
+  };
+}
+
+export function toArchiveIndexEntry(record) {
+  const recordLayers = Array.isArray(record?.layers) ? record.layers : [];
+  const regionIds = new Set();
+  let pointCount = 0;
+  recordLayers.forEach((layer) => {
+    pointCount += layer.features?.length ?? 0;
+    (layer.regionIds || []).forEach((id) => regionIds.add(id));
+  });
+
+  return {
+    archiveId: record.archiveId,
+    groupKey: record.groupKey,
+    title: record.title || "Временный слой",
+    markerColor: record.markerColor ?? null,
+    createdAt: record.createdAt,
+    archivedAt: record.archivedAt,
+    updatedAt: record.updatedAt,
+    sources: recordLayers.map((layer) => normalizeTempSource(layer.source)),
+    pointCount,
+    regionCount: regionIds.size
+  };
 }
