@@ -79,6 +79,7 @@ export function normalizeTempLayerMarkerColor(color) {
  *   regionIds: string[],
  *   createdAt: string,
  *   visible: boolean,
+ *   heatmapEnabled: boolean,
  *   markerColor: string | null,
  *   features: object[]
  * }>} */
@@ -212,6 +213,7 @@ export function commitTempLayerStaging() {
     regionIds: [...staging.regionIds],
     createdAt: new Date().toISOString(),
     visible: true,
+    heatmapEnabled: false,
     markerColor: null,
     features: cloneFeatures(staging.features)
   };
@@ -226,6 +228,19 @@ export function setTempLayerVisible(layerId, visible) {
   layers = layers.map((layer) =>
     layer.id === layerId ? { ...layer, visible: Boolean(visible) } : layer
   );
+  emit();
+}
+
+export function setTempLayerHeatmapEnabled(layerId, enabled) {
+  layers = layers.map((layer) =>
+    layer.id === layerId ? { ...layer, heatmapEnabled: Boolean(enabled) } : layer
+  );
+  emit();
+}
+
+export function setAllTempLayersHeatmapEnabled(enabled) {
+  const next = Boolean(enabled);
+  layers = layers.map((layer) => ({ ...layer, heatmapEnabled: next }));
   emit();
 }
 
@@ -246,6 +261,7 @@ export function replaceTempLayers(nextLayers) {
   layers = Array.isArray(nextLayers)
     ? nextLayers.map((layer) => ({
         ...layer,
+        heatmapEnabled: Boolean(layer?.heatmapEnabled),
         markerColor: normalizeTempLayerMarkerColor(layer?.markerColor)
       }))
     : [];
@@ -306,6 +322,7 @@ export function serializeTempLayers() {
     regionIds: layer.regionIds,
     createdAt: layer.createdAt,
     visible: layer.visible,
+    heatmapEnabled: Boolean(layer.heatmapEnabled),
     markerColor: layer.markerColor ?? null,
     features: layer.features
   }));

@@ -64,7 +64,10 @@ import {
 import DenseClustersPanel from "./components/DenseClustersPanel";
 import {
   addHeatmapLayer,
+  applyHeatmapPaintSettings,
   setHeatmapEnabled,
+  refreshHeatmapSourceOptions,
+  syncTempLayerHeatmaps,
   updateHeatmapData
 } from "./components/addHeatmapLayer";
 import {
@@ -177,6 +180,8 @@ import AreaSelectionPopup from "./components/AreaSelectionPopup";
 import SpeciesSearchPanel from "./components/SpeciesSearchPanel";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
+import HeatmapSettingsPanel from "./components/HeatmapSettingsPanel";
+import { loadHeatmapSettingsFromStorage, saveHeatmapSettingsToStorage } from "./components/heatmapSettings";
 import DataWorkPanel from "./components/DataWorkPanel";
 import NearSpeciesMatchesPopup from "./components/NearSpeciesMatchesPopup";
 import UnattributedPointsPopup from "./components/UnattributedPointsPopup";
@@ -203,7 +208,7 @@ import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
 import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
 import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles } from "./components/addTempLayersLayer";
-import { deleteTempLayer, getTempLayers, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
+import { deleteTempLayer, getTempLayers, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
 import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatDensePiles, expandInatDensePileByKey, collapseInatExpandedDensePiles, setInatDensePileExpandedHandler } from "./components/addInatLayer";
 import {
   addMergedLayer,
@@ -358,6 +363,8 @@ export default function MapView() {
   const [markersVisible, setMarkersVisibleState] = useState(DEFAULT_MARKERS_VISIBLE);
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
+  const [heatmapSettingsOpen, setHeatmapSettingsOpen] = useState(false);
+  const [heatmapSettings, setHeatmapSettings] = useState(loadHeatmapSettingsFromStorage);
   const [boundsFeatureVisibility, setBoundsFeatureVisibility] = useState({});
   const [boundsCatalogByLayerId, setBoundsCatalogByLayerId] = useState({});
   const [boundsLayerLoading, setBoundsLayerLoading] = useState({});
@@ -1181,6 +1188,18 @@ export default function MapView() {
     if (map.current) {
       setTempLayersData(map.current);
     }
+  }, []);
+
+  const handleTempLayerHeatmapChange = useCallback((layerId, enabled) => {
+    setTempLayerHeatmapEnabled(layerId, enabled);
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
+  }, []);
+
+  const handleTempLayersHeatmapAllChange = useCallback((enabled) => {
+    setAllTempLayersHeatmapEnabled(enabled);
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
   }, []);
 
   const handleTempLayersChange = useCallback(() => {
@@ -3307,6 +3326,7 @@ export default function MapView() {
       includeMerged: mergedOnly,
       includeRedBook: redbookOnly
     });
+    refreshHeatmapSourceOptions(externalOnly);
 
     if (!map.current || !mapReady) {
       return;
@@ -3489,14 +3509,25 @@ export default function MapView() {
       if (!map.current) {
         return;
       }
-      // Heatmap строится по getToolFeatures; coords-only внутри слоя.
+      refreshHeatmapSourceOptions(externalOnly);
+      // Общая тепловая карта: в режиме временных слоёв — только они.
       setHeatmapEnabled(map.current, heatmapEnabled, locationFilters);
+      syncTempLayerHeatmaps(map.current, {
+        active: externalOnly,
+        filters: locationFilters,
+        layers: getTempLayers()
+      });
+      applyHeatmapPaintSettings(map.current, heatmapSettings);
     }, LOCATION_FILTERS_DEBOUNCE_MS);
 
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [heatmapEnabled, locationFilters]);
+  }, [heatmapEnabled, locationFilters, externalOnly, tempLayersRevision, heatmapSettings]);
+
+  useEffect(() => {
+    saveHeatmapSettingsToStorage(heatmapSettings);
+  }, [heatmapSettings]);
 
   useEffect(() => {
     if (!mapReady || !map.current || !isFirebaseConfigured()) {
@@ -5398,6 +5429,8 @@ export default function MapView() {
               onMarkersVisibleChange={setMarkersVisibleState}
               heatmapEnabled={heatmapEnabled}
               onHeatmapEnabledChange={setHeatmapEnabledState}
+              heatmapTempLayersOnly={externalOnly}
+              onHeatmapSettingsOpen={() => setHeatmapSettingsOpen(true)}
               clusteringEnabled={clusteringEnabled}
               onClusteringEnabledChange={handleClusteringEnabledChange}
               clusterByRegnum={clusterByRegnum}
@@ -5795,8 +5828,16 @@ export default function MapView() {
         onTempLayerToggle={handleTempLayerToggle}
         onTempLayerDelete={handleTempLayerDelete}
         onTempLayerColorChange={handleTempLayerColorChange}
+        onTempLayerHeatmapChange={handleTempLayerHeatmapChange}
+        onTempLayersHeatmapAllChange={handleTempLayersHeatmapAllChange}
         regnumFilters={regnumFilters}
         onRegnumFilterChange={handleRegnumFilterChange}
+      />
+      <HeatmapSettingsPanel
+        open={heatmapSettingsOpen}
+        settings={heatmapSettings}
+        onSettingsChange={setHeatmapSettings}
+        onClose={() => setHeatmapSettingsOpen(false)}
       />
     </>
   );

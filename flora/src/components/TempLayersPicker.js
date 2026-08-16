@@ -9,6 +9,23 @@ import { ClockIcon, EyeIcon, EyeOffIcon, TrashIcon } from "../images/buttons";
 
 const HOVER_CLOSE_DELAY_MS = 160;
 
+function HeatmapIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        fill="currentColor"
+        d="M12 3.2c.4 2.1-.3 3.6-1.4 5-1.2 1.5-2.6 2.8-2.6 5.1 0 3.1 2.4 5.5 5.4 5.5s5.4-2.4 5.4-5.5c0-2.6-1.5-4.2-2.8-5.8-1-1.2-1.8-2.6-1.5-4.3-.9.6-1.8 1.6-2.5 2.8z"
+        opacity="0.92"
+      />
+    </svg>
+  );
+}
+
 function formatLayerMeta(layer) {
   const points = new Intl.NumberFormat("ru-RU").format(layer.features?.length ?? 0);
   const regionCount = Array.isArray(layer.regionIds) ? layer.regionIds.length : 0;
@@ -103,7 +120,9 @@ export default function TempLayersPicker({
   dataRevision = 0,
   onToggleLayer,
   onDeleteLayer,
-  onColorChange
+  onColorChange,
+  onHeatmapChange,
+  onHeatmapAllChange
 }) {
   const [open, setOpen] = useState(false);
   const [colorMenuLayerId, setColorMenuLayerId] = useState(null);
@@ -154,6 +173,8 @@ export default function TempLayersPicker({
   useEffect(() => () => clearCloseTimer(), []);
 
   const activeCount = layers.filter((layer) => layer.visible).length;
+  const heatmapCount = layers.filter((layer) => layer.heatmapEnabled).length;
+  const allHeatmapsOn = layers.length > 0 && heatmapCount === layers.length;
 
   return (
     <div
@@ -188,7 +209,31 @@ export default function TempLayersPicker({
               Пока нет временных слоёв. Сохраните выборку кнопкой «Во временный слой».
             </p>
           ) : (
-            layers.map((layer) => (
+            <>
+              <div className="temp-layers-picker-toolbar">
+                <button
+                  type="button"
+                  className={`temp-layers-picker-heatmap-all${
+                    allHeatmapsOn ? " temp-layers-picker-heatmap-all--on" : ""
+                  }`}
+                  tabIndex={open ? 0 : -1}
+                  aria-pressed={allHeatmapsOn}
+                  title={
+                    allHeatmapsOn
+                      ? "Выключить тепловые карты всех слоёв"
+                      : "Тепловая карта по всем временным слоям"
+                  }
+                  onClick={() => onHeatmapAllChange?.(!allHeatmapsOn)}
+                >
+                  <HeatmapIcon className="temp-layers-picker-heatmap-icon" />
+                  <span>
+                    {allHeatmapsOn
+                      ? "Тепловые карты выкл."
+                      : "Тепловая карта всех слоёв"}
+                  </span>
+                </button>
+              </div>
+              {layers.map((layer) => (
               <div
                 key={layer.id}
                 className={`temp-layers-picker-row${
@@ -213,6 +258,27 @@ export default function TempLayersPicker({
                     <span className="external-layers-picker-option-label">{layerTitle(layer)}</span>
                     <span className="temp-layers-picker-option-meta">{formatLayerMeta(layer)}</span>
                   </span>
+                </button>
+                <button
+                  type="button"
+                  className={`temp-layers-picker-heatmap${
+                    layer.heatmapEnabled ? " temp-layers-picker-heatmap--on" : ""
+                  }`}
+                  tabIndex={open ? 0 : -1}
+                  aria-pressed={Boolean(layer.heatmapEnabled)}
+                  aria-label={
+                    layer.heatmapEnabled
+                      ? `Выключить тепловую карту «${layer.label}»`
+                      : `Тепловая карта слоя «${layer.label}»`
+                  }
+                  title={
+                    layer.heatmapEnabled
+                      ? "Тепловая карта слоя включена"
+                      : "Тепловая карта только этого слоя"
+                  }
+                  onClick={() => onHeatmapChange?.(layer.id, !layer.heatmapEnabled)}
+                >
+                  <HeatmapIcon className="temp-layers-picker-heatmap-icon" />
                 </button>
                 <button
                   type="button"
@@ -262,7 +328,8 @@ export default function TempLayersPicker({
                   }}
                 />
               </div>
-            ))
+            ))}
+            </>
           )}
         </div>
       </div>

@@ -5,7 +5,8 @@ import TempLayersPicker from "./TempLayersPicker";
 import RegnumFilterPicker from "./RegnumFilterPicker";
 import FeedbackWidget from "./FeedbackWidget";
 import "../styles/MapCornerControls.css";
-
+
+
 
 /** Плавающая панель в углу карты: сброс фильтров и виджет обратной связи. */
 export default function MapCornerControls({
@@ -21,6 +22,8 @@ export default function MapCornerControls({
   onTempLayerToggle,
   onTempLayerDelete,
   onTempLayerColorChange,
+  onTempLayerHeatmapChange,
+  onTempLayersHeatmapAllChange,
   regnumFilters = [],
   onRegnumFilterChange
 }) {
@@ -167,18 +170,20 @@ export default function MapCornerControls({
           activeRegnumFilters={regnumFilters}
           onRegnumFilterChange={onRegnumFilterChange}
         />
-        <TempLayersPicker
-          dataRevision={tempLayersDataRevision}
-          onToggleLayer={onTempLayerToggle}
-          onDeleteLayer={onTempLayerDelete}
-          onColorChange={onTempLayerColorChange}
-        />
         <ExternalLayersPicker
           visible={externalLayersVisible}
           enabledLayers={externalLayersEnabled}
           dataRevision={externalLayersDataRevision}
           onToggleLayer={onExternalLayerToggle}
           onRequestLoad={onExternalLayerRequestLoad}
+        />
+        <TempLayersPicker
+          dataRevision={tempLayersDataRevision}
+          onToggleLayer={onTempLayerToggle}
+          onDeleteLayer={onTempLayerDelete}
+          onColorChange={onTempLayerColorChange}
+          onHeatmapChange={onTempLayerHeatmapChange}
+          onHeatmapAllChange={onTempLayersHeatmapAllChange}
         />
       </div>
     </div>

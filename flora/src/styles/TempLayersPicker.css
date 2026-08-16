@@ -1,4 +1,10 @@
+.temp-layers-picker {
+  z-index: 2;
+}
+
 .temp-layers-picker .external-layers-picker-panel-wrap {
+  left: 0;
+  right: auto;
   max-width: min(400px, calc(100vw - 40px));
 }
 
@@ -228,7 +234,8 @@
 }
 
 .temp-layers-picker-delete,
-.temp-layers-picker-hide {
+.temp-layers-picker-hide,
+.temp-layers-picker-heatmap {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -254,8 +261,52 @@
   color: #4b5563;
 }
 
+.temp-layers-picker-heatmap:hover,
+.temp-layers-picker-heatmap--on {
+  background: rgba(194, 65, 12, 0.12);
+  color: #c2410c;
+}
+
+.temp-layers-picker-toolbar {
+  display: flex;
+  align-items: stretch;
+  margin: 0 0 2px;
+}
+
+.temp-layers-picker-heatmap-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 10px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.temp-layers-picker-heatmap-all:hover,
+.temp-layers-picker-heatmap-all--on {
+  border-color: rgba(194, 65, 12, 0.28);
+  background: rgba(194, 65, 12, 0.08);
+  color: #9a3412;
+}
+
+.temp-layers-picker-heatmap-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
 .temp-layers-picker-delete-icon,
-.temp-layers-picker-hide-icon {
+.temp-layers-picker-hide-icon,
+.temp-layers-picker-heatmap-icon {
   display: block;
   width: 16px;
   height: 16px;

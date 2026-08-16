@@ -53,6 +53,8 @@ export default function MapDisplayPanel({
   onMarkersVisibleChange,
   heatmapEnabled = false,
   onHeatmapEnabledChange,
+  heatmapTempLayersOnly = false,
+  onHeatmapSettingsOpen,
   clusteringEnabled = true,
   onClusteringEnabledChange,
   clusterByRegnum = true,
@@ -283,15 +285,32 @@ export default function MapDisplayPanel({
             <span className="map-display-switch-label">Слитые точки</span>
           </label>
 
-          <label className="map-display-switch" title="Показать тепловую карту по всем точкам">
-            <input
-              type="checkbox"
-              checked={heatmapEnabled}
-              onChange={(e) => onHeatmapEnabledChange?.(e.target.checked)}
-            />
-            <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">Тепловая карта</span>
-          </label>
+          <div className="map-display-dense-row">
+            <label
+              className="map-display-switch"
+              title={
+                heatmapTempLayersOnly
+                  ? "Тепловая карта по видимым временным слоям"
+                  : "Показать тепловую карту по всем точкам"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={heatmapEnabled}
+                onChange={(e) => onHeatmapEnabledChange?.(e.target.checked)}
+              />
+              <span className="map-display-switch-slider" />
+              <span className="map-display-switch-label">Тепловая карта</span>
+            </label>
+            <button
+              type="button"
+              className="map-display-dense-process-btn"
+              onClick={() => onHeatmapSettingsOpen?.()}
+              title="Настроить слой heatmap Mapbox"
+            >
+              Настроить
+            </button>
+          </div>
         </div>
       )}
 
