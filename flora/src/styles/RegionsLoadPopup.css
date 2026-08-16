@@ -210,27 +210,62 @@
 }
 
 .selective-load-dialog {
-  min-width: min(560px, calc(100vw - 32px));
+  width: min(600px, calc(100vw - 32px));
+  min-width: 0;
+  max-width: min(600px, calc(100vw - 32px));
+}
+
+.selective-load-dialog--results {
+  width: max-content;
+  min-width: min(600px, calc(100vw - 32px));
+  max-width: min(960px, calc(100vw - 32px));
+}
+
+.selective-load-dialog .regions-load-hint {
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .selective-load-toolbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
 }
 
 .selective-load-picker {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    ". rank ."
+    "prefix query action";
+  align-items: end;
+  column-gap: 8px;
+  row-gap: 4px;
+  min-width: 0;
+}
+
+.selective-load-rank-tabs {
+  grid-area: rank;
+  justify-self: start;
+  width: max-content;
+}
+
+.selective-load-search-prefix {
+  grid-area: prefix;
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-end;
-  gap: 8px;
-  flex: 1 1 280px;
 }
 
 .selective-load-query {
-  flex: 1 1 220px;
-  min-width: 180px;
+  grid-area: query;
+  min-width: 0;
+}
+
+.selective-load-search-action {
+  grid-area: action;
+  display: flex;
+  align-items: flex-end;
 }
 
 .selective-load-search-btn {
@@ -280,6 +315,21 @@
   padding: 8px 10px;
   border-radius: 8px;
   color: #1f2937;
+  cursor: pointer;
+}
+
+.submission-autocomplete-suggestion-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.submission-autocomplete-suggestion-check {
+  margin-top: 3px;
+  margin-left: auto;
+  flex: 0 0 auto;
+  pointer-events: none;
+  accent-color: #0d9488;
 }
 
 .selective-load-suggestions .submission-autocomplete-suggestion + .submission-autocomplete-suggestion {
@@ -289,6 +339,10 @@
 .selective-load-suggestions .submission-autocomplete-suggestion:hover,
 .selective-load-suggestions .selective-load-suggestion--active {
   background: rgba(13, 148, 136, 0.18);
+}
+
+.selective-load-suggestions .submission-autocomplete-suggestion--checked {
+  background: rgba(13, 148, 136, 0.12);
 }
 
 .selective-load-suggestion-body {

@@ -169,11 +169,7 @@ export function normalizeHeatmapSettings(raw, { fromFile = false } = {}) {
   let paletteId = source.paletteId;
   if (fromFile) {
     paletteId = CUSTOM_PALETTE_ID;
-  } else if (paletteId === CUSTOM_PALETTE_ID) {
-    paletteId = CUSTOM_PALETTE_ID;
-  } else if (HEATMAP_COLOR_PRESETS[paletteId]) {
-    paletteId = paletteId;
-  } else {
+  } else if (paletteId !== CUSTOM_PALETTE_ID && !HEATMAP_COLOR_PRESETS[paletteId]) {
     paletteId = matchHeatmapColorPreset(nextStops) ?? base.paletteId;
   }
 

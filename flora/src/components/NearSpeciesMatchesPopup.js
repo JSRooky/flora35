@@ -5,13 +5,10 @@ import {
   formatMatchCoordinates
 } from "../dataWork/findNearSpeciesMatches";
 import {
+  collectNearSpeciesSourceFeatures,
   getMatchSourceLabel,
   MATCH_SOURCE_IDS
 } from "../dataWork/matchSources";
-import {
-  getVisibleGbifFeatures,
-  getVisibleInatFeatures
-} from "./addLocationsLayer";
 import "../styles/NearSpeciesMatchesPopup.css";
 import { MergeIcon, ZoomInIcon } from "../images/buttons";
 
@@ -136,7 +133,7 @@ function clampThreshold(value) {
 
 /**
  * Диалог «Близкие точки»: таблица пар GBIF ↔ iNaturalist
- * с одинаковым латинским названием в заданном радиусе.
+ * (основные и временные слои) с одинаковым латинским названием в заданном радиусе.
  */
 export default function NearSpeciesMatchesPopup({
   open,
@@ -196,16 +193,15 @@ export default function NearSpeciesMatchesPopup({
       return;
     }
 
-    const gbifFeatures = getVisibleGbifFeatures();
-    const inatFeatures = getVisibleInatFeatures();
+    const { leftFeatures, rightFeatures } = collectNearSpeciesSourceFeatures();
 
-    if (gbifFeatures.length === 0 || inatFeatures.length === 0) {
+    if (leftFeatures.length === 0 || rightFeatures.length === 0) {
       if (signal.aborted) {
         return;
       }
       setMatches([]);
       setStatusMessage(
-        "Загрузите слои GBIF и iNaturalist (оба нужны для поиска совпадений)."
+        "Нужны точки GBIF и iNaturalist (основные слои или видимые временные слои)."
       );
       setSearching(false);
       return;
@@ -213,8 +209,8 @@ export default function NearSpeciesMatchesPopup({
 
     const { matches: nextMatches, truncated } = await findNearSpeciesMatchesAsync(
       {
-        leftFeatures: gbifFeatures,
-        rightFeatures: inatFeatures,
+        leftFeatures,
+        rightFeatures,
         thresholdMeters: threshold,
         leftSourceId: MATCH_SOURCE_IDS.GBIF,
         rightSourceId: MATCH_SOURCE_IDS.INATURALIST,

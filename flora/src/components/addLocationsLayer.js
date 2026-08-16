@@ -2157,6 +2157,14 @@ export function getToolFeatures(filters = {}) {
   return features;
 }
 
+/** Видимые точки временных слоёв с теми же фильтрами, что у инструментов. */
+export function getVisibleTempLayerToolFeatures(locationFilters = currentFilters) {
+  if (!isTempLayersVisible()) {
+    return [];
+  }
+  return filterFeatures(getVisibleTempLayerFeatures(), locationFilters);
+}
+
 /** Плотные группы по источникам отдельно, затем слияние по координатам (без фантомных куч). */
 export function listToolDensePiles(filters = {}, { minSize = getDensePileMinSize() } = {}) {
   const options = { minSize };

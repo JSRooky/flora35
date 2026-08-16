@@ -45,7 +45,11 @@ export default function TaxonLoadPicker({
   query,
   onModeChange,
   onQueryChange,
-  onSuggestionChange
+  onSuggestionChange,
+  selectedSuggestions = [],
+  onSelectedSuggestionsChange,
+  searchPrefix = null,
+  searchAction = null
 }) {
   const [suggestions, setSuggestions] = useState([]);
   const abortRef = useRef(null);
@@ -70,11 +74,11 @@ export default function TaxonLoadPicker({
       try {
         let items = [];
         if (mode === TAXON_LOAD_MODES.FAMILY) {
-          items = await suggestFamilies(q, { limit: 8, signal: controller.signal });
+          items = await suggestFamilies(q, { limit: 16, signal: controller.signal });
         } else if (mode === TAXON_LOAD_MODES.GENUS) {
-          items = await suggestGenera(q, { limit: 8, signal: controller.signal });
+          items = await suggestGenera(q, { limit: 16, signal: controller.signal });
         } else {
-          items = await suggestTaxa(q, { limit: 8, signal: controller.signal });
+          items = await suggestTaxa(q, { limit: 16, signal: controller.signal });
         }
         if (!controller.signal.aborted) {
           setSuggestions(items);
@@ -101,7 +105,11 @@ export default function TaxonLoadPicker({
 
   return (
     <div className="selective-load-picker">
-      <div className="regions-load-source-tabs" role="tablist" aria-label="Ранг таксона">
+      <div
+        className="regions-load-source-tabs selective-load-rank-tabs"
+        role="tablist"
+        aria-label="Ранг таксона"
+      >
         {TAXON_MODE_OPTIONS.map((option) => (
           <button
             key={option.id}
@@ -119,12 +127,17 @@ export default function TaxonLoadPicker({
               }
               onModeChange?.(option.id);
               onSuggestionChange?.(null);
+              onSelectedSuggestionsChange?.([]);
             }}
           >
             {option.label}
           </button>
         ))}
       </div>
+
+      {searchPrefix ? (
+        <div className="selective-load-search-prefix">{searchPrefix}</div>
+      ) : null}
 
       <div className="selective-load-query">
         <SubmissionAutocompleteInput
@@ -134,9 +147,16 @@ export default function TaxonLoadPicker({
             onSuggestionChange?.(null);
           }}
           onSuggestionSelect={(item) => {
-            onQueryChange?.(item.scientificName || item.family || query);
-            onSuggestionChange?.(item);
+            const key = suggestionKey(item);
+            const already = selectedSuggestions.some((selected) => suggestionKey(selected) === key);
+            const nextSelected = already
+              ? selectedSuggestions.filter((selected) => suggestionKey(selected) !== key)
+              : [...selectedSuggestions, item];
+            onSelectedSuggestionsChange?.(nextSelected);
+            onSuggestionChange?.(nextSelected.length === 1 ? nextSelected[0] : null);
           }}
+          multiSelect
+          selectedSuggestionKeys={selectedSuggestions.map((item) => suggestionKey(item))}
           suggestions={suggestions}
           getSuggestionLabel={(item) => item.scientificName || item.family || ""}
           renderSuggestion={(item) => <TaxonSuggestionContent item={item} />}
@@ -150,6 +170,10 @@ export default function TaxonLoadPicker({
           aria-label="Поиск таксона"
         />
       </div>
+
+      {searchAction ? (
+        <div className="selective-load-search-action">{searchAction}</div>
+      ) : null}
     </div>
   );
 }

@@ -77,6 +77,8 @@ export default function SubmissionAutocompleteInput({
   placement = "drop-down",
   usePortal = false,
   placeholder,
+  multiSelect = false,
+  selectedSuggestionKeys = [],
   "aria-label": ariaLabel
 }) {
   const [open, setOpen] = useState(false);
@@ -136,7 +138,16 @@ export default function SubmissionAutocompleteInput({
     setOpen(true);
   };
 
+  const selectedKeySet = useMemo(
+    () => new Set((selectedSuggestionKeys || []).map(String)),
+    [selectedSuggestionKeys]
+  );
+
   const handleSelect = (suggestion) => {
+    if (multiSelect) {
+      onSuggestionSelect?.(suggestion);
+      return;
+    }
     onChange(getLabel(suggestion));
     onSuggestionSelect?.(suggestion);
     setOpen(false);
@@ -184,23 +195,40 @@ export default function SubmissionAutocompleteInput({
       style={usePortal ? portalStyle ?? undefined : undefined}
       role="listbox"
     >
-      {filteredSuggestions.map((suggestion, index) => (
+      {filteredSuggestions.map((suggestion, index) => {
+        const selected = selectedKeySet.has(String(getKey(suggestion, index)));
+        return (
         <li
           key={getKey(suggestion, index)}
           role="option"
-          aria-selected={index === activeIndex}
+          aria-selected={multiSelect ? selected : index === activeIndex}
           className={`submission-autocomplete-suggestion${
             index === activeIndex ? ` ${listClassNameActive}` : ""
-          }`}
+          }${multiSelect && selected ? " submission-autocomplete-suggestion--checked" : ""}`}
           onMouseDown={(event) => event.preventDefault()}
           onMouseEnter={() => setActiveIndex(index)}
           onClick={() => handleSelect(suggestion)}
         >
-          {renderSuggestion
-            ? renderSuggestion(suggestion)
-            : getLabel(suggestion)}
+          {multiSelect ? (
+            <span className="submission-autocomplete-suggestion-row">
+              {renderSuggestion ? renderSuggestion(suggestion) : getLabel(suggestion)}
+              <input
+                type="checkbox"
+                className="submission-autocomplete-suggestion-check"
+                checked={selected}
+                readOnly
+                tabIndex={-1}
+                aria-hidden="true"
+              />
+            </span>
+          ) : renderSuggestion ? (
+            renderSuggestion(suggestion)
+          ) : (
+            getLabel(suggestion)
+          )}
         </li>
-      ))}
+        );
+      })}
     </ul>
   ) : null;
 

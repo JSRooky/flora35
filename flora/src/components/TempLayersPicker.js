@@ -1,7 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   getTempLayers,
-  TEMP_LAYER_MARKER_PALETTE
+  listTempLayerPlaques,
+  normalizeTempSource,
+  resolveTempSourceMarkerColor,
+  TEMP_LAYER_MARKER_PALETTE,
+  TEMP_SOURCE_IDS
 } from "../tempLayers/tempLayerStore";
 import "../styles/ExternalLayersPicker.css";
 import "../styles/TempLayersPicker.css";
@@ -26,31 +30,46 @@ function HeatmapIcon({ className }) {
   );
 }
 
-function formatLayerMeta(layer) {
-  const points = new Intl.NumberFormat("ru-RU").format(layer.features?.length ?? 0);
-  const regionCount = Array.isArray(layer.regionIds) ? layer.regionIds.length : 0;
+function formatPlaqueMeta(plaque) {
+  const regionIds = new Set();
+  let points = 0;
+  plaque.layers.forEach((layer) => {
+    points += layer.features?.length ?? 0;
+    (layer.regionIds || []).forEach((id) => regionIds.add(id));
+  });
+  const pointsText = new Intl.NumberFormat("ru-RU").format(points);
+  const regionCount = regionIds.size;
   const regionPart =
     regionCount === 1 ? "1 рег." : regionCount > 1 ? `${regionCount} рег.` : null;
-  return regionPart ? `${regionPart} · ${points} т.` : `${points} т.`;
+  return regionPart ? `${regionPart} · ${pointsText} т.` : `${pointsText} т.`;
 }
 
-function layerRowStyle(layer) {
-  if (!layer.markerColor) {
-    return undefined;
+function plaqueRowStyle(plaque) {
+  const gbifColor = resolveTempSourceMarkerColor(plaque.markerColor, TEMP_SOURCE_IDS.GBIF);
+  const inatColor = resolveTempSourceMarkerColor(plaque.markerColor, TEMP_SOURCE_IDS.INAT);
+  const style = {
+    "--temp-layer-color-gbif": gbifColor,
+    "--temp-layer-color-inat": inatColor
+  };
+  if (plaque.markerColor) {
+    style["--temp-layer-color"] = plaque.markerColor;
   }
-  return { "--temp-layer-color": layer.markerColor };
+  return style;
 }
 
-function layerTitle(layer) {
-  const source = layer.source === "inat" ? "iNaturalist" : "GBIF";
-  if (layer.taxonName) {
-    return `${source} · ${layer.taxonName}`;
-  }
-  return layer.label || source;
+function plaqueTitle(plaque) {
+  return plaque.taxonName || plaque.label || "Временный слой";
 }
 
-function LayerColorButton({ layer, open, tabIndex, onToggle, onSelect, onReset }) {
-  const current = layer.markerColor || "";
+function sourceLayer(plaque, sourceId) {
+  return plaque.layers.find(
+    (layer) => normalizeTempSource(layer.source) === sourceId
+  );
+}
+
+function LayerColorButton({ plaque, open, tabIndex, onToggle, onSelect, onReset }) {
+  const current = plaque.markerColor || "";
+  const label = plaqueTitle(plaque);
 
   return (
     <div className="temp-layers-picker-color">
@@ -64,8 +83,8 @@ function LayerColorButton({ layer, open, tabIndex, onToggle, onSelect, onReset }
         aria-haspopup="listbox"
         aria-label={
           current
-            ? `Цвет маркеров «${layer.label}»: ${current}`
-            : `Цвет маркеров «${layer.label}»: по царству`
+            ? `Цвет маркеров «${label}»: ${current}`
+            : `Цвет маркеров «${label}»: по царству`
         }
         title={current ? "Цвет маркеров" : "Цвет маркеров (по царству)"}
         style={current ? { backgroundColor: current } : undefined}
@@ -78,7 +97,7 @@ function LayerColorButton({ layer, open, tabIndex, onToggle, onSelect, onReset }
         <div
           className="temp-layers-picker-palette"
           role="listbox"
-          aria-label={`Палитра цвета для «${layer.label}»`}
+          aria-label={`Палитра цвета для «${label}»`}
           onClick={(event) => event.stopPropagation()}
         >
           <button
@@ -129,6 +148,7 @@ export default function TempLayersPicker({
   const rootRef = useRef(null);
   const closeTimerRef = useRef(null);
   void dataRevision;
+  const plaques = listTempLayerPlaques();
   const layers = getTempLayers();
 
   const clearCloseTimer = () => {
@@ -172,7 +192,9 @@ export default function TempLayersPicker({
 
   useEffect(() => () => clearCloseTimer(), []);
 
-  const activeCount = layers.filter((layer) => layer.visible).length;
+  const activeCount = plaques.filter((plaque) =>
+    plaque.layers.some((layer) => layer.visible)
+  ).length;
   const heatmapCount = layers.filter((layer) => layer.heatmapEnabled).length;
   const allHeatmapsOn = layers.length > 0 && heatmapCount === layers.length;
 
@@ -233,50 +255,107 @@ export default function TempLayersPicker({
                   </span>
                 </button>
               </div>
-              {layers.map((layer) => (
+              {plaques.map((plaque) => {
+              const primary = plaque.layers[0];
+              const gbif = sourceLayer(plaque, TEMP_SOURCE_IDS.GBIF);
+              const inat = sourceLayer(plaque, TEMP_SOURCE_IDS.INAT);
+              const anyVisible = plaque.layers.some((layer) => layer.visible);
+              const heatmapOn = plaque.layers.some((layer) => layer.heatmapEnabled);
+              const splitStripe = Boolean(gbif && inat);
+              const title = plaqueTitle(plaque);
+
+              return (
               <div
-                key={layer.id}
+                key={plaque.key}
                 className={`temp-layers-picker-row${
-                  layer.visible ? "" : " temp-layers-picker-row--hidden"
+                  anyVisible ? "" : " temp-layers-picker-row--hidden"
                 }${
-                  colorMenuLayerId === layer.id
+                  splitStripe ? " temp-layers-picker-row--split" : ""
+                }${
+                  !splitStripe && gbif ? " temp-layers-picker-row--gbif" : ""
+                }${
+                  !splitStripe && inat ? " temp-layers-picker-row--inat" : ""
+                }${
+                  colorMenuLayerId === primary.id
                     ? " temp-layers-picker-row--palette-open"
                     : ""
                 }`}
-                style={layerRowStyle(layer)}
+                style={plaqueRowStyle(plaque)}
               >
+                <div className="temp-layers-picker-main">
                 <button
                   type="button"
                   role="option"
-                  aria-selected={layer.visible}
+                  aria-selected={anyVisible}
                   tabIndex={open ? 0 : -1}
                   className="temp-layers-picker-toggle"
-                  title={layer.visible ? `Скрыть «${layer.label}»` : `Показать «${layer.label}»`}
-                  onClick={() => onToggleLayer?.(layer.id, !layer.visible)}
+                  title={anyVisible ? `Скрыть «${title}»` : `Показать «${title}»`}
+                  onClick={() => {
+                    plaque.layers.forEach((layer) => {
+                      onToggleLayer?.(layer.id, !anyVisible);
+                    });
+                  }}
                 >
-                  <span className="temp-layers-picker-option-text">
-                    <span className="external-layers-picker-option-label">{layerTitle(layer)}</span>
-                    <span className="temp-layers-picker-option-meta">{formatLayerMeta(layer)}</span>
-                  </span>
+                  <span className="external-layers-picker-option-label">{title}</span>
                 </button>
+                <div className="temp-layers-picker-option-meta-row">
+                  <span className="temp-layers-picker-option-meta">{formatPlaqueMeta(plaque)}</span>
+                  <span className="temp-layers-picker-sources" role="group" aria-label="Источники">
+                  <button
+                    type="button"
+                    className={`temp-layers-picker-source temp-layers-picker-source--gbif${
+                      gbif?.visible ? " temp-layers-picker-source--on" : ""
+                    }`}
+                    tabIndex={open && gbif ? 0 : -1}
+                    disabled={!gbif}
+                    aria-pressed={Boolean(gbif?.visible)}
+                    title={gbif ? "GBIF" : "GBIF не загружен"}
+                    onClick={() => {
+                      if (gbif) {
+                        onToggleLayer?.(gbif.id, !gbif.visible);
+                      }
+                    }}
+                  >
+                    GBIF
+                  </button>
+                  <button
+                    type="button"
+                    className={`temp-layers-picker-source temp-layers-picker-source--inat${
+                      inat?.visible ? " temp-layers-picker-source--on" : ""
+                    }`}
+                    tabIndex={open && inat ? 0 : -1}
+                    disabled={!inat}
+                    aria-pressed={Boolean(inat?.visible)}
+                    title={inat ? "iNaturalist" : "iNaturalist не загружен"}
+                    onClick={() => {
+                      if (inat) {
+                        onToggleLayer?.(inat.id, !inat.visible);
+                      }
+                    }}
+                  >
+                    iNat
+                  </button>
+                </span>
+                </div>
+                </div>
                 <button
                   type="button"
                   className={`temp-layers-picker-heatmap${
-                    layer.heatmapEnabled ? " temp-layers-picker-heatmap--on" : ""
+                    heatmapOn ? " temp-layers-picker-heatmap--on" : ""
                   }`}
                   tabIndex={open ? 0 : -1}
-                  aria-pressed={Boolean(layer.heatmapEnabled)}
+                  aria-pressed={heatmapOn}
                   aria-label={
-                    layer.heatmapEnabled
-                      ? `Выключить тепловую карту «${layer.label}»`
-                      : `Тепловая карта слоя «${layer.label}»`
+                    heatmapOn
+                      ? `Выключить тепловую карту «${title}»`
+                      : `Тепловая карта слоя «${title}»`
                   }
                   title={
-                    layer.heatmapEnabled
+                    heatmapOn
                       ? "Тепловая карта слоя включена"
                       : "Тепловая карта только этого слоя"
                   }
-                  onClick={() => onHeatmapChange?.(layer.id, !layer.heatmapEnabled)}
+                  onClick={() => onHeatmapChange?.(primary.id, !heatmapOn)}
                 >
                   <HeatmapIcon className="temp-layers-picker-heatmap-icon" />
                 </button>
@@ -284,51 +363,56 @@ export default function TempLayersPicker({
                   type="button"
                   className="temp-layers-picker-delete"
                   tabIndex={open ? 0 : -1}
-                  aria-label={`Удалить слой «${layer.label}»`}
+                  aria-label={`Удалить слой «${title}»`}
                   title="Удалить"
-                  onClick={() => onDeleteLayer?.(layer.id)}
+                  onClick={() => onDeleteLayer?.(primary.id)}
                 >
                   <TrashIcon className="temp-layers-picker-delete-icon" aria-hidden="true" focusable="false" />
                 </button>
                 <button
                   type="button"
                   className={`temp-layers-picker-hide${
-                    layer.visible ? "" : " temp-layers-picker-hide--off"
+                    anyVisible ? "" : " temp-layers-picker-hide--off"
                   }`}
                   tabIndex={open ? 0 : -1}
-                  aria-pressed={!layer.visible}
+                  aria-pressed={!anyVisible}
                   aria-label={
-                    layer.visible ? `Скрыть «${layer.label}»` : `Показать «${layer.label}»`
+                    anyVisible ? `Скрыть «${title}»` : `Показать «${title}»`
                   }
-                  title={layer.visible ? "Скрыть слой" : "Показать слой"}
-                  onClick={() => onToggleLayer?.(layer.id, !layer.visible)}
+                  title={anyVisible ? "Скрыть слой" : "Показать слой"}
+                  onClick={() => {
+                    plaque.layers.forEach((layer) => {
+                      onToggleLayer?.(layer.id, !anyVisible);
+                    });
+                  }}
                 >
-                  {layer.visible ? (
+                  {anyVisible ? (
                     <EyeIcon className="temp-layers-picker-hide-icon" aria-hidden="true" focusable="false" />
                   ) : (
                     <EyeOffIcon className="temp-layers-picker-hide-icon" aria-hidden="true" focusable="false" />
                   )}
                 </button>
                 <LayerColorButton
-                  layer={layer}
-                  open={colorMenuLayerId === layer.id}
+                  plaque={plaque}
+                  open={colorMenuLayerId === primary.id}
                   tabIndex={open ? 0 : -1}
                   onToggle={() =>
                     setColorMenuLayerId((current) =>
-                      current === layer.id ? null : layer.id
+                      current === primary.id ? null : primary.id
                     )
                   }
                   onSelect={(color) => {
-                    onColorChange?.(layer.id, color);
+                    onColorChange?.(primary.id, color);
                     setColorMenuLayerId(null);
                   }}
                   onReset={() => {
-                    onColorChange?.(layer.id, null);
+                    onColorChange?.(primary.id, null);
                     setColorMenuLayerId(null);
                   }}
                 />
               </div>
-            ))}
+              );
+            })}
             </>
           )}
         </div>

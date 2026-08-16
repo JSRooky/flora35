@@ -178,7 +178,8 @@ export async function startGbifExternalLoad({
   query,
   previewCount = null,
   intoTempStaging = false,
-  taxon = null
+  taxon = null,
+  bundleKey = null
 } = {}) {
   const map = mapRef;
   if (!map || !region) {
@@ -187,7 +188,7 @@ export async function startGbifExternalLoad({
 
   const generation = snapshot.gbif.generation + 1;
   if (intoTempStaging) {
-    prepareTempLayerStaging({ source: "gbif", taxon });
+    prepareTempLayerStaging({ source: "gbif", taxon, bundleKey });
   } else {
     setGbifMapUpdatesPaused(true);
     clearGbifLayer(map);
@@ -320,7 +321,8 @@ export async function startInatExternalLoad({
   query,
   previewCount = null,
   intoTempStaging = false,
-  taxon = null
+  taxon = null,
+  bundleKey = null
 } = {}) {
   const map = mapRef;
   if (!map || !region) {
@@ -329,7 +331,7 @@ export async function startInatExternalLoad({
 
   const generation = snapshot.inat.generation + 1;
   if (intoTempStaging) {
-    prepareTempLayerStaging({ source: "inat", taxon });
+    prepareTempLayerStaging({ source: "inat", taxon, bundleKey });
   } else {
     setInatMapUpdatesPaused(true);
     clearInatLayer(map);

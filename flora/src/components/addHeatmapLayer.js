@@ -7,7 +7,7 @@ import {
 } from "./heatmapSettings";
 import { toHeatmapFeatures } from "./mapPerformance";
 import { DEFAULT_POINT_COLOR } from "./pointColors";
-import { getTempLayers } from "../tempLayers/tempLayerStore";
+import { getTempLayers, resolveTempSourceMarkerColor } from "../tempLayers/tempLayerStore";
 
 const SOURCE_ID = "heatmap";
 const LAYER_ID = "heatmap";
@@ -226,7 +226,11 @@ function removeTempHeatmap(map, layerId) {
 function ensureTempHeatmap(map, layer, filters = {}) {
   const ids = tempHeatmapIds(layer.id);
   const data = collectionFromFeatures(filterFeatures(layer.features ?? [], filters));
-  const color = heatmapColorForLayer(layer.markerColor || DEFAULT_POINT_COLOR);
+  const color = heatmapColorForLayer(
+    layer.markerColor
+      ? resolveTempSourceMarkerColor(layer.markerColor, layer.source)
+      : DEFAULT_POINT_COLOR
+  );
 
   if (!map.getSource(ids.sourceId)) {
     map.addSource(ids.sourceId, {

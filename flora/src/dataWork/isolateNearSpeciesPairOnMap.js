@@ -8,6 +8,7 @@ import {
   refreshLocationsFromCurrentFilters,
   setTemporaryLocationsFeatures
 } from "../components/addLocationsLayer";
+import { clearTempLayersLayer, setTempLayersData } from "../components/addTempLayersLayer";
 import {
   clearNearSpeciesPairPreview,
   showNearSpeciesPairPreview
@@ -33,6 +34,7 @@ export function isolateNearSpeciesPairOnMap(map, match) {
   setInatData(map, EMPTY_COLLECTION, { preview: true });
   setMergedData(map, EMPTY_COLLECTION, { preview: true });
   setTemporaryLocationsFeatures(map, []);
+  clearTempLayersLayer(map);
   setHeatmapFeatures(map, []);
 
   showNearSpeciesPairPreview(map, match);
@@ -53,5 +55,6 @@ export function restoreNearSpeciesMapLayers(map, locationFilters = {}) {
   applyInatLocationsFilter(map, locationFilters);
   setMergedData(map, getMergedFeatureCollection());
   refreshLocationsFromCurrentFilters(map);
+  setTempLayersData(map);
   updateHeatmapData(map, locationFilters);
 }

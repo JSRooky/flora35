@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   INAT_QUALITY_MODES
 } from "../inaturalist/inatClient";
@@ -33,6 +33,10 @@ import {
 import { persistTempLayers } from "../tempLayers/tempLayerPersistence";
 import { DownloadIcon, SearchIcon } from "../images/buttons";
 
+const SOURCE_GBIF = "gbif";
+const SOURCE_INAT = "inat";
+const SOURCE_ALL = "all";
+
 function formatCount(value) {
   if (value == null || Number.isNaN(Number(value))) {
     return "—";
@@ -49,6 +53,74 @@ function buildLoadQuery(regionId, taxon) {
   };
 }
 
+function previewCellText(preview, hasSpatial) {
+  if (!hasSpatial || preview?.status === "unavailable") {
+    return "—";
+  }
+  if (preview?.status === "loading") {
+    return "…";
+  }
+  return formatCount(preview?.count);
+}
+
+function mergeCountPreview(prev, regionId, preview) {
+  const existing = prev[regionId];
+  if (preview?.status === "ready" && typeof preview.count === "number") {
+    const previous = typeof existing?.count === "number" ? existing.count : 0;
+    return { ...prev, [regionId]: { count: previous + preview.count, status: "ready" } };
+  }
+  if (preview?.status === "loading" && existing?.status === "ready") {
+    return prev;
+  }
+  if (existing?.status === "ready") {
+    return prev;
+  }
+  return { ...prev, [regionId]: preview };
+}
+
+function formatTaxaBundleName(taxa) {
+  if (!taxa.length) {
+    return "";
+  }
+  if (taxa.length === 1) {
+    return taxa[0].scientificName;
+  }
+  return `${taxa[0].scientificName} +${taxa.length - 1}`;
+}
+
+function taxaBundleKey(source, taxa) {
+  const keys = taxa
+    .map((taxon) => String(taxon.taxonKey ?? taxon.familyKey ?? taxon.inatTaxonId ?? ""))
+    .filter(Boolean)
+    .sort();
+  return `${source}|bundle|${keys.join(",")}`;
+}
+
+function toBundleTaxon(taxa) {
+  if (!taxa.length) {
+    return null;
+  }
+  const taxonKeys = taxa.map((taxon) => taxon.taxonKey).filter((key) => key != null);
+  return {
+    ...taxa[0],
+    scientificName: formatTaxaBundleName(taxa),
+    taxonKeys
+  };
+}
+
+function sumRegionCounts(countMap, regions) {
+  let sum = 0;
+  let any = false;
+  regions.forEach((region) => {
+    const value = countMap[region.id]?.count;
+    if (typeof value === "number") {
+      sum += value;
+      any = true;
+    }
+  });
+  return any ? sum : null;
+}
+
 export default function SelectiveLoadPopup({
   open = false,
   map = null,
@@ -59,54 +131,88 @@ export default function SelectiveLoadPopup({
   onLoadError,
   onTempLayersChange
 }) {
-  const [source, setSource] = useState("gbif");
+  const [source, setSource] = useState(SOURCE_GBIF);
   const [mode, setMode] = useState(TAXON_LOAD_MODES.SPECIES);
   const [query, setQuery] = useState("");
   const [suggestion, setSuggestion] = useState(null);
+  const [selectedSuggestions, setSelectedSuggestions] = useState([]);
+  const [resolvedTaxa, setResolvedTaxa] = useState([]);
   const [resolvedTaxon, setResolvedTaxon] = useState(null);
-  const [counts, setCounts] = useState(() => createEmptyRegionTaxonCountMap(EXTERNAL_REGIONS));
+  const [gbifCounts, setGbifCounts] = useState(() =>
+    createEmptyRegionTaxonCountMap(EXTERNAL_REGIONS)
+  );
+  const [inatCounts, setInatCounts] = useState(() =>
+    createEmptyRegionTaxonCountMap(EXTERNAL_REGIONS)
+  );
   const [searchStatus, setSearchStatus] = useState("idle");
   const [searching, setSearching] = useState(false);
   const [busyRegionId, setBusyRegionId] = useState(null);
   const [datasetRevision, setDatasetRevision] = useState(0);
   const searchAbortRef = useRef(null);
 
-  const isInat = source === "inat";
+  const isInat = source === SOURCE_INAT;
+  const isAll = source === SOURCE_ALL;
   void datasetRevision;
 
+  const selectSource = (next) => {
+    setSource(next);
+    setSearchStatus("idle");
+    setResolvedTaxon(null);
+    setResolvedTaxa([]);
+  };
+
+  const stopSearch = useCallback(() => {
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
+    setSearching(false);
+    setSearchStatus((status) => (status === "loading" ? "idle" : status));
+  }, []);
+
   const handleClose = useCallback(() => {
+    stopSearch();
     onClose?.();
-  }, [onClose]);
+  }, [onClose, stopSearch]);
+
+  useEffect(() => {
+    if (open) {
+      return undefined;
+    }
+    stopSearch();
+    return undefined;
+  }, [open, stopSearch]);
 
   const handleCancelLoad = useCallback(() => {
     cancelGbifExternalLoad();
     cancelInatExternalLoad();
   }, []);
 
-  const availableRegions = useMemo(
-    () =>
-      EXTERNAL_REGIONS.filter((region) =>
-        isInat ? Boolean(toInatSpatialRegion(region)) : Boolean(toGbifSpatialRegion(region))
-      ),
-    [isInat]
+  const gbifRegions = useMemo(
+    () => EXTERNAL_REGIONS.filter((region) => Boolean(toGbifSpatialRegion(region))),
+    []
   );
+  const inatRegions = useMemo(
+    () => EXTERNAL_REGIONS.filter((region) => Boolean(toInatSpatialRegion(region))),
+    []
+  );
+  const availableRegions = isAll ? EXTERNAL_REGIONS : isInat ? inatRegions : gbifRegions;
 
-  const totalCount = useMemo(() => {
-    let sum = 0;
-    let any = false;
-    availableRegions.forEach((region) => {
-      const value = counts[region.id]?.count;
-      if (typeof value === "number") {
-        sum += value;
-        any = true;
-      }
-    });
-    return any ? sum : null;
-  }, [availableRegions, counts]);
+  const totalGbif = useMemo(
+    () => sumRegionCounts(gbifCounts, gbifRegions),
+    [gbifCounts, gbifRegions]
+  );
+  const totalInat = useMemo(
+    () => sumRegionCounts(inatCounts, inatRegions),
+    [inatCounts, inatRegions]
+  );
+  const totalCount = isAll
+    ? null
+    : isInat
+      ? totalInat
+      : totalGbif;
 
   const runSearch = useCallback(async () => {
     const q = query.trim();
-    if (q.length < 2) {
+    if (selectedSuggestions.length === 0 && q.length < 2) {
       onLoadError?.("Введите название таксона");
       return;
     }
@@ -116,42 +222,90 @@ export default function SelectiveLoadPopup({
     searchAbortRef.current = controller;
     setSearching(true);
     setSearchStatus("loading");
-    setCounts(createEmptyRegionTaxonCountMap(EXTERNAL_REGIONS));
+    setGbifCounts(createEmptyRegionTaxonCountMap(EXTERNAL_REGIONS));
+    setInatCounts(createEmptyRegionTaxonCountMap(EXTERNAL_REGIONS));
     onLoadError?.(null);
 
     try {
-      const gbif = await resolveGbifLoadTaxon(
-        { mode, suggestion, query: q },
-        { signal: controller.signal }
-      );
-      if (!gbif) {
+      const seeds = selectedSuggestions.length
+        ? selectedSuggestions
+        : [suggestion].filter(Boolean);
+      const taxa = [];
+
+      if (seeds.length) {
+        for (const item of seeds) {
+          const gbif = await resolveGbifLoadTaxon(
+            {
+              mode,
+              suggestion: item,
+              query: item.scientificName || item.family || q
+            },
+            { signal: controller.signal }
+          );
+          if (!gbif) {
+            continue;
+          }
+          taxa.push(await attachInatTaxonId(gbif, { signal: controller.signal }));
+        }
+      } else {
+        const gbif = await resolveGbifLoadTaxon(
+          { mode, suggestion, query: q },
+          { signal: controller.signal }
+        );
+        if (gbif) {
+          taxa.push(await attachInatTaxonId(gbif, { signal: controller.signal }));
+        }
+      }
+
+      if (!taxa.length) {
         throw new Error("Не удалось сопоставить таксон в GBIF");
       }
 
-      const taxon = await attachInatTaxonId(gbif, { signal: controller.signal });
       if (controller.signal.aborted) {
         return;
       }
 
-      if (source === "inat" && taxon.inatTaxonId == null) {
-        throw new Error(`Не найден taxon_id iNaturalist для «${taxon.scientificName}»`);
+      if (source === SOURCE_INAT && taxa.every((taxon) => taxon.inatTaxonId == null)) {
+        throw new Error(`Не найден taxon_id iNat для выбранных вариантов`);
       }
 
-      setResolvedTaxon(taxon);
+      const bundle = toBundleTaxon(taxa);
+      setResolvedTaxa(taxa);
+      setResolvedTaxon(bundle);
 
-      const extras =
-        source === "inat"
-          ? { taxon_id: taxon.inatTaxonId }
-          : buildGbifLoadExtras(taxon);
-
-      await fetchRegionTaxonCounts(EXTERNAL_REGIONS, {
-        source,
-        extras,
-        signal: controller.signal,
-        onRegion: (regionId, preview) => {
-          setCounts((prev) => ({ ...prev, [regionId]: preview }));
+      for (const taxon of taxa) {
+        if (controller.signal.aborted) {
+          return;
         }
-      });
+        if (source === SOURCE_GBIF || source === SOURCE_ALL) {
+          await fetchRegionTaxonCounts(EXTERNAL_REGIONS, {
+            source: SOURCE_GBIF,
+            extras: buildGbifLoadExtras(taxon),
+            signal: controller.signal,
+            onRegion: (regionId, preview) => {
+              setGbifCounts((prev) => mergeCountPreview(prev, regionId, preview));
+            }
+          });
+        }
+        if ((source === SOURCE_INAT || source === SOURCE_ALL) && taxon.inatTaxonId != null) {
+          await fetchRegionTaxonCounts(EXTERNAL_REGIONS, {
+            source: SOURCE_INAT,
+            extras: { taxon_id: taxon.inatTaxonId },
+            signal: controller.signal,
+            onRegion: (regionId, preview) => {
+              setInatCounts((prev) => mergeCountPreview(prev, regionId, preview));
+            }
+          });
+        }
+      }
+
+      if (
+        source === SOURCE_ALL &&
+        taxa.every((taxon) => taxon.inatTaxonId == null) &&
+        !controller.signal.aborted
+      ) {
+        onLoadError?.(`Таксон найден в GBIF, но не сопоставлен с iNat`);
+      }
 
       if (!controller.signal.aborted) {
         setSearchStatus("ready");
@@ -161,62 +315,89 @@ export default function SelectiveLoadPopup({
         return;
       }
       setResolvedTaxon(null);
+      setResolvedTaxa([]);
       setSearchStatus("error");
       onLoadError?.(error?.message || "Не удалось выполнить поиск");
     } finally {
-      if (!controller.signal.aborted) {
+      if (searchAbortRef.current === controller) {
         setSearching(false);
       }
     }
-  }, [mode, onLoadError, query, source, suggestion]);
+  }, [mode, onLoadError, query, selectedSuggestions, source, suggestion]);
 
   const loadOneRegion = useCallback(
-    async (region) => {
-      const taxon = resolvedTaxon;
-      if (!taxon) {
+    async (region, sourceId) => {
+      const taxa = resolvedTaxa.length ? resolvedTaxa : resolvedTaxon ? [resolvedTaxon] : [];
+      if (!taxa.length) {
         throw new Error("Сначала выполните поиск таксона");
       }
 
-      if (source === "inat") {
-        const inatRegion = toInatSpatialRegion(region);
-        if (!inatRegion) {
-          throw new Error(`У региона «${region.label}» нет placeId iNaturalist`);
-        }
-        const extras = { taxon_id: taxon.inatTaxonId };
-        const previewCount = counts[region.id]?.count ?? null;
-        const querySnapshot = {
-          ...buildLoadQuery(region.id, taxon),
-          qualityGrade: INAT_QUALITY_MODES.RESEARCH
-        };
-        await startInatExternalLoad({
-          region: inatRegion,
-          kingdomId: querySnapshot.kingdomId || "",
-          qualityGrade: INAT_QUALITY_MODES.RESEARCH,
-          extras,
-          query: querySnapshot,
-          previewCount,
-          intoTempStaging: true,
-          taxon
-        });
+      const bundleTaxon = toBundleTaxon(taxa);
+      const bundleKey = taxaBundleKey(sourceId, taxa);
+      const usePreview = taxa.length === 1;
+
+      if (sourceId === SOURCE_INAT && !toInatSpatialRegion(region)) {
+        return;
+      }
+      if (sourceId !== SOURCE_INAT && !toGbifSpatialRegion(region)) {
         return;
       }
 
-      const gbifRegion = toGbifSpatialRegion(region);
-      if (!gbifRegion) {
-        throw new Error(`У региона «${region.label}» нет GADM-идентификатора`);
+      for (const taxon of taxa) {
+        if (sourceId === SOURCE_INAT) {
+          if (taxon.inatTaxonId == null) {
+            continue;
+          }
+          const extras = { taxon_id: taxon.inatTaxonId };
+          const previewCount = usePreview ? inatCounts[region.id]?.count ?? null : null;
+          const querySnapshot = {
+            ...buildLoadQuery(region.id, taxon),
+            qualityGrade: INAT_QUALITY_MODES.RESEARCH
+          };
+          await startInatExternalLoad({
+            region: toInatSpatialRegion(region),
+            kingdomId: querySnapshot.kingdomId || "",
+            qualityGrade: INAT_QUALITY_MODES.RESEARCH,
+            extras,
+            query: querySnapshot,
+            previewCount,
+            intoTempStaging: true,
+            taxon: bundleTaxon,
+            bundleKey
+          });
+          continue;
+        }
+
+        await startGbifExternalLoad({
+          region: toGbifSpatialRegion(region),
+          kingdomId: taxon.kingdomId || "",
+          extras: buildGbifLoadExtras(taxon),
+          query: buildLoadQuery(region.id, taxon),
+          previewCount: usePreview ? gbifCounts[region.id]?.count ?? null : null,
+          intoTempStaging: true,
+          taxon: bundleTaxon,
+          bundleKey
+        });
       }
-      const extras = buildGbifLoadExtras(taxon);
-      await startGbifExternalLoad({
-        region: gbifRegion,
-        kingdomId: taxon.kingdomId || "",
-        extras,
-        query: buildLoadQuery(region.id, taxon),
-        previewCount: counts[region.id]?.count ?? null,
-        intoTempStaging: true,
-        taxon
-      });
     },
-    [counts, resolvedTaxon, source]
+    [gbifCounts, inatCounts, resolvedTaxa, resolvedTaxon]
+  );
+
+  const commitStagingIfAny = useCallback(() => {
+    if (getTempLayerStagingCount() === 0) {
+      return null;
+    }
+    return commitTempLayerStaging();
+  }, []);
+
+  const loadRegionsForSource = useCallback(
+    async (sourceId, regions) => {
+      for (const region of regions) {
+        setBusyRegionId(region.id);
+        await loadOneRegion(region, sourceId);
+      }
+    },
+    [loadOneRegion]
   );
 
   const runRegionLoad = useCallback(
@@ -227,7 +408,16 @@ export default function SelectiveLoadPopup({
       setBusyRegionId(region.id);
       onLoadError?.(null);
       try {
-        await loadOneRegion(region);
+        if (isAll) {
+          await loadOneRegion(region, SOURCE_GBIF);
+          commitStagingIfAny();
+          await loadOneRegion(region, SOURCE_INAT);
+          commitStagingIfAny();
+          await persistTempLayers();
+          onTempLayersChange?.();
+        } else {
+          await loadOneRegion(region, isInat ? SOURCE_INAT : SOURCE_GBIF);
+        }
         setDatasetRevision((value) => value + 1);
       } catch (error) {
         onLoadError?.(error?.message || "Не удалось выполнить загрузку");
@@ -235,7 +425,7 @@ export default function SelectiveLoadPopup({
         setBusyRegionId(null);
       }
     },
-    [busyRegionId, loadOneRegion, map, onLoadError]
+    [busyRegionId, commitStagingIfAny, isAll, isInat, loadOneRegion, map, onLoadError, onTempLayersChange]
   );
 
   const runLoadAll = useCallback(async () => {
@@ -244,9 +434,15 @@ export default function SelectiveLoadPopup({
     }
     onLoadError?.(null);
     try {
-      for (const region of availableRegions) {
-        setBusyRegionId(region.id);
-        await loadOneRegion(region);
+      if (isAll) {
+        await loadRegionsForSource(SOURCE_GBIF, gbifRegions);
+        commitStagingIfAny();
+        await loadRegionsForSource(SOURCE_INAT, inatRegions);
+        commitStagingIfAny();
+        await persistTempLayers();
+        onTempLayersChange?.();
+      } else {
+        await loadRegionsForSource(isInat ? SOURCE_INAT : SOURCE_GBIF, availableRegions);
       }
       setDatasetRevision((value) => value + 1);
     } catch (error) {
@@ -255,7 +451,20 @@ export default function SelectiveLoadPopup({
     } finally {
       setBusyRegionId(null);
     }
-  }, [availableRegions, busyRegionId, loadOneRegion, map, onLoadError, resolvedTaxon]);
+  }, [
+    availableRegions,
+    busyRegionId,
+    commitStagingIfAny,
+    gbifRegions,
+    inatRegions,
+    isAll,
+    isInat,
+    loadRegionsForSource,
+    map,
+    onLoadError,
+    onTempLayersChange,
+    resolvedTaxon
+  ]);
 
   const saveToTempLayer = useCallback(async () => {
     if (!map || isExternalSourcesLoadActive() || busyRegionId || !resolvedTaxon) {
@@ -264,18 +473,24 @@ export default function SelectiveLoadPopup({
 
     onLoadError?.(null);
     try {
-      for (const region of availableRegions) {
-        setBusyRegionId(region.id);
-        await loadOneRegion(region);
+      if (isAll) {
+        await loadRegionsForSource(SOURCE_GBIF, gbifRegions);
+        const gbifLayer = commitStagingIfAny();
+        await loadRegionsForSource(SOURCE_INAT, inatRegions);
+        const inatLayer = commitStagingIfAny();
+        if (!gbifLayer && !inatLayer) {
+          onLoadError?.("Нет точек для временного слоя");
+          return;
+        }
+      } else {
+        await loadRegionsForSource(isInat ? SOURCE_INAT : SOURCE_GBIF, availableRegions);
+        setDatasetRevision((value) => value + 1);
+        if (getTempLayerStagingCount() === 0) {
+          onLoadError?.("Нет точек для временного слоя");
+          return;
+        }
+        commitTempLayerStaging();
       }
-      setDatasetRevision((value) => value + 1);
-
-      if (getTempLayerStagingCount() === 0) {
-        onLoadError?.("Нет точек для временного слоя");
-        return;
-      }
-
-      commitTempLayerStaging();
       setDatasetRevision((value) => value + 1);
       await persistTempLayers();
       onTempLayersChange?.();
@@ -288,7 +503,12 @@ export default function SelectiveLoadPopup({
   }, [
     availableRegions,
     busyRegionId,
-    loadOneRegion,
+    commitStagingIfAny,
+    gbifRegions,
+    inatRegions,
+    isAll,
+    isInat,
+    loadRegionsForSource,
     map,
     onLoadError,
     onTempLayersChange,
@@ -312,7 +532,11 @@ export default function SelectiveLoadPopup({
   return (
     <div className="regions-load-overlay" onClick={handleClose}>
       <div
-        className="regions-load-dialog selective-load-dialog"
+        className={
+          showTable
+            ? "regions-load-dialog selective-load-dialog selective-load-dialog--results"
+            : "regions-load-dialog selective-load-dialog"
+        }
         role="dialog"
         aria-modal="true"
         aria-label="Выборочная загрузка"
@@ -330,43 +554,6 @@ export default function SelectiveLoadPopup({
         <h3 className="regions-load-title">Выборочная загрузка</h3>
 
         <div className="selective-load-toolbar">
-          <div className="regions-load-source-tabs" role="tablist" aria-label="Источник данных">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={source === "gbif"}
-              className={
-                source === "gbif"
-                  ? "regions-load-source-tab regions-load-source-tab--active"
-                  : "regions-load-source-tab"
-              }
-              onClick={() => {
-                setSource("gbif");
-                setSearchStatus("idle");
-                setResolvedTaxon(null);
-              }}
-            >
-              GBIF
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={source === "inat"}
-              className={
-                source === "inat"
-                  ? "regions-load-source-tab regions-load-source-tab--active"
-                  : "regions-load-source-tab"
-              }
-              onClick={() => {
-                setSource("inat");
-                setSearchStatus("idle");
-                setResolvedTaxon(null);
-              }}
-            >
-              iNaturalist
-            </button>
-          </div>
-
           <TaxonLoadPicker
             mode={mode}
             query={query}
@@ -374,35 +561,89 @@ export default function SelectiveLoadPopup({
               setMode(next);
               setSearchStatus("idle");
               setResolvedTaxon(null);
+              setResolvedTaxa([]);
+              setSelectedSuggestions([]);
             }}
             onQueryChange={(next) => {
               setQuery(next);
               setSearchStatus("idle");
               setResolvedTaxon(null);
+              setResolvedTaxa([]);
             }}
             onSuggestionChange={setSuggestion}
+            selectedSuggestions={selectedSuggestions}
+            onSelectedSuggestionsChange={setSelectedSuggestions}
+            searchPrefix={
+          <div className="regions-load-source-tabs" role="tablist" aria-label="Источник данных">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={source === SOURCE_GBIF}
+              className={
+                source === SOURCE_GBIF
+                  ? "regions-load-source-tab regions-load-source-tab--active"
+                  : "regions-load-source-tab"
+              }
+              onClick={() => selectSource(SOURCE_GBIF)}
+            >
+              GBIF
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={source === SOURCE_INAT}
+              className={
+                source === SOURCE_INAT
+                  ? "regions-load-source-tab regions-load-source-tab--active"
+                  : "regions-load-source-tab"
+              }
+              onClick={() => selectSource(SOURCE_INAT)}
+            >
+              iNat
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={source === SOURCE_ALL}
+              className={
+                source === SOURCE_ALL
+                  ? "regions-load-source-tab regions-load-source-tab--active"
+                  : "regions-load-source-tab"
+              }
+              onClick={() => selectSource(SOURCE_ALL)}
+            >
+              Все
+            </button>
+          </div>
+            }
+            searchAction={
+            <button
+              type="button"
+              className="gbif-panel-btn selective-load-search-btn"
+              disabled={searching || (query.trim().length < 2 && selectedSuggestions.length === 0)}
+              aria-label="Поиск"
+              title="Поиск"
+              onClick={runSearch}
+            >
+              {searching ? <span aria-hidden="true">…</span> : <SearchIcon className="regions-load-action-icon" aria-hidden="true" focusable="false" />}
+            </button>
+            }
           />
-
-          <button
-            type="button"
-            className="gbif-panel-btn selective-load-search-btn"
-            disabled={searching || query.trim().length < 2}
-            aria-label="Поиск"
-            title="Поиск"
-            onClick={runSearch}
-          >
-            {searching ? <span aria-hidden="true">…</span> : <SearchIcon className="regions-load-action-icon" aria-hidden="true" focusable="false" />}
-          </button>
         </div>
 
         {resolvedTaxon ? (
           <p className="regions-load-hint">
-            {resolvedTaxon.scientificName}
-            {resolvedTaxon.inatTaxonId != null ? ` · iNat ${resolvedTaxon.inatTaxonId}` : ""}
+            {resolvedTaxa.length > 1
+              ? resolvedTaxa.map((taxon) => taxon.scientificName).join(" · ")
+              : resolvedTaxon.scientificName}
+            {resolvedTaxa.length === 1 && resolvedTaxon.inatTaxonId != null
+              ? ` · iNat ${resolvedTaxon.inatTaxonId}`
+              : ""}
           </p>
         ) : (
           <p className="regions-load-hint">
-            Выберите вид, род или семейство и нажмите поиск — появится число точек по регионам.
+            Выберите источник загрузки, уровень (вид, род...). Отметьте галочками варианты, которые нужно загрузить в один временный слой.
+            {isAll ? " в GBIF и iNat" : ""}.
           </p>
         )}
 
@@ -412,7 +653,7 @@ export default function SelectiveLoadPopup({
               Идёт загрузка
               {loadSnapshot?.gbif?.loading ? " GBIF" : ""}
               {loadSnapshot?.gbif?.loading && loadSnapshot?.inat?.loading ? " и" : ""}
-              {loadSnapshot?.inat?.loading ? " iNaturalist" : ""}
+              {loadSnapshot?.inat?.loading ? " iNat" : ""}
               …
               {seriesLabel ? ` (${seriesLabel})` : ""}
             </p>
@@ -435,29 +676,51 @@ export default function SelectiveLoadPopup({
                 <thead>
                   <tr>
                     <th scope="col">Регион</th>
-                    <th scope="col">Точек</th>
+                    {isAll ? (
+                      <>
+                        <th scope="col">GBIF</th>
+                        <th scope="col">iNat</th>
+                      </>
+                    ) : (
+                      <th scope="col">Точек</th>
+                    )}
                     <th scope="col">Загрузить</th>
                   </tr>
                 </thead>
                 <tbody>
                   {EXTERNAL_REGIONS.map((region) => {
-                    const preview = counts[region.id];
-                    const unavailable = preview?.status === "unavailable";
-                    const hasSpatial = isInat
-                      ? Boolean(toInatSpatialRegion(region))
-                      : Boolean(toGbifSpatialRegion(region));
+                    const gbifPreview = gbifCounts[region.id];
+                    const inatPreview = inatCounts[region.id];
+                    const hasGbif = Boolean(toGbifSpatialRegion(region));
+                    const hasInat = Boolean(toInatSpatialRegion(region));
+                    const hasSpatial = isAll
+                      ? hasGbif || hasInat
+                      : isInat
+                        ? hasInat
+                        : hasGbif;
+                    const preview = isInat ? inatPreview : gbifPreview;
+                    const unavailable = isAll
+                      ? false
+                      : preview?.status === "unavailable";
                     const rowBusy = busyRegionId === region.id;
-                    const cellText =
-                      unavailable || !hasSpatial
-                        ? "—"
-                        : preview?.status === "loading"
-                          ? "…"
-                          : formatCount(preview?.count);
 
                     return (
                       <tr key={region.id}>
                         <th scope="row">{region.label}</th>
-                        <td className="regions-load-table-num">{cellText}</td>
+                        {isAll ? (
+                          <>
+                            <td className="regions-load-table-num">
+                              {previewCellText(gbifPreview, hasGbif)}
+                            </td>
+                            <td className="regions-load-table-num">
+                              {previewCellText(inatPreview, hasInat)}
+                            </td>
+                          </>
+                        ) : (
+                          <td className="regions-load-table-num">
+                            {previewCellText(preview, hasSpatial)}
+                          </td>
+                        )}
                         <td>
                           <button
                             type="button"
@@ -485,7 +748,9 @@ export default function SelectiveLoadPopup({
 
             <div className="selective-load-footer">
               <span className="selective-load-footer-total">
-                Всего точек: {formatCount(totalCount)}
+                {isAll
+                  ? `Всего: GBIF ${formatCount(totalGbif)} · iNat ${formatCount(totalInat)}`
+                  : `Всего точек: ${formatCount(totalCount)}`}
                 {getTempLayerStagingCount() > 0
                   ? ` · в сессии: ${formatCount(getTempLayerStagingCount())}`
                   : ""}

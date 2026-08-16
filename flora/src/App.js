@@ -335,6 +335,7 @@ export default function MapView() {
   const [regnumFilters, setRegnumFilters] = useState([]);
   const [clusterByRegnum, setClusterByRegnumState] = useState(DEFAULT_CLUSTER_BY_REGNUM);
   const [clusterByTempLayers, setClusterByTempLayersState] = useState(true);
+  const [clusterByTempSublayers, setClusterByTempSublayersState] = useState(true);
   const [clusteringEnabled, setClusteringEnabledState] = useState(DEFAULT_CLUSTERING_ENABLED);
   const [clusterPieCharts, setClusterPieChartsState] = useState(DEFAULT_CLUSTER_PIE_CHARTS);
   const [denseClustersHighlight, setDenseClustersHighlightState] = useState(
@@ -365,6 +366,10 @@ export default function MapView() {
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
   const [heatmapSettingsOpen, setHeatmapSettingsOpen] = useState(false);
   const [heatmapSettings, setHeatmapSettings] = useState(loadHeatmapSettingsFromStorage);
+  const handleHeatmapSettingsChange = (next) => {
+    setHeatmapSettings(next);
+    saveHeatmapSettingsToStorage(next);
+  };
   const [boundsFeatureVisibility, setBoundsFeatureVisibility] = useState({});
   const [boundsCatalogByLayerId, setBoundsCatalogByLayerId] = useState({});
   const [boundsLayerLoading, setBoundsLayerLoading] = useState({});
@@ -2109,6 +2114,7 @@ export default function MapView() {
       applyInatGroupingMode(map.current, grouping);
       applyTempLayersGroupingMode(map.current, {
         clusterByTempLayers,
+        clusterByTempSublayers,
         clusterPieCharts,
         clusteringEnabled,
         denseClustersHighlight: true
@@ -2142,6 +2148,7 @@ export default function MapView() {
   }, [
     clusterByRegnum,
     clusterByTempLayers,
+    clusterByTempSublayers,
     clusterPieCharts,
     clusteringEnabled,
     denseGroupsHidden,
@@ -3442,6 +3449,7 @@ export default function MapView() {
     applyInatGroupingMode(map.current, grouping);
     applyTempLayersGroupingMode(map.current, {
       clusterByTempLayers,
+      clusterByTempSublayers,
       clusterPieCharts,
       clusteringEnabled,
       denseClustersHighlight
@@ -3451,6 +3459,7 @@ export default function MapView() {
     clusteringEnabled,
     clusterByRegnum,
     clusterByTempLayers,
+    clusterByTempSublayers,
     clusterPieCharts,
     denseClustersHighlight,
     mapReady
@@ -3524,10 +3533,6 @@ export default function MapView() {
       window.clearTimeout(timerId);
     };
   }, [heatmapEnabled, locationFilters, externalOnly, tempLayersRevision, heatmapSettings]);
-
-  useEffect(() => {
-    saveHeatmapSettingsToStorage(heatmapSettings);
-  }, [heatmapSettings]);
 
   useEffect(() => {
     if (!mapReady || !map.current || !isFirebaseConfigured()) {
@@ -3802,6 +3807,14 @@ export default function MapView() {
       setClusterPieChartsState(false);
     }
     setClusterByTempLayersState(enabled);
+  };
+
+  const handleClusterByTempSublayersChange = (enabled) => {
+    if (enabled) {
+      setClusterPieChartsState(false);
+      setClusterByTempLayersState(true);
+    }
+    setClusterByTempSublayersState(enabled);
   };
 
   const handleClusterPieChartsChange = (enabled) => {
@@ -5437,6 +5450,8 @@ export default function MapView() {
               onClusterByRegnumChange={handleClusterByRegnumChange}
               clusterByTempLayers={clusterByTempLayers}
               onClusterByTempLayersChange={handleClusterByTempLayersChange}
+              clusterByTempSublayers={clusterByTempSublayers}
+              onClusterByTempSublayersChange={handleClusterByTempSublayersChange}
               hasTempLayers={getTempLayers().length > 0}
               clusterPieCharts={clusterPieCharts}
               onClusterPieChartsChange={handleClusterPieChartsChange}
@@ -5836,7 +5851,7 @@ export default function MapView() {
       <HeatmapSettingsPanel
         open={heatmapSettingsOpen}
         settings={heatmapSettings}
-        onSettingsChange={setHeatmapSettings}
+        onSettingsChange={handleHeatmapSettingsChange}
         onClose={() => setHeatmapSettingsOpen(false)}
       />
     </>

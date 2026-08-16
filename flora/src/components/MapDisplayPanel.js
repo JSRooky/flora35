@@ -12,6 +12,7 @@ function getCollapsedSummary(
   clusteringEnabled,
   clusterByRegnum,
   clusterByTempLayers,
+  clusterByTempSublayers,
   hasTempLayers,
   clusterPieCharts,
   denseClustersHighlight
@@ -27,8 +28,12 @@ function getCollapsedSummary(
   } else if (clusteringEnabled && markersVisible) {
     if (clusterPieCharts) {
       parts.push("диаграммы");
+    } else if (clusterByRegnum && hasTempLayers && clusterByTempLayers && clusterByTempSublayers) {
+      parts.push("по царству, по слоям, внутри слоя");
     } else if (clusterByRegnum && hasTempLayers && clusterByTempLayers) {
       parts.push("по царству, по слоям");
+    } else if (hasTempLayers && clusterByTempLayers && clusterByTempSublayers) {
+      parts.push("по слоям, внутри слоя");
     } else if (clusterByRegnum) {
       parts.push("по царству");
     } else if (hasTempLayers && clusterByTempLayers) {
@@ -61,6 +66,8 @@ export default function MapDisplayPanel({
   onClusterByRegnumChange,
   clusterByTempLayers = true,
   onClusterByTempLayersChange,
+  clusterByTempSublayers = true,
+  onClusterByTempSublayersChange,
   hasTempLayers = false,
   clusterPieCharts = false,
   onClusterPieChartsChange,
@@ -87,6 +94,8 @@ export default function MapDisplayPanel({
     clusteringDisabled || !clusteringEnabled || clusterPieCharts;
   const clusterByTempLayersDisabled =
     clusteringDisabled || !clusteringEnabled || clusterPieCharts;
+  const clusterByTempSublayersDisabled =
+    clusterByTempLayersDisabled || !clusterByTempLayers;
   const denseClustersHighlightDisabled = !markersVisible;
 
   return (
@@ -118,6 +127,7 @@ export default function MapDisplayPanel({
             clusteringEnabled,
             clusterByRegnum,
             clusterByTempLayers,
+            clusterByTempSublayers,
             hasTempLayers,
             clusterPieCharts,
             denseClustersHighlight
@@ -174,6 +184,7 @@ export default function MapDisplayPanel({
           </label>
 
           {hasTempLayers ? (
+            <div className="map-display-dense-row">
             <label
               className={`map-display-switch${
                 clusterByTempLayersDisabled ? " map-display-switch--disabled" : ""
@@ -199,6 +210,26 @@ export default function MapDisplayPanel({
               <span className="map-display-switch-slider" />
               <span className="map-display-switch-label">По слоям</span>
             </label>
+            <label
+              className={`map-display-switch map-display-switch--nested${
+                clusterByTempSublayersDisabled ? " map-display-switch--disabled" : ""
+              }`}
+              title={
+                clusterByTempSublayersDisabled
+                  ? "Доступно при включённой кластеризации по слоям"
+                  : "Кластеризовать GBIF и iNat внутри слоя отдельно"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={clusterByTempLayers && clusterByTempSublayers}
+                disabled={clusterByTempSublayersDisabled}
+                onChange={(e) => onClusterByTempSublayersChange?.(e.target.checked)}
+              />
+              <span className="map-display-switch-slider" />
+              <span className="map-display-switch-label">Внутри слоя</span>
+            </label>
+            </div>
           ) : null}
 
           <label

@@ -1,6 +1,7 @@
 import { DEFAULT_CLUSTER_COLOR, DEFAULT_POINT_COLOR, getPointColorExpression } from "./pointColors";
 import {
   getTempLayerFeatureGroups,
+  getTempLayerPlaqueFeatureGroups,
   getVisibleTempLayerFeatures,
   TEMP_LAYER_MARKER_PALETTE
 } from "../tempLayers/tempLayerStore";
@@ -21,6 +22,11 @@ import {
   restoreOriginalCoordinates,
   spreadCoincidentFeatures
 } from "./spreadCoincidentPoints";
+import {
+  cancelClusterHoverRequest,
+  removePointHoverPopup,
+  showClusterRegnumHover
+} from "./pointHoverTooltips";
 
 export const TEMP_LAYERS_SOURCE_ID = "temp-layers";
 export const TEMP_LAYERS_LAYER_ID = "temp-layers-unclustered";
@@ -52,11 +58,13 @@ const TEMP_LAYER_CLUSTER_COLOR = [
 
 let layerVisible = false;
 let clusterByTempLayers = true;
+let clusterByTempSublayers = true;
 let clusterPieChartsEnabled = false;
 let clusteringEnabled = true;
 let denseClustersHighlightEnabled = false;
 let expandedTempCoincidentKeys = new Set();
 let expandedTempDensePileKeys = new Set();
+let tempDensePileMembers = new Map();
 let onPointClickCallback = null;
 let onTempDensePileExpandedCallback = null;
 let interactionHandlers = null;
@@ -74,6 +82,14 @@ let locationFeatureFilter = (features) => features;
 
 export function setTempLayersLocationFeatureFilter(filterFn) {
   locationFeatureFilter = typeof filterFn === "function" ? filterFn : (features) => features;
+}
+
+function getTempDensePileMembers(feature) {
+  const key = feature?.properties?.dense_pile_key;
+  if (!key) {
+    return [];
+  }
+  return tempDensePileMembers.get(`dense-${key}`) ?? [];
 }
 
 function getTempFeatureStableKey(feature) {
@@ -112,18 +128,20 @@ function prepareMapTempFeatures(features) {
       mapFeatures: isTempMapboxClusteringActive()
         ? spreadCoincidentFeatures(features, expandedTempCoincidentKeys)
         : spreadCoincidentFeatures(features),
-      denseClusterFeatures: []
+      denseClusterFeatures: [],
+      densePileMembersById: new Map()
     };
   }
 
-  const { expandedDenseFeatures, denseClusterFeatures } =
+  const { expandedDenseFeatures, denseClusterFeatures, densePileMembersById } =
     partitionFeaturesByDensePiles(features, {
       expandedPileKeys: expandedTempDensePileKeys
     });
 
   return {
     mapFeatures: spreadCoincidentFeatures(expandedDenseFeatures),
-    denseClusterFeatures
+    denseClusterFeatures,
+    densePileMembersById
   };
 }
 
@@ -170,6 +188,10 @@ function isSplitByLayer() {
   return clusterByTempLayers && !clusterPieChartsEnabled && isTempMapboxClusteringActive();
 }
 
+function isSplitBySublayer() {
+  return isSplitByLayer() && clusterByTempSublayers;
+}
+
 function buildUnits() {
   const units = !isSplitByLayer()
     ? [
@@ -179,7 +201,9 @@ function buildUnits() {
           features: getVisibleTempLayerFeatures()
         }
       ]
-    : getTempLayerFeatureGroups();
+    : isSplitBySublayer()
+      ? getTempLayerFeatureGroups()
+      : getTempLayerPlaqueFeatureGroups();
 
   return units.map((unit) => ({
     ...unit,
@@ -290,6 +314,7 @@ function detachInteractions(map) {
     pointEnter,
     pointLeave,
     clusterLayerIds,
+    clusterHoverLayerIds,
     pointLayerIds
   } = interactionHandlers;
 
@@ -298,6 +323,12 @@ function detachInteractions(map) {
       return;
     }
     map.off("click", layerId, clusterClick);
+  });
+
+  (clusterHoverLayerIds ?? clusterLayerIds ?? []).forEach((layerId) => {
+    if (!map.getLayer(layerId)) {
+      return;
+    }
     map.off("mouseenter", layerId, clusterEnter);
     map.off("mouseleave", layerId, clusterLeave);
   });
@@ -340,6 +371,11 @@ function attachInteractions(map) {
   const clusterLayerIds = [
     ...activeUnits.map((unit) => unit.clusterLayerId),
     TEMP_DENSE_PILES_CLUSTER_LAYER_ID
+  ].filter((layerId) => map.getLayer(layerId));
+  const clusterHoverLayerIds = [
+    ...clusterLayerIds,
+    ...activeUnits.map((unit) => unit.countLayerId),
+    TEMP_DENSE_PILES_COUNT_LAYER_ID
   ].filter((layerId) => map.getLayer(layerId));
   const pointLayerIds = activeUnits
     .map((unit) => unit.pointLayerId)
@@ -412,6 +448,19 @@ function attachInteractions(map) {
     onPointClickCallback?.(feature);
   };
 
+  const clusterEnter = (event) => {
+    map.getCanvas().style.cursor = "pointer";
+    showClusterRegnumHover(map, event, {
+      getDensePileLeaves: getTempDensePileMembers
+    });
+  };
+
+  const clusterLeave = () => {
+    map.getCanvas().style.cursor = "";
+    cancelClusterHoverRequest();
+    removePointHoverPopup();
+  };
+
   const pointerEnter = () => {
     map.getCanvas().style.cursor = "pointer";
   };
@@ -422,8 +471,10 @@ function attachInteractions(map) {
 
   clusterLayerIds.forEach((layerId) => {
     map.on("click", layerId, clusterClick);
-    map.on("mouseenter", layerId, pointerEnter);
-    map.on("mouseleave", layerId, pointerLeave);
+  });
+  clusterHoverLayerIds.forEach((layerId) => {
+    map.on("mouseenter", layerId, clusterEnter);
+    map.on("mouseleave", layerId, clusterLeave);
   });
   pointLayerIds.forEach((layerId) => {
     map.on("click", layerId, pointClick);
@@ -433,12 +484,13 @@ function attachInteractions(map) {
 
   interactionHandlers = {
     clusterClick,
-    clusterEnter: pointerEnter,
-    clusterLeave: pointerLeave,
+    clusterEnter,
+    clusterLeave,
     pointClick,
     pointEnter: pointerEnter,
     pointLeave: pointerLeave,
     clusterLayerIds,
+    clusterHoverLayerIds,
     pointLayerIds
   };
 }
@@ -452,6 +504,8 @@ function addUnitToMap(map, unit) {
   const useClustering = isTempMapboxClusteringActive();
   const clusterProperties = {
     marker_color: ["coalesce", ["get", "temp_marker_color"]],
+    src_gbif: ["+", ["case", ["==", ["get", "temp_source"], "gbif"], 1, 0]],
+    src_inat: ["+", ["case", ["==", ["get", "temp_source"], "inat"], 1, 0]],
     ...(clusterPieChartsEnabled && useClustering ? buildPieClusterProperties() : {})
   };
 
@@ -525,12 +579,16 @@ export function setTempLayersData(map) {
 
   removeTempLayersFromMap(map);
   pieLayerKeys = [];
+  tempDensePileMembers = new Map();
   const denseClusterFeatures = [];
   buildUnits()
     .filter((unit) => unit.features.length > 0)
     .forEach((unit) => {
       const prepared = prepareMapTempFeatures(unit.features);
       denseClusterFeatures.push(...prepared.denseClusterFeatures);
+      (prepared.densePileMembersById ?? new Map()).forEach((members, key) => {
+        tempDensePileMembers.set(key, members);
+      });
       addUnitToMap(map, {
         ...unit,
         features: excludeHiddenPinFeatures(prepared.mapFeatures)
@@ -545,6 +603,7 @@ export function applyTempLayersGroupingMode(
   map,
   {
     clusterByTempLayers: nextClusterByTempLayers,
+    clusterByTempSublayers: nextClusterByTempSublayers,
     clusterPieCharts: nextPie,
     clusteringEnabled: nextClustering,
     denseClustersHighlight: nextDense
@@ -561,6 +620,9 @@ export function applyTempLayersGroupingMode(
   }
   if (nextClusterByTempLayers !== undefined) {
     clusterByTempLayers = Boolean(nextClusterByTempLayers);
+  }
+  if (nextClusterByTempSublayers !== undefined) {
+    clusterByTempSublayers = Boolean(nextClusterByTempSublayers);
   }
   if (
     nextDense !== undefined &&
