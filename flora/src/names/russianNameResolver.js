@@ -1,4 +1,5 @@
 import { matchScientificName } from "../gbif/speciesLookup";
+import { gbifFetch } from "../gbif/gbifRequestQueue";
 import { getAllSpeciesCollection } from "../locations/loadPoints";
 import { getCachedRussianName, setCachedRussianName, clearCachedRussianName } from "./nameRuCache";
 import {
@@ -17,7 +18,10 @@ const SOURCE_LABELS = {
 };
 
 async function fetchJson(url, { signal, headers = {} } = {}) {
-  const response = await fetch(url, { signal, headers });
+  const isGbif = String(url).includes("api.gbif.org");
+  const response = isGbif
+    ? await gbifFetch(url, { signal, headers })
+    : await fetch(url, { signal, headers });
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status} ${response.statusText}`);
   }

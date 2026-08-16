@@ -42,7 +42,6 @@ import {
 } from "../inaturalist/inatPersistence";
 import { clearGbifLayer, setGbifData, setGbifMapUpdatesPaused } from "../components/addGbifLayer";
 import { clearInatLayer, setInatData, setInatMapUpdatesPaused } from "../components/addInatLayer";
-import { setTempLayersData } from "../components/addTempLayersLayer";
 import {
   prepareTempLayerStaging,
   upsertTempLayerStagingFeatures
@@ -113,9 +112,9 @@ function patchSource(source, patch) {
   emit();
 }
 
-function notifyDataChange() {
+function notifyDataChange(detail) {
   try {
-    onDataChangeRef?.();
+    onDataChangeRef?.(detail);
   } catch {
     // контекст App мог быть временно недоступен
   }
@@ -220,6 +219,11 @@ export async function startGbifExternalLoad({
       signal: controller.signal,
       extras,
       previewCount,
+      onOverloaded: () => {
+        patchSource("gbif", {
+          seriesLabel: "ожидание GBIF…"
+        });
+      },
       onSeriesStart: ({ series, index, planned, queued }) => {
         patchSource("gbif", {
           seriesIndex: index,
@@ -266,8 +270,6 @@ export async function startGbifExternalLoad({
       if (map) {
         setGbifData(map, getGbifSlimMapCollection());
       }
-    } else if (map) {
-      setTempLayersData(map);
     }
 
     const nextSyncedAt = succeeded ? new Date().toISOString() : null;
@@ -298,8 +300,8 @@ export async function startGbifExternalLoad({
 
     if (!intoTempStaging) {
       await persistGbifSnapshot();
+      notifyDataChange({ source: "gbif" });
     }
-    notifyDataChange();
   }
 }
 
@@ -409,8 +411,6 @@ export async function startInatExternalLoad({
       if (map) {
         setInatData(map, getInatSlimMapCollection());
       }
-    } else if (map) {
-      setTempLayersData(map);
     }
 
     const nextSyncedAt = succeeded ? new Date().toISOString() : null;
@@ -437,8 +437,8 @@ export async function startInatExternalLoad({
 
     if (!intoTempStaging) {
       await persistInatSnapshot();
+      notifyDataChange({ source: "inat" });
     }
-    notifyDataChange();
   }
 }
 

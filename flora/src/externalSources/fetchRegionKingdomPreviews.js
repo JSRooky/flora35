@@ -9,7 +9,8 @@ import { toGbifSpatialRegion, toInatSpatialRegion } from "./regions";
 /** Оценка среднего размера одной точки в колоночном снимке IndexedDB. */
 export const AVG_EXTERNAL_FEATURE_BYTES = 120;
 
-const PREVIEW_CONCURRENCY = 4;
+const PREVIEW_CONCURRENCY = 2;
+const GBIF_PREVIEW_DELAY_MS = 400;
 /** iNat ~60 req/min — ниже параллелизм и пауза между запросами. */
 const INAT_PREVIEW_CONCURRENCY = 2;
 const INAT_PREVIEW_DELAY_MS = 600;
@@ -227,6 +228,9 @@ export async function fetchRegionKingdomPreviews(
       }
 
       await fetchOne(region, { signal, onRegion, taxonExtras, taxonKingdomId });
+      if (source === "gbif") {
+        await wait(GBIF_PREVIEW_DELAY_MS, signal);
+      }
     }
   }
 
@@ -312,6 +316,8 @@ export async function fetchRegionTaxonCounts(
         onRegion?.(region.id, result);
         if (source === "inat") {
           await wait(INAT_PREVIEW_DELAY_MS, signal);
+        } else {
+          await wait(GBIF_PREVIEW_DELAY_MS, signal);
         }
       } catch (error) {
         if (signal?.aborted || error?.name === "AbortError") {

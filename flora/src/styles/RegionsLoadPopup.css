@@ -88,6 +88,14 @@
   line-height: 1.4;
 }
 
+.regions-load-progress-counts {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+  line-height: 1.35;
+  width: 100%;
+}
+
 .regions-load-error {
   margin: 0;
   padding: 8px 10px;
@@ -278,6 +286,56 @@
   flex: 0 0 auto;
 }
 
+.selective-load-search-btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(13, 148, 136, 0.25);
+  border-top-color: #0d9488;
+  border-radius: 50%;
+  animation: selectiveLoadSpin 0.7s linear infinite;
+  flex: 0 0 auto;
+}
+
+@keyframes selectiveLoadSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.selective-load-search-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(13, 148, 136, 0.1);
+  border: 1px solid rgba(13, 148, 136, 0.28);
+}
+
+.selective-load-search-status-text {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.selective-load-search-status-title,
+.selective-load-search-status-detail {
+  margin: 0;
+}
+
+.selective-load-search-status-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #134e4a;
+}
+
+.selective-load-search-status-detail {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #3f5f5c;
+}
+
 .selective-load-footer {
   display: flex;
   flex-wrap: wrap;
@@ -292,13 +350,11 @@
   gap: 8px;
 }
 
-.selective-load-suggestions {
+.selective-load-suggest-panel {
   box-sizing: border-box;
   min-width: min(360px, 86vw) !important;
   max-width: min(460px, 90vw);
-  max-height: min(320px, 50vh);
-  padding: 6px;
-  overflow-y: auto;
+  overflow: hidden;
   border: 1px solid rgba(13, 148, 136, 0.38);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.62);
@@ -307,6 +363,21 @@
   box-shadow:
     0 10px 32px rgba(15, 23, 42, 0.16),
     0 0 0 1px rgba(255, 255, 255, 0.35) inset;
+}
+
+.selective-load-suggestions {
+  box-sizing: border-box;
+  position: static !important;
+  min-width: 0 !important;
+  max-width: none;
+  width: 100%;
+  max-height: min(280px, 42vh);
+  padding: 6px;
+  overflow-y: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .selective-load-suggestions .submission-autocomplete-suggestion {
@@ -341,8 +412,9 @@
   background: rgba(13, 148, 136, 0.18);
 }
 
-.selective-load-suggestions .submission-autocomplete-suggestion--checked {
-  background: rgba(13, 148, 136, 0.12);
+.selective-load-suggest-panel .submission-autocomplete-dropdown-footer {
+  border-top: 1px solid rgba(13, 148, 136, 0.22);
+  background: rgba(255, 255, 255, 0.35);
 }
 
 .selective-load-suggestion-body {

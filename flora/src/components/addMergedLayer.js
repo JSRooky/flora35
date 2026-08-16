@@ -47,16 +47,33 @@ function applyVisibility(map) {
   );
 }
 
-function attachInteractions(map) {
-  if (!map || interactionHandlers) {
+function detachInteractions(map) {
+  if (!interactionHandlers) {
     return;
   }
 
+  if (map) {
+    map.off("click", MERGED_UNCLUSTERED_LAYER_ID, interactionHandlers.click);
+    map.off("mouseenter", MERGED_UNCLUSTERED_LAYER_ID, interactionHandlers.enter);
+    map.off("mouseleave", MERGED_UNCLUSTERED_LAYER_ID, interactionHandlers.leave);
+  }
+
+  interactionHandlers = null;
+}
+
+function attachInteractions(map) {
+  if (!map) {
+    return;
+  }
+
+  detachInteractions(map);
+
   const handleClick = (event) => {
-    const features = safeQueryRenderedFeatures(map, event.point, {
-      layers: [MERGED_UNCLUSTERED_LAYER_ID]
-    });
-    const feature = features?.[0];
+    const feature =
+      event.features?.[0] ??
+      safeQueryRenderedFeatures(map, event.point, {
+        layers: [MERGED_UNCLUSTERED_LAYER_ID]
+      })?.[0];
     if (!feature) {
       return;
     }
@@ -206,7 +223,13 @@ function getMergedPinIconImageExpression() {
 }
 
 function addMergedSymbolLayer(map) {
-  if (!map || map.getLayer(MERGED_UNCLUSTERED_LAYER_ID)) {
+  if (!map) {
+    return;
+  }
+
+  if (map.getLayer(MERGED_UNCLUSTERED_LAYER_ID)) {
+    map.setLayoutProperty(MERGED_UNCLUSTERED_LAYER_ID, "icon-anchor", "center");
+    map.setLayoutProperty(MERGED_UNCLUSTERED_LAYER_ID, "icon-overlap", "always");
     return;
   }
 
@@ -217,9 +240,12 @@ function addMergedSymbolLayer(map) {
     layout: {
       "icon-image": getMergedPinIconImageExpression(),
       "icon-size": 1,
-      "icon-anchor": "bottom",
+      // SVG — крест с кругом в центре, не булавка: якорь должен совпадать
+      // с видимым маркером, иначе клик по иконке не попадает в hit-area.
+      "icon-anchor": "center",
       "icon-allow-overlap": true,
-      "icon-ignore-placement": true
+      "icon-ignore-placement": true,
+      "icon-overlap": "always"
     }
   });
 }
@@ -243,12 +269,8 @@ export function addMergedLayer(map, { onPointClick } = {}) {
   if (map.getSource(MERGED_SOURCE_ID)) {
     setMergedData(map, mergedCollection);
     ensureMergedPinImages(map).then(() => {
-      if (!map.getLayer(MERGED_UNCLUSTERED_LAYER_ID)) {
-        addMergedSymbolLayer(map);
-      }
-      if (!interactionHandlers) {
-        attachInteractions(map);
-      }
+      addMergedSymbolLayer(map);
+      attachInteractions(map);
       applyVisibility(map);
     });
     return;

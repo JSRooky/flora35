@@ -13,6 +13,45 @@ export const TAXON_MODE_OPTIONS = [
   { id: TAXON_LOAD_MODES.FAMILY, label: "Семейство" }
 ];
 
+export function suggestionKey(item) {
+  return String(item?.taxonKey ?? item?.familyKey ?? item?.scientificName ?? item?.family ?? "");
+}
+
+export function suggestionLabel(item) {
+  return String(item?.scientificName || item?.family || "").trim();
+}
+
+export function splitTaxonQueryNames(query) {
+  return String(query ?? "")
+    .split(/[,;\n]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+export function joinTaxonQueryNames(names) {
+  return names
+    .map((name) => String(name ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+function lastSeparatorIndex(value) {
+  const raw = String(value ?? "");
+  return Math.max(raw.lastIndexOf(","), raw.lastIndexOf(";"), raw.lastIndexOf("\n"));
+}
+
+export function getTaxonQueryDraft(query) {
+  const raw = String(query ?? "");
+  const index = lastSeparatorIndex(raw);
+  if (index < 0) {
+    return { prefix: "", draft: raw.trim() };
+  }
+  return {
+    prefix: raw.slice(0, index + 1),
+    draft: raw.slice(index + 1).trim()
+  };
+}
+
 function TaxonSuggestionContent({ item }) {
   const latin = item?.scientificName || item?.family || "";
   const ru = item?.vernacularName || "";
@@ -32,10 +71,6 @@ function TaxonSuggestionContent({ item }) {
   );
 }
 
-function suggestionKey(item) {
-  return String(item.taxonKey ?? item.familyKey ?? item.scientificName);
-}
-
 /**
  * Строка поиска таксона: селекторы ранга и поле с подсказками.
  * Сопоставление GBIF/iNat выполняется по кнопке «Поиск» снаружи.
@@ -52,6 +87,7 @@ export default function TaxonLoadPicker({
   searchAction = null
 }) {
   const [suggestions, setSuggestions] = useState([]);
+  const [pendingChecked, setPendingChecked] = useState([]);
   const abortRef = useRef(null);
 
   useEffect(() => {
@@ -61,8 +97,8 @@ export default function TaxonLoadPicker({
   }, []);
 
   useEffect(() => {
-    const q = String(query ?? "").trim();
-    if (q.length < 2) {
+    const draft = getTaxonQueryDraft(query).draft;
+    if (draft.length < 2) {
       setSuggestions([]);
       return undefined;
     }
@@ -74,11 +110,11 @@ export default function TaxonLoadPicker({
       try {
         let items = [];
         if (mode === TAXON_LOAD_MODES.FAMILY) {
-          items = await suggestFamilies(q, { limit: 16, signal: controller.signal });
+          items = await suggestFamilies(draft, { limit: 16, signal: controller.signal });
         } else if (mode === TAXON_LOAD_MODES.GENUS) {
-          items = await suggestGenera(q, { limit: 16, signal: controller.signal });
+          items = await suggestGenera(draft, { limit: 16, signal: controller.signal });
         } else {
-          items = await suggestTaxa(q, { limit: 16, signal: controller.signal });
+          items = await suggestTaxa(draft, { limit: 16, signal: controller.signal });
         }
         if (!controller.signal.aborted) {
           setSuggestions(items);
@@ -98,10 +134,10 @@ export default function TaxonLoadPicker({
 
   const placeholder =
     mode === TAXON_LOAD_MODES.FAMILY
-      ? "Семейство"
+      ? "Семейства через запятую"
       : mode === TAXON_LOAD_MODES.GENUS
-        ? "Род или биномен"
-        : "Латинское или русское название";
+        ? "Роды через запятую"
+        : "Названия через запятую";
 
   return (
     <div className="selective-load-picker">
@@ -128,6 +164,7 @@ export default function TaxonLoadPicker({
               onModeChange?.(option.id);
               onSuggestionChange?.(null);
               onSelectedSuggestionsChange?.([]);
+              setPendingChecked([]);
             }}
           >
             {option.label}
@@ -144,19 +181,50 @@ export default function TaxonLoadPicker({
           value={query}
           onChange={(next) => {
             onQueryChange?.(next);
+            const names = splitTaxonQueryNames(next).map((name) => name.toLowerCase());
+            onSelectedSuggestionsChange?.(
+              selectedSuggestions.filter((item) => names.includes(suggestionLabel(item).toLowerCase()))
+            );
             onSuggestionChange?.(null);
           }}
           onSuggestionSelect={(item) => {
             const key = suggestionKey(item);
-            const already = selectedSuggestions.some((selected) => suggestionKey(selected) === key);
-            const nextSelected = already
-              ? selectedSuggestions.filter((selected) => suggestionKey(selected) !== key)
-              : [...selectedSuggestions, item];
+            setPendingChecked((current) => {
+              const already = current.some((selected) => suggestionKey(selected) === key);
+              return already
+                ? current.filter((selected) => suggestionKey(selected) !== key)
+                : [...current, item];
+            });
+          }}
+          onCommitSelected={() => {
+            if (pendingChecked.length === 0) {
+              return;
+            }
+            const completeNames = splitTaxonQueryNames(getTaxonQueryDraft(query).prefix);
+            const nextNames = [...completeNames];
+            pendingChecked.forEach((item) => {
+              const label = suggestionLabel(item);
+              if (!label) {
+                return;
+              }
+              if (!nextNames.some((name) => name.toLowerCase() === label.toLowerCase())) {
+                nextNames.push(label);
+              }
+            });
+            const nextSelected = [...selectedSuggestions];
+            pendingChecked.forEach((item) => {
+              const key = suggestionKey(item);
+              if (!nextSelected.some((selected) => suggestionKey(selected) === key)) {
+                nextSelected.push(item);
+              }
+            });
+            onQueryChange?.(joinTaxonQueryNames(nextNames));
             onSelectedSuggestionsChange?.(nextSelected);
             onSuggestionChange?.(nextSelected.length === 1 ? nextSelected[0] : null);
+            setPendingChecked([]);
           }}
           multiSelect
-          selectedSuggestionKeys={selectedSuggestions.map((item) => suggestionKey(item))}
+          selectedSuggestionKeys={pendingChecked.map((item) => suggestionKey(item))}
           suggestions={suggestions}
           getSuggestionLabel={(item) => item.scientificName || item.family || ""}
           renderSuggestion={(item) => <TaxonSuggestionContent item={item} />}
@@ -165,6 +233,7 @@ export default function TaxonLoadPicker({
           className="gbif-panel-input"
           listClassName="submission-autocomplete-suggestions selective-load-suggestions"
           listClassNameActive="submission-autocomplete-suggestion--active selective-load-suggestion--active"
+          dropdownClassName="selective-load-suggest-panel"
           usePortal
           placeholder={placeholder}
           aria-label="Поиск таксона"

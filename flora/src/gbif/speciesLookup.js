@@ -1,6 +1,7 @@
 import { getAllSpeciesCollection } from "../locations/loadPoints";
 import { getGbifKingdomById } from "./taxonFilters";
 import { pickRussianVernacular } from "../names/vernacularUtils";
+import { gbifFetch } from "./gbifRequestQueue";
 
 const SPECIES_SUGGEST_URL = "https://api.gbif.org/v1/species/suggest";
 const SPECIES_SEARCH_URL = "https://api.gbif.org/v1/species/search";
@@ -123,7 +124,7 @@ export function firstLatinWord(name) {
 }
 
 async function fetchJson(url, { signal } = {}) {
-  const response = await fetch(url, { signal });
+  const response = await gbifFetch(url, { signal });
   if (!response.ok) {
     throw new Error(`GBIF Species API error: ${response.status} ${response.statusText}`);
   }

@@ -1,5 +1,10 @@
 import { toGbifSpatialRegion } from "../externalSources/regions";
 import { mapOccurrencesToFeatures } from "./mapOccurrenceToFeature";
+import {
+  gbifFetch,
+  notifyGbifRateLimit,
+  parseGbifRetryAfterMs
+} from "./gbifRequestQueue";
 
 const GBIF_OCCURRENCE_SEARCH_URL = "https://api.gbif.org/v1/occurrence/search";
 export const GBIF_PAGE_SIZE = 300;
@@ -8,8 +13,11 @@ export const GBIF_MAP_UPDATE_PAGES = 80;
 /** Одновременных page-запросов внутри одной серии (осторожный параллелизм). */
 export const GBIF_PAGE_CONCURRENCY = 3;
 const FETCH_RETRY_COUNT = 2;
+const FETCH_RATE_LIMIT_RETRY_COUNT = 5;
 const FETCH_RETRY_DELAY_MS = 700;
-const FETCH_RETRY_429_DELAY_MS = 1500;
+const FETCH_RETRY_429_DELAY_MS = 2000;
+const PAGE_SURVIVE_ROUNDS = 3;
+const PAGE_SURVIVE_DELAY_MS = 5000;
 
 /** Отмена запроса (в т.ч. когда браузер вместо AbortError отдаёт Failed to fetch). */
 export function isGbifAbortError(error, signal) {
@@ -34,6 +42,10 @@ export function getGbifNetworkErrorMessage(error) {
     /failed to fetch|networkerror|load failed|network request failed/i.test(message)
   ) {
     return "Не удалось связаться с GBIF. Проверьте интернет и попробуйте ещё раз.";
+  }
+
+  if (error?.status === 429 || error?.status === 503) {
+    return "GBIF временно перегружен. Подождите и попробуйте ещё раз.";
   }
 
   return message || "Не удалось загрузить данные GBIF";
@@ -73,23 +85,12 @@ function isRetryableHttpStatus(status) {
   return status === 429 || status === 503 || (status >= 500 && status < 600);
 }
 
-function parseRetryAfterMs(response) {
-  const raw = response.headers?.get?.("Retry-After");
-  if (!raw) {
-    return null;
-  }
+function isRateLimitedStatus(status) {
+  return status === 429 || status === 503;
+}
 
-  const asSeconds = Number(raw);
-  if (Number.isFinite(asSeconds) && asSeconds >= 0) {
-    return asSeconds * 1000;
-  }
-
-  const asDate = Date.parse(raw);
-  if (!Number.isNaN(asDate)) {
-    return Math.max(0, asDate - Date.now());
-  }
-
-  return null;
+function retryLimitForStatus(status) {
+  return isRateLimitedStatus(status) ? FETCH_RATE_LIMIT_RETRY_COUNT : FETCH_RETRY_COUNT;
 }
 
 function createHttpError(status, statusText, retryAfterMs = null) {
@@ -143,14 +144,17 @@ export function buildOccurrenceSearchParams(region, extras = {}) {
 }
 
 /**
- * Запрашивает одну страницу occurrence/search (с короткими повторами при
- * сетевом сбое, 429 и 5xx). onRateLimited вызывается при ответе 429.
+ * Запрашивает одну страницу occurrence/search (повторы при сетевом сбое, 429 и 5xx).
+ * onRateLimited — 429 и 503; onOverloaded — пауза перед повтором из-за перегруза.
  */
-export async function fetchOccurrencePage(params, { signal, onRateLimited } = {}) {
+export async function fetchOccurrencePage(
+  params,
+  { signal, onRateLimited, onOverloaded, maxRetries = null } = {}
+) {
   const url = `${GBIF_OCCURRENCE_SEARCH_URL}?${params.toString()}`;
   let lastError = null;
 
-  for (let attempt = 0; attempt <= FETCH_RETRY_COUNT; attempt += 1) {
+  for (let attempt = 0; attempt <= FETCH_RATE_LIMIT_RETRY_COUNT; attempt += 1) {
     if (signal?.aborted) {
       const abortError = new Error("Aborted");
       abortError.name = "AbortError";
@@ -158,10 +162,10 @@ export async function fetchOccurrencePage(params, { signal, onRateLimited } = {}
     }
 
     try {
-      const response = await fetch(url, { signal, mode: "cors", credentials: "omit" });
+      const response = await gbifFetch(url, { signal });
 
       if (!response.ok) {
-        const retryAfterMs = parseRetryAfterMs(response);
+        const retryAfterMs = parseGbifRetryAfterMs(response);
         throw createHttpError(response.status, response.statusText, retryAfterMs);
       }
 
@@ -176,21 +180,23 @@ export async function fetchOccurrencePage(params, { signal, onRateLimited } = {}
       lastError = error;
       const status = error?.status;
       const retryableHttp = typeof status === "number" && isRetryableHttpStatus(status);
-      const retryable =
-        isRetryableNetworkError(error) || retryableHttp;
+      const retryable = isRetryableNetworkError(error) || retryableHttp;
+      const defaultLimit = retryLimitForStatus(status);
+      const maxAttempts = typeof maxRetries === "number" ? maxRetries : defaultLimit;
 
-      if (!retryable || attempt >= FETCH_RETRY_COUNT) {
+      if (!retryable || attempt >= maxAttempts) {
         throw error;
       }
 
-      if (status === 429) {
+      if (isRateLimitedStatus(status)) {
         onRateLimited?.();
+        onOverloaded?.();
+        notifyGbifRateLimit(error.retryAfterMs ?? FETCH_RETRY_429_DELAY_MS * (attempt + 1));
       }
 
-      const delayMs =
-        status === 429
-          ? error.retryAfterMs ?? FETCH_RETRY_429_DELAY_MS * (attempt + 1)
-          : FETCH_RETRY_DELAY_MS * (attempt + 1);
+      const delayMs = isRateLimitedStatus(status)
+        ? error.retryAfterMs ?? FETCH_RETRY_429_DELAY_MS * (attempt + 1)
+        : FETCH_RETRY_DELAY_MS * (attempt + 1);
       await wait(delayMs, signal);
     }
   }
@@ -208,8 +214,15 @@ export async function previewOccurrenceCount(region, { signal, extras = {} } = {
     limit: 0,
     offset: 0
   });
-  const page = await fetchOccurrencePage(params, { signal });
-  return typeof page.count === "number" ? page.count : null;
+  try {
+    const page = await fetchOccurrencePage(params, { signal, maxRetries: 1 });
+    return typeof page.count === "number" ? page.count : null;
+  } catch (error) {
+    if (isGbifAbortError(error, signal) || error?.name === "AbortError") {
+      throw error;
+    }
+    return null;
+  }
 }
 
 /** yyyy-MM-dd для параметров дат GBIF. */
@@ -277,8 +290,8 @@ function throwIfAborted(signal) {
  * softLimit — мягкая отсечка по offset (для серийной загрузки): дальше пагинация GBIF
  * сильно замедляется, серию лучше дробить (годы → месяцы).
  *
- * Страницы запрашиваются пулом (по умолчанию 3); в store/UI отдаются строго по возрастанию offset.
- * При 429 concurrency временно падает до 1 до конца серии.
+ * Страницы запрашиваются пулом (по умолчанию 2); в store/UI отдаются строго по возрастанию offset.
+ * При 429/503 concurrency временно падает до 1; страница повторяется с паузой, без abort всей загрузки.
  */
 export async function loadOccurrencesForRegion(
   region,
@@ -286,6 +299,7 @@ export async function loadOccurrencesForRegion(
     signal,
     onPage,
     onProgress,
+    onOverloaded,
     pageSize = GBIF_PAGE_SIZE,
     extras = {},
     softLimit = null,
@@ -311,6 +325,46 @@ export async function loadOccurrencesForRegion(
     effectiveConcurrency = 1;
   };
 
+  const fetchPageAtOffset = async (offset) => {
+    const params = buildOccurrenceSearchParams(region, {
+      ...extras,
+      limit: pageSize,
+      offset
+    });
+    let lastError = null;
+    for (let round = 0; round <= PAGE_SURVIVE_ROUNDS; round += 1) {
+      try {
+        const page = await fetchOccurrencePage(params, {
+          signal,
+          onRateLimited: markRateLimited,
+          onOverloaded
+        });
+        const features = mapOccurrencesToFeatures(page.results ?? []);
+        const endOfRecords =
+          Boolean(page.endOfRecords) || !(page.results?.length);
+        return {
+          offset,
+          features,
+          count: typeof page.count === "number" ? page.count : null,
+          endOfRecords
+        };
+      } catch (error) {
+        lastError = error;
+        if (isGbifAbortError(error, signal)) {
+          throw error;
+        }
+        if (!isRateLimitedStatus(error?.status) || round >= PAGE_SURVIVE_ROUNDS) {
+          throw error;
+        }
+        markRateLimited();
+        onOverloaded?.();
+        notifyGbifRateLimit(error.retryAfterMs ?? PAGE_SURVIVE_DELAY_MS);
+        await wait(error.retryAfterMs ?? PAGE_SURVIVE_DELAY_MS * (round + 1), signal);
+      }
+    }
+    throw lastError;
+  };
+
   const canScheduleMore = () =>
     nextFetchOffset < fetchLimit && !signal?.aborted;
 
@@ -322,26 +376,7 @@ export async function loadOccurrencesForRegion(
     const offset = nextFetchOffset;
     nextFetchOffset += pageSize;
 
-    const task = (async () => {
-      const params = buildOccurrenceSearchParams(region, {
-        ...extras,
-        limit: pageSize,
-        offset
-      });
-      const page = await fetchOccurrencePage(params, {
-        signal,
-        onRateLimited: markRateLimited
-      });
-      const features = mapOccurrencesToFeatures(page.results ?? []);
-      const endOfRecords =
-        Boolean(page.endOfRecords) || !(page.results?.length);
-      return {
-        offset,
-        features,
-        count: typeof page.count === "number" ? page.count : null,
-        endOfRecords
-      };
-    })()
+    const task = fetchPageAtOffset(offset)
       .then((result) => {
         ready.set(offset, result);
       })

@@ -35,6 +35,26 @@
   min-width: 0;
 }
 
+.submission-autocomplete-dropdown {
+  box-sizing: border-box;
+  z-index: 30;
+}
+
+.submission-autocomplete-dropdown.submission-autocomplete-suggestions--portal {
+  top: auto;
+  bottom: auto;
+  left: auto;
+  right: auto;
+}
+
+.submission-autocomplete-dropdown-footer {
+  padding: 6px 8px 8px;
+}
+
+.submission-autocomplete-add-btn {
+  width: 100%;
+}
+
 .submission-autocomplete-suggestion {
   padding: 6px 10px;
   font-size: 13px;

@@ -69,6 +69,7 @@ export default function SubmissionAutocompleteInput({
   wrapClassName = "submission-autocomplete-wrap",
   listClassName = "submission-autocomplete-suggestions",
   listClassNameActive = "submission-autocomplete-suggestion--active",
+  dropdownClassName = "",
   disabled = false,
   type = "text",
   min,
@@ -79,6 +80,8 @@ export default function SubmissionAutocompleteInput({
   placeholder,
   multiSelect = false,
   selectedSuggestionKeys = [],
+  onCommitSelected,
+  commitSelectedLabel = "Добавить",
   "aria-label": ariaLabel
 }) {
   const [open, setOpen] = useState(false);
@@ -187,49 +190,73 @@ export default function SubmissionAutocompleteInput({
   const listPlacementClass =
     placement === "drop-up" ? " submission-autocomplete-suggestions--drop-up" : "";
   const portalClass = usePortal ? " submission-autocomplete-suggestions--portal" : "";
+  const selectedCount = selectedKeySet.size;
 
   const suggestionsList = showSuggestions ? (
-    <ul
+    <div
       id={listboxId}
-      className={`${listClassName}${listPlacementClass}${portalClass}`}
+      className={`submission-autocomplete-dropdown${portalClass}${
+        dropdownClassName ? ` ${dropdownClassName}` : ""
+      }`}
       style={usePortal ? portalStyle ?? undefined : undefined}
-      role="listbox"
     >
-      {filteredSuggestions.map((suggestion, index) => {
-        const selected = selectedKeySet.has(String(getKey(suggestion, index)));
-        return (
-        <li
-          key={getKey(suggestion, index)}
-          role="option"
-          aria-selected={multiSelect ? selected : index === activeIndex}
-          className={`submission-autocomplete-suggestion${
-            index === activeIndex ? ` ${listClassNameActive}` : ""
-          }${multiSelect && selected ? " submission-autocomplete-suggestion--checked" : ""}`}
-          onMouseDown={(event) => event.preventDefault()}
-          onMouseEnter={() => setActiveIndex(index)}
-          onClick={() => handleSelect(suggestion)}
-        >
-          {multiSelect ? (
-            <span className="submission-autocomplete-suggestion-row">
-              {renderSuggestion ? renderSuggestion(suggestion) : getLabel(suggestion)}
-              <input
-                type="checkbox"
-                className="submission-autocomplete-suggestion-check"
-                checked={selected}
-                readOnly
-                tabIndex={-1}
-                aria-hidden="true"
-              />
-            </span>
-          ) : renderSuggestion ? (
-            renderSuggestion(suggestion)
-          ) : (
-            getLabel(suggestion)
-          )}
-        </li>
-        );
-      })}
-    </ul>
+      <ul
+        className={`${listClassName}${listPlacementClass}`}
+        role="listbox"
+      >
+        {filteredSuggestions.map((suggestion, index) => {
+          const selected = selectedKeySet.has(String(getKey(suggestion, index)));
+          return (
+          <li
+            key={getKey(suggestion, index)}
+            role="option"
+            aria-selected={multiSelect ? selected : index === activeIndex}
+            className={`submission-autocomplete-suggestion${
+              index === activeIndex ? ` ${listClassNameActive}` : ""
+            }${multiSelect && selected ? " submission-autocomplete-suggestion--checked" : ""}`}
+            onMouseDown={(event) => event.preventDefault()}
+            onMouseEnter={() => setActiveIndex(index)}
+            onClick={() => handleSelect(suggestion)}
+          >
+            {multiSelect ? (
+              <span className="submission-autocomplete-suggestion-row">
+                {renderSuggestion ? renderSuggestion(suggestion) : getLabel(suggestion)}
+                <input
+                  type="checkbox"
+                  className="submission-autocomplete-suggestion-check"
+                  checked={selected}
+                  readOnly
+                  tabIndex={-1}
+                  aria-hidden="true"
+                />
+              </span>
+            ) : renderSuggestion ? (
+              renderSuggestion(suggestion)
+            ) : (
+              getLabel(suggestion)
+            )}
+          </li>
+          );
+        })}
+      </ul>
+      {multiSelect && onCommitSelected ? (
+        <div className="submission-autocomplete-dropdown-footer">
+          <button
+            type="button"
+            className="gbif-panel-btn submission-autocomplete-add-btn"
+            disabled={selectedCount === 0}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              onCommitSelected();
+              setOpen(false);
+            }}
+          >
+            {commitSelectedLabel}
+            {selectedCount > 0 ? ` (${selectedCount})` : ""}
+          </button>
+        </div>
+      ) : null}
+    </div>
   ) : null;
 
   return (

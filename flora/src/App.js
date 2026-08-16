@@ -204,6 +204,7 @@ import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
+import MapZoomControl from "./components/MapZoomControl";
 import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
 import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
@@ -3286,7 +3287,8 @@ export default function MapView() {
     }
   }, [popupData, mapReady]);
 
-  const handleExternalDataChange = useCallback(() => {
+  const handleExternalDataChange = useCallback((detail = {}) => {
+    const source = detail?.source;
     clearArealDynamicsSliceCache();
     syncYearBounds();
     bumpPointsDataRevision();
@@ -3295,9 +3297,15 @@ export default function MapView() {
       return;
     }
 
-    applyGbifLocationsFilter(map.current, locationFilters);
-    applyInatLocationsFilter(map.current, locationFilters);
-    setTempLayersData(map.current);
+    if (!source || source === "gbif") {
+      applyGbifLocationsFilter(map.current, locationFilters);
+    }
+    if (!source || source === "inat") {
+      applyInatLocationsFilter(map.current, locationFilters);
+    }
+    if (source === "temp") {
+      setTempLayersData(map.current);
+    }
     updateHeatmapData(map.current, locationFilters);
     refreshAreal();
   }, [mapReady, locationFilters, refreshAreal, syncYearBounds, bumpPointsDataRevision]);
@@ -5830,6 +5838,7 @@ export default function MapView() {
         bottomOccupyPx={timelineBottomOccupyPx}
         onOpenPanel={handleOpenExternalLoadPanel}
       />
+      <MapZoomControl map={mapReady ? map.current : null} />
       <MapCornerControls
         activeFilters={activeMapFilters}
         onFiltersReset={handleMapFiltersReset}

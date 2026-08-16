@@ -260,7 +260,6 @@ export function upsertTempLayerStagingFeatures(features, regionId) {
     if (regionId && !staging.regionIds.includes(regionId)) {
       staging.regionIds = [...staging.regionIds, regionId];
     }
-    emit();
     return { added: 0 };
   }
 
@@ -281,7 +280,6 @@ export function upsertTempLayerStagingFeatures(features, regionId) {
     staging.regionIds = [...staging.regionIds, regionId];
   }
 
-  emit();
   return { added };
 }
 

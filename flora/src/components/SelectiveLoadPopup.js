@@ -14,7 +14,8 @@ import {
   startGbifExternalLoad,
   startInatExternalLoad,
   cancelGbifExternalLoad,
-  cancelInatExternalLoad
+  cancelInatExternalLoad,
+  subscribeExternalSourcesLoad
 } from "../externalSources/externalSourcesLoadManager";
 import {
   EXTERNAL_REGIONS,
@@ -25,7 +26,10 @@ import {
   createEmptyRegionTaxonCountMap,
   fetchRegionTaxonCounts
 } from "../externalSources/fetchRegionKingdomPreviews";
-import TaxonLoadPicker from "./TaxonLoadPicker";
+import TaxonLoadPicker, {
+  splitTaxonQueryNames,
+  suggestionLabel
+} from "./TaxonLoadPicker";
 import {
   getTempLayerStagingCount,
   commitTempLayerStaging
@@ -108,6 +112,17 @@ function toBundleTaxon(taxa) {
   };
 }
 
+function countSettledRegions(countMap, regions) {
+  let settled = 0;
+  regions.forEach((region) => {
+    const status = countMap[region.id]?.status;
+    if (status === "ready" || status === "error" || status === "unavailable") {
+      settled += 1;
+    }
+  });
+  return settled;
+}
+
 function sumRegionCounts(countMap, regions) {
   let sum = 0;
   let any = false;
@@ -134,7 +149,6 @@ export default function SelectiveLoadPopup({
   const [source, setSource] = useState(SOURCE_GBIF);
   const [mode, setMode] = useState(TAXON_LOAD_MODES.SPECIES);
   const [query, setQuery] = useState("");
-  const [suggestion, setSuggestion] = useState(null);
   const [selectedSuggestions, setSelectedSuggestions] = useState([]);
   const [resolvedTaxa, setResolvedTaxa] = useState([]);
   const [resolvedTaxon, setResolvedTaxon] = useState(null);
@@ -148,6 +162,7 @@ export default function SelectiveLoadPopup({
   const [searching, setSearching] = useState(false);
   const [busyRegionId, setBusyRegionId] = useState(null);
   const [datasetRevision, setDatasetRevision] = useState(0);
+  const [sourcesLoading, setSourcesLoading] = useState(() => isExternalSourcesLoadActive());
   const searchAbortRef = useRef(null);
 
   const isInat = source === SOURCE_INAT;
@@ -168,10 +183,22 @@ export default function SelectiveLoadPopup({
     setSearchStatus((status) => (status === "loading" ? "idle" : status));
   }, []);
 
+  const abortCountSearch = useCallback(() => {
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
+    setSearching(false);
+  }, []);
+
   const handleClose = useCallback(() => {
     stopSearch();
     onClose?.();
   }, [onClose, stopSearch]);
+
+  useEffect(() => {
+    return subscribeExternalSourcesLoad((snap) => {
+      setSourcesLoading(Boolean(snap?.gbif?.loading || snap?.inat?.loading));
+    });
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -210,9 +237,14 @@ export default function SelectiveLoadPopup({
       ? totalInat
       : totalGbif;
 
+  const searchGbifDone = countSettledRegions(gbifCounts, gbifRegions);
+  const searchInatDone = countSettledRegions(inatCounts, inatRegions);
+  const searchCountsGbif = source === SOURCE_GBIF || source === SOURCE_ALL;
+  const searchCountsInat = source === SOURCE_INAT || source === SOURCE_ALL;
+
   const runSearch = useCallback(async () => {
-    const q = query.trim();
-    if (selectedSuggestions.length === 0 && q.length < 2) {
+    const names = splitTaxonQueryNames(query);
+    if (selectedSuggestions.length === 0 && names.length === 0) {
       onLoadError?.("Введите название таксона");
       return;
     }
@@ -227,34 +259,46 @@ export default function SelectiveLoadPopup({
     onLoadError?.(null);
 
     try {
-      const seeds = selectedSuggestions.length
-        ? selectedSuggestions
-        : [suggestion].filter(Boolean);
+      const selectedByName = new Map(
+        selectedSuggestions.map((item) => [suggestionLabel(item).toLowerCase(), item])
+      );
+      const seeds = [];
+      const seen = new Set();
+
+      names.forEach((name) => {
+        const key = name.toLowerCase();
+        if (seen.has(key)) {
+          return;
+        }
+        seen.add(key);
+        seeds.push(selectedByName.get(key) || { scientificName: name });
+      });
+
+      selectedSuggestions.forEach((item) => {
+        const key = suggestionLabel(item).toLowerCase();
+        if (!key || seen.has(key)) {
+          return;
+        }
+        seen.add(key);
+        seeds.push(item);
+      });
+
       const taxa = [];
 
-      if (seeds.length) {
-        for (const item of seeds) {
-          const gbif = await resolveGbifLoadTaxon(
-            {
-              mode,
-              suggestion: item,
-              query: item.scientificName || item.family || q
-            },
-            { signal: controller.signal }
-          );
-          if (!gbif) {
-            continue;
-          }
-          taxa.push(await attachInatTaxonId(gbif, { signal: controller.signal }));
-        }
-      } else {
+      for (const item of seeds) {
+        const hasKey = item?.taxonKey != null || item?.familyKey != null;
         const gbif = await resolveGbifLoadTaxon(
-          { mode, suggestion, query: q },
+          {
+            mode,
+            suggestion: hasKey ? item : null,
+            query: suggestionLabel(item) || item.scientificName || item.family || ""
+          },
           { signal: controller.signal }
         );
-        if (gbif) {
-          taxa.push(await attachInatTaxonId(gbif, { signal: controller.signal }));
+        if (!gbif) {
+          continue;
         }
+        taxa.push(await attachInatTaxonId(gbif, { signal: controller.signal }));
       }
 
       if (!taxa.length) {
@@ -272,6 +316,7 @@ export default function SelectiveLoadPopup({
       const bundle = toBundleTaxon(taxa);
       setResolvedTaxa(taxa);
       setResolvedTaxon(bundle);
+      setSearchStatus("ready");
 
       for (const taxon of taxa) {
         if (controller.signal.aborted) {
@@ -323,7 +368,7 @@ export default function SelectiveLoadPopup({
         setSearching(false);
       }
     }
-  }, [mode, onLoadError, query, selectedSuggestions, source, suggestion]);
+  }, [mode, onLoadError, query, selectedSuggestions, source]);
 
   const loadOneRegion = useCallback(
     async (region, sourceId) => {
@@ -334,7 +379,6 @@ export default function SelectiveLoadPopup({
 
       const bundleTaxon = toBundleTaxon(taxa);
       const bundleKey = taxaBundleKey(sourceId, taxa);
-      const usePreview = taxa.length === 1;
 
       if (sourceId === SOURCE_INAT && !toInatSpatialRegion(region)) {
         return;
@@ -349,7 +393,7 @@ export default function SelectiveLoadPopup({
             continue;
           }
           const extras = { taxon_id: taxon.inatTaxonId };
-          const previewCount = usePreview ? inatCounts[region.id]?.count ?? null : null;
+          const previewCount = inatCounts[region.id]?.count ?? null;
           const querySnapshot = {
             ...buildLoadQuery(region.id, taxon),
             qualityGrade: INAT_QUALITY_MODES.RESEARCH
@@ -373,7 +417,7 @@ export default function SelectiveLoadPopup({
           kingdomId: taxon.kingdomId || "",
           extras: buildGbifLoadExtras(taxon),
           query: buildLoadQuery(region.id, taxon),
-          previewCount: usePreview ? gbifCounts[region.id]?.count ?? null : null,
+          previewCount: gbifCounts[region.id]?.count ?? null,
           intoTempStaging: true,
           taxon: bundleTaxon,
           bundleKey
@@ -402,9 +446,10 @@ export default function SelectiveLoadPopup({
 
   const runRegionLoad = useCallback(
     async (region) => {
-      if (!map || isExternalSourcesLoadActive() || busyRegionId) {
+      if (!map || sourcesLoading || loading || busyRegionId) {
         return;
       }
+      abortCountSearch();
       setBusyRegionId(region.id);
       onLoadError?.(null);
       try {
@@ -419,19 +464,21 @@ export default function SelectiveLoadPopup({
           await loadOneRegion(region, isInat ? SOURCE_INAT : SOURCE_GBIF);
         }
         setDatasetRevision((value) => value + 1);
+        onTempLayersChange?.();
       } catch (error) {
         onLoadError?.(error?.message || "Не удалось выполнить загрузку");
       } finally {
         setBusyRegionId(null);
       }
     },
-    [busyRegionId, commitStagingIfAny, isAll, isInat, loadOneRegion, map, onLoadError, onTempLayersChange]
+    [abortCountSearch, busyRegionId, commitStagingIfAny, isAll, isInat, loadOneRegion, loading, map, onLoadError, onTempLayersChange, sourcesLoading]
   );
 
   const runLoadAll = useCallback(async () => {
-    if (!map || isExternalSourcesLoadActive() || busyRegionId || !resolvedTaxon) {
+    if (!map || sourcesLoading || loading || busyRegionId || !resolvedTaxon) {
       return;
     }
+    abortCountSearch();
     onLoadError?.(null);
     try {
       if (isAll) {
@@ -445,6 +492,7 @@ export default function SelectiveLoadPopup({
         await loadRegionsForSource(isInat ? SOURCE_INAT : SOURCE_GBIF, availableRegions);
       }
       setDatasetRevision((value) => value + 1);
+      onTempLayersChange?.();
     } catch (error) {
       onLoadError?.(error?.message || "Не удалось выполнить загрузку");
       setDatasetRevision((value) => value + 1);
@@ -452,6 +500,7 @@ export default function SelectiveLoadPopup({
       setBusyRegionId(null);
     }
   }, [
+    abortCountSearch,
     availableRegions,
     busyRegionId,
     commitStagingIfAny,
@@ -460,16 +509,19 @@ export default function SelectiveLoadPopup({
     isAll,
     isInat,
     loadRegionsForSource,
+    loading,
     map,
     onLoadError,
     onTempLayersChange,
-    resolvedTaxon
+    resolvedTaxon,
+    sourcesLoading
   ]);
 
   const saveToTempLayer = useCallback(async () => {
-    if (!map || isExternalSourcesLoadActive() || busyRegionId || !resolvedTaxon) {
+    if (!map || sourcesLoading || loading || busyRegionId || !resolvedTaxon) {
       return;
     }
+    abortCountSearch();
 
     onLoadError?.(null);
     try {
@@ -501,6 +553,7 @@ export default function SelectiveLoadPopup({
       setBusyRegionId(null);
     }
   }, [
+    abortCountSearch,
     availableRegions,
     busyRegionId,
     commitStagingIfAny,
@@ -509,10 +562,12 @@ export default function SelectiveLoadPopup({
     isAll,
     isInat,
     loadRegionsForSource,
+    loading,
     map,
     onLoadError,
     onTempLayersChange,
-    resolvedTaxon
+    resolvedTaxon,
+    sourcesLoading
   ]);
 
   if (!open) {
@@ -522,12 +577,9 @@ export default function SelectiveLoadPopup({
   const seriesLabel =
     loadSnapshot?.gbif?.seriesLabel || loadSnapshot?.inat?.seriesLabel || null;
   const showTable = searchStatus === "ready" || searchStatus === "loading";
+  const loadBusy = Boolean(busyRegionId) || sourcesLoading || loading;
   const canLoad =
-    Boolean(map) &&
-    Boolean(resolvedTaxon) &&
-    searchStatus === "ready" &&
-    !busyRegionId &&
-    !isExternalSourcesLoadActive();
+    Boolean(map) && Boolean(resolvedTaxon) && searchStatus === "ready" && !loadBusy;
 
   return (
     <div className="regions-load-overlay" onClick={handleClose}>
@@ -570,7 +622,6 @@ export default function SelectiveLoadPopup({
               setResolvedTaxon(null);
               setResolvedTaxa([]);
             }}
-            onSuggestionChange={setSuggestion}
             selectedSuggestions={selectedSuggestions}
             onSelectedSuggestionsChange={setSelectedSuggestions}
             searchPrefix={
@@ -620,12 +671,21 @@ export default function SelectiveLoadPopup({
             <button
               type="button"
               className="gbif-panel-btn selective-load-search-btn"
-              disabled={searching || (query.trim().length < 2 && selectedSuggestions.length === 0)}
-              aria-label="Поиск"
-              title="Поиск"
+              disabled={
+                searching ||
+                (splitTaxonQueryNames(query).every((name) => name.length < 2) &&
+                  selectedSuggestions.length === 0)
+              }
+              aria-label={searching ? "Идёт поиск" : "Поиск"}
+              title={searching ? "Идёт поиск" : "Поиск"}
+              aria-busy={searching}
               onClick={runSearch}
             >
-              {searching ? <span aria-hidden="true">…</span> : <SearchIcon className="regions-load-action-icon" aria-hidden="true" focusable="false" />}
+              {searching ? (
+                <span className="selective-load-search-btn-spinner" aria-hidden="true" />
+              ) : (
+                <SearchIcon className="regions-load-action-icon" aria-hidden="true" focusable="false" />
+              )}
             </button>
             }
           />
@@ -647,7 +707,38 @@ export default function SelectiveLoadPopup({
           </p>
         )}
 
-        {loading ? (
+        {searching ? (
+          <div className="selective-load-search-status" role="status" aria-live="polite">
+            <span className="selective-load-search-btn-spinner" aria-hidden="true" />
+            <div className="selective-load-search-status-text">
+              <p className="selective-load-search-status-title">Идёт поиск</p>
+              <p className="selective-load-search-status-detail">
+                {!resolvedTaxon
+                  ? "Сопоставляем таксон в GBIF…"
+                  : searchCountsGbif && searchCountsInat
+                    ? `Считаем точки по регионам · GBIF ${searchGbifDone} из ${gbifRegions.length} · iNat ${searchInatDone} из ${inatRegions.length}`
+                    : searchCountsInat
+                      ? `Считаем точки по регионам · ${searchInatDone} из ${inatRegions.length}`
+                      : `Считаем точки по регионам · ${searchGbifDone} из ${gbifRegions.length}`}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="gbif-panel-btn gbif-panel-btn--secondary"
+              onClick={() => {
+                if (resolvedTaxon) {
+                  abortCountSearch();
+                  return;
+                }
+                stopSearch();
+              }}
+            >
+              Отменить поиск
+            </button>
+          </div>
+        ) : null}
+
+        {loading || sourcesLoading ? (
           <div className="regions-load-progress">
             <p className="regions-load-progress-text">
               Идёт загрузка
@@ -657,6 +748,22 @@ export default function SelectiveLoadPopup({
               …
               {seriesLabel ? ` (${seriesLabel})` : ""}
             </p>
+            {loadSnapshot?.gbif?.loading ? (
+              <p className="regions-load-progress-counts">
+                GBIF: {formatCount(loadSnapshot.gbif.fetched)}
+                {typeof loadSnapshot.gbif.total === "number"
+                  ? ` из ${formatCount(loadSnapshot.gbif.total)}`
+                  : " получено"}
+              </p>
+            ) : null}
+            {loadSnapshot?.inat?.loading ? (
+              <p className="regions-load-progress-counts">
+                iNat: {formatCount(loadSnapshot.inat.fetched)}
+                {typeof loadSnapshot.inat.total === "number"
+                  ? ` из ${formatCount(loadSnapshot.inat.total)}`
+                  : " получено"}
+              </p>
+            ) : null}
             <button
               type="button"
               className="gbif-panel-btn gbif-panel-btn--secondary"
