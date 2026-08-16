@@ -7,22 +7,20 @@ import RedBookSpeciesTablePopup from "./RedBookSpeciesTablePopup";
 import { matchRedBookOccurrences } from "../redbook/matchRedBookOccurrences";
 import { parseRedBookListAuto } from "../redbook/parseRedBookList";
 import {
-  clearRedBookMatches,
-  downloadJsonFile,
+  getRedBookLastSearchCollection,
   getRedBookList,
-  getRedBookListDocument,
   getRedBookMatches,
   getRedBookMatchStats,
   setRedBookList,
-  setRedBookMatches,
   setRedBookLastSearchResult
 } from "../redbook/redBookStore";
 import { getGbifFeatureCount } from "../gbif/gbifStore";
 import { getInatFeatureCount } from "../inaturalist/inatStore";
+import { getAllTempLayerFeatureCount } from "../tempLayers/tempLayerStore";
 import "../styles/RedBookSearchPanel.css";
 
 /**
- * Панель «Поиск редких видов»: загрузка списка латынь+статус и поиск в GBIF/iNat.
+ * Панель «Поиск редких видов»: загрузка списка и запись совпадений на слой «Красная книга».
  */
 export default function RedBookSearchPanel({
   collapsed: collapsedProp,
@@ -48,7 +46,7 @@ export default function RedBookSearchPanel({
   const [matchCount, setMatchCount] = useState(
     () => getRedBookMatches()?.features?.length ?? 0
   );
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState(null);
   const [message, setMessage] = useState(null);
   const [tableOpen, setTableOpen] = useState(false);
   const fileInputRef = useRef(null);
@@ -60,7 +58,8 @@ export default function RedBookSearchPanel({
 
   const sourceCounts = {
     gbif: getGbifFeatureCount(),
-    inat: getInatFeatureCount()
+    inat: getInatFeatureCount(),
+    temp: getAllTempLayerFeatureCount()
   };
 
   const applyParsedList = useCallback((parsed) => {
@@ -68,6 +67,7 @@ export default function RedBookSearchPanel({
     setParseSkipped(parsed.skipped ?? []);
     setSpecies(parsed.species ?? []);
     setRedBookList(parsed);
+    setRedBookLastSearchResult(null, null);
     setMatchStats(null);
     setTableOpen(false);
     setMessage(
@@ -111,31 +111,70 @@ export default function RedBookSearchPanel({
     [onMatchesReady]
   );
 
-  const handleMatch = useCallback(() => {
+  const handleSearch = useCallback(() => {
     if (!species.length) {
       setMessage("Сначала загрузите или разберите список видов");
       return;
     }
 
-    setBusy(true);
+    setBusyAction("search");
     setMessage(null);
 
     window.setTimeout(() => {
       try {
-        const list = getRedBookList();
-        const { collection, stats } = matchRedBookOccurrences(list);
+        const { collection, stats } = matchRedBookOccurrences(getRedBookList());
         setRedBookLastSearchResult(collection, stats);
-        setRedBookMatches(collection, { stats });
-        applyMatchResult(collection, stats);
+        setMatchStats(stats);
         setMessage(
           stats.pointCount > 0
             ? `Найдено ${stats.pointCount} точек (${stats.matchedSpeciesCount} видов)`
-            : "Совпадений в загруженных GBIF/iNat нет"
+            : "Совпадений в загруженных GBIF/iNat и временных слоях нет"
         );
       } catch (error) {
         setMessage(`Ошибка поиска: ${error?.message || "error"}`);
       } finally {
-        setBusy(false);
+        setBusyAction(null);
+      }
+    }, 0);
+  }, [species.length]);
+
+  const handleWriteToLayer = useCallback(() => {
+    if (!species.length) {
+      setMessage("Сначала загрузите или разберите список видов");
+      return;
+    }
+
+    setBusyAction("write");
+    setMessage(null);
+
+    window.setTimeout(() => {
+      try {
+        let collection = getRedBookLastSearchCollection();
+        let stats = getRedBookMatchStats();
+
+        if (!collection) {
+          const list = getRedBookList();
+          const result = matchRedBookOccurrences(list);
+          collection = result.collection;
+          stats = result.stats;
+          setRedBookLastSearchResult(collection, stats);
+        }
+
+        setMatchStats(stats ?? null);
+        const features = collection?.features ?? [];
+        if (features.length === 0) {
+          setMessage("Совпадений в загруженных GBIF/iNat и временных слоях нет");
+          return;
+        }
+
+        applyMatchResult(collection, stats);
+        setMessage(
+          `В слой «Красная книга» записано ${features.length} точ. (${stats?.matchedSpeciesCount ?? 0} вид.)`
+        );
+      } catch (error) {
+        setMessage(`Ошибка записи в слой: ${error?.message || "error"}`);
+      } finally {
+        setBusyAction(null);
       }
     }, 0);
   }, [applyMatchResult, species.length]);
@@ -144,8 +183,8 @@ export default function RedBookSearchPanel({
     setMatchStats(stats ?? null);
     setMessage(
       stats?.pointCount > 0
-        ? `Найдено ${stats.pointCount} точек (${stats.matchedSpeciesCount} видов). Добавьте виды в слой из таблицы.`
-        : "Совпадений в загруженных GBIF/iNat нет"
+        ? `Найдено ${stats.pointCount} точек (${stats.matchedSpeciesCount} видов). Запишите их в слой или добавьте виды из таблицы.`
+        : "Совпадений в загруженных GBIF/iNat и временных слоях нет"
     );
   }, []);
 
@@ -158,22 +197,6 @@ export default function RedBookSearchPanel({
     },
     [onAddSpeciesToLayer]
   );
-
-  const handleClearMatches = useCallback(() => {
-    clearRedBookMatches();
-    setMatchStats(null);
-    setMatchCount(0);
-    onMatchesReady?.({ type: "FeatureCollection", features: [] }, null);
-    setMessage("Слой совпадений очищен");
-  }, [onMatchesReady]);
-
-  const handleDownloadList = useCallback(() => {
-    downloadJsonFile("redBookList.json", getRedBookListDocument());
-  }, []);
-
-  const handleDownloadMatches = useCallback(() => {
-    downloadJsonFile("redBookMatches.json", getRedBookMatches());
-  }, []);
 
   const showInlinePreview = species.length === 1;
   const showTableButton = species.length > 1;
@@ -213,12 +236,13 @@ export default function RedBookSearchPanel({
           <div className="redbook-search-panel-content">
             <p className="redbook-search-panel-note">
               Загрузите список латинских названий (и статус, если есть). Поиск идёт
-              только по уже загруженным точкам GBIF и iNaturalist.
+              по уже загруженным точкам GBIF, iNaturalist и временных слоёв.
             </p>
 
             <div className="redbook-search-sources">
               <span>GBIF: {sourceCounts.gbif}</span>
               <span>iNat: {sourceCounts.inat}</span>
+              <span>Временные: {sourceCounts.temp}</span>
             </div>
 
             <label className="redbook-search-label" htmlFor="redbook-list-text">
@@ -303,23 +327,47 @@ export default function RedBookSearchPanel({
               </div>
             ) : null}
 
-            <div className="redbook-search-actions">
-              <button
-                type="button"
-                className="redbook-search-btn redbook-search-btn--primary"
-                onClick={handleMatch}
-                disabled={busy || species.length === 0}
-              >
-                {busy ? "Поиск…" : "Найти в GBIF / iNat"}
-              </button>
-              <button
-                type="button"
-                className="redbook-search-btn"
-                onClick={() => onShowMatchesLayer?.()}
-                disabled={matchCount === 0}
-              >
-                Показать слой
-              </button>
+            <div className="redbook-search-write">
+              <div className="redbook-search-actions redbook-search-actions--row">
+                <button
+                  type="button"
+                  className="redbook-search-btn redbook-search-btn--primary"
+                  onClick={handleSearch}
+                  disabled={Boolean(busyAction) || species.length === 0}
+                >
+                  {busyAction === "search" ? "Поиск…" : "Поиск"}
+                </button>
+                <button
+                  type="button"
+                  className="redbook-search-btn redbook-search-btn--primary"
+                  onClick={handleWriteToLayer}
+                  disabled={Boolean(busyAction) || species.length === 0}
+                >
+                  {busyAction === "write" ? "Запись…" : "Записать в слой"}
+                </button>
+                <button
+                  type="button"
+                  className="redbook-search-btn"
+                  onClick={() => onShowMatchesLayer?.()}
+                  disabled={matchCount === 0}
+                >
+                  Показать слой
+                </button>
+              </div>
+              <div className="redbook-search-write-meta" role="status">
+                <p>
+                  Найдено точек:{" "}
+                  {matchStats
+                    ? Number(matchStats.pointCount).toLocaleString("ru-RU")
+                    : "—"}
+                </p>
+                <p>
+                  Источник:{" "}
+                  {matchStats?.foundSources?.length
+                    ? matchStats.foundSources.join(", ")
+                    : "—"}
+                </p>
+              </div>
             </div>
 
             {matchStats ? (
@@ -329,7 +377,7 @@ export default function RedBookSearchPanel({
                 </p>
                 <p>
                   Точек: {matchStats.pointCount} (GBIF {matchStats.gbifPointCount}, iNat{" "}
-                  {matchStats.inatPointCount})
+                  {matchStats.inatPointCount}, врем. {matchStats.tempPointCount ?? 0})
                 </p>
                 {matchStats.unmatchedSpeciesCount > 0 ? (
                   <details className="redbook-search-unmatched">
@@ -348,28 +396,6 @@ export default function RedBookSearchPanel({
                 ) : null}
               </div>
             ) : null}
-
-            <div className="redbook-search-actions redbook-search-actions--secondary">
-              <button type="button" className="redbook-search-btn" onClick={handleDownloadList}>
-                Скачать список JSON
-              </button>
-              <button
-                type="button"
-                className="redbook-search-btn"
-                onClick={handleDownloadMatches}
-                disabled={matchCount === 0}
-              >
-                Скачать совпадения
-              </button>
-              <button
-                type="button"
-                className="redbook-search-btn"
-                onClick={handleClearMatches}
-                disabled={matchCount === 0}
-              >
-                Очистить слой
-              </button>
-            </div>
 
             {message ? (
               <p className="redbook-search-message" role="status">

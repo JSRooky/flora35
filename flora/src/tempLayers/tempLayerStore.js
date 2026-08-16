@@ -558,6 +558,24 @@ export function getVisibleTempLayerFeatures() {
   return getTempLayerFeatureGroups().flatMap((group) => group.features);
 }
 
+/** Все точки временных слоёв и staging, включая скрытые слои. */
+export function getAllTempLayerFeatures() {
+  const features = [];
+  if (Array.isArray(staging.features) && staging.features.length > 0) {
+    features.push(...staging.features);
+  }
+  layers.forEach((layer) => {
+    if (Array.isArray(layer?.features) && layer.features.length > 0) {
+      features.push(...layer.features);
+    }
+  });
+  return features;
+}
+
+export function getAllTempLayerFeatureCount() {
+  return getAllTempLayerFeatures().length;
+}
+
 /** Группы для кластеризации «по слоям»: одна единица на плашку (GBIF+iNat вместе). */
 export function getTempLayerPlaqueFeatureGroups() {
   const groups = [];
