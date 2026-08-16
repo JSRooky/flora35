@@ -1,0 +1,21 @@
+appId: com.flora35.app
+productName: Flora
+extends: null
+asar: true
+npmRebuild: false
+directories:
+  output: release
+files:
+  - package.json
+  - electron/**/*
+  - build/**/*
+  - "!node_modules/**"
+extraMetadata:
+  main: electron/main.js
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: Flora-Setup-${version}.${ext}
