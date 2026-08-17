@@ -182,6 +182,8 @@ export default function FeaturePopup({
   bufferDockedOpen = false,
   bufferDisabled = false,
   bufferDisabledTitle,
+  onOpenPolygon,
+  polygonDockedOpen = false,
   onLookupRussianName,
   onApplyRussianName,
   onClearRussianName,
@@ -701,6 +703,7 @@ export default function FeaturePopup({
                   images.length > 0 ||
                   onOpenAreal ||
                   onOpenBuffer ||
+                  onOpenPolygon ||
                   feature) && (
                   <div className="feature-popup-actions">
                     {descriptionPath && (
@@ -743,6 +746,16 @@ export default function FeaturePopup({
                         title={bufferDisabled ? bufferDisabledTitle : undefined}
                       >
                         Буфер
+                      </button>
+                    )}
+                    {onOpenPolygon && (
+                      <button
+                        type="button"
+                        className={`feature-popup-action-btn${polygonDockedOpen ? " feature-popup-action-btn--active" : ""}`}
+                        onClick={onOpenPolygon}
+                        aria-pressed={polygonDockedOpen}
+                      >
+                        Полигон
                       </button>
                     )}
                     <button

@@ -17,6 +17,7 @@ export const HELP_SECTION_LABELS = {
   "oopt-feature": "Сведения об ООПТ",
   submit: "Новая находка",
   "data-sources": "Источники данных",
+  "temp-archive": "Архив слоёв",
   "external-processing": "Обработка внешних данных",
   "data-work": "Работа с данными",
   redbook: "Красная книга",

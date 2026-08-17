@@ -147,6 +147,7 @@ import {
   getToolWithinFeature,
   getOoptWithinFeature,
   isOoptPointsFilterActive,
+  isPolygonToolActive,
   resolveToolPointsFilterModule
 } from "./components/getToolWithinFeature";
 import {
@@ -395,6 +396,8 @@ export default function MapView() {
   const [arealDockedWithFeature, setArealDockedWithFeature] = useState(false);
   // Буфер, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
   const [bufferDockedWithFeature, setBufferDockedWithFeature] = useState(false);
+  // Полигон, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
+  const [polygonDockedWithFeature, setPolygonDockedWithFeature] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [arealEnabled, setArealEnabled] = useState(false);
   const [arealAllMarkers, setArealAllMarkers] = useState(false);
@@ -877,10 +880,15 @@ export default function MapView() {
     if (bufferDockedWithFeature) {
       expandPanel(PANEL_IDS.BUFFER);
     }
+
+    if (polygonDockedWithFeature) {
+      expandPanel(PANEL_IDS.POLYGON);
+    }
   }, [
     activeModule,
     arealDockedWithFeature,
     bufferDockedWithFeature,
+    polygonDockedWithFeature,
     expandPanel,
     isPanelCollapsed,
     panelCollapsed
@@ -1106,12 +1114,22 @@ export default function MapView() {
     if (moduleId === MODULE_IDS.AREAL) {
       // Из меню «Радиус» открывается отдельно — панель точки не остаётся в стеке.
       setArealDockedWithFeature(false);
+      setPolygonDockedWithFeature(false);
       selectModule(moduleId);
       return;
     }
 
     if (moduleId === MODULE_IDS.BUFFER) {
       // Из меню «Буфер» открывается отдельно — панель точки не остаётся в стеке.
+      setBufferDockedWithFeature(false);
+      setPolygonDockedWithFeature(false);
+      selectModule(moduleId);
+      return;
+    }
+
+    if (moduleId === MODULE_IDS.POLYGON) {
+      setPolygonDockedWithFeature(false);
+      setArealDockedWithFeature(false);
       setBufferDockedWithFeature(false);
       selectModule(moduleId);
       return;
@@ -1121,12 +1139,14 @@ export default function MapView() {
       // Из меню «Область» открывается отдельно — панель точки не остаётся в стеке.
       setArealDockedWithFeature(false);
       setBufferDockedWithFeature(false);
+      setPolygonDockedWithFeature(false);
       selectModule(moduleId);
       return;
     }
 
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature(false);
+    setPolygonDockedWithFeature(false);
     selectModule(moduleId);
   }, [isArealApplied, isBufferApplied, toolPointsFilterEnabled]);
 
@@ -1137,6 +1157,7 @@ export default function MapView() {
 
     setActiveModule(MODULE_IDS.FEATURE);
     setBufferDockedWithFeature(false);
+    setPolygonDockedWithFeature(false);
     setArealDockedWithFeature((open) => !open);
   }, [isBufferApplied]);
 
@@ -1147,8 +1168,16 @@ export default function MapView() {
 
     setActiveModule(MODULE_IDS.FEATURE);
     setArealDockedWithFeature(false);
+    setPolygonDockedWithFeature(false);
     setBufferDockedWithFeature((open) => !open);
   }, [isArealApplied]);
+
+  const handleOpenPolygonFromFeature = useCallback(() => {
+    setActiveModule(MODULE_IDS.FEATURE);
+    setArealDockedWithFeature(false);
+    setBufferDockedWithFeature(false);
+    setPolygonDockedWithFeature((open) => !open);
+  }, []);
 
   const handleYearRangeChange = useCallback((nextRange) => {
     setYearRange((prev) =>
@@ -1216,6 +1245,21 @@ export default function MapView() {
     setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.TEMP_ARCHIVE]: false }));
     pinPanelsToTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
   }, [pinPanelsToTaskbar]);
+
+  const handleTempArchivePanelToggle = useCallback(() => {
+    if (tempArchivePanelOpen && !isPanelMinimized(PANEL_IDS.TEMP_ARCHIVE)) {
+      setTempArchivePanelOpen(false);
+      unpinPanelsFromTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
+      return;
+    }
+
+    handleOpenTempArchive();
+  }, [
+    handleOpenTempArchive,
+    isPanelMinimized,
+    tempArchivePanelOpen,
+    unpinPanelsFromTaskbar
+  ]);
 
   const handleTempLayerArchive = useCallback(
     async (layerId) => {
@@ -1414,7 +1458,8 @@ export default function MapView() {
   const polygonStateRef = useRef({});
   polygonStateRef.current = {
     polygonAddMode,
-    activeModule
+    activeModule,
+    polygonDockedWithFeature
   };
 
   const pointSelectionStateRef = useRef({});
@@ -1431,6 +1476,7 @@ export default function MapView() {
     polygonAddMode,
     arealDockedWithFeature,
     bufferDockedWithFeature,
+    polygonDockedWithFeature,
     activeModule,
     ooptPointsFilterEnabled: Boolean(toolPointsFilterEnabled[MODULE_IDS.OOPT])
   };
@@ -1592,9 +1638,10 @@ export default function MapView() {
     () =>
       resolveToolPointsFilterModule(activeModule, {
         arealDockedWithFeature,
-        bufferDockedWithFeature
+        bufferDockedWithFeature,
+        polygonDockedWithFeature
       }),
-    [activeModule, arealDockedWithFeature, bufferDockedWithFeature]
+    [activeModule, arealDockedWithFeature, bufferDockedWithFeature, polygonDockedWithFeature]
   );
 
   const bufferFilterFeatures = useMemo(() => {
@@ -1734,7 +1781,11 @@ export default function MapView() {
       ids.push(PANEL_IDS.SEASONALITY);
     }
 
-    if (activeModule === MODULE_IDS.POLYGON && !isMin(PANEL_IDS.POLYGON)) {
+    if (
+      (activeModule === MODULE_IDS.POLYGON ||
+        (activeModule === MODULE_IDS.FEATURE && polygonDockedWithFeature)) &&
+      !isMin(PANEL_IDS.POLYGON)
+    ) {
       ids.push(PANEL_IDS.POLYGON);
     }
 
@@ -1809,6 +1860,7 @@ export default function MapView() {
     arealDockedWithFeature,
     boundsSpeciesListOpen,
     bufferDockedWithFeature,
+    polygonDockedWithFeature,
     dataSourceMode,
     dataSourcesPanelOpen,
     tempArchivePanelOpen,
@@ -2621,11 +2673,11 @@ export default function MapView() {
   }, [builtSpeciesPolygons, intersectionSpeciesA, intersectionSpeciesB]);
 
   useEffect(() => {
-    if (activeModule !== MODULE_IDS.POLYGON) {
+    if (!isPolygonToolActive(activeModule, polygonDockedWithFeature)) {
       setPolygonAddMode(false);
       clearIntersectionState();
     }
-  }, [activeModule, clearIntersectionState]);
+  }, [activeModule, clearIntersectionState, polygonDockedWithFeature]);
 
   useEffect(() => {
     if (activeModule !== MODULE_IDS.TIMELINE) {
@@ -2972,11 +3024,6 @@ export default function MapView() {
   }, []);
 
   const handleOpenDataWorkTool = useCallback((toolId) => {
-    const closeArchive = () => {
-      setTempArchivePanelOpen(false);
-      unpinPanelsFromTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
-    };
-
     if (toolId === DATA_WORK_TOOL_IDS.NEAR_SPECIES_MATCHES) {
       if (map.current) {
         restoreUnattributedMapLayers(map.current, locationFilters);
@@ -2984,7 +3031,6 @@ export default function MapView() {
       unattributedCameraBeforeRef.current = null;
       setUnattributedPointsActive(false);
       setUndoMergedPointsActive(false);
-      closeArchive();
       setNearSpeciesMatchesActive(true);
     } else if (toolId === DATA_WORK_TOOL_IDS.UNATTRIBUTED_POINTS) {
       if (map.current) {
@@ -2993,7 +3039,6 @@ export default function MapView() {
       nearSpeciesCameraBeforeRef.current = null;
       setNearSpeciesMatchesActive(false);
       setUndoMergedPointsActive(false);
-      closeArchive();
       setUnattributedPointsActive(true);
     } else if (toolId === DATA_WORK_TOOL_IDS.UNDO_MERGED_POINTS) {
       if (map.current) {
@@ -3004,21 +3049,9 @@ export default function MapView() {
       unattributedCameraBeforeRef.current = null;
       setNearSpeciesMatchesActive(false);
       setUnattributedPointsActive(false);
-      closeArchive();
       setUndoMergedPointsActive(true);
-    } else if (toolId === DATA_WORK_TOOL_IDS.TEMP_ARCHIVE) {
-      if (map.current) {
-        restoreNearSpeciesMapLayers(map.current, locationFilters);
-        restoreUnattributedMapLayers(map.current, locationFilters);
-      }
-      nearSpeciesCameraBeforeRef.current = null;
-      unattributedCameraBeforeRef.current = null;
-      setNearSpeciesMatchesActive(false);
-      setUnattributedPointsActive(false);
-      setUndoMergedPointsActive(false);
-      handleOpenTempArchive();
     }
-  }, [handleOpenTempArchive, locationFilters, unpinPanelsFromTaskbar]);
+  }, [locationFilters]);
 
   const handleCloseNearSpeciesMatches = useCallback(() => {
     if (map.current) {
@@ -4571,6 +4604,7 @@ export default function MapView() {
       !state.polygonAddMode &&
       !state.arealDockedWithFeature &&
       !state.bufferDockedWithFeature &&
+      !state.polygonDockedWithFeature &&
       state.activeModule !== MODULE_IDS.FEATURE &&
       (!state.activeModule || state.activeModule === MODULE_IDS.POLYGON)
     ) {
@@ -4614,6 +4648,7 @@ export default function MapView() {
     });
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature(false);
+    setPolygonDockedWithFeature(false);
   }, []);
 
   const closePanel = useCallback(
@@ -4624,7 +4659,8 @@ export default function MapView() {
           unpinPanelsFromTaskbar([
             PANEL_IDS.FEATURE,
             PANEL_IDS.AREAL,
-            PANEL_IDS.BUFFER
+            PANEL_IDS.BUFFER,
+            PANEL_IDS.POLYGON
           ]);
           break;
         }
@@ -4646,6 +4682,17 @@ export default function MapView() {
           } else {
             setActiveModule((current) =>
               current === MODULE_IDS.BUFFER ? null : current
+            );
+          }
+          break;
+        }
+        case PANEL_IDS.POLYGON: {
+          unpinPanelsFromTaskbar([PANEL_IDS.POLYGON]);
+          if (polygonDockedWithFeature) {
+            setPolygonDockedWithFeature(false);
+          } else {
+            setActiveModule((current) =>
+              current === MODULE_IDS.POLYGON ? null : current
             );
           }
           break;
@@ -4702,8 +4749,7 @@ export default function MapView() {
           handleCloseNearSpeciesMatches();
           handleCloseUnattributedPoints();
           handleCloseUndoMergedPoints();
-          setTempArchivePanelOpen(false);
-          unpinPanelsFromTaskbar([PANEL_IDS.DATA_WORK, PANEL_IDS.TEMP_ARCHIVE]);
+          unpinPanelsFromTaskbar([PANEL_IDS.DATA_WORK]);
           setActiveModule((current) =>
             current === MODULE_IDS.DATA_WORK ? null : current
           );
@@ -4730,6 +4776,7 @@ export default function MapView() {
     [
       arealDockedWithFeature,
       bufferDockedWithFeature,
+      polygonDockedWithFeature,
       clearPointSelection,
       handleBoundsSpeciesListClose,
       handleCloseNearSpeciesMatches,
@@ -4926,10 +4973,10 @@ export default function MapView() {
               }
             }
 
-            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule, polygonDockedWithFeature: polygonDocked } =
               polygonStateRef.current;
 
-            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+            if (isPolygonToolActive(currentPolygonModule, polygonDocked) && addMode) {
               const nameLatin = feature.properties?.name_latin;
 
               setSpeciesPolygons((prev) =>
@@ -5049,10 +5096,10 @@ export default function MapView() {
               }
             }
 
-            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule, polygonDockedWithFeature: polygonDocked } =
               polygonStateRef.current;
 
-            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+            if (isPolygonToolActive(currentPolygonModule, polygonDocked) && addMode) {
               const nameLatin = feature.properties?.name_latin;
 
               setSpeciesPolygons((prev) =>
@@ -5146,10 +5193,10 @@ export default function MapView() {
               }
             }
 
-            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule, polygonDockedWithFeature: polygonDocked } =
               polygonStateRef.current;
 
-            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+            if (isPolygonToolActive(currentPolygonModule, polygonDocked) && addMode) {
               const nameLatin = feature.properties?.name_latin;
 
               setSpeciesPolygons((prev) =>
@@ -5219,10 +5266,10 @@ export default function MapView() {
               }
             }
 
-            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule, polygonDockedWithFeature: polygonDocked } =
               polygonStateRef.current;
 
-            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+            if (isPolygonToolActive(currentPolygonModule, polygonDocked) && addMode) {
               const nameLatin = feature.properties?.name_latin;
 
               setSpeciesPolygons((prev) =>
@@ -5292,10 +5339,10 @@ export default function MapView() {
               }
             }
 
-            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule, polygonDockedWithFeature: polygonDocked } =
               polygonStateRef.current;
 
-            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+            if (isPolygonToolActive(currentPolygonModule, polygonDocked) && addMode) {
               const nameLatin = feature.properties?.name_latin;
 
               setSpeciesPolygons((prev) =>
@@ -5424,6 +5471,8 @@ export default function MapView() {
         onDataSourceModeChange={handleDataSourceModeChange}
         dataSourcesPanelOpen={dataSourcesPanelOpen}
         onDataSourcesPanelToggle={handleDataSourcesPanelToggle}
+        tempArchivePanelOpen={tempArchivePanelOpen}
+        onTempArchivePanelToggle={handleTempArchivePanelToggle}
       />
       <div
         ref={ref}
@@ -5481,6 +5530,8 @@ export default function MapView() {
                   bufferDockedOpen={bufferDockedWithFeature}
                   bufferDisabled={isArealApplied}
                   bufferDisabledTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
+                  onOpenPolygon={handleOpenPolygonFromFeature}
+                  polygonDockedOpen={polygonDockedWithFeature}
                   onLookupRussianName={handleLookupRussianName}
                   onApplyRussianName={handleApplyRussianName}
                   onClearRussianName={handleClearRussianName}
@@ -5535,6 +5586,8 @@ export default function MapView() {
               bufferDockedOpen={bufferDockedWithFeature}
               bufferDisabled={isArealApplied}
               bufferDisabledTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
+              onOpenPolygon={handleOpenPolygonFromFeature}
+              polygonDockedOpen={polygonDockedWithFeature}
               onLookupRussianName={handleLookupRussianName}
               onApplyRussianName={handleApplyRussianName}
               onClearRussianName={handleClearRussianName}
@@ -5640,7 +5693,8 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.SEASONALITY)}
             />
           )}
-          {activeModule === MODULE_IDS.POLYGON &&
+          {(activeModule === MODULE_IDS.POLYGON ||
+            (activeModule === MODULE_IDS.FEATURE && polygonDockedWithFeature)) &&
             !isPanelMinimized(PANEL_IDS.POLYGON) && (
             <SpeciesPolygonPopup
               feature={popupData}
@@ -5745,9 +5799,7 @@ export default function MapView() {
                     ? DATA_WORK_TOOL_IDS.UNATTRIBUTED_POINTS
                     : undoMergedPointsActive
                       ? DATA_WORK_TOOL_IDS.UNDO_MERGED_POINTS
-                      : tempArchivePanelOpen
-                        ? DATA_WORK_TOOL_IDS.TEMP_ARCHIVE
-                        : null
+                      : null
               }
             />
           )}

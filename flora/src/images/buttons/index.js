@@ -32,6 +32,7 @@ export { ReactComponent as LayersIcon } from "./layers.svg";
 export { ReactComponent as ClockIcon } from "./clock.svg";
 export { ReactComponent as ClustersIcon } from "./clusters.svg";
 export { ReactComponent as DatabaseIcon } from "./database.svg";
+export { ReactComponent as LayersArchiveIcon } from "./layers-archive.svg";
 export { ReactComponent as RadiusIcon } from "./radius.svg";
 export { ReactComponent as BufferIcon } from "./buffer.svg";
 export { ReactComponent as PolygonIcon } from "./polygon.svg";

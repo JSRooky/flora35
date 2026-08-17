@@ -11,6 +11,8 @@ import {
   LayersIcon,
   TrashIcon
 } from "../images/buttons";
+import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
+import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/TempLayerArchivePanel.css";
@@ -83,6 +85,7 @@ export default function TempLayerArchivePanel({
   const [query, setQuery] = useState("");
   const [entries, setEntries] = useState(() => getTempLayerArchiveIndex());
   const [busyId, setBusyId] = useState("");
+  const [helpOpen, setHelpOpen] = useState(false); // раздел ## temp-archive в docs/moduleHelp.md
 
   useEffect(() => {
     return subscribeTempLayers(() => {
@@ -117,6 +120,7 @@ export default function TempLayerArchivePanel({
       <div className="temp-archive-panel-header">
         <h3 className="temp-archive-panel-title">Архив слоёв</h3>
         <div className="popup-panel-header-actions">
+          <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
           {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           <button
             type="button"
@@ -141,8 +145,7 @@ export default function TempLayerArchivePanel({
       ) : (
         <div className="temp-archive-panel-content">
           <p className="temp-archive-panel-note">
-            Слой либо на карте во временных, либо здесь. Перенос сохраняет цвет,
-            точки и состав выборки.
+            Архив содержит слои, перенесенные из временных. Сохраняет все настройки, приданные временному слою. Может быть возвращен во временные слои в любое время. Хранится локально.
           </p>
           <input
             className="temp-archive-panel-search"
@@ -231,6 +234,8 @@ export default function TempLayerArchivePanel({
           )}
         </div>
       )}
+
+      <ModuleHelpPanel sectionId={MODULE_IDS.TEMP_ARCHIVE} open={helpOpen} />
     </aside>
   );
 }

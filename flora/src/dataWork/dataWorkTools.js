@@ -6,8 +6,7 @@
 export const DATA_WORK_TOOL_IDS = {
   NEAR_SPECIES_MATCHES: "near-species-matches",
   UNATTRIBUTED_POINTS: "unattributed-points",
-  UNDO_MERGED_POINTS: "undo-merged-points",
-  TEMP_ARCHIVE: "temp-archive"
+  UNDO_MERGED_POINTS: "undo-merged-points"
 };
 
 export const DATA_WORK_TOOLS = [
@@ -28,11 +27,5 @@ export const DATA_WORK_TOOLS = [
     title: "Отменить слияние",
     description:
       "Список слитых точек: удаление объединения и возврат исходных точек GBIF и iNaturalist на карту."
-  },
-  {
-    id: DATA_WORK_TOOL_IDS.TEMP_ARCHIVE,
-    title: "Архив слоёв",
-    description:
-      "Склад временных слоёв: перенос с карты в архив и обратно, экспорт GeoJSON и снимка."
   }
 ];

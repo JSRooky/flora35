@@ -163,10 +163,22 @@ export function getToolWithinFeature({
   }
 }
 
+/** Панель полигона открыта как модуль или пристыкована к «О точке». */
+export function isPolygonToolActive(activeModule, polygonDockedWithFeature = false) {
+  return (
+    activeModule === MODULE_IDS.POLYGON ||
+    (activeModule === MODULE_IDS.FEATURE && polygonDockedWithFeature)
+  );
+}
+
 /** Определяет, какой инструмент сейчас управляет фильтром точек (учитывает док-панели). */
 export function resolveToolPointsFilterModule(
   activeModule,
-  { arealDockedWithFeature = false, bufferDockedWithFeature = false } = {}
+  {
+    arealDockedWithFeature = false,
+    bufferDockedWithFeature = false,
+    polygonDockedWithFeature = false
+  } = {}
 ) {
   if (activeModule === MODULE_IDS.FEATURE && arealDockedWithFeature) {
     return MODULE_IDS.AREAL;
@@ -174,6 +186,10 @@ export function resolveToolPointsFilterModule(
 
   if (activeModule === MODULE_IDS.FEATURE && bufferDockedWithFeature) {
     return MODULE_IDS.BUFFER;
+  }
+
+  if (activeModule === MODULE_IDS.FEATURE && polygonDockedWithFeature) {
+    return MODULE_IDS.POLYGON;
   }
 
   return activeModule;

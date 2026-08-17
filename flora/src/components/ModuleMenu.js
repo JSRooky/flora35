@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ReactComponent as MainLogo } from "../images/main_logo.svg";
-import { DatabaseIcon } from "../images/buttons";
+import { DatabaseIcon, LayersArchiveIcon } from "../images/buttons";
 import { DATA_SOURCE_OPTIONS, VISIBLE_DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
 import UserAccountControl from "./UserAccountControl";
 import "../styles/ModuleMenu.css";
@@ -34,6 +34,7 @@ export const MODULE_IDS = {
   /** @deprecated Используйте DATA_SOURCES */
   GBIF_LEGACY: "gbif",
   DATA_SOURCES: "data-sources",
+  TEMP_ARCHIVE: "temp-archive",
   EXTERNAL_PROCESSING: "external-processing",
   /** @deprecated Используйте EXTERNAL_PROCESSING */
   GBIF_PROCESSING: "external-processing",
@@ -87,6 +88,11 @@ const REDBOOK_MODULE_ITEM = { id: MODULE_IDS.REDBOOK, label: "Красная к�
 const DATA_SOURCES_MODULE_ITEM = {
   id: MODULE_IDS.DATA_SOURCES,
   label: "Источники данных"
+};
+
+const TEMP_ARCHIVE_MODULE_ITEM = {
+  id: MODULE_IDS.TEMP_ARCHIVE,
+  label: "Архив слоёв"
 };
 
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
@@ -291,6 +297,8 @@ export default function ModuleMenu({
   onDataSourceModeChange,
   dataSourcesPanelOpen = false,
   onDataSourcesPanelToggle,
+  tempArchivePanelOpen = false,
+  onTempArchivePanelToggle,
   accountUser = null,
   onAccountClick
 }) {
@@ -382,6 +390,17 @@ export default function ModuleMenu({
                 dataSourcesPanelOpen ? MODULE_IDS.DATA_SOURCES : activeModule
               }
               onModuleSelect={onDataSourcesPanelToggle}
+            />
+          </li>
+          <li>
+            <ModuleMenuButton
+              id={TEMP_ARCHIVE_MODULE_ITEM.id}
+              label={TEMP_ARCHIVE_MODULE_ITEM.label}
+              icon={<LayersArchiveIcon className="module-menu-btn-icon" aria-hidden="true" focusable="false" />}
+              activeModule={
+                tempArchivePanelOpen ? MODULE_IDS.TEMP_ARCHIVE : activeModule
+              }
+              onModuleSelect={onTempArchivePanelToggle}
             />
           </li>
           <li className="module-menu-toggle-item">
