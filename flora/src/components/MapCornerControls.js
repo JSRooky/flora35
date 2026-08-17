@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { FilterIcon, TrashIcon } from "../images/buttons";
+import { FilterIcon, LayersIcon, TrashIcon } from "../images/buttons";
 import ExternalLayersPicker from "./ExternalLayersPicker";
 import TempLayersPicker from "./TempLayersPicker";
 import RegnumFilterPicker from "./RegnumFilterPicker";
@@ -13,6 +13,7 @@ export default function MapCornerControls({
   activeFilters = [],
   onFiltersReset,
   onFilterClear,
+  onSaveFiltersToTempLayer,
   externalLayersVisible = false,
   externalLayersEnabled,
   externalLayersDataRevision = 0,
@@ -132,6 +133,27 @@ export default function MapCornerControls({
         >
           <FilterIcon className="map-corner-controls-btn-icon" aria-hidden="true" focusable="false" />
         </button>
+        <button
+          type="button"
+          className={`map-corner-controls-btn${!filtersActive ? " map-corner-controls-btn--disabled" : ""}`}
+          onClick={() => {
+            if (!filtersActive) {
+              return;
+            }
+            if (onSaveFiltersToTempLayer?.()) {
+              setPopoverOpen(false);
+            }
+          }}
+          disabled={!filtersActive}
+          aria-label="Сохранить отфильтрованные точки во временный слой"
+          title={
+            filtersActive
+              ? "Сохранить отфильтрованные точки во временный слой"
+              : "Сначала примените фильтры"
+          }
+        >
+          <LayersIcon className="map-corner-controls-btn-icon" aria-hidden="true" focusable="false" />
+        </button>
 
         {popoverOpen && filtersActive ? (
           <div
@@ -162,6 +184,17 @@ export default function MapCornerControls({
               onClick={handleClearAll}
             >
               Сбросить все
+            </button>
+            <button
+              type="button"
+              className="map-corner-filters-popover-save-temp"
+              onClick={() => {
+                if (onSaveFiltersToTempLayer?.()) {
+                  setPopoverOpen(false);
+                }
+              }}
+            >
+              Во временный слой
             </button>
           </div>
         ) : null}

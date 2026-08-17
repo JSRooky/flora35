@@ -13,6 +13,7 @@ import {
   ClockIcon,
   EyeIcon,
   EyeOffIcon,
+  HelpIcon,
   LayersIcon,
   TrashIcon
 } from "../images/buttons";
@@ -62,6 +63,26 @@ function plaqueRowStyle(plaque) {
     style["--temp-layer-color"] = plaque.markerColor;
   }
   return style;
+}
+
+function plaqueOriginItems(plaque) {
+  if (plaque.filterSnapshot?.length) {
+    return plaque.filterSnapshot.map((entry) => entry.label);
+  }
+  const items = [];
+  if (plaque.taxonName) {
+    items.push(plaque.taxonName);
+  }
+  const regionIds = new Set();
+  plaque.layers.forEach((layer) => {
+    (layer.regionIds || []).forEach((id) => regionIds.add(id));
+  });
+  if (regionIds.size === 1) {
+    items.push("1 регион");
+  } else if (regionIds.size > 1) {
+    items.push(`${regionIds.size} регионов`);
+  }
+  return items;
 }
 
 function plaqueTitle(plaque) {
@@ -154,6 +175,7 @@ export default function TempLayersPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [colorMenuLayerId, setColorMenuLayerId] = useState(null);
+  const [infoMenuLayerId, setInfoMenuLayerId] = useState(null);
   const rootRef = useRef(null);
   const closeTimerRef = useRef(null);
   void dataRevision;
@@ -207,6 +229,7 @@ export default function TempLayersPicker({
     closeTimerRef.current = setTimeout(() => {
       setOpen(false);
       setColorMenuLayerId(null);
+      setInfoMenuLayerId(null);
     }, HOVER_CLOSE_DELAY_MS);
   };
 
@@ -221,13 +244,17 @@ export default function TempLayersPicker({
           setColorMenuLayerId(null);
           return;
         }
+        if (infoMenuLayerId) {
+          setInfoMenuLayerId(null);
+          return;
+        }
         setOpen(false);
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, colorMenuLayerId]);
+  }, [open, colorMenuLayerId, infoMenuLayerId]);
 
   useEffect(() => () => clearCloseTimer(), []);
 
@@ -248,6 +275,7 @@ export default function TempLayersPicker({
         if (!rootRef.current?.contains(event.relatedTarget)) {
           setOpen(false);
           setColorMenuLayerId(null);
+          setInfoMenuLayerId(null);
         }
       }}
     >
@@ -279,7 +307,7 @@ export default function TempLayersPicker({
                 </button>
               </div>
               <p className="temp-layers-picker-empty">
-                Пока нет временных слоёв. Сохраните выборку кнопкой «Во временный слой».
+                Пока нет временных слоёв. Сохраните выборку из фильтров карты или кнопкой «Во временный слой».
               </p>
             </>
           ) : (
@@ -315,10 +343,13 @@ export default function TempLayersPicker({
               const primary = plaque.layers[0];
               const gbif = sourceLayer(plaque, TEMP_SOURCE_IDS.GBIF);
               const inat = sourceLayer(plaque, TEMP_SOURCE_IDS.INAT);
+              const mapSource = sourceLayer(plaque, TEMP_SOURCE_IDS.MAP);
               const anyVisible = plaque.layers.some((layer) => layer.visible);
               const heatmapOn = plaque.layers.some((layer) => layer.heatmapEnabled);
               const splitStripe = Boolean(gbif && inat);
               const title = plaqueTitle(plaque);
+              const originItems = plaqueOriginItems(plaque);
+              const infoOpen = infoMenuLayerId === primary.id;
 
               return (
               <div
@@ -332,7 +363,7 @@ export default function TempLayersPicker({
                 }${
                   !splitStripe && inat ? " temp-layers-picker-row--inat" : ""
                 }${
-                  colorMenuLayerId === primary.id
+                  colorMenuLayerId === primary.id || infoOpen
                     ? " temp-layers-picker-row--palette-open"
                     : ""
                 }`}
@@ -391,9 +422,61 @@ export default function TempLayersPicker({
                   >
                     iNat
                   </button>
+                  {mapSource ? (
+                    <button
+                      type="button"
+                      className={`temp-layers-picker-source temp-layers-picker-source--map${
+                        mapSource.visible ? " temp-layers-picker-source--on" : ""
+                      }`}
+                      tabIndex={open ? 0 : -1}
+                      aria-pressed={Boolean(mapSource.visible)}
+                      title="Локальные и прочие точки карты"
+                      onClick={() => onToggleLayer?.(mapSource.id, !mapSource.visible)}
+                    >
+                      Карта
+                    </button>
+                  ) : null}
                 </span>
                 </div>
                 </div>
+                <button
+                  type="button"
+                  className={`temp-layers-picker-info${infoOpen ? " temp-layers-picker-info--on" : ""}`}
+                  tabIndex={open ? 0 : -1}
+                  aria-expanded={infoOpen}
+                  aria-label={`Информация о слое «${title}»`}
+                  title="Информация о слое"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setColorMenuLayerId(null);
+                    setInfoMenuLayerId((current) =>
+                      current === primary.id ? null : primary.id
+                    );
+                  }}
+                >
+                  <HelpIcon className="temp-layers-picker-info-icon" aria-hidden="true" focusable="false" />
+                </button>
+                {infoOpen ? (
+                  <div
+                    className="temp-layers-picker-info-popup"
+                    role="dialog"
+                    aria-label={`Фильтры слоя «${title}»`}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <p className="temp-layers-picker-info-title">
+                      {plaque.filterSnapshot?.length ? "Применённые фильтры" : "Условия выборки"}
+                    </p>
+                    {originItems.length > 0 ? (
+                      <ul className="temp-layers-picker-info-list">
+                        {originItems.map((item, index) => (
+                          <li key={`${item}-${index}`}>{item}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="temp-layers-picker-info-empty">Нет сохранённых условий.</p>
+                    )}
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   className={`temp-layers-picker-heatmap${
@@ -462,11 +545,12 @@ export default function TempLayersPicker({
                   plaque={plaque}
                   open={colorMenuLayerId === primary.id}
                   tabIndex={open ? 0 : -1}
-                  onToggle={() =>
+                  onToggle={() => {
+                    setInfoMenuLayerId(null);
                     setColorMenuLayerId((current) =>
                       current === primary.id ? null : primary.id
-                    )
-                  }
+                    );
+                  }}
                   onSelect={(color) => {
                     onColorChange?.(primary.id, color);
                     setColorMenuLayerId(null);

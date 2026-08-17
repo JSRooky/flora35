@@ -9,6 +9,7 @@ import {
 } from "../dataWork/findUnattributedPoints";
 import { getStablePointKey, getToolFeatures, setToolFeaturesContext } from "./addLocationsLayer";
 import UnattributedAttributionEditor from "./UnattributedAttributionEditor";
+import PanelHint from "./PanelHint";
 import "../styles/UnattributedPointsPopup.css";
 import { EyeIcon, EyeOffIcon, ZoomInIcon } from "../images/buttons";
 
@@ -354,11 +355,11 @@ export default function UnattributedPointsPopup({
         </button>
 
         <h3 className="unattributed-points-title">Без атрибуции</h3>
-        <p className="unattributed-points-hint">
+        <PanelHint>
           Точки всех видимых слоёв, у которых нет царства, семейства, латинского
           названия или года находки. Клик по строке — заполнить пустые поля и
           сохранить в Firebase.
-        </p>
+        </PanelHint>
 
         <div className="unattributed-points-toolbar">
           <button

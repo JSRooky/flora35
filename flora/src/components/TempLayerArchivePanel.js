@@ -3,6 +3,7 @@ import {
   getTempLayerArchiveIndex,
   resolveTempSourceMarkerColor,
   subscribeTempLayers,
+  formatTempSourceLabel,
   TEMP_SOURCE_IDS
 } from "../tempLayers/tempLayerStore";
 import {
@@ -14,6 +15,7 @@ import {
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
+import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/TempLayerArchivePanel.css";
 
@@ -59,7 +61,7 @@ function formatMeta(entry) {
         ? `${entry.regionCount} рег.`
         : null;
   const sources = [...new Set(entry.sources || [])]
-    .map((source) => (source === "inat" ? "iNat" : "GBIF"))
+    .map((source) => formatTempSourceLabel(source))
     .join(" + ");
   const date = entry.archivedAt
     ? new Date(entry.archivedAt).toLocaleDateString("ru-RU")
@@ -144,9 +146,9 @@ export default function TempLayerArchivePanel({
         </p>
       ) : (
         <div className="temp-archive-panel-content">
-          <p className="temp-archive-panel-note">
+          <PanelHint>
             Архив содержит слои, перенесенные из временных. Сохраняет все настройки, приданные временному слою. Может быть возвращен во временные слои в любое время. Хранится локально.
-          </p>
+          </PanelHint>
           <input
             className="temp-archive-panel-search"
             type="search"

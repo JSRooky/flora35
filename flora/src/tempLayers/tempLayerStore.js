@@ -3,8 +3,21 @@ import { getExternalRegionById } from "../externalSources/regions";
 
 const listeners = new Set();
 
+function cloneFeature(feature) {
+  try {
+    return JSON.parse(JSON.stringify(feature));
+  } catch {
+    return {
+      type: "Feature",
+      id: feature?.id,
+      geometry: feature?.geometry ?? null,
+      properties: { ...(feature?.properties ?? {}) }
+    };
+  }
+}
+
 function cloneFeatures(features) {
-  return JSON.parse(JSON.stringify(features ?? []));
+  return (features ?? []).map((feature) => cloneFeature(feature));
 }
 
 function featureStableKey(feature) {
@@ -23,19 +36,35 @@ function featureStableKey(feature) {
 
 export const TEMP_SOURCE_IDS = {
   GBIF: "gbif",
-  INAT: "inat"
+  INAT: "inat",
+  MAP: "map"
 };
 
 export const TEMP_SOURCE_TINTS = {
   [TEMP_SOURCE_IDS.GBIF]: "#3b82f6",
-  [TEMP_SOURCE_IDS.INAT]: "#22c55e"
+  [TEMP_SOURCE_IDS.INAT]: "#22c55e",
+  [TEMP_SOURCE_IDS.MAP]: "#6b7280"
 };
 
 export function normalizeTempSource(source) {
   if (source === "inat" || source === "inaturalist") {
     return TEMP_SOURCE_IDS.INAT;
   }
+  if (source === TEMP_SOURCE_IDS.MAP || source === "local" || source === "merged") {
+    return TEMP_SOURCE_IDS.MAP;
+  }
   return TEMP_SOURCE_IDS.GBIF;
+}
+
+export function formatTempSourceLabel(source) {
+  const normalized = normalizeTempSource(source);
+  if (normalized === TEMP_SOURCE_IDS.INAT) {
+    return "iNat";
+  }
+  if (normalized === TEMP_SOURCE_IDS.MAP) {
+    return "Карта";
+  }
+  return "GBIF";
 }
 
 function parseHexRgb(hex) {
@@ -289,7 +318,46 @@ export function clearTempLayerStaging() {
 }
 
 function sourceLabel(source) {
-  return normalizeTempSource(source) === TEMP_SOURCE_IDS.INAT ? "iNaturalist" : "GBIF";
+  const normalized = normalizeTempSource(source);
+  if (normalized === TEMP_SOURCE_IDS.INAT) {
+    return "iNaturalist";
+  }
+  if (normalized === TEMP_SOURCE_IDS.MAP) {
+    return "Карта";
+  }
+  return "GBIF";
+}
+
+function normalizeFilterSnapshot(snapshot) {
+  if (!Array.isArray(snapshot)) {
+    return [];
+  }
+  return snapshot
+    .map((entry) => ({
+      id: String(entry?.id || ""),
+      label: String(entry?.label || "").trim()
+    }))
+    .filter((entry) => entry.label);
+}
+
+function classifySnapshotSource(feature) {
+  const inferred = inferFeatureTempSource(feature);
+  if (inferred === TEMP_SOURCE_IDS.INAT) {
+    return TEMP_SOURCE_IDS.INAT;
+  }
+  if (inferred === TEMP_SOURCE_IDS.GBIF) {
+    return TEMP_SOURCE_IDS.GBIF;
+  }
+  return TEMP_SOURCE_IDS.MAP;
+}
+
+function buildFilterSnapshotLabel(filters) {
+  const labels = (filters || []).map((entry) => entry.label).filter(Boolean);
+  if (labels.length === 0) {
+    return "Выборка";
+  }
+  const joined = `Выборка · ${labels.join(", ")}`;
+  return joined.length > 72 ? `${joined.slice(0, 69)}…` : joined;
 }
 
 function buildLayerLabel({ source, taxonName, regionIds }) {
@@ -407,6 +475,70 @@ export function commitTempLayerStaging() {
   return layer;
 }
 
+/**
+ * Сохраняет текущую отфильтрованную выборку карты во временный слой.
+ * Точки уже существующих временных слоёв не копируются.
+ */
+export function createTempLayerFromFilterSnapshot({ features, filters } = {}) {
+  const filterSnapshot = normalizeFilterSnapshot(filters);
+  const buckets = {
+    [TEMP_SOURCE_IDS.GBIF]: [],
+    [TEMP_SOURCE_IDS.INAT]: [],
+    [TEMP_SOURCE_IDS.MAP]: []
+  };
+
+  (Array.isArray(features) ? features : []).forEach((feature) => {
+    if (feature?.properties?.temp_layer_id) {
+      return;
+    }
+    const source = classifySnapshotSource(feature);
+    buckets[source].push(cloneFeature(feature));
+  });
+
+  const created = [];
+  const groupKey = `filter:${createLayerId()}`;
+  const createdAt = new Date().toISOString();
+  const label = buildFilterSnapshotLabel(filterSnapshot);
+
+  [
+    TEMP_SOURCE_IDS.GBIF,
+    TEMP_SOURCE_IDS.INAT,
+    TEMP_SOURCE_IDS.MAP
+  ].forEach((source) => {
+    const list = buckets[source];
+    if (!list.length) {
+      return;
+    }
+    created.push({
+      id: createLayerId(),
+      label,
+      source,
+      groupKey,
+      taxonName: label,
+      taxonMode: "filter-snapshot",
+      taxonKey: null,
+      familyKey: null,
+      inatTaxonId: null,
+      regionIds: [],
+      createdAt,
+      visible: true,
+      heatmapEnabled: false,
+      markerColor: null,
+      archiveId: null,
+      filterSnapshot,
+      features: list
+    });
+  });
+
+  if (created.length === 0) {
+    return { ok: false, reason: "empty" };
+  }
+
+  layers = [...created, ...layers];
+  emit();
+  return { ok: true, layers: created };
+}
+
 export function setTempLayerVisible(layerId, visible) {
   layers = layers.map((layer) =>
     layer.id === layerId ? { ...layer, visible: Boolean(visible) } : layer
@@ -475,7 +607,8 @@ function normalizePersistedLayer(layer) {
     inatTaxonId: layer?.inatTaxonId ?? null,
     heatmapEnabled: Boolean(layer?.heatmapEnabled),
     markerColor: normalizeTempLayerMarkerColor(layer?.markerColor),
-    archiveId: layer?.archiveId ? String(layer.archiveId) : null
+    archiveId: layer?.archiveId ? String(layer.archiveId) : null,
+    filterSnapshot: normalizeFilterSnapshot(layer?.filterSnapshot)
   };
 }
 
@@ -642,6 +775,7 @@ export function listTempLayerPlaques() {
         taxonName: layer.taxonName || "",
         label: layer.taxonName || layer.label || sourceLabel(layer.source),
         markerColor: layer.markerColor ?? null,
+        filterSnapshot: normalizeFilterSnapshot(layer.filterSnapshot),
         layers: []
       };
       indexByKey.set(key, plaque);
@@ -650,6 +784,9 @@ export function listTempLayerPlaques() {
     plaque.layers.push(layer);
     if (!plaque.markerColor && layer.markerColor) {
       plaque.markerColor = layer.markerColor;
+    }
+    if (!plaque.filterSnapshot.length && layer.filterSnapshot?.length) {
+      plaque.filterSnapshot = normalizeFilterSnapshot(layer.filterSnapshot);
     }
     if (!plaque.taxonName && layer.taxonName) {
       plaque.taxonName = layer.taxonName;
@@ -737,6 +874,7 @@ function serializeLayer(layer) {
     heatmapEnabled: Boolean(layer.heatmapEnabled),
     markerColor: layer.markerColor ?? null,
     archiveId: layer.archiveId ?? null,
+    filterSnapshot: normalizeFilterSnapshot(layer.filterSnapshot),
     features: layer.features
   };
 }

@@ -9,6 +9,7 @@ import {
   getMatchSourceLabel,
   MATCH_SOURCE_IDS
 } from "../dataWork/matchSources";
+import PanelHint from "./PanelHint";
 import "../styles/NearSpeciesMatchesPopup.css";
 import { MergeIcon, ZoomInIcon } from "../images/buttons";
 
@@ -558,11 +559,11 @@ export default function NearSpeciesMatchesPopup({
         </button>
 
         <h3 className="near-species-matches-title">Близкие точки</h3>
-        <p className="near-species-matches-hint">
+        <PanelHint>
           Пары точек GBIF и iNaturalist с одинаковым латинским названием вида
           в заданном радиусе; если год указан у обеих точек — он тоже должен
           совпадать.
-        </p>
+        </PanelHint>
 
         <div className="near-species-matches-toolbar">
           <label

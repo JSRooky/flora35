@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { getMergedFeatures } from "./addMergedLayer";
 import { listUndoMergedRows } from "../dataWork/listUndoMergedRows";
+import PanelHint from "./PanelHint";
 import "../styles/UndoMergedPointsPopup.css";
 
 /**
@@ -95,10 +96,10 @@ export default function UndoMergedPointsPopup({
         </button>
 
         <h3 className="undo-merged-points-title">Отменить слияние</h3>
-        <p className="undo-merged-points-hint">
+        <PanelHint>
           Выберите слитую точку, чтобы удалить объединение и вернуть исходные
           точки GBIF и iNaturalist на карту.
-        </p>
+        </PanelHint>
 
         <div className="undo-merged-points-toolbar">
           <span className="undo-merged-points-count" aria-live="polite">

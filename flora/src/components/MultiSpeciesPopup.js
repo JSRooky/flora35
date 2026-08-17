@@ -13,6 +13,7 @@ import {
 import { saveUserFindings } from "../locations/saveUserFinding";
 import { buildSubmissionSuggestionData } from "../locations/submissionSuggestions";
 import MultiSpeciesConfirmTable from "./MultiSpeciesConfirmTable";
+import PanelHint from "./PanelHint";
 import "../styles/MultiSpeciesPopup.css";
 import { TrashIcon } from "../images/buttons";
 
@@ -452,10 +453,10 @@ export default function MultiSpeciesPopup({
         {step === "input" && inputMode === "text" ? (
           <>
             <h3 className="multi-species-title">Несколько видов</h3>
-            <p className="multi-species-hint">
+            <PanelHint>
               Координаты — широта и долгота через запятую или пробел. Разделитель полей — любой
               символ, кроме пробела и запятой.
-            </p>
+            </PanelHint>
 
             <label className="multi-species-field">
               <span>Данные находок</span>
@@ -509,7 +510,7 @@ export default function MultiSpeciesPopup({
         {step === "input" && inputMode === "table" ? (
           <>
             <h3 className="multi-species-title">Несколько видов</h3>
-            <p className="multi-species-hint">Заполните ячейки таблицы для каждой находки.</p>
+            <PanelHint>Заполните ячейки таблицы для каждой находки.</PanelHint>
 
             <MultiSpeciesConfirmTable
               rows={pendingRows}

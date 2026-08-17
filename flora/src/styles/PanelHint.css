@@ -1,0 +1,42 @@
+.panel-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.panel-hint-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #666;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.panel-hint-toggle:hover {
+  color: #333;
+}
+
+.panel-hint-chevron {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.panel-hint-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #444;
+}
+
+.panel-hint-body p {
+  margin: 0;
+}

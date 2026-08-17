@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
+import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import RedBookSpeciesTablePopup from "./RedBookSpeciesTablePopup";
 import { matchRedBookOccurrences } from "../redbook/matchRedBookOccurrences";
@@ -234,10 +235,10 @@ export default function RedBookSearchPanel({
           </p>
         ) : (
           <div className="redbook-search-panel-content">
-            <p className="redbook-search-panel-note">
+            <PanelHint>
               Загрузите список латинских названий (и статус, если есть). Поиск идёт
               по уже загруженным точкам GBIF, iNaturalist и временных слоёв.
-            </p>
+            </PanelHint>
 
             <div className="redbook-search-sources">
               <span>GBIF: {sourceCounts.gbif}</span>

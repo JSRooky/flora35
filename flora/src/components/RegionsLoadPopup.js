@@ -4,6 +4,7 @@ import {
   cancelGbifExternalLoad,
   cancelInatExternalLoad
 } from "../externalSources/externalSourcesLoadManager";
+import PanelHint from "./PanelHint";
 import "../styles/RegionsLoadPopup.css";
 import "../styles/GbifPanel.css";
 
@@ -55,11 +56,11 @@ export default function RegionsLoadPopup({
           ×
         </button>
         <h3 className="regions-load-title">Регионы России</h3>
-        <p className="regions-load-hint">
+        <PanelHint>
           Кликайте по числам царств, чтобы выбрать одно или несколько (пусто —
           все). Затем «Загрузить» / «Обновить». Корзина удаляет локальный набор
           выбранного региона. Источник: GBIF или iNaturalist.
-        </p>
+        </PanelHint>
 
         {loading ? (
           <div className="regions-load-progress">

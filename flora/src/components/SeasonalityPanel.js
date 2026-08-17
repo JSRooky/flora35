@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
+import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import {
   buildSeasonalityCoordinateBounds,
@@ -804,10 +805,10 @@ export default function SeasonalityPanel({
                     </div>
                   ) : null}
 
-                  <p className="seasonality-panel-hint">
+                  <PanelHint>
                     Для полных данных по внешним источникам перезагрузите их после
                     обновления приложения (месяц сохраняется при загрузке).
-                  </p>
+                  </PanelHint>
                 </>
               ) : null}
             </>

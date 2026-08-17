@@ -36,6 +36,7 @@ import {
 } from "../tempLayers/tempLayerStore";
 import { persistTempLayers } from "../tempLayers/tempLayerPersistence";
 import { DownloadIcon, SearchIcon } from "../images/buttons";
+import PanelHint from "./PanelHint";
 
 const SOURCE_GBIF = "gbif";
 const SOURCE_INAT = "inat";
@@ -701,10 +702,10 @@ export default function SelectiveLoadPopup({
               : ""}
           </p>
         ) : (
-          <p className="regions-load-hint">
+          <PanelHint>
             Выберите источник загрузки, уровень (вид, род...). Отметьте галочками варианты, которые нужно загрузить в один временный слой.
             {isAll ? " в GBIF и iNat" : ""}.
-          </p>
+          </PanelHint>
         )}
 
         {searching ? (

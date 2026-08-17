@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
+import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import {
   DENSE_PILE_MIN_SIZE_MAX,
@@ -147,11 +148,11 @@ export default function DenseClustersPanel({
         </p>
       ) : (
         <div className="dense-clusters-panel-content">
-          <p className="dense-clusters-panel-note">
+          <PanelHint>
             {groupsHidden
               ? "Плотные группы скрыты на карте. Список и порог остаются доступны; остальные панели скрыты на время обработки."
               : `На карте только группы из ≥${minPileSize} точек с полностью одинаковыми координатами. Остальные панели скрыты на время обработки.`}
-          </p>
+          </PanelHint>
 
           <div className="dense-clusters-panel-threshold">
             <label

@@ -3,6 +3,7 @@ import { clearGbifLayer, setGbifData, setGbifMapUpdatesPaused } from "./addGbifL
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
+import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import {
   GBIF_PAGE_SIZE,
@@ -334,12 +335,12 @@ export default function GbifPanel({
         </p>
       ) : (
         <div className="gbif-panel-content">
-          <p className="gbif-panel-hint">
+          <PanelHint>
             Внешние находки GBIF на отдельном слое карты. Выберите регион и нажмите
             «Загрузить» — точки сохранятся локально и добавятся к уже загруженным
             (дубликаты по GBIF ID обновятся). Фильтры по царству, семейству и латыни —
             в панели «Обработка данных GBIF».
-          </p>
+          </PanelHint>
 
           <label className="gbif-panel-field" htmlFor="gbif-region-select">
             <span className="gbif-panel-label">Регион</span>

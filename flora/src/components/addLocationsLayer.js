@@ -1949,12 +1949,17 @@ export function filterFeatures(features, filters = {}) {
     result = result.filter((feature) =>
       filterEntries.every(([key, value]) => {
         if (value && typeof value === "object" && !Array.isArray(value) && "min" in value && "max" in value) {
-          const prop = feature.properties[key];
-          if (prop == null) {
+          const prop = feature.properties?.[key];
+          if (prop == null || prop === "") {
             return false;
           }
 
-          return prop >= value.min && prop <= value.max;
+          const numeric = typeof prop === "number" ? prop : Number(prop);
+          if (!Number.isFinite(numeric)) {
+            return false;
+          }
+
+          return numeric >= value.min && numeric <= value.max;
         }
 
         if (Array.isArray(value)) {
@@ -2155,6 +2160,22 @@ export function getToolFeatures(filters = {}) {
   }
 
   return features;
+}
+
+/**
+ * Точки текущего фильтра для снимка во временный слой.
+ * Берём видимые источники и, если слой локальных точек ещё в памяти, его тоже.
+ */
+export function getMapFilterSnapshotFeatures(filters = {}) {
+  const features = getToolFeatures(filters);
+  if (features.length > 0 || !locationsData?.features?.length) {
+    return features;
+  }
+
+  return filterFeatures(
+    enrichFeaturesWithAttribution(locationsData.features, getStablePointKey),
+    filters
+  );
 }
 
 /** Видимые точки временных слоёв с теми же фильтрами, что у инструментов. */

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
+import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import { GBIF_KINGDOMS } from "../gbif/taxonFilters";
 import { hasActiveGbifProcessingFilters } from "../gbif/gbifProcessingFilters";
@@ -128,10 +129,10 @@ export default function GbifProcessingPanel({
         <p className="gbif-processing-panel-summary">{collapsedSummary}</p>
       ) : (
         <div className="gbif-processing-panel-content">
-          <p className="gbif-processing-panel-hint">
+          <PanelHint>
             Фильтры применяются к уже загруженному слою GBIF на карте и в инструментах.
             Сами данные в локальном хранилище не меняются.
-          </p>
+          </PanelHint>
 
           <label className="gbif-processing-panel-field" htmlFor="gbif-proc-kingdom">
             <span className="gbif-processing-panel-label">Царство</span>

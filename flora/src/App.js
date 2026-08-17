@@ -37,6 +37,7 @@ import {
   showSharedPointPopup,
   updateSelectedPointHighlight,
   getToolFeatures,
+  getMapFilterSnapshotFeatures,
   listToolDensePiles,
   getVisibleMapPointCount,
   getStablePointKey,
@@ -211,7 +212,7 @@ import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
 import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
 import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles } from "./components/addTempLayersLayer";
-import { deleteTempLayer, getTempLayers, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
+import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
 import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatDensePiles, expandInatDensePileByKey, collapseInatExpandedDensePiles, setInatDensePileExpandedHandler } from "./components/addInatLayer";
 import {
   addMergedLayer,
@@ -1371,12 +1372,17 @@ export default function MapView() {
         prevRange.min === prevBounds.min && prevRange.max === prevBounds.max;
       const wasDegenerate = prevRange.min >= prevRange.max;
       if (wasFull || wasDegenerate) {
-        return bounds;
+        return prevRange.min === bounds.min && prevRange.max === bounds.max
+          ? prevRange
+          : bounds;
       }
 
       const min = Math.min(Math.max(prevRange.min, bounds.min), bounds.max);
       const max = Math.max(Math.min(prevRange.max, bounds.max), bounds.min);
-      return min <= max ? { min, max } : bounds;
+      const next = min <= max ? { min, max } : bounds;
+      return next.min === prevRange.min && next.max === prevRange.max
+        ? prevRange
+        : next;
     });
     setTimelineYear((prev) => Math.min(bounds.max, Math.max(bounds.min, prev)));
   }, []);
@@ -3501,6 +3507,9 @@ export default function MapView() {
     refreshAreal();
     syncYearBounds();
     bumpPointsDataRevision();
+    // locationFilters нарочно не в зависимостях: иначе syncYearBounds даёт
+    // новый объект yearRange и сбрасывает debounce applyLocationsFilter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     localDataActive,
     externalOnly,
@@ -3511,7 +3520,6 @@ export default function MapView() {
     redBookPointsVisible,
     mapMarkersVisible,
     mapReady,
-    locationFilters,
     refreshAreal,
     syncYearBounds,
     bumpPointsDataRevision
@@ -4073,6 +4081,39 @@ export default function MapView() {
       speciesSearchSelectedLatin
     ]
   );
+
+  const handleSaveFiltersToTempLayer = useCallback(() => {
+    if (activeMapFilters.length === 0) {
+      return false;
+    }
+
+    const result = createTempLayerFromFilterSnapshot({
+      features: getMapFilterSnapshotFeatures(locationFilters),
+      filters: activeMapFilters
+    });
+    if (!result?.ok) {
+      return false;
+    }
+
+    handleDataSourceModeChange(DATA_SOURCE_MODES.EXTERNAL);
+    setExternalLayersEnabled({
+      [EXTERNAL_LAYER_IDS.GBIF]: false,
+      [EXTERNAL_LAYER_IDS.INATURALIST]: false
+    });
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
+    if (map.current) {
+      setTempLayersData(map.current);
+      setTempLayersVisibility(map.current, true);
+    }
+    bumpPointsDataRevision();
+    return true;
+  }, [
+    activeMapFilters,
+    bumpPointsDataRevision,
+    handleDataSourceModeChange,
+    locationFilters
+  ]);
 
   const handleMapFiltersReset = useCallback(() => {
     setPropertyFilters({});
@@ -6025,6 +6066,7 @@ export default function MapView() {
         activeFilters={activeMapFilters}
         onFiltersReset={handleMapFiltersReset}
         onFilterClear={handleMapFilterClear}
+        onSaveFiltersToTempLayer={handleSaveFiltersToTempLayer}
         externalLayersVisible={externalOnly}
         externalLayersEnabled={externalLayersEnabled}
         externalLayersDataRevision={pointsDataRevision}
