@@ -16,6 +16,7 @@ import {
   filterInatTableIndices
 } from "../inaturalist/inatProcessingFilters";
 import { getOverlayVersion } from "../names/nameRuCache";
+import { parseFoundYear } from "./yearBounds";
 import {
   GBIF_SOURCE_ID,
   getGbifInteractiveLayerIds,
@@ -115,6 +116,9 @@ export const WITHIN_FEATURE_FILTER_KEY = "__withinFeature";
 
 /** Ключ массива стабильных id скрытых точек в объекте filters. */
 export const HIDDEN_FEATURE_KEYS_FILTER_KEY = "__hiddenFeatureKeys";
+
+/** Скрывать точки без атрибута found_year. */
+export const REQUIRE_FOUND_YEAR_FILTER_KEY = "__requireFoundYear";
 
 export { SPECIES_SEARCH_FILTER_KEY } from "../locations/speciesSearchFilter";
 
@@ -1631,6 +1635,14 @@ function isTimelineYearMaxOnlyChange(prevFilters, nextFilters) {
   return isFoundYearOnlyChange(prevFilters, nextFilters);
 }
 
+function featureMatchesYearWindow(feature, yearMin, yearMax, keepMissing) {
+  const year = parseFoundYear(feature.properties?.found_year);
+  if (year == null) {
+    return Boolean(keepMissing);
+  }
+  return year >= yearMin && year <= yearMax;
+}
+
 function locationsSourcesExist(map) {
   if (!isMapboxClusteringActive()) {
     return Boolean(map.getSource("locations"));
@@ -1814,10 +1826,14 @@ function applyTimelineYearChange(map, prevFilters, nextFilters) {
       }
     }
   } else {
-    newFilteredFeatures = currentFilteredFeatures.filter((feature) => {
-      const year = feature.properties?.found_year;
-      return typeof year === "number" && year >= yearMin && year <= nextMax;
-    });
+    newFilteredFeatures = currentFilteredFeatures.filter((feature) =>
+      featureMatchesYearWindow(
+        feature,
+        yearMin,
+        nextMax,
+        !nextFilters[REQUIRE_FOUND_YEAR_FILTER_KEY]
+      )
+    );
   }
 
   setCurrentFilteredFeatures(newFilteredFeatures);
@@ -1927,6 +1943,7 @@ export function filterFeatures(features, filters = {}) {
     [WITHIN_FEATURE_FILTER_KEY]: withinFeature,
     [HIDDEN_FEATURE_KEYS_FILTER_KEY]: _hiddenFeatureKeys,
     [SPECIES_SEARCH_FILTER_KEY]: speciesSearch,
+    [REQUIRE_FOUND_YEAR_FILTER_KEY]: requireFoundYear,
     ...propertyFilters
   } = filters;
   const filterEntries = Object.entries(propertyFilters);
@@ -1936,6 +1953,12 @@ export function filterFeatures(features, filters = {}) {
   if (hiddenPointKeysSet.size > 0) {
     result = result.filter(
       (feature) => !hiddenPointKeysSet.has(getStablePointKey(feature))
+    );
+  }
+
+  if (requireFoundYear) {
+    result = result.filter(
+      (feature) => parseFoundYear(feature.properties?.found_year) != null
     );
   }
 
@@ -1950,6 +1973,13 @@ export function filterFeatures(features, filters = {}) {
       filterEntries.every(([key, value]) => {
         if (value && typeof value === "object" && !Array.isArray(value) && "min" in value && "max" in value) {
           const prop = feature.properties?.[key];
+          if (key === "found_year") {
+            const year = parseFoundYear(prop);
+            if (year == null) {
+              return true;
+            }
+            return year >= value.min && year <= value.max;
+          }
           if (prop == null || prop === "") {
             return false;
           }
@@ -2164,7 +2194,7 @@ export function getToolFeatures(filters = {}) {
 
 /**
  * Точки текущего фильтра для снимка во временный слой.
- * Берём видимые источники и, если слой локальных точек ещё в памяти, его тоже.
+ * Та же выборка, что у инструментов, плюс локальные точки, если они ещё в памяти.
  */
 export function getMapFilterSnapshotFeatures(filters = {}) {
   const features = getToolFeatures(filters);
@@ -2556,10 +2586,14 @@ function applyGbifTimelineYearChange(map, prevFilters, nextFilters) {
       }
     }
   } else {
-    nextFeatures = current.filter((feature) => {
-      const year = feature.properties?.found_year;
-      return typeof year === "number" && year >= yearMin && year <= nextMax;
-    });
+    nextFeatures = current.filter((feature) =>
+      featureMatchesYearWindow(
+        feature,
+        yearMin,
+        nextMax,
+        !nextFilters[REQUIRE_FOUND_YEAR_FILTER_KEY]
+      )
+    );
   }
 
   visibleGbifCache = {
@@ -2780,10 +2814,14 @@ function applyInatTimelineYearChange(map, prevFilters, nextFilters) {
       }
     }
   } else {
-    nextFeatures = current.filter((feature) => {
-      const year = feature.properties?.found_year;
-      return typeof year === "number" && year >= yearMin && year <= nextMax;
-    });
+    nextFeatures = current.filter((feature) =>
+      featureMatchesYearWindow(
+        feature,
+        yearMin,
+        nextMax,
+        !nextFilters[REQUIRE_FOUND_YEAR_FILTER_KEY]
+      )
+    );
   }
 
   visibleInatCache = {

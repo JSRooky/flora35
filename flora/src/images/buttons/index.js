@@ -30,6 +30,7 @@ export { ReactComponent as CloseIcon } from "./close.svg";
 export { ReactComponent as HelpIcon } from "./help.svg";
 export { ReactComponent as LayersIcon } from "./layers.svg";
 export { ReactComponent as ClockIcon } from "./clock.svg";
+export { ReactComponent as CameraIcon } from "./camera.svg";
 export { ReactComponent as ClustersIcon } from "./clusters.svg";
 export { ReactComponent as DatabaseIcon } from "./database.svg";
 export { ReactComponent as LayersArchiveIcon } from "./layers-archive.svg";

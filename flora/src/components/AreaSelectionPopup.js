@@ -113,6 +113,8 @@ export default function AreaSelectionPopup({
   containedPoints = null,
   onPointSelect,
   onReset,
+  onSaveToTempLayer,
+  canSaveToTempLayer = false,
   collapsed = false,
   onCollapsedChange,
   onMinimize,
@@ -208,6 +210,14 @@ export default function AreaSelectionPopup({
             </p>
 
             <div className="area-selection-actions">
+              <button
+                type="button"
+                className="area-selection-save-temp-btn"
+                onClick={onSaveToTempLayer}
+                disabled={!canSaveToTempLayer}
+              >
+                Во временный слой
+              </button>
               <button
                 type="button"
                 className="area-selection-reset-btn"

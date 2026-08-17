@@ -87,9 +87,9 @@
   gap: 8px;
   min-height: 48px;
   padding: 8px 8px 8px 24px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 12px;
   background: #fff;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
 .temp-archive-row::before {
@@ -138,6 +138,60 @@
   font-size: 13px;
   font-weight: 600;
   color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.temp-archive-row--compact {
+  min-height: 24px;
+  gap: 2px;
+  padding: 1px 4px 1px 16px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.temp-archive-row--compact + .temp-archive-row--compact {
+  margin-top: -4px;
+}
+
+.temp-archive-row--compact::before {
+  width: 9px;
+  border-radius: 8px 0 0 8px;
+}
+
+.temp-archive-row--compact .temp-archive-row-title {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.temp-archive-row--compact .temp-archive-row-toggle {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+}
+
+.temp-archive-row-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.temp-archive-row-toggle:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: #111827;
 }
 
 .temp-archive-row-meta {

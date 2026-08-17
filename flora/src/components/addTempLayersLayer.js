@@ -5,6 +5,7 @@ import {
   getVisibleTempLayerFeatures,
   TEMP_LAYER_MARKER_PALETTE
 } from "../tempLayers/tempLayerStore";
+import { setTempLayerOverlaysData } from "./addTempLayerOverlaysLayer";
 import { safeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
 import {
   ensureDensePilesLayers,
@@ -597,6 +598,7 @@ export function setTempLayersData(map) {
   syncTempDensePilesLayers(map, denseClusterFeatures);
   attachInteractions(map);
   applyVisibility(map);
+  setTempLayerOverlaysData(map, { visible: layerVisible });
 }
 
 export function applyTempLayersGroupingMode(
@@ -659,10 +661,13 @@ export function setTempLayersVisibility(map, visible) {
   if (activeUnits.length === 0) {
     if (layerVisible) {
       setTempLayersData(map);
+    } else {
+      setTempLayerOverlaysData(map, { visible: false });
     }
     return;
   }
   applyVisibility(map);
+  setTempLayerOverlaysData(map, { visible: layerVisible });
 }
 
 export function getTempLayersInteractiveLayerIds() {

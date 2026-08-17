@@ -13,13 +13,34 @@ import {
   ClockIcon,
   EyeIcon,
   EyeOffIcon,
-  HelpIcon,
   LayersIcon,
   TrashIcon
 } from "../images/buttons";
 import { ReactComponent as LayersArchiveIcon } from "../images/layers-archive.svg";
 
 const HOVER_CLOSE_DELAY_MS = 160;
+
+function InfoIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <circle cx="12" cy="8.2" r="1.15" fill="currentColor" />
+      <rect x="11.15" y="10.4" width="1.7" height="6.2" rx="0.7" fill="currentColor" />
+    </svg>
+  );
+}
 
 function HeatmapIcon({ className }) {
   return (
@@ -66,10 +87,18 @@ function plaqueRowStyle(plaque) {
 }
 
 function plaqueOriginItems(plaque) {
-  if (plaque.filterSnapshot?.length) {
-    return plaque.filterSnapshot.map((entry) => entry.label);
-  }
   const items = [];
+  if (plaque.filterSnapshot?.length) {
+    plaque.filterSnapshot.forEach((entry) => items.push(entry.label));
+  }
+  (plaque.overlays || []).forEach((overlay) => {
+    if (overlay.label && !items.includes(overlay.label)) {
+      items.push(overlay.label);
+    }
+  });
+  if (items.length > 0) {
+    return items;
+  }
   if (plaque.taxonName) {
     items.push(plaque.taxonName);
   }
@@ -454,7 +483,7 @@ export default function TempLayersPicker({
                     );
                   }}
                 >
-                  <HelpIcon className="temp-layers-picker-info-icon" aria-hidden="true" focusable="false" />
+                  <InfoIcon className="temp-layers-picker-info-icon" />
                 </button>
                 {infoOpen ? (
                   <div
@@ -464,7 +493,9 @@ export default function TempLayersPicker({
                     onClick={(event) => event.stopPropagation()}
                   >
                     <p className="temp-layers-picker-info-title">
-                      {plaque.filterSnapshot?.length ? "Применённые фильтры" : "Условия выборки"}
+                      {plaque.filterSnapshot?.length || plaque.overlays?.length
+                        ? "Применённые фильтры"
+                        : "Условия выборки"}
                     </p>
                     {originItems.length > 0 ? (
                       <ul className="temp-layers-picker-info-list">

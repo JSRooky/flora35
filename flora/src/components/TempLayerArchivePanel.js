@@ -7,7 +7,7 @@ import {
   TEMP_SOURCE_IDS
 } from "../tempLayers/tempLayerStore";
 import {
-  ClockIcon,
+  CameraIcon,
   DownloadIcon,
   LayersIcon,
   TrashIcon
@@ -88,6 +88,7 @@ export default function TempLayerArchivePanel({
   const [entries, setEntries] = useState(() => getTempLayerArchiveIndex());
   const [busyId, setBusyId] = useState("");
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## temp-archive в docs/moduleHelp.md
+  const [collapsedIds, setCollapsedIds] = useState(() => new Set());
 
   useEffect(() => {
     return subscribeTempLayers(() => {
@@ -104,6 +105,18 @@ export default function TempLayerArchivePanel({
       String(entry.title || "").toLowerCase().includes(needle)
     );
   }, [entries, query]);
+
+  const togglePlaqueCollapsed = (archiveId) => {
+    setCollapsedIds((current) => {
+      const next = new Set(current);
+      if (next.has(archiveId)) {
+        next.delete(archiveId);
+      } else {
+        next.add(archiveId);
+      }
+      return next;
+    });
+  };
 
   const run = async (archiveId, action) => {
     setBusyId(archiveId);
@@ -170,16 +183,23 @@ export default function TempLayerArchivePanel({
             </p>
           ) : (
             <ul className="temp-archive-list">
-              {filtered.map((entry) => (
+              {filtered.map((entry) => {
+                const plaqueCollapsed = collapsedIds.has(entry.archiveId);
+                return (
                 <li
                   key={entry.archiveId}
-                  className={archiveRowClassName(entry)}
+                  className={`${archiveRowClassName(entry)}${
+                    plaqueCollapsed ? " temp-archive-row--compact" : ""
+                  }`}
                   style={archiveRowStyle(entry)}
                 >
                   <div className="temp-archive-row-body">
                     <div className="temp-archive-row-title">{entry.title}</div>
-                    <div className="temp-archive-row-meta">{formatMeta(entry)}</div>
+                    {plaqueCollapsed ? null : (
+                      <div className="temp-archive-row-meta">{formatMeta(entry)}</div>
+                    )}
                   </div>
+                  {plaqueCollapsed ? null : (
                   <div className="temp-archive-row-actions">
                     <button
                       type="button"
@@ -209,7 +229,7 @@ export default function TempLayerArchivePanel({
                       disabled={Boolean(busyId)}
                       onClick={() => run(entry.archiveId, (id) => onExport?.(id, "snapshot"))}
                     >
-                      <ClockIcon className="temp-archive-row-icon" />
+                      <CameraIcon className="temp-archive-row-icon" />
                     </button>
                     <button
                       type="button"
@@ -230,8 +250,28 @@ export default function TempLayerArchivePanel({
                       <TrashIcon className="temp-archive-row-icon" />
                     </button>
                   </div>
+                  )}
+                  <button
+                    type="button"
+                    className="temp-archive-row-toggle"
+                    onClick={() => togglePlaqueCollapsed(entry.archiveId)}
+                    aria-expanded={!plaqueCollapsed}
+                    aria-label={
+                      plaqueCollapsed
+                        ? `Развернуть «${entry.title}»`
+                        : `Свернуть «${entry.title}»`
+                    }
+                    title={
+                      plaqueCollapsed
+                        ? "Развернуть до прежнего размера"
+                        : "Свернуть в одну строку"
+                    }
+                  >
+                    {plaqueCollapsed ? "▾" : "▴"}
+                  </button>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </div>

@@ -160,13 +160,15 @@
 
 .area-selection-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 8px;
   padding-top: 10px;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
   flex-shrink: 0;
 }
 
+.area-selection-save-temp-btn,
 .area-selection-reset-btn {
   padding: 5px 12px;
   border-radius: 5px;
@@ -180,11 +182,13 @@
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
+.area-selection-save-temp-btn:hover:not(:disabled),
 .area-selection-reset-btn:hover:not(:disabled) {
   background: #f5f5f5;
   border-color: #999;
 }
 
+.area-selection-save-temp-btn:disabled,
 .area-selection-reset-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;

@@ -41,6 +41,7 @@ export function collectActiveMapFilters({
   statusFilters,
   regnumFilters,
   yearFilterEnabled,
+  hideMissingFoundYear,
   toolPointsFilterEnabled,
   boundsSpeciesRegnumFilter,
   denseClustersHighlight,
@@ -76,6 +77,11 @@ export function collectActiveMapFilters({
     entries.push({
       id: MAP_FILTER_IDS.YEAR,
       label: "Год находки"
+    });
+  } else if (hideMissingFoundYear) {
+    entries.push({
+      id: MAP_FILTER_IDS.YEAR,
+      label: "Без года скрыты"
     });
   }
 

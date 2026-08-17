@@ -72,6 +72,8 @@ export default function BufferPopup({
   onSelectionModeChange,
   onRadiusChange,
   onReset,
+  onSaveToTempLayer,
+  canSaveToTempLayer = false,
   toolBlocked = false,
   toolBlockedTitle,
   collapsed = false,
@@ -210,6 +212,14 @@ export default function BufferPopup({
               disabled={buildBlocked}
             >
               Добавить
+            </button>
+            <button
+              type="button"
+              className="buffer-save-temp-btn"
+              onClick={onSaveToTempLayer}
+              disabled={!canSaveToTempLayer || buildBlocked}
+            >
+              Во временный слой
             </button>
             <button
               type="button"

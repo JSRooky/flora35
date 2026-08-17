@@ -144,6 +144,8 @@ export default function SpeciesPolygonPopup({
   onBuildExtremePoints,
   onBuildAllPoints,
   onResetAll,
+  onSaveToTempLayer,
+  canSaveToTempLayer = false,
   onResetOne,
   onToggleHidden,
   onToggleBuildMode,
@@ -327,6 +329,14 @@ export default function SpeciesPolygonPopup({
                 </button>
               )}
             </div>
+            <button
+              type="button"
+              className="species-polygon-save-temp-btn"
+              onClick={onSaveToTempLayer}
+              disabled={!canSaveToTempLayer}
+            >
+              Во временный слой
+            </button>
           </div>
 
           <div className="species-polygon-popup-scroll">

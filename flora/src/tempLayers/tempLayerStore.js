@@ -16,6 +16,46 @@ function cloneFeature(feature) {
   }
 }
 
+function cloneJson(value) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeOverlays(raw) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map((entry) => {
+      const features = (Array.isArray(entry?.features) ? entry.features : [])
+        .map((feature) => cloneJson(feature))
+        .filter((feature) => feature?.geometry);
+      if (!features.length) {
+        return null;
+      }
+      return {
+        kind: String(entry?.kind || "shape"),
+        label: String(entry?.label || "").trim() || "Фигура",
+        features
+      };
+    })
+    .filter(Boolean);
+}
+
+function cloneSnapshotFeature(feature) {
+  const cloned = cloneFeature(feature);
+  if (!cloned.properties) {
+    cloned.properties = {};
+  }
+  delete cloned.properties.temp_layer_id;
+  delete cloned.properties.temp_marker_color;
+  return cloned;
+}
+
 function cloneFeatures(features) {
   return (features ?? []).map((feature) => cloneFeature(feature));
 }
@@ -351,13 +391,53 @@ function classifySnapshotSource(feature) {
   return TEMP_SOURCE_IDS.MAP;
 }
 
-function buildFilterSnapshotLabel(filters) {
-  const labels = (filters || []).map((entry) => entry.label).filter(Boolean);
-  if (labels.length === 0) {
-    return "Выборка";
+function formatSnapshotDate(iso) {
+  const date = iso ? new Date(iso) : new Date();
+  const safe = Number.isNaN(date.getTime()) ? new Date() : date;
+  const day = String(safe.getDate()).padStart(2, "0");
+  const month = String(safe.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}.${safe.getFullYear()}`;
+}
+
+const DATED_SNAPSHOT_LABEL = /^(\d{2}\.\d{2}\.\d{4}) · (\d{3})$/;
+
+function collectUsedSnapshotSerials(dateLabel) {
+  const used = new Set();
+  const remember = (text) => {
+    const match = DATED_SNAPSHOT_LABEL.exec(String(text || "").trim());
+    if (match && match[1] === dateLabel) {
+      used.add(match[2]);
+    }
+  };
+
+  layers.forEach((layer) => {
+    remember(layer.label);
+    remember(layer.taxonName);
+  });
+  archiveIndex.forEach((entry) => remember(entry.title));
+  return used;
+}
+
+function allocateSnapshotSerial(dateLabel) {
+  const used = collectUsedSnapshotSerials(dateLabel);
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    const serial = String(Math.floor(Math.random() * 1000)).padStart(3, "0");
+    if (!used.has(serial)) {
+      return serial;
+    }
   }
-  const joined = `Выборка · ${labels.join(", ")}`;
-  return joined.length > 72 ? `${joined.slice(0, 69)}…` : joined;
+  for (let index = 0; index < 1000; index += 1) {
+    const serial = String(index).padStart(3, "0");
+    if (!used.has(serial)) {
+      return serial;
+    }
+  }
+  return String(Date.now() % 1000).padStart(3, "0");
+}
+
+function buildDatedSnapshotLabel(createdAt) {
+  const dateLabel = formatSnapshotDate(createdAt);
+  return `${dateLabel} · ${allocateSnapshotSerial(dateLabel)}`;
 }
 
 function buildLayerLabel({ source, taxonName, regionIds }) {
@@ -477,28 +557,35 @@ export function commitTempLayerStaging() {
 
 /**
  * Сохраняет текущую отфильтрованную выборку карты во временный слой.
- * Точки уже существующих временных слоёв не копируются.
+ * Точки с уже существующих временных слоёв тоже входят в снимок (без дублей).
+ * Исходные временные слои скрываются, чтобы на карте осталась только выборка.
  */
-export function createTempLayerFromFilterSnapshot({ features, filters } = {}) {
+export function createTempLayerFromFilterSnapshot({ features, filters, overlays } = {}) {
   const filterSnapshot = normalizeFilterSnapshot(filters);
+  const overlaySnapshot = normalizeOverlays(overlays);
   const buckets = {
     [TEMP_SOURCE_IDS.GBIF]: [],
     [TEMP_SOURCE_IDS.INAT]: [],
     [TEMP_SOURCE_IDS.MAP]: []
   };
+  const seen = new Set();
 
   (Array.isArray(features) ? features : []).forEach((feature) => {
-    if (feature?.properties?.temp_layer_id) {
-      return;
+    const key = featureStableKey(feature);
+    if (key) {
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
     }
     const source = classifySnapshotSource(feature);
-    buckets[source].push(cloneFeature(feature));
+    buckets[source].push(cloneSnapshotFeature(feature));
   });
 
   const created = [];
   const groupKey = `filter:${createLayerId()}`;
   const createdAt = new Date().toISOString();
-  const label = buildFilterSnapshotLabel(filterSnapshot);
+  const label = buildDatedSnapshotLabel(createdAt);
 
   [
     TEMP_SOURCE_IDS.GBIF,
@@ -526,15 +613,44 @@ export function createTempLayerFromFilterSnapshot({ features, filters } = {}) {
       markerColor: null,
       archiveId: null,
       filterSnapshot,
+      overlays: overlaySnapshot,
       features: list
     });
   });
 
   if (created.length === 0) {
-    return { ok: false, reason: "empty" };
+    if (overlaySnapshot.length === 0) {
+      return { ok: false, reason: "empty" };
+    }
+    created.push({
+      id: createLayerId(),
+      label,
+      source: TEMP_SOURCE_IDS.MAP,
+      groupKey,
+      taxonName: label,
+      taxonMode: "filter-snapshot",
+      taxonKey: null,
+      familyKey: null,
+      inatTaxonId: null,
+      regionIds: [],
+      createdAt,
+      visible: true,
+      heatmapEnabled: false,
+      markerColor: null,
+      archiveId: null,
+      filterSnapshot,
+      overlays: overlaySnapshot,
+      features: []
+    });
   }
 
-  layers = [...created, ...layers];
+  const createdIds = new Set(created.map((layer) => layer.id));
+  layers = [
+    ...created,
+    ...layers.map((layer) =>
+      createdIds.has(layer.id) ? layer : { ...layer, visible: false }
+    )
+  ];
   emit();
   return { ok: true, layers: created };
 }
@@ -608,7 +724,8 @@ function normalizePersistedLayer(layer) {
     heatmapEnabled: Boolean(layer?.heatmapEnabled),
     markerColor: normalizeTempLayerMarkerColor(layer?.markerColor),
     archiveId: layer?.archiveId ? String(layer.archiveId) : null,
-    filterSnapshot: normalizeFilterSnapshot(layer?.filterSnapshot)
+    filterSnapshot: normalizeFilterSnapshot(layer?.filterSnapshot),
+    overlays: normalizeOverlays(layer?.overlays)
   };
 }
 
@@ -689,6 +806,27 @@ export function getTempLayerFeatureGroups() {
 
 export function getVisibleTempLayerFeatures() {
   return getTempLayerFeatureGroups().flatMap((group) => group.features);
+}
+
+/** Фигуры видимых временных слоёв (полигоны, буферы, радиусы, области). */
+export function getVisibleTempLayerOverlays() {
+  const overlays = [];
+  const seenGroups = new Set();
+
+  layers.forEach((layer) => {
+    if (!layer.visible) {
+      return;
+    }
+    const key = layerGroupKey(layer);
+    if (seenGroups.has(key)) {
+      return;
+    }
+    seenGroups.add(key);
+    const list = normalizeOverlays(layer.overlays);
+    list.forEach((overlay) => overlays.push(overlay));
+  });
+
+  return overlays;
 }
 
 /** Все точки временных слоёв и staging, включая скрытые слои. */
@@ -776,6 +914,7 @@ export function listTempLayerPlaques() {
         label: layer.taxonName || layer.label || sourceLabel(layer.source),
         markerColor: layer.markerColor ?? null,
         filterSnapshot: normalizeFilterSnapshot(layer.filterSnapshot),
+        overlays: normalizeOverlays(layer.overlays),
         layers: []
       };
       indexByKey.set(key, plaque);
@@ -787,6 +926,9 @@ export function listTempLayerPlaques() {
     }
     if (!plaque.filterSnapshot.length && layer.filterSnapshot?.length) {
       plaque.filterSnapshot = normalizeFilterSnapshot(layer.filterSnapshot);
+    }
+    if (!plaque.overlays?.length && layer.overlays?.length) {
+      plaque.overlays = normalizeOverlays(layer.overlays);
     }
     if (!plaque.taxonName && layer.taxonName) {
       plaque.taxonName = layer.taxonName;
@@ -875,6 +1017,7 @@ function serializeLayer(layer) {
     markerColor: layer.markerColor ?? null,
     archiveId: layer.archiveId ?? null,
     filterSnapshot: normalizeFilterSnapshot(layer.filterSnapshot),
+    overlays: normalizeOverlays(layer.overlays),
     features: layer.features
   };
 }
