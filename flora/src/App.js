@@ -84,6 +84,7 @@ import {
   showBoundsFeaturePopup,
   syncBoundsFeaturesVisibility
 } from "./components/addBoundsLayers";
+import { addRegionBoundsLayer, setRegionBoundsEnabled } from "./components/addRegionBoundsLayer";
 import OoptPanel from "./components/OoptPanel";
 import OoptFeaturePanel from "./components/OoptFeaturePanel";
 import BoundsSpeciesListPopup from "./components/BoundsSpeciesListPopup";
@@ -441,6 +442,7 @@ export default function MapView() {
   const [areaDrawingActive, setAreaDrawingActive] = useState(false);
   const [areaGeometry, setAreaGeometry] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
+  const [regionBoundsEnabled, setRegionBoundsVisible] = useState(false);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
   const [dataSourceMode, setDataSourceModeState] = useState(DEFAULT_DATA_SOURCE_MODE);
   const localDataActive =
@@ -3340,6 +3342,13 @@ export default function MapView() {
     if (!map.current || !mapReady) {
       return;
     }
+    setRegionBoundsEnabled(map.current, regionBoundsEnabled);
+  }, [mapReady, regionBoundsEnabled]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
 
     if (basemapMode === BASEMAP_MODES.YANDEX) {
       setOsmBasemapEnabled(map.current, false);
@@ -5036,6 +5045,7 @@ export default function MapView() {
           clusterPieChartsEnabled: DEFAULT_CLUSTER_PIE_CHARTS,
           markersVisible: DEFAULT_MARKERS_VISIBLE
         });
+        addRegionBoundsLayer(mapInstance);
         addBoundsLayers(mapInstance);
         addArealLayer(mapInstance);
         addSpeciesPolygonLayer(mapInstance); // слой экспериментального модуля «Полигон»
@@ -5467,6 +5477,8 @@ export default function MapView() {
         bufferBlocked={isArealApplied}
         hoverTooltipsDisabled={hoverTooltipsDisabled}
         onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
+        regionBoundsEnabled={regionBoundsEnabled}
+        onRegionBoundsEnabledChange={setRegionBoundsVisible}
         dataSourceMode={dataSourceMode}
         onDataSourceModeChange={handleDataSourceModeChange}
         dataSourcesPanelOpen={dataSourcesPanelOpen}
