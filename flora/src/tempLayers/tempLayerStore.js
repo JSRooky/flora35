@@ -373,11 +373,58 @@ function normalizeFilterSnapshot(snapshot) {
     return [];
   }
   return snapshot
-    .map((entry) => ({
-      id: String(entry?.id || ""),
-      label: String(entry?.label || "").trim()
-    }))
-    .filter((entry) => entry.label);
+    .map((entry) => {
+      const label = String(entry?.label || "").trim();
+      if (!label) {
+        return null;
+      }
+      const details = Array.isArray(entry?.details)
+        ? entry.details.map((item) => String(item || "").trim()).filter(Boolean)
+        : [];
+      return {
+        id: String(entry?.id || ""),
+        label,
+        details
+      };
+    })
+    .filter(Boolean);
+}
+
+export function listTempLayerOriginItems({
+  filterSnapshot,
+  overlays,
+  taxonName,
+  layers: plaqueLayers
+} = {}) {
+  const items = [];
+  normalizeFilterSnapshot(filterSnapshot).forEach((entry) => {
+    items.push({
+      label: entry.label,
+      details: entry.details
+    });
+  });
+  (overlays || []).forEach((overlay) => {
+    const label = String(overlay?.label || "").trim();
+    if (label && !items.some((item) => item.label === label)) {
+      items.push({ label, details: [] });
+    }
+  });
+  if (items.length > 0) {
+    return items;
+  }
+  if (taxonName) {
+    items.push({ label: taxonName, details: [] });
+  }
+  const regionIds = new Set();
+  (plaqueLayers || []).forEach((layer) => {
+    (layer.regionIds || []).forEach((id) => regionIds.add(id));
+  });
+  if (regionIds.size === 1) {
+    items.push({ label: "1 регион", details: [] });
+  } else if (regionIds.size > 1) {
+    items.push({ label: `${regionIds.size} регионов`, details: [] });
+  }
+  return items;
 }
 
 function classifySnapshotSource(feature) {
@@ -1060,9 +1107,20 @@ export function toArchiveIndexEntry(record) {
   const recordLayers = Array.isArray(record?.layers) ? record.layers : [];
   const regionIds = new Set();
   let pointCount = 0;
+  let filterSnapshot = [];
+  const overlayLabels = [];
   recordLayers.forEach((layer) => {
     pointCount += layer.features?.length ?? 0;
     (layer.regionIds || []).forEach((id) => regionIds.add(id));
+    if (!filterSnapshot.length && layer.filterSnapshot?.length) {
+      filterSnapshot = normalizeFilterSnapshot(layer.filterSnapshot);
+    }
+    (layer.overlays || []).forEach((overlay) => {
+      const label = String(overlay?.label || "").trim();
+      if (label && !overlayLabels.includes(label)) {
+        overlayLabels.push(label);
+      }
+    });
   });
 
   return {
@@ -1075,6 +1133,8 @@ export function toArchiveIndexEntry(record) {
     updatedAt: record.updatedAt,
     sources: recordLayers.map((layer) => normalizeTempSource(layer.source)),
     pointCount,
-    regionCount: regionIds.size
+    regionCount: regionIds.size,
+    filterSnapshot,
+    overlayLabels
   };
 }

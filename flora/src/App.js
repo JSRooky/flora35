@@ -4084,6 +4084,7 @@ export default function MapView() {
         statusFilters,
         regnumFilters,
         yearFilterEnabled,
+        yearRange,
         hideMissingFoundYear,
         toolPointsFilterEnabled,
         boundsSpeciesRegnumFilter,
@@ -4096,13 +4097,16 @@ export default function MapView() {
             query: speciesSearchQuery,
             nameLatin: speciesSearchSelectedLatin
           })
-        )
+        ),
+        speciesSearchQuery,
+        speciesSearchSelectedLatin
       }),
     [
       propertyFilters,
       statusFilters,
       regnumFilters,
       yearFilterEnabled,
+      yearRange,
       hideMissingFoundYear,
       toolPointsFilterEnabled,
       boundsSpeciesRegnumFilter,

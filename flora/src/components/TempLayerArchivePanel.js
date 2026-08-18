@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   getTempLayerArchiveIndex,
+  listTempLayerOriginItems,
   resolveTempSourceMarkerColor,
   subscribeTempLayers,
   formatTempSourceLabel,
@@ -18,6 +19,28 @@ import PanelCloseButton from "./PanelCloseButton";
 import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/TempLayerArchivePanel.css";
+
+function InfoIcon({ className }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <circle cx="12" cy="8.2" r="1.15" fill="currentColor" />
+      <rect x="11.15" y="10.4" width="1.7" height="6.2" rx="0.7" fill="currentColor" />
+    </svg>
+  );
+}
 
 function archiveRowStyle(entry) {
   const gbifColor = resolveTempSourceMarkerColor(
@@ -69,6 +92,13 @@ function formatMeta(entry) {
   return [sources, regions, `${points} т.`, date].filter(Boolean).join(" · ");
 }
 
+function archiveOriginItems(entry) {
+  return listTempLayerOriginItems({
+    filterSnapshot: entry.filterSnapshot,
+    overlays: (entry.overlayLabels || []).map((label) => ({ label }))
+  });
+}
+
 export default function TempLayerArchivePanel({
   collapsed: collapsedProp,
   onCollapsedChange,
@@ -89,6 +119,8 @@ export default function TempLayerArchivePanel({
   const [busyId, setBusyId] = useState("");
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## temp-archive в docs/moduleHelp.md
   const [collapsedIds, setCollapsedIds] = useState(() => new Set());
+  const [infoMenuArchiveId, setInfoMenuArchiveId] = useState(null);
+  const infoMenuRef = useRef(null);
 
   useEffect(() => {
     return subscribeTempLayers(() => {
@@ -107,6 +139,7 @@ export default function TempLayerArchivePanel({
   }, [entries, query]);
 
   const togglePlaqueCollapsed = (archiveId) => {
+    setInfoMenuArchiveId((current) => (current === archiveId ? null : current));
     setCollapsedIds((current) => {
       const next = new Set(current);
       if (next.has(archiveId)) {
@@ -117,6 +150,39 @@ export default function TempLayerArchivePanel({
       return next;
     });
   };
+
+  useEffect(() => {
+    if (collapsed) {
+      setInfoMenuArchiveId(null);
+    }
+  }, [collapsed]);
+
+  useEffect(() => {
+    if (!infoMenuArchiveId) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setInfoMenuArchiveId(null);
+      }
+    };
+
+    const handlePointerDown = (event) => {
+      const root = infoMenuRef.current;
+      if (root && event.target instanceof Node && root.contains(event.target)) {
+        return;
+      }
+      setInfoMenuArchiveId(null);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [infoMenuArchiveId]);
 
   const run = async (archiveId, action) => {
     setBusyId(archiveId);
@@ -129,7 +195,9 @@ export default function TempLayerArchivePanel({
 
   return (
     <aside
-      className={`temp-archive-panel${collapsed ? " temp-archive-panel--collapsed" : ""}`}
+      className={`temp-archive-panel${collapsed ? " temp-archive-panel--collapsed" : ""}${
+        infoMenuArchiveId ? " temp-archive-panel--overlay-open" : ""
+      }`}
       aria-label="Архив временных слоёв"
     >
       <div className="temp-archive-panel-header">
@@ -182,14 +250,22 @@ export default function TempLayerArchivePanel({
                 : "Ничего не найдено."}
             </p>
           ) : (
-            <ul className="temp-archive-list">
+            <ul
+              className={`temp-archive-list${
+                infoMenuArchiveId ? " temp-archive-list--overlay-open" : ""
+              }`}
+            >
               {filtered.map((entry) => {
                 const plaqueCollapsed = collapsedIds.has(entry.archiveId);
+                const infoOpen = infoMenuArchiveId === entry.archiveId;
+                const originItems = infoOpen ? archiveOriginItems(entry) : [];
                 return (
                 <li
                   key={entry.archiveId}
                   className={`${archiveRowClassName(entry)}${
                     plaqueCollapsed ? " temp-archive-row--compact" : ""
+                  }${
+                    infoOpen ? " temp-archive-row--info-open" : ""
                   }`}
                   style={archiveRowStyle(entry)}
                 >
@@ -201,6 +277,67 @@ export default function TempLayerArchivePanel({
                   </div>
                   {plaqueCollapsed ? null : (
                   <div className="temp-archive-row-actions">
+                    <div
+                      className="temp-archive-row-info-wrap"
+                      ref={infoOpen ? infoMenuRef : null}
+                    >
+                    <button
+                      type="button"
+                      className={`temp-archive-row-button temp-archive-row-info${
+                        infoOpen ? " temp-archive-row-info--on" : ""
+                      }`}
+                      title="Информация о слое"
+                      aria-expanded={infoOpen}
+                      aria-label={`Информация о слое «${entry.title}»`}
+                      disabled={Boolean(busyId)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setInfoMenuArchiveId((current) =>
+                          current === entry.archiveId ? null : entry.archiveId
+                        );
+                      }}
+                    >
+                      <InfoIcon className="temp-archive-row-icon" />
+                    </button>
+                    {infoOpen ? (
+                      <div
+                        className="temp-archive-row-info-popup"
+                        role="dialog"
+                        aria-label={`Фильтры слоя «${entry.title}»`}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <p className="temp-archive-row-info-title">
+                          {entry.filterSnapshot?.length || entry.overlayLabels?.length
+                            ? "Применённые фильтры"
+                            : "Условия выборки"}
+                        </p>
+                        {originItems.length > 0 ? (
+                          <ul className="temp-archive-row-info-list">
+                            {originItems.map((item, index) => (
+                              <li key={`${entry.archiveId}-${item.label}-${index}`}>
+                                {item.label}
+                                {item.details?.length ? (
+                                  <ul className="temp-archive-row-info-details">
+                                    {item.details.map((detail, detailIndex) => (
+                                      <li
+                                        key={`${item.label}-${detail}-${detailIndex}`}
+                                      >
+                                        {detail}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="temp-archive-row-info-empty">
+                            Нет сохранённых условий.
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
+                    </div>
                     <button
                       type="button"
                       className="temp-archive-row-button"

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   getTempLayers,
+  listTempLayerOriginItems,
   listTempLayerPlaques,
   normalizeTempSource,
   resolveTempSourceMarkerColor,
@@ -87,31 +88,7 @@ function plaqueRowStyle(plaque) {
 }
 
 function plaqueOriginItems(plaque) {
-  const items = [];
-  if (plaque.filterSnapshot?.length) {
-    plaque.filterSnapshot.forEach((entry) => items.push(entry.label));
-  }
-  (plaque.overlays || []).forEach((overlay) => {
-    if (overlay.label && !items.includes(overlay.label)) {
-      items.push(overlay.label);
-    }
-  });
-  if (items.length > 0) {
-    return items;
-  }
-  if (plaque.taxonName) {
-    items.push(plaque.taxonName);
-  }
-  const regionIds = new Set();
-  plaque.layers.forEach((layer) => {
-    (layer.regionIds || []).forEach((id) => regionIds.add(id));
-  });
-  if (regionIds.size === 1) {
-    items.push("1 регион");
-  } else if (regionIds.size > 1) {
-    items.push(`${regionIds.size} регионов`);
-  }
-  return items;
+  return listTempLayerOriginItems(plaque);
 }
 
 function plaqueTitle(plaque) {
@@ -316,7 +293,9 @@ export default function TempLayersPicker({
       >
         <div
           className={`external-layers-picker-panel temp-layers-picker-panel${
-            colorMenuLayerId ? " temp-layers-picker-panel--palette-open" : ""
+            colorMenuLayerId || infoMenuLayerId
+              ? " temp-layers-picker-panel--palette-open"
+              : ""
           }`}
           role="listbox"
           aria-label="Временные слои"
@@ -500,7 +479,18 @@ export default function TempLayersPicker({
                     {originItems.length > 0 ? (
                       <ul className="temp-layers-picker-info-list">
                         {originItems.map((item, index) => (
-                          <li key={`${item}-${index}`}>{item}</li>
+                          <li key={`${item.label}-${index}`}>
+                            {item.label}
+                            {item.details?.length ? (
+                              <ul className="temp-layers-picker-info-details">
+                                {item.details.map((detail, detailIndex) => (
+                                  <li key={`${item.label}-${detail}-${detailIndex}`}>
+                                    {detail}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </li>
                         ))}
                       </ul>
                     ) : (
