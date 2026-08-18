@@ -1,0 +1,16 @@
+.region-bounds-settings-dialog {
+  width: min(400px, calc(100vw - 32px));
+  max-height: min(90vh, 520px);
+}
+
+.region-bounds-settings-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.region-bounds-settings-fields .heatmap-settings-color {
+  width: 42px;
+  height: 28px;
+}

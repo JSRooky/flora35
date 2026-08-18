@@ -295,6 +295,7 @@ export default function ModuleMenu({
   onHoverTooltipsDisabledChange,
   regionBoundsEnabled = false,
   onRegionBoundsEnabledChange,
+  onRegionBoundsSettingsOpen,
   dataSourceMode,
   onDataSourceModeChange,
   dataSourcesPanelOpen = false,
@@ -406,15 +407,25 @@ export default function ModuleMenu({
             />
           </li>
           <li className="module-menu-toggle-item">
-            <label className="module-menu-switch" title="Показать границы субъектов Российской Федерации">
-              <input
-                type="checkbox"
-                checked={regionBoundsEnabled}
-                onChange={(event) => onRegionBoundsEnabledChange?.(event.target.checked)}
-              />
-              <span className="module-menu-switch-slider" aria-hidden="true" />
-              <span className="module-menu-switch-label">Регионы</span>
-            </label>
+            <div className="module-menu-toggle-row">
+              <label className="module-menu-switch" title="Показать границы субъектов Российской Федерации">
+                <input
+                  type="checkbox"
+                  checked={regionBoundsEnabled}
+                  onChange={(event) => onRegionBoundsEnabledChange?.(event.target.checked)}
+                />
+                <span className="module-menu-switch-slider" aria-hidden="true" />
+                <span className="module-menu-switch-label">Регионы</span>
+              </label>
+              <button
+                type="button"
+                className="module-menu-settings-btn"
+                title="Настроить отображение регионов"
+                onClick={() => onRegionBoundsSettingsOpen?.()}
+              >
+                Настроить
+              </button>
+            </div>
           </li>
           <li className="module-menu-toggle-item">
             <label className="module-menu-switch" title="Показывать подсказки при наведении на точки и кластеры">

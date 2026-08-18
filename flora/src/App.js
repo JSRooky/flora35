@@ -84,7 +84,7 @@ import {
   showBoundsFeaturePopup,
   syncBoundsFeaturesVisibility
 } from "./components/addBoundsLayers";
-import { addRegionBoundsLayer, setRegionBoundsEnabled } from "./components/addRegionBoundsLayer";
+import { addRegionBoundsLayer, applyRegionBoundsPaintSettings, setRegionBoundsEnabled } from "./components/addRegionBoundsLayer";
 import OoptPanel from "./components/OoptPanel";
 import OoptFeaturePanel from "./components/OoptFeaturePanel";
 import BoundsSpeciesListPopup from "./components/BoundsSpeciesListPopup";
@@ -184,6 +184,11 @@ import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
 import HeatmapSettingsPanel from "./components/HeatmapSettingsPanel";
 import { loadHeatmapSettingsFromStorage, saveHeatmapSettingsToStorage } from "./components/heatmapSettings";
+import RegionBoundsSettingsPanel from "./components/RegionBoundsSettingsPanel";
+import {
+  loadRegionBoundsSettingsFromStorage,
+  saveRegionBoundsSettingsToStorage
+} from "./components/regionBoundsSettings";
 import DataWorkPanel from "./components/DataWorkPanel";
 import TempLayerArchivePanel from "./components/TempLayerArchivePanel";
 import NearSpeciesMatchesPopup from "./components/NearSpeciesMatchesPopup";
@@ -379,9 +384,17 @@ export default function MapView() {
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
   const [heatmapSettingsOpen, setHeatmapSettingsOpen] = useState(false);
   const [heatmapSettings, setHeatmapSettings] = useState(loadHeatmapSettingsFromStorage);
+  const [regionBoundsSettingsOpen, setRegionBoundsSettingsOpen] = useState(false);
+  const [regionBoundsSettings, setRegionBoundsSettings] = useState(
+    loadRegionBoundsSettingsFromStorage
+  );
   const handleHeatmapSettingsChange = (next) => {
     setHeatmapSettings(next);
     saveHeatmapSettingsToStorage(next);
+  };
+  const handleRegionBoundsSettingsChange = (next) => {
+    setRegionBoundsSettings(next);
+    saveRegionBoundsSettingsToStorage(next);
   };
   const [boundsFeatureVisibility, setBoundsFeatureVisibility] = useState({});
   const [boundsCatalogByLayerId, setBoundsCatalogByLayerId] = useState({});
@@ -3343,7 +3356,8 @@ export default function MapView() {
       return;
     }
     setRegionBoundsEnabled(map.current, regionBoundsEnabled);
-  }, [mapReady, regionBoundsEnabled]);
+    applyRegionBoundsPaintSettings(map.current, regionBoundsSettings);
+  }, [mapReady, regionBoundsEnabled, regionBoundsSettings]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -5479,6 +5493,7 @@ export default function MapView() {
         onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
         regionBoundsEnabled={regionBoundsEnabled}
         onRegionBoundsEnabledChange={setRegionBoundsVisible}
+        onRegionBoundsSettingsOpen={() => setRegionBoundsSettingsOpen(true)}
         dataSourceMode={dataSourceMode}
         onDataSourceModeChange={handleDataSourceModeChange}
         dataSourcesPanelOpen={dataSourcesPanelOpen}
@@ -6058,6 +6073,12 @@ export default function MapView() {
         settings={heatmapSettings}
         onSettingsChange={handleHeatmapSettingsChange}
         onClose={() => setHeatmapSettingsOpen(false)}
+      />
+      <RegionBoundsSettingsPanel
+        open={regionBoundsSettingsOpen}
+        settings={regionBoundsSettings}
+        onSettingsChange={handleRegionBoundsSettingsChange}
+        onClose={() => setRegionBoundsSettingsOpen(false)}
       />
     </>
   );
