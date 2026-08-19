@@ -2,6 +2,9 @@ import { circle } from "@turf/turf";
 import { buildBufferRings } from "../components/addBufferLayer";
 import { geometryToFeature } from "../components/addAreaSelectionLayer";
 import {
+  collectRegionSelectionOverlayFeatures
+} from "../components/addRegionBoundsLayer";
+import {
   getPointColorForRegnum,
   getUnclusteredFeatures
 } from "../components/addLocationsLayer";
@@ -93,7 +96,9 @@ export function collectMapToolOverlays({
   arealAllMarkers = false,
   arealRadius = 0,
   arealCenterFeature = null,
-  areaGeometry = null
+  areaGeometry = null,
+  selectedRegionFeatures = [],
+  regionBufferKm = 0
 } = {}) {
   const allowed = Array.isArray(kinds) && kinds.length > 0 ? new Set(kinds) : null;
   const include = (kind) => !allowed || allowed.has(kind);
@@ -173,6 +178,16 @@ export function collectMapToolOverlays({
     ]);
     if (areaOverlay) {
       overlays.push(areaOverlay);
+    }
+  }
+
+  if (include(TEMP_OVERLAY_KINDS.REGIONS)) {
+    const regionOverlay = overlayEntry(
+      TEMP_OVERLAY_KINDS.REGIONS,
+      collectRegionSelectionOverlayFeatures(selectedRegionFeatures, regionBufferKm)
+    );
+    if (regionOverlay) {
+      overlays.push(regionOverlay);
     }
   }
 

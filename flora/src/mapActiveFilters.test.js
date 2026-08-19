@@ -29,4 +29,17 @@ describe("collectActiveMapFilters", () => {
       details: ["1990–2020"]
     });
   });
+
+  it("includes selected regions as a map filter", () => {
+    const entries = collectActiveMapFilters({
+      selectedRegionNames: ["Вологодская область", "Архангельская область"],
+      regionBufferKm: 12
+    });
+
+    expect(entries[0]).toEqual({
+      id: MAP_FILTER_IDS.REGION_BOUNDS,
+      label: "Регионы",
+      details: ["Вологодская область", "Архангельская область", "буфер 12 км"]
+    });
+  });
 });

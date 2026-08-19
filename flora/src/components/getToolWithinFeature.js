@@ -2,6 +2,7 @@ import { bboxPolygon, circle, featureCollection, union } from "@turf/turf";
 import { getUnclusteredFeatures } from "./addLocationsLayer";
 import { geometryToFeature } from "./addAreaSelectionLayer";
 import { getBufferOuterFeature } from "./addBufferLayer";
+import { getRegionSelectionWithinFeature } from "./addRegionBoundsLayer";
 import { MODULE_IDS } from "./ModuleMenu";
 
 function unionCircleFeatures(circleFeatures) {
@@ -92,16 +93,18 @@ export function isOoptPointsFilterActive(toolPointsFilterEnabled, selectedBounds
   return Boolean(toolPointsFilterEnabled?.[MODULE_IDS.OOPT] && getOoptWithinFeature(selectedBoundsFeature));
 }
 
-/** GeoJSON выбранного субъекта РФ для фильтра точек. */
-export function getRegionWithinFeature(selectedRegionFeature) {
-  return selectedRegionFeature?.geometry ? selectedRegionFeature : null;
+/** GeoJSON выбранных субъектов РФ (с буфером) для фильтра точек. */
+export function getRegionWithinFeature(selectedRegionFeature, extraFeatures = [], bufferKm = 0) {
+  const features = [
+    ...(Array.isArray(extraFeatures) ? extraFeatures : []),
+    ...(selectedRegionFeature?.geometry ? [selectedRegionFeature] : [])
+  ];
+  return getRegionSelectionWithinFeature(features, bufferKm);
 }
 
-/** Активен ли глобальный фильтр по выбранному субъекту. */
-export function isRegionPointsFilterActive(toolPointsFilterEnabled, selectedRegionFeature) {
-  return Boolean(
-    toolPointsFilterEnabled?.[MODULE_IDS.REGIONS] && getRegionWithinFeature(selectedRegionFeature)
-  );
+/** Активен ли пространственный фильтр по выбранным субъектам. */
+export function isRegionPointsFilterActive(selectedRegionFeature, extraFeatures = [], bufferKm = 0) {
+  return Boolean(getRegionWithinFeature(selectedRegionFeature, extraFeatures, bufferKm));
 }
 
 /**
@@ -123,7 +126,9 @@ export function getToolWithinFeature({
   intersectionResult = null,
   areaGeometry = null,
   selectedBoundsFeature = null,
-  selectedRegionFeature = null
+  selectedRegionFeature = null,
+  selectedRegionFeatures = [],
+  regionBufferKm = 0
 }) {
   switch (moduleId) {
     case MODULE_IDS.MAP:
@@ -172,7 +177,14 @@ export function getToolWithinFeature({
       return selectedBoundsFeature?.feature?.geometry ? selectedBoundsFeature.feature : null;
 
     case MODULE_IDS.REGIONS:
-      return selectedRegionFeature?.geometry ? selectedRegionFeature : null;
+      return getRegionSelectionWithinFeature(
+        selectedRegionFeatures.length
+          ? selectedRegionFeatures
+          : selectedRegionFeature?.geometry
+            ? [selectedRegionFeature]
+            : [],
+        regionBufferKm
+      );
 
     default:
       return null;

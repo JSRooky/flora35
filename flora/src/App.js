@@ -92,9 +92,9 @@ import {
   applyRegionBoundsPaintSettings,
   buildRegionCatalog,
   flyToRegionBoundsFeature,
-  getRegionEntryByIso,
   getRegionFeatureAtClick,
   hideRegionActionPopup,
+  getRegionSelectionWithinFeature,
   loadRegionBoundsGeoJSON,
   setRegionBoundsEnabled,
   setRegionBoundsSelectHandler,
@@ -165,9 +165,7 @@ import {
 import {
   getToolWithinFeature,
   getOoptWithinFeature,
-  getRegionWithinFeature,
   isOoptPointsFilterActive,
-  isRegionPointsFilterActive,
   isPolygonToolActive,
   resolveToolPointsFilterModule
 } from "./components/getToolWithinFeature";
@@ -238,8 +236,8 @@ import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
 import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
 import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles } from "./components/addTempLayersLayer";
-import { addTempLayerOverlaysLayer } from "./components/addTempLayerOverlaysLayer";
-import { commitRegionSelectionTempLayer, deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
+import { addTempLayerOverlaysLayer, applyTempRegionOverlayPaint } from "./components/addTempLayerOverlaysLayer";
+import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
 import {
   collectMapToolOverlays,
   TEMP_OVERLAY_KINDS,
@@ -422,6 +420,18 @@ export default function MapView() {
   };
   const handleRegionBoundsSettingsChange = (next) => {
     setRegionBoundsSettings(next);
+    const overlayEdit = getVisibleRegionOverlayEditState();
+    if (overlayEdit.active) {
+      patchVisibleRegionOverlays({ style: next });
+      persistTempLayers().catch(() => {});
+      if (map.current) {
+        applyTempRegionOverlayPaint(map.current, {
+          settings: next,
+          featureColors: overlayEdit.featureColors
+        });
+      }
+      return;
+    }
     saveRegionBoundsSettingsToStorage(next);
   };
   const [regionFeatureColors, setRegionFeatureColors] = useState(null);
@@ -491,21 +501,59 @@ export default function MapView() {
   const [selectedRegionIsos, setSelectedRegionIsos] = useState([]);
   const [regionAddMode, setRegionAddMode] = useState(false);
   const [regionBufferKm, setRegionBufferKm] = useState(0);
+  const [overlayRegionBufferKm, setOverlayRegionBufferKm] = useState(0);
+  const overlayRegionModeRef = useRef(false);
   const selectedRegionIsosRef = useRef([]);
   const regionAddModeRef = useRef(false);
   const hiddenRegionIsosRef = useRef([]);
   const regionCatalogRef = useRef([]);
   const selectedRegionIso = selectedRegionIsos[selectedRegionIsos.length - 1] ?? null;
-  const [regionFilterFeature, setRegionFilterFeature] = useState(null);
   const handleRegionBoundsRandomizeColors = useCallback((styleId) => {
+    const overlayEdit = getVisibleRegionOverlayEditState();
+    if (overlayEdit.active) {
+      const colors = createRandomRegionColorMap(overlayEdit.isos, styleId);
+      patchVisibleRegionOverlays({
+        featureColors: colors,
+        style: regionBoundsSettings
+      });
+      persistTempLayers().catch(() => {});
+      if (map.current) {
+        setTempLayersData(map.current);
+        applyTempRegionOverlayPaint(map.current, {
+          settings: regionBoundsSettings,
+          featureColors: colors
+        });
+      }
+      return;
+    }
     setRegionFeatureColors(
       createRandomRegionColorMap(
         regionCatalog.map((entry) => entry.iso),
         styleId
       )
     );
-  }, [regionCatalog]);
+  }, [regionBoundsSettings, regionCatalog]);
   const handleRegionBoundsClearFeatureColors = useCallback(() => {
+    const overlayEdit = getVisibleRegionOverlayEditState();
+    if (overlayEdit.active) {
+      const colors = createSubtleRegionColorMap(
+        overlayEdit.isos,
+        regionBoundsSettings.fillColor
+      );
+      patchVisibleRegionOverlays({
+        featureColors: colors,
+        style: regionBoundsSettings
+      });
+      persistTempLayers().catch(() => {});
+      if (map.current) {
+        setTempLayersData(map.current);
+        applyTempRegionOverlayPaint(map.current, {
+          settings: regionBoundsSettings,
+          featureColors: colors
+        });
+      }
+      return;
+    }
     setRegionFeatureColors(
       createSubtleRegionColorMap(
         regionCatalog.map((entry) => entry.iso),
@@ -528,6 +576,10 @@ export default function MapView() {
     [EXTERNAL_LAYER_IDS.INATURALIST]: true
   });
   const [tempLayersRevision, setTempLayersRevision] = useState(0);
+  const overlayRegionEdit = useMemo(
+    () => getVisibleRegionOverlayEditState(),
+    [tempLayersRevision]
+  );
   const [externalProcessingActive, setExternalProcessingActive] = useState(false);
   const [nearSpeciesMatchesActive, setNearSpeciesMatchesActive] = useState(false);
   const [unattributedPointsActive, setUnattributedPointsActive] = useState(false);
@@ -1184,7 +1236,7 @@ export default function MapView() {
 
         if (
           nextModuleId === MODULE_IDS.REGIONS &&
-          toolPointsFilterEnabled[MODULE_IDS.REGIONS]
+          selectedRegionIsosRef.current.length > 0
         ) {
           return current;
         }
@@ -1583,7 +1635,7 @@ export default function MapView() {
     polygonDockedWithFeature,
     activeModule,
     ooptPointsFilterEnabled: Boolean(toolPointsFilterEnabled[MODULE_IDS.OOPT]),
-    regionPointsFilterEnabled: Boolean(toolPointsFilterEnabled[MODULE_IDS.REGIONS])
+    regionPointsFilterEnabled: selectedRegionIsos.length > 0
   };
 
   const submissionStateRef = useRef({});
@@ -1804,27 +1856,20 @@ export default function MapView() {
     [regionCatalog, selectedRegionIsos]
   );
 
-  const selectedRegionEntry = useMemo(
-    () => regionCatalog.find((entry) => entry.iso === selectedRegionIso) ?? getRegionEntryByIso(selectedRegionIso),
-    [regionCatalog, selectedRegionIso]
+  const selectedRegionFeatures = useMemo(
+    () =>
+      selectedRegionIsos
+        .map((iso) => regionCatalog.find((entry) => entry.iso === iso)?.feature)
+        .filter(Boolean),
+    [regionCatalog, selectedRegionIsos]
   );
-
-  const regionFilterTarget = useMemo(() => {
-    if (!toolPointsFilterEnabled[MODULE_IDS.REGIONS]) {
-      return selectedRegionEntry?.feature ?? null;
-    }
-    return regionFilterFeature ?? selectedRegionEntry?.feature ?? null;
-  }, [toolPointsFilterEnabled, regionFilterFeature, selectedRegionEntry]);
 
   const regionWithinFeature = useMemo(
-    () => getRegionWithinFeature(regionFilterTarget),
-    [regionFilterTarget]
+    () => getRegionSelectionWithinFeature(selectedRegionFeatures, regionBufferKm),
+    [regionBufferKm, selectedRegionFeatures]
   );
 
-  const regionPointsFilterActive = useMemo(
-    () => isRegionPointsFilterActive(toolPointsFilterEnabled, regionFilterTarget),
-    [toolPointsFilterEnabled, regionFilterTarget]
-  );
+  const regionPointsFilterActive = selectedRegionFeatures.length > 0;
 
   const activeToolWithinFeature = useMemo(() => {
     const mapInstance = mapReady ? map.current : null;
@@ -1845,7 +1890,8 @@ export default function MapView() {
       intersectionResult,
       areaGeometry,
       selectedBoundsFeature,
-      selectedRegionFeature: regionFilterTarget
+      selectedRegionFeatures,
+      regionBufferKm
     });
   }, [
     activeToolFilterModule,
@@ -1862,7 +1908,8 @@ export default function MapView() {
     intersectionResult,
     areaGeometry,
     selectedBoundsFeature,
-    regionFilterTarget,
+    selectedRegionFeatures,
+    regionBufferKm,
     mapReady
   ]);
 
@@ -3509,7 +3556,15 @@ export default function MapView() {
       return;
     }
     setRegionBoundsEnabled(map.current, regionBoundsEnabled);
-    applyRegionBoundsPaintSettings(map.current, regionBoundsSettings, regionFeatureColors);
+    if (!overlayRegionEdit.active) {
+      applyRegionBoundsPaintSettings(map.current, regionBoundsSettings, regionFeatureColors);
+    } else {
+      const overlayEdit = getVisibleRegionOverlayEditState();
+      applyTempRegionOverlayPaint(map.current, {
+        settings: overlayEdit.style || regionBoundsSettings,
+        featureColors: overlayEdit.featureColors
+      });
+    }
 
     const allVisible = hiddenRegionIsos.length === 0;
     const visibleIsos = allVisible
@@ -3527,11 +3582,33 @@ export default function MapView() {
     hiddenRegionIsos,
     hiddenRegionIsoSet,
     regionCatalog,
-    selectedRegionIsos
+    selectedRegionIsos,
+    overlayRegionEdit
   ]);
 
   useEffect(() => {
+    if (overlayRegionEdit.active && !overlayRegionModeRef.current) {
+      setOverlayRegionBufferKm(overlayRegionEdit.bufferKm);
+      if (overlayRegionEdit.style) {
+        setRegionBoundsSettings(overlayRegionEdit.style);
+      }
+    } else if (!overlayRegionEdit.active && overlayRegionModeRef.current) {
+      setRegionBoundsSettings(loadRegionBoundsSettingsFromStorage());
+    }
+    overlayRegionModeRef.current = overlayRegionEdit.active;
+  }, [overlayRegionEdit.active, overlayRegionEdit.bufferKm, overlayRegionEdit.style]);
+
+  useEffect(() => {
     if (!map.current || !mapReady) {
+      return;
+    }
+
+    if (overlayRegionEdit.active) {
+      updateRegionSelectionBuffer(
+        map.current,
+        overlayRegionEdit.features,
+        overlayRegionBufferKm
+      );
       return;
     }
 
@@ -3543,6 +3620,8 @@ export default function MapView() {
     updateRegionSelectionBuffer(map.current, features, regionBufferKm);
   }, [
     mapReady,
+    overlayRegionEdit,
+    overlayRegionBufferKm,
     regionBoundsEnabled,
     regionCatalog,
     selectedRegionIsos,
@@ -4087,25 +4166,19 @@ export default function MapView() {
   }, [activeModule, mapReady]);
 
   useEffect(() => {
-    if (toolPointsFilterEnabled[MODULE_IDS.REGIONS] && selectedRegionEntry?.feature) {
-      setRegionFilterFeature(selectedRegionEntry.feature);
-    }
-  }, [selectedRegionEntry, toolPointsFilterEnabled]);
-
-  useEffect(() => {
-    if (activeModule !== MODULE_IDS.REGIONS && !toolPointsFilterEnabled[MODULE_IDS.REGIONS]) {
+    if (activeModule !== MODULE_IDS.REGIONS && selectedRegionIsos.length === 0) {
       hideRegionActionPopup();
     }
-  }, [activeModule, toolPointsFilterEnabled]);
+  }, [activeModule, selectedRegionIsos.length]);
 
   useEffect(() => {
-    if (!selectedRegionIso || toolPointsFilterEnabled[MODULE_IDS.REGIONS]) {
+    if (!selectedRegionIso) {
       return;
     }
     if (hiddenRegionIsoSet.has(selectedRegionIso)) {
       setSelectedRegionIsos((current) => current.filter((iso) => !hiddenRegionIsoSet.has(iso)));
     }
-  }, [hiddenRegionIsoSet, selectedRegionIso, toolPointsFilterEnabled]);
+  }, [hiddenRegionIsoSet, selectedRegionIso]);
 
   useEffect(() => {
     if (toolPointsFilterEnabled[MODULE_IDS.OOPT] && selectedBoundsFeature) {
@@ -4379,7 +4452,9 @@ export default function MapView() {
           })
         ),
         speciesSearchQuery,
-        speciesSearchSelectedLatin
+        speciesSearchSelectedLatin,
+        selectedRegionNames,
+        regionBufferKm
       }),
     [
       propertyFilters,
@@ -4395,7 +4470,9 @@ export default function MapView() {
       externalProcessingFilters,
       hiddenPointKeys,
       speciesSearchQuery,
-      speciesSearchSelectedLatin
+      speciesSearchSelectedLatin,
+      selectedRegionNames,
+      regionBufferKm
     ]
   );
 
@@ -4407,7 +4484,14 @@ export default function MapView() {
     setHideMissingFoundYear(false);
     setToolPointsFilterEnabled(createDefaultToolPointsFilterState());
     setOoptFilterBoundsFeature(null);
-    setRegionFilterFeature(null);
+    setSelectedRegionIsos([]);
+    selectedRegionIsosRef.current = [];
+    setHiddenRegionIsos([]);
+    hiddenRegionIsosRef.current = [];
+    setRegionBufferKm(0);
+    setRegionAddMode(false);
+    regionAddModeRef.current = false;
+    hideRegionActionPopup();
     setBoundsSpeciesRegnumFilter(null);
     setDenseClustersHighlightState(false);
     setDenseProcessingActive(false);
@@ -4437,7 +4521,9 @@ export default function MapView() {
         arealAllMarkers,
         arealRadius,
         arealCenterFeature: popupData,
-        areaGeometry
+        areaGeometry,
+        selectedRegionFeatures,
+        regionBufferKm
       }),
     [
       arealAllMarkers,
@@ -4451,6 +4537,8 @@ export default function MapView() {
       intersectionResult,
       mapReady,
       popupData,
+      regionBufferKm,
+      selectedRegionFeatures,
       visibleBuiltPolygons
     ]
   );
@@ -4604,7 +4692,14 @@ export default function MapView() {
           ...current,
           [MODULE_IDS.REGIONS]: false
         }));
-        setRegionFilterFeature(null);
+        setSelectedRegionIsos([]);
+        selectedRegionIsosRef.current = [];
+        setHiddenRegionIsos([]);
+        hiddenRegionIsosRef.current = [];
+        setRegionBufferKm(0);
+        setRegionAddMode(false);
+        regionAddModeRef.current = false;
+        hideRegionActionPopup();
         return;
       }
 
@@ -4678,7 +4773,14 @@ export default function MapView() {
           [moduleId]: false
         }));
         if (moduleId === MODULE_IDS.REGIONS) {
-          setRegionFilterFeature(null);
+          setSelectedRegionIsos([]);
+          selectedRegionIsosRef.current = [];
+          setHiddenRegionIsos([]);
+          hiddenRegionIsosRef.current = [];
+          setRegionBufferKm(0);
+          setRegionAddMode(false);
+          regionAddModeRef.current = false;
+          hideRegionActionPopup();
         }
       }
     },
@@ -5058,39 +5160,11 @@ export default function MapView() {
     setSelectedRegionIsos((current) => current.filter((item) => item !== iso));
   }, []);
 
-  const handleSaveRegionsTempLayer = useCallback(() => {
-    const features = selectedRegionIsos
-      .map((iso) => regionCatalog.find((entry) => entry.iso === iso)?.feature)
-      .filter(Boolean);
-    if (!features.length) {
-      return;
-    }
-    const label =
-      selectedRegionNames.length <= 3
-        ? selectedRegionNames.join(", ")
-        : `${selectedRegionNames.length} субъектов`;
-    const layer = commitRegionSelectionTempLayer({
-      label,
-      isos: selectedRegionIsos,
-      features,
-      bufferKm: regionBufferKm
-    });
-    if (!layer) {
-      return;
-    }
+  const handleOverlayRegionBufferChange = useCallback((km) => {
+    setOverlayRegionBufferKm(km);
+    patchVisibleRegionOverlays({ bufferKm: km });
     persistTempLayers().catch(() => {});
-    setTempLayersRevision((value) => value + 1);
-    if (map.current) {
-      setTempLayersData(map.current);
-    }
-    bumpPointsDataRevision();
-  }, [
-    bumpPointsDataRevision,
-    regionBufferKm,
-    regionCatalog,
-    selectedRegionIsos,
-    selectedRegionNames
-  ]);
+  }, []);
 
   const handleBoundsSpeciesListToggle = useCallback(() => {
     setBoundsSpeciesListOpen((open) => {
@@ -6450,9 +6524,12 @@ export default function MapView() {
               selectedIsos={selectedRegionIsos}
               onSearchSelect={handleRegionSearchSelect}
               onSearchRemove={handleRegionSearchRemove}
-              onSaveTempLayer={handleSaveRegionsTempLayer}
-              bufferKm={regionBufferKm}
-              onBufferKmChange={setRegionBufferKm}
+              bufferKm={overlayRegionEdit.active ? overlayRegionBufferKm : regionBufferKm}
+              onBufferKmChange={
+                overlayRegionEdit.active ? handleOverlayRegionBufferChange : setRegionBufferKm
+              }
+              overlayMode={overlayRegionEdit.active}
+              overlayCount={overlayRegionEdit.isos.length}
               collapsed={isPanelCollapsed(PANEL_IDS.REGIONS)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.REGIONS)}
               onMinimize={handleMinimizePanel(PANEL_IDS.REGIONS)}

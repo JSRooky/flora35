@@ -179,7 +179,9 @@ export function collectActiveMapFilters({
   hiddenPointKeys,
   speciesSearchActive,
   speciesSearchQuery,
-  speciesSearchSelectedLatin
+  speciesSearchSelectedLatin,
+  selectedRegionNames,
+  regionBufferKm
 }) {
   const entries = [];
 
@@ -224,10 +226,15 @@ export function collectActiveMapFilters({
     });
   }
 
-  if (toolPointsFilterEnabled?.[MODULE_IDS.REGIONS]) {
+  if (Array.isArray(selectedRegionNames) && selectedRegionNames.length > 0) {
+    const details = [...selectedRegionNames];
+    if (Number(regionBufferKm) > 0) {
+      details.push(`буфер ${regionBufferKm} км`);
+    }
     entries.push({
       id: MAP_FILTER_IDS.REGION_BOUNDS,
-      label: "Регионы"
+      label: "Регионы",
+      details
     });
   }
 

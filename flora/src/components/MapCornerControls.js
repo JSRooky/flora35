@@ -35,7 +35,6 @@ export default function MapCornerControls({
 
   const filterCount = activeFilters.length;
   const filtersActive = filterCount > 0;
-  const multiFilters = filterCount > 1;
 
   // Список остаётся, пока есть хотя бы один фильтр; закрываем только когда все сняты.
   useEffect(() => {
@@ -85,26 +84,14 @@ export default function MapCornerControls({
     ? "Нет активных фильтров"
     : popoverOpen
       ? "Скрыть список фильтров"
-      : multiFilters
-        ? "Активные фильтры"
-        : "Сбросить фильтр";
+      : "Активные фильтры";
 
   const handleFilterButtonClick = () => {
     if (!filtersActive) {
       return;
     }
 
-    if (popoverOpen) {
-      setPopoverOpen(false);
-      return;
-    }
-
-    if (multiFilters) {
-      setPopoverOpen(true);
-      return;
-    }
-
-    onFiltersReset?.();
+    setPopoverOpen((open) => !open);
   };
 
   const handleClearOne = (filterId) => {
@@ -126,7 +113,7 @@ export default function MapCornerControls({
           onClick={handleFilterButtonClick}
           disabled={!filtersActive}
           aria-pressed={filtersActive}
-          aria-haspopup={multiFilters || popoverOpen ? "dialog" : undefined}
+          aria-haspopup={filtersActive ? "dialog" : undefined}
           aria-expanded={popoverOpen}
           aria-label={filterTitle}
           title={filterTitle}
@@ -163,9 +150,16 @@ export default function MapCornerControls({
           >
             <p className="map-corner-filters-popover-title">Активные фильтры</p>
             <ul className="map-corner-filters-popover-list">
-              {activeFilters.map(({ id, label }) => (
+              {activeFilters.map(({ id, label, details }) => (
                 <li key={id} className="map-corner-filters-popover-row">
-                  <span className="map-corner-filters-popover-item-label">{label}</span>
+                  <span className="map-corner-filters-popover-item-label">
+                    {label}
+                    {Array.isArray(details) && details.length > 0 ? (
+                      <span className="map-corner-filters-popover-item-details">
+                        {details.join(" · ")}
+                      </span>
+                    ) : null}
+                  </span>
                   <button
                     type="button"
                     className="map-corner-filters-popover-trash"

@@ -87,6 +87,24 @@ function applyPaintToRegionBoundsLayers(map, settings, colorsByIso = regionFeatu
   }
 }
 
+/** Применяет заливку и обводку к произвольным слоям карты (контуры или оверлеи). */
+export function applyRegionStylePaint(map, { fillLayerId, lineLayerId, settings, colorsByIso = null } = {}) {
+  if (!map?.getLayer) {
+    return;
+  }
+  const paintSettings = normalizeRegionBoundsSettings(settings);
+  if (fillLayerId && map.getLayer(fillLayerId)) {
+    Object.entries(buildFillPaint(paintSettings, colorsByIso)).forEach(([property, value]) => {
+      map.setPaintProperty(fillLayerId, property, value);
+    });
+  }
+  if (lineLayerId && map.getLayer(lineLayerId)) {
+    Object.entries(buildOutlinePaint(paintSettings, colorsByIso)).forEach(([property, value]) => {
+      map.setPaintProperty(lineLayerId, property, value);
+    });
+  }
+}
+
 /** Применяет настройки отображения контуров регионов. */
 export function applyRegionBoundsPaintSettings(map, settings, colorsByIso = null) {
   regionBoundsPaintSettings = normalizeRegionBoundsSettings(settings);
@@ -607,14 +625,18 @@ export function getRegionFeatureAtClick(map, event) {
   };
 }
 
+function setRegionBufferVisibility(map, visible) {
+  const visibility = visible ? "visible" : "none";
+  [REGION_BUFFER_FILL_LAYER_ID, REGION_BUFFER_OUTLINE_LAYER_ID].forEach((layerId) => {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, "visibility", visibility);
+    }
+  });
+}
+
 function setRegionBoundsVisibility(map, visible) {
   const visibility = visible ? "visible" : "none";
-  [
-    REGION_BOUNDS_FILL_LAYER_ID,
-    REGION_BOUNDS_OUTLINE_LAYER_ID,
-    REGION_BUFFER_FILL_LAYER_ID,
-    REGION_BUFFER_OUTLINE_LAYER_ID
-  ].forEach((layerId) => {
+  [REGION_BOUNDS_FILL_LAYER_ID, REGION_BOUNDS_OUTLINE_LAYER_ID].forEach((layerId) => {
     if (map.getLayer(layerId)) {
       map.setLayoutProperty(layerId, "visibility", visibility);
     }
@@ -890,6 +912,62 @@ function simplifyForBuffer(feature, radiusKm) {
   }
 }
 
+/** Объединённый контур выбранных субъектов, при bufferKm > 0 — с внешним оффсетом. */
+export function getRegionSelectionWithinFeature(features = [], bufferKm = 0) {
+  const combined = unionPolygonFeatures(features);
+  if (!combined) {
+    return null;
+  }
+
+  const radius = Number(bufferKm);
+  if (!Number.isFinite(radius) || radius <= 0) {
+    return combined;
+  }
+
+  const simplified = simplifyForBuffer(combined, radius);
+  try {
+    return buffer(simplified, radius, { units: "kilometers", steps: 24 }) || combined;
+  } catch (error) {
+    console.error("Не удалось построить буфер региона", error);
+    return combined;
+  }
+}
+
+/** Контуры выбранных субъектов и кольцо буфера для оверлея временного слоя. */
+export function collectRegionSelectionOverlayFeatures(features = [], bufferKm = 0) {
+  const list = [];
+  (Array.isArray(features) ? features : []).forEach((feature) => {
+    const type = feature?.geometry?.type;
+    if (type !== "Polygon" && type !== "MultiPolygon") {
+      return;
+    }
+    list.push({
+      type: "Feature",
+      geometry: feature.geometry,
+      properties: {
+        ...(feature.properties ?? {}),
+        fillOpacity: 0.18
+      }
+    });
+  });
+
+  const halo = buildRegionSelectionBufferFeature(features, bufferKm);
+  if (halo?.geometry) {
+    list.push({
+      type: "Feature",
+      geometry: halo.geometry,
+      properties: {
+        ...(halo.properties ?? {}),
+        overlayRole: "buffer",
+        color: "#0284c7",
+        fillOpacity: 0.16
+      }
+    });
+  }
+
+  return list;
+}
+
 function buildRegionSelectionBufferFeature(features, radiusKm) {
   const radius = Number(radiusKm);
   if (!Number.isFinite(radius) || radius <= 0) {
@@ -941,6 +1019,7 @@ export function updateRegionSelectionBuffer(map, features = [], radiusKm = 0) {
   const radius = Number(radiusKm);
   if (!list.length || !Number.isFinite(radius) || radius <= 0) {
     clearRegionSelectionBufferData(map);
+    setRegionBufferVisibility(map, false);
     return;
   }
 
@@ -954,6 +1033,7 @@ export function updateRegionSelectionBuffer(map, features = [], radiusKm = 0) {
       ? { type: "FeatureCollection", features: [bufferFeature] }
       : EMPTY_COLLECTION
   );
+  setRegionBufferVisibility(map, Boolean(bufferFeature));
 }
 
 function addRegionSelectionBufferLayers(map, beforeId) {

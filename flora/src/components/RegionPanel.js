@@ -13,7 +13,23 @@ import { TrashIcon } from "../images/buttons";
 import "../styles/HeatmapSettingsPanel.css";
 import "../styles/RegionPanel.css";
 
-function getCollapsedSummary({ layerEnabled, catalog, hiddenIsoSet, selectedCount, bufferKm }) {
+function getCollapsedSummary({
+  layerEnabled,
+  catalog,
+  hiddenIsoSet,
+  selectedCount,
+  bufferKm,
+  overlayMode,
+  overlayCount
+}) {
+  if (overlayMode) {
+    const parts = [`Временные слои: ${overlayCount}`];
+    if (bufferKm > 0) {
+      parts.push(`буфер ${bufferKm} км`);
+    }
+    return parts.join(", ");
+  }
+
   if (!layerEnabled) {
     return "Контуры скрыты";
   }
@@ -73,9 +89,10 @@ export default function RegionPanel({
   selectedIsos = [],
   onSearchSelect,
   onSearchRemove,
-  onSaveTempLayer,
   bufferKm = 0,
   onBufferKmChange,
+  overlayMode = false,
+  overlayCount = 0,
   collapsed: collapsedProp,
   onCollapsedChange,
   onMinimize,
@@ -90,7 +107,7 @@ export default function RegionPanel({
   const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const hidden = hiddenIsoSet instanceof Set ? hiddenIsoSet : new Set();
-  const hasSelection = selectedIsos.length > 0;
+  const hasSelection = overlayMode || selectedIsos.length > 0;
   const selectedIsoSet = useMemo(() => new Set(selectedIsos), [selectedIsos]);
   const query = normalizeSearchQuery(searchQuery);
   const searchResults = useMemo(() => {
@@ -153,7 +170,9 @@ export default function RegionPanel({
             catalog,
             hiddenIsoSet: hidden,
             selectedCount: selectedNames.length,
-            bufferKm
+            bufferKm,
+            overlayMode,
+            overlayCount
           })}
         </p>
       ) : (
@@ -169,12 +188,18 @@ export default function RegionPanel({
           </label>
 
           <h4 className="region-panel-section-title">Отображение</h4>
+          {overlayMode ? (
+            <p className="region-panel-note">
+              Заливка, граница и буфер применяются к регионам видимых временных слоёв
+              {overlayCount > 1 ? ` (${overlayCount})` : ""}.
+            </p>
+          ) : null}
           <RegionBoundsDisplaySettings
             settings={settings}
             onSettingsChange={onSettingsChange}
             onRandomizeColors={onRandomizeColors}
             onClearFeatureColors={onClearFeatureColors}
-            randomizeDisabled={!catalog.length}
+            randomizeDisabled={overlayMode ? overlayCount === 0 : !catalog.length}
           />
 
           <h4 className="region-panel-section-title">Буфер</h4>
@@ -196,13 +221,17 @@ export default function RegionPanel({
                 onChange={(event) => onBufferKmChange?.(Number(event.target.value))}
                 title={
                   hasSelection
-                    ? "Ширина буфера вокруг выделенных регионов"
+                    ? overlayMode
+                      ? "Ширина буфера вокруг регионов временного слоя"
+                      : "Ширина буфера вокруг выделенных регионов"
                     : "Сначала выделите регион на карте"
                 }
               />
             </span>
           </div>
 
+          {overlayMode ? null : (
+          <>
           <label className="region-panel-search">
             <span className="region-panel-search-label">Поиск</span>
             <input
@@ -269,20 +298,8 @@ export default function RegionPanel({
               })}
             </ul>
           ) : null}
-
-          <button
-            type="button"
-            className="heatmap-settings-reset"
-            disabled={!hasSelection || !onSaveTempLayer}
-            onClick={() => onSaveTempLayer?.()}
-            title={
-              hasSelection
-                ? "Сохранить выбранные субъекты во временный слой"
-                : "Сначала выделите регион"
-            }
-          >
-            Во временный слой
-          </button>
+          </>
+          )}
         </div>
       )}
 
