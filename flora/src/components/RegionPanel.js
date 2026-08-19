@@ -219,7 +219,11 @@ export default function RegionPanel({
     () => catalog.filter((entry) => matchesSearch(entry, query)),
     [catalog, query]
   );
-  const groups = useMemo(() => groupCatalog(filteredCatalog), [filteredCatalog]);
+  const searchResults = query ? filteredCatalog : [];
+  const groups = useMemo(
+    () => (query ? [] : groupCatalog(catalog)),
+    [catalog, query]
+  );
   const allVisible =
     catalog.length > 0 && catalog.every((entry) => !hidden.has(entry.iso));
 
@@ -331,23 +335,70 @@ export default function RegionPanel({
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Название, округ или ISO…"
-              disabled={!layerEnabled}
             />
           </label>
 
-          {!layerEnabled ? (
-            <p className="region-panel-note">Включите контуры, чтобы работать со списком.</p>
-          ) : null}
+          <div className="region-panel-search-results" role="list" aria-label="Результаты поиска">
+            {!catalog.length ? (
+              <p className="region-panel-note">Список загружается…</p>
+            ) : !query ? (
+              <p className="region-panel-note">Начните вводить название субъекта</p>
+            ) : searchResults.length === 0 ? (
+              <p className="region-panel-note">Ничего не найдено</p>
+            ) : (
+              <ul className="region-panel-object-list">
+                {searchResults.map((entry) => {
+                  const visible = !hidden.has(entry.iso);
+                  const selected = selectedIso === entry.iso;
+                  return (
+                    <li key={entry.iso} className="region-panel-search-result" role="listitem">
+                      <button
+                        type="button"
+                        className={`region-panel-object-btn${
+                          selected ? " region-panel-object-btn--selected" : ""
+                        }`}
+                        onClick={() => onSelect?.(entry)}
+                        title="Выбрать субъект и показать на карте"
+                      >
+                        <span className="region-panel-object-title">{entry.name}</span>
+                      </button>
+                      <label
+                        className="region-panel-switch"
+                        title={
+                          visible && layerEnabled
+                            ? "Скрыть регион на карте"
+                            : "Показать только этот регион"
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={visible && layerEnabled}
+                          onChange={(event) => {
+                            const nextVisible = event.target.checked;
+                            if (nextVisible) {
+                              if (!layerEnabled) {
+                                onLayerEnabledChange?.(true);
+                              }
+                              const otherIsos = catalog
+                                .map((item) => item.iso)
+                                .filter((iso) => iso !== entry.iso);
+                              onGroupVisibilityChange?.(otherIsos, false);
+                              onVisibilityChange?.(entry.iso, true);
+                              return;
+                            }
+                            onVisibilityChange?.(entry.iso, false);
+                          }}
+                        />
+                        <span className="region-panel-switch-slider" aria-hidden="true" />
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
 
-          {layerEnabled && !catalog.length ? (
-            <p className="region-panel-note">Список загружается…</p>
-          ) : null}
-
-          {layerEnabled && catalog.length && groups.length === 0 ? (
-            <p className="region-panel-note">Ничего не найдено</p>
-          ) : null}
-
-          {layerEnabled ? (
+          {!query && layerEnabled && groups.length > 0 ? (
             <div className="region-panel-catalog">
               {groups.map(({ fo, entries }) => (
                 <DistrictGroup

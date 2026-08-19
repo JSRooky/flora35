@@ -3455,7 +3455,7 @@ export default function MapView() {
   ]);
 
   useEffect(() => {
-    if (!mapReady || !regionBoundsEnabled) {
+    if (!mapReady) {
       return undefined;
     }
 
@@ -3473,7 +3473,7 @@ export default function MapView() {
     return () => {
       cancelled = true;
     };
-  }, [mapReady, regionBoundsEnabled]);
+  }, [mapReady]);
 
   useEffect(() => {
     setRegionBoundsSelectHandler((entry) => {
