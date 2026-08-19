@@ -25,12 +25,21 @@ let regionSelectListener = null;
 let cachedRegionCollection = null;
 
 let regionBoundsPaintSettings = createDefaultRegionBoundsSettings();
+let regionFeatureColors = null;
 
-function buildFillPaint(settings = regionBoundsPaintSettings) {
+function buildColorMatchExpression(colorsByIso, fallback) {
+  const entries = colorsByIso ? Object.entries(colorsByIso) : [];
+  if (entries.length === 0) {
+    return fallback;
+  }
+  return ["match", ["get", "iso"], ...entries.flatMap(([iso, color]) => [iso, color]), fallback];
+}
+
+function buildFillPaint(settings = regionBoundsPaintSettings, colorsByIso = regionFeatureColors) {
   const fillOpacity = Number(settings.fillOpacity);
   const hoverOpacity = Math.min(1, fillOpacity + HOVER_FILL_OPACITY_BOOST);
   return {
-    "fill-color": settings.fillColor,
+    "fill-color": buildColorMatchExpression(colorsByIso, settings.fillColor),
     "fill-opacity": [
       "case",
       ["boolean", ["feature-state", "selected"], false],
@@ -43,10 +52,10 @@ function buildFillPaint(settings = regionBoundsPaintSettings) {
   };
 }
 
-function buildOutlinePaint(settings = regionBoundsPaintSettings) {
+function buildOutlinePaint(settings = regionBoundsPaintSettings, colorsByIso = regionFeatureColors) {
   const lineWidth = Number(settings.lineWidth);
   return {
-    "line-color": settings.lineColor,
+    "line-color": buildColorMatchExpression(colorsByIso, settings.lineColor),
     "line-width": [
       "case",
       ["boolean", ["feature-state", "selected"], false],
@@ -59,26 +68,27 @@ function buildOutlinePaint(settings = regionBoundsPaintSettings) {
   };
 }
 
-function applyPaintToRegionBoundsLayers(map, settings) {
+function applyPaintToRegionBoundsLayers(map, settings, colorsByIso = regionFeatureColors) {
   if (map.getLayer(REGION_BOUNDS_FILL_LAYER_ID)) {
-    Object.entries(buildFillPaint(settings)).forEach(([property, value]) => {
+    Object.entries(buildFillPaint(settings, colorsByIso)).forEach(([property, value]) => {
       map.setPaintProperty(REGION_BOUNDS_FILL_LAYER_ID, property, value);
     });
   }
   if (map.getLayer(REGION_BOUNDS_OUTLINE_LAYER_ID)) {
-    Object.entries(buildOutlinePaint(settings)).forEach(([property, value]) => {
+    Object.entries(buildOutlinePaint(settings, colorsByIso)).forEach(([property, value]) => {
       map.setPaintProperty(REGION_BOUNDS_OUTLINE_LAYER_ID, property, value);
     });
   }
 }
 
 /** Применяет настройки отображения контуров регионов. */
-export function applyRegionBoundsPaintSettings(map, settings) {
+export function applyRegionBoundsPaintSettings(map, settings, colorsByIso = null) {
   regionBoundsPaintSettings = normalizeRegionBoundsSettings(settings);
+  regionFeatureColors = colorsByIso && Object.keys(colorsByIso).length > 0 ? colorsByIso : null;
   if (!map?.getLayer) {
     return;
   }
-  applyPaintToRegionBoundsLayers(map, regionBoundsPaintSettings);
+  applyPaintToRegionBoundsLayers(map, regionBoundsPaintSettings, regionFeatureColors);
 }
 
 let regionBoundsDataPromise = null;

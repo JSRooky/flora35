@@ -200,6 +200,7 @@ import MapDisplayPanel from "./components/MapDisplayPanel";
 import HeatmapSettingsPanel from "./components/HeatmapSettingsPanel";
 import { loadHeatmapSettingsFromStorage, saveHeatmapSettingsToStorage } from "./components/heatmapSettings";
 import {
+  createRandomRegionColorMap,
   loadRegionBoundsSettingsFromStorage,
   saveRegionBoundsSettingsToStorage
 } from "./components/regionBoundsSettings";
@@ -411,6 +412,7 @@ export default function MapView() {
     setRegionBoundsSettings(next);
     saveRegionBoundsSettingsToStorage(next);
   };
+  const [regionFeatureColors, setRegionFeatureColors] = useState(null);
   const [boundsFeatureVisibility, setBoundsFeatureVisibility] = useState({});
   const [boundsCatalogByLayerId, setBoundsCatalogByLayerId] = useState({});
   const [boundsLayerLoading, setBoundsLayerLoading] = useState({});
@@ -475,6 +477,17 @@ export default function MapView() {
   const [hiddenRegionIsos, setHiddenRegionIsos] = useState([]);
   const [selectedRegionIso, setSelectedRegionIso] = useState(null);
   const [regionFilterFeature, setRegionFilterFeature] = useState(null);
+  const handleRegionBoundsRandomizeColors = useCallback((styleId) => {
+    setRegionFeatureColors(
+      createRandomRegionColorMap(
+        regionCatalog.map((entry) => entry.iso),
+        styleId
+      )
+    );
+  }, [regionCatalog]);
+  const handleRegionBoundsClearFeatureColors = useCallback(() => {
+    setRegionFeatureColors(null);
+  }, []);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
   const [dataSourceMode, setDataSourceModeState] = useState(DEFAULT_DATA_SOURCE_MODE);
   const localDataActive =
@@ -3420,7 +3433,7 @@ export default function MapView() {
       return;
     }
     setRegionBoundsEnabled(map.current, regionBoundsEnabled);
-    applyRegionBoundsPaintSettings(map.current, regionBoundsSettings);
+    applyRegionBoundsPaintSettings(map.current, regionBoundsSettings, regionFeatureColors);
 
     const allVisible = hiddenRegionIsos.length === 0;
     const visibleIsos = allVisible
@@ -3434,6 +3447,7 @@ export default function MapView() {
     mapReady,
     regionBoundsEnabled,
     regionBoundsSettings,
+    regionFeatureColors,
     hiddenRegionIsos,
     hiddenRegionIsoSet,
     regionCatalog,
@@ -6101,6 +6115,8 @@ export default function MapView() {
               onLayerEnabledChange={setRegionBoundsVisible}
               settings={regionBoundsSettings}
               onSettingsChange={handleRegionBoundsSettingsChange}
+              onRandomizeColors={handleRegionBoundsRandomizeColors}
+              onClearFeatureColors={handleRegionBoundsClearFeatureColors}
               catalog={regionCatalog}
               hiddenIsoSet={hiddenRegionIsoSet}
               selectedIso={selectedRegionIso}

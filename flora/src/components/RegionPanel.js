@@ -187,6 +187,8 @@ export default function RegionPanel({
   onLayerEnabledChange,
   settings,
   onSettingsChange,
+  onRandomizeColors,
+  onClearFeatureColors,
   catalog = [],
   hiddenIsoSet,
   selectedIso = null,
@@ -275,6 +277,9 @@ export default function RegionPanel({
           <RegionBoundsDisplaySettings
             settings={settings}
             onSettingsChange={onSettingsChange}
+            onRandomizeColors={onRandomizeColors}
+            onClearFeatureColors={onClearFeatureColors}
+            randomizeDisabled={!catalog.length}
           />
 
           {selectedName ? (
@@ -342,8 +347,9 @@ export default function RegionPanel({
             <p className="region-panel-note">Ничего не найдено</p>
           ) : null}
 
-          {layerEnabled
-            ? groups.map(({ fo, entries }) => (
+          {layerEnabled ? (
+            <div className="region-panel-catalog">
+              {groups.map(({ fo, entries }) => (
                 <DistrictGroup
                   key={fo}
                   fo={fo}
@@ -359,8 +365,9 @@ export default function RegionPanel({
                   onGroupVisibilityChange={onGroupVisibilityChange}
                   onSelect={onSelect}
                 />
-              ))
-            : null}
+              ))}
+            </div>
+          ) : null}
         </div>
       )}
 
