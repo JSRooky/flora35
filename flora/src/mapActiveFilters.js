@@ -17,6 +17,7 @@ export const MAP_FILTER_IDS = {
   HIDDEN_POINTS: "hidden-points",
   SEARCH: "search",
   REGION_VISIBILITY: "region-visibility",
+  REGION_BOUNDS: "region-bounds",
   /** @deprecated */
   GBIF_PROCESSING: "external-processing"
 };
@@ -25,7 +26,8 @@ const TOOL_FILTER_PANEL_LABELS = {
   [MODULE_IDS.AREAL]: "Радиус",
   [MODULE_IDS.BUFFER]: "Буфер",
   [MODULE_IDS.POLYGON]: "Полигон",
-  [MODULE_IDS.AREA]: "Область"
+  [MODULE_IDS.AREA]: "Область",
+  [MODULE_IDS.REGIONS]: "Регионы"
 };
 
 function toolFilterId(moduleId) {
@@ -79,6 +81,13 @@ export function collectActiveMapFilters({
     });
   }
 
+  if (toolPointsFilterEnabled?.[MODULE_IDS.REGIONS]) {
+    entries.push({
+      id: MAP_FILTER_IDS.REGION_BOUNDS,
+      label: "Регионы"
+    });
+  }
+
   if (toolPointsFilterEnabled?.[MODULE_IDS.OOPT]) {
     entries.push({
       id: MAP_FILTER_IDS.OOPT_FEATURE,
@@ -87,7 +96,7 @@ export function collectActiveMapFilters({
   }
 
   TOOL_POINTS_FILTER_MODULES.forEach((moduleId) => {
-    if (moduleId === MODULE_IDS.OOPT || moduleId === MODULE_IDS.MAP) {
+    if (moduleId === MODULE_IDS.OOPT || moduleId === MODULE_IDS.MAP || moduleId === MODULE_IDS.REGIONS) {
       return;
     }
 

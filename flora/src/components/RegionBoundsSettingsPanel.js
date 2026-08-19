@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import {
   createDefaultRegionBoundsSettings,
   normalizeHexColor
@@ -38,103 +38,57 @@ function RangeInput({ value, min, max, step, onChange }) {
   );
 }
 
-export default function RegionBoundsSettingsPanel({
-  open = false,
-  settings,
-  onSettingsChange,
-  onClose
-}) {
+/** Поля стиля контуров субъектов — встраиваются в панель регионов. */
+export default function RegionBoundsDisplaySettings({ settings, onSettingsChange }) {
   const value = settings ?? createDefaultRegionBoundsSettings();
-
-  useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        onClose?.();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
-
-  if (!open) {
-    return null;
-  }
 
   const patch = (partial) => {
     onSettingsChange?.({ ...value, ...partial });
   };
 
   return (
-    <div className="heatmap-settings-overlay" onClick={() => onClose?.()}>
-      <div
-        className="heatmap-settings-dialog region-bounds-settings-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="region-bounds-settings-title"
-        onClick={(event) => event.stopPropagation()}
+    <div className="region-bounds-settings-fields">
+      <FieldRow label="Прозрачность" hint="заливка, 0–1">
+        <RangeInput
+          min={0}
+          max={1}
+          step={0.01}
+          value={value.fillOpacity}
+          onChange={(fillOpacity) => patch({ fillOpacity: Number(fillOpacity.toFixed(2)) })}
+        />
+      </FieldRow>
+      <FieldRow label="Ширина границы" hint="пиксели">
+        <RangeInput
+          min={0}
+          max={6}
+          step={0.1}
+          value={value.lineWidth}
+          onChange={(lineWidth) => patch({ lineWidth: Number(lineWidth.toFixed(1)) })}
+        />
+      </FieldRow>
+      <FieldRow label="Цвет заливки">
+        <input
+          type="color"
+          className="heatmap-settings-color"
+          value={normalizeHexColor(value.fillColor, "#7a5a2d")}
+          onChange={(event) => patch({ fillColor: event.target.value })}
+        />
+      </FieldRow>
+      <FieldRow label="Цвет границы">
+        <input
+          type="color"
+          className="heatmap-settings-color"
+          value={normalizeHexColor(value.lineColor, "#6b4f2a")}
+          onChange={(event) => patch({ lineColor: event.target.value })}
+        />
+      </FieldRow>
+      <button
+        type="button"
+        className="heatmap-settings-reset"
+        onClick={() => onSettingsChange?.(createDefaultRegionBoundsSettings())}
       >
-        <button
-          type="button"
-          className="heatmap-settings-close"
-          onClick={() => onClose?.()}
-          aria-label="Закрыть"
-        >
-          ×
-        </button>
-        <h3 id="region-bounds-settings-title" className="heatmap-settings-title">
-          Отображение регионов
-        </h3>
-        <div className="region-bounds-settings-fields">
-          <FieldRow label="Прозрачность" hint="заливка, 0–1">
-            <RangeInput
-              min={0}
-              max={1}
-              step={0.01}
-              value={value.fillOpacity}
-              onChange={(fillOpacity) =>
-                patch({ fillOpacity: Number(fillOpacity.toFixed(2)) })
-              }
-            />
-          </FieldRow>
-          <FieldRow label="Ширина границы" hint="пиксели">
-            <RangeInput
-              min={0}
-              max={6}
-              step={0.1}
-              value={value.lineWidth}
-              onChange={(lineWidth) => patch({ lineWidth: Number(lineWidth.toFixed(1)) })}
-            />
-          </FieldRow>
-          <FieldRow label="Цвет заливки">
-            <input
-              type="color"
-              className="heatmap-settings-color"
-              value={normalizeHexColor(value.fillColor, "#7a5a2d")}
-              onChange={(event) => patch({ fillColor: event.target.value })}
-            />
-          </FieldRow>
-          <FieldRow label="Цвет границы">
-            <input
-              type="color"
-              className="heatmap-settings-color"
-              value={normalizeHexColor(value.lineColor, "#6b4f2a")}
-              onChange={(event) => patch({ lineColor: event.target.value })}
-            />
-          </FieldRow>
-        </div>
-        <div className="heatmap-settings-actions">
-          <button
-            type="button"
-            className="heatmap-settings-reset"
-            onClick={() => onSettingsChange?.(createDefaultRegionBoundsSettings())}
-          >
-            Сбросить
-          </button>
-        </div>
-      </div>
+        Сбросить
+      </button>
     </div>
   );
 }

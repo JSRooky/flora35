@@ -13,6 +13,7 @@ export const HELP_SECTION_LABELS = {
   regnum: "Царство",
   map: "Группы точек",
   dense: "Обработка плотных групп",
+  regions: "Регионы",
   oopt: "ООПТ",
   "oopt-feature": "Сведения об ООПТ",
   submit: "Новая находка",

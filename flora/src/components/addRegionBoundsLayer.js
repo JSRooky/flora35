@@ -1,5 +1,5 @@
 import mapboxgl from "mapbox-gl";
-import { booleanPointInPolygon, polygon } from "@turf/turf";
+import { bbox, booleanPointInPolygon, polygon } from "@turf/turf";
 import { applyMapCursor, getFirstLocationsLayerId } from "./addLocationsLayer";
 import {
   createDefaultRegionBoundsSettings,
@@ -17,7 +17,12 @@ const EMPTY_COLLECTION = {
 };
 
 const HOVER_FILL_OPACITY_BOOST = 0.23;
+const SELECTED_FILL_OPACITY_BOOST = 0.32;
 const HOVER_LINE_WIDTH_BOOST = 1.1;
+const SELECTED_LINE_WIDTH_BOOST = 1.6;
+
+let regionSelectListener = null;
+let cachedRegionCollection = null;
 
 let regionBoundsPaintSettings = createDefaultRegionBoundsSettings();
 
@@ -28,6 +33,8 @@ function buildFillPaint(settings = regionBoundsPaintSettings) {
     "fill-color": settings.fillColor,
     "fill-opacity": [
       "case",
+      ["boolean", ["feature-state", "selected"], false],
+      Math.min(1, fillOpacity + SELECTED_FILL_OPACITY_BOOST),
       ["boolean", ["feature-state", "hover"], false],
       hoverOpacity,
       fillOpacity
@@ -42,6 +49,8 @@ function buildOutlinePaint(settings = regionBoundsPaintSettings) {
     "line-color": settings.lineColor,
     "line-width": [
       "case",
+      ["boolean", ["feature-state", "selected"], false],
+      lineWidth + SELECTED_LINE_WIDTH_BOOST,
       ["boolean", ["feature-state", "hover"], false],
       lineWidth + HOVER_LINE_WIDTH_BOOST,
       lineWidth
@@ -411,9 +420,10 @@ function normalizeAntimeridianCollection(collection) {
           : polygons;
       const coordinates = stitchAntimeridianPolygons(shifted);
 
+      const iso = feature.properties?.iso;
       return {
         ...feature,
-        id: index,
+        id: iso || index,
         geometry: {
           type: coordinates.length === 1 ? "Polygon" : "MultiPolygon",
           coordinates: coordinates.length === 1 ? coordinates[0] : coordinates
@@ -423,7 +433,7 @@ function normalizeAntimeridianCollection(collection) {
   };
 }
 
-function loadRegionBoundsGeoJSON() {
+export function loadRegionBoundsGeoJSON() {
   if (!regionBoundsDataPromise) {
     regionBoundsDataPromise = import("../bounds/ru-subjects-contour.geojson")
       .then((module) => {
@@ -438,10 +448,135 @@ function loadRegionBoundsGeoJSON() {
         }
         return data;
       })
-      .then((data) => normalizeAntimeridianCollection(data));
+      .then((data) => {
+        const normalized = normalizeAntimeridianCollection(data);
+        cachedRegionCollection = normalized;
+        return normalized;
+      });
   }
 
   return regionBoundsDataPromise;
+}
+
+/** Каталог субъектов из загруженного GeoJSON. */
+export function buildRegionCatalog(collection = cachedRegionCollection) {
+  const features = collection?.features ?? [];
+  return features
+    .map((feature) => {
+      const properties = feature.properties ?? {};
+      const iso = properties.iso ? String(properties.iso) : null;
+      if (!iso) {
+        return null;
+      }
+      return {
+        iso,
+        name: properties.name || properties.name_en || iso,
+        nameEn: properties.name_en || "",
+        fo: properties.fo || "Прочие",
+        feature
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+}
+
+export function getCachedRegionCatalog() {
+  return cachedRegionCollection ? buildRegionCatalog(cachedRegionCollection) : [];
+}
+
+export function getRegionEntryByIso(iso) {
+  if (!iso) {
+    return null;
+  }
+  return getCachedRegionCatalog().find((entry) => entry.iso === iso) ?? null;
+}
+
+/** Фильтр видимых субъектов по ISO; null — показать все. */
+export function applyRegionBoundsIsoFilter(map, visibleIsos) {
+  if (!map?.getLayer) {
+    return;
+  }
+
+  const filter =
+    visibleIsos == null
+      ? null
+      : visibleIsos.length === 0
+        ? ["==", ["get", "iso"], "__none__"]
+        : ["match", ["get", "iso"], visibleIsos, true, false];
+
+  [REGION_BOUNDS_FILL_LAYER_ID, REGION_BOUNDS_OUTLINE_LAYER_ID].forEach((layerId) => {
+    if (map.getLayer(layerId)) {
+      map.setFilter(layerId, filter);
+    }
+  });
+}
+
+export function setRegionBoundsSelectedIso(map, iso) {
+  if (!map?.getSource || !map.getSource(REGION_BOUNDS_SOURCE_ID)) {
+    return;
+  }
+
+  const state = mapsWithRegionHover.get(map) ?? {
+    hoveredId: null,
+    selectedId: null,
+    attached: false
+  };
+  mapsWithRegionHover.set(map, state);
+
+  if (state.selectedId != null && state.selectedId !== iso) {
+    map.setFeatureState(
+      { source: REGION_BOUNDS_SOURCE_ID, id: state.selectedId },
+      { selected: false }
+    );
+  }
+
+  if (iso != null) {
+    map.setFeatureState({ source: REGION_BOUNDS_SOURCE_ID, id: iso }, { selected: true });
+  }
+
+  state.selectedId = iso ?? null;
+}
+
+export function flyToRegionBoundsFeature(map, feature, { padding = 48, maxZoom = 6, duration = 800 } = {}) {
+  if (!map || !feature?.geometry) {
+    return;
+  }
+
+  const bounds = bbox(feature);
+  map.fitBounds(
+    [
+      [bounds[0], bounds[1]],
+      [bounds[2], bounds[3]]
+    ],
+    { padding, maxZoom, duration }
+  );
+}
+
+export function setRegionBoundsSelectHandler(handler) {
+  regionSelectListener = typeof handler === "function" ? handler : null;
+}
+
+export function getRegionFeatureAtClick(map, event) {
+  if (!map || !event?.point) {
+    return null;
+  }
+
+  const hits = safeQueryRenderedFeatures(map, event.point).filter(
+    (hit) => hit.layer?.id === REGION_BOUNDS_FILL_LAYER_ID
+  );
+  const feature = hits[0];
+  if (!feature) {
+    return null;
+  }
+
+  const iso = getRegionFeatureId(feature);
+  return getRegionEntryByIso(iso) ?? {
+    iso,
+    name: getRegionFeatureTitle(feature),
+    nameEn: feature.properties?.name_en || "",
+    fo: feature.properties?.fo || "Прочие",
+    feature
+  };
 }
 
 function setRegionBoundsVisibility(map, visible) {
@@ -539,7 +674,7 @@ function hasPointLayerUnderCursor(map, point) {
 
 function setRegionHover(map, feature, lngLat, point) {
   const nextId = getRegionFeatureId(feature);
-  const state = mapsWithRegionHover.get(map) ?? { hoveredId: null, attached: false };
+  const state = mapsWithRegionHover.get(map) ?? { hoveredId: null, selectedId: null, attached: false };
   mapsWithRegionHover.set(map, state);
 
   if (state.hoveredId != null && state.hoveredId !== nextId) {
@@ -563,7 +698,7 @@ function setRegionHover(map, feature, lngLat, point) {
 }
 
 function attachRegionHoverHandlers(map) {
-  const state = mapsWithRegionHover.get(map) ?? { hoveredId: null, attached: false };
+  const state = mapsWithRegionHover.get(map) ?? { hoveredId: null, selectedId: null, attached: false };
   mapsWithRegionHover.set(map, state);
   if (state.attached) {
     return;
@@ -583,6 +718,25 @@ function attachRegionHoverHandlers(map) {
     applyMapCursor(map, "");
     clearRegionHover(map);
   });
+
+  map.on("click", REGION_BOUNDS_FILL_LAYER_ID, (event) => {
+    if (hasPointLayerUnderCursor(map, event.point)) {
+      return;
+    }
+    const feature = event.features?.[0];
+    if (!feature) {
+      return;
+    }
+    const iso = getRegionFeatureId(feature);
+    const entry = getRegionEntryByIso(iso) ?? {
+      iso,
+      name: getRegionFeatureTitle(feature),
+      nameEn: feature.properties?.name_en || "",
+      fo: feature.properties?.fo || "Прочие",
+      feature
+    };
+    regionSelectListener?.(entry);
+  });
 }
 
 /** Добавляет контуры субъектов РФ. По умолчанию слой скрыт. */
@@ -595,6 +749,7 @@ export function addRegionBoundsLayer(map, { loadData = false } = {}) {
     map.addSource(REGION_BOUNDS_SOURCE_ID, {
       type: "geojson",
       data: EMPTY_COLLECTION,
+      promoteId: "iso",
       generateId: false
     });
   }

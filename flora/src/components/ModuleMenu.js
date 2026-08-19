@@ -43,6 +43,7 @@ export const MODULE_IDS = {
   SEARCH: "search",
   // Поиск редких видов по пользовательскому списку (Красная книга).
   REDBOOK: "redbook",
+  REGIONS: "regions",
   ABOUT: "about"
 };
 
@@ -293,9 +294,6 @@ export default function ModuleMenu({
   bufferBlocked = false,
   hoverTooltipsDisabled = false,
   onHoverTooltipsDisabledChange,
-  regionBoundsEnabled = false,
-  onRegionBoundsEnabledChange,
-  onRegionBoundsSettingsOpen,
   dataSourceMode,
   onDataSourceModeChange,
   dataSourcesPanelOpen = false,
@@ -406,26 +404,14 @@ export default function ModuleMenu({
               onModuleSelect={onTempArchivePanelToggle}
             />
           </li>
-          <li className="module-menu-toggle-item">
-            <div className="module-menu-toggle-row">
-              <label className="module-menu-switch" title="Показать границы субъектов Российской Федерации">
-                <input
-                  type="checkbox"
-                  checked={regionBoundsEnabled}
-                  onChange={(event) => onRegionBoundsEnabledChange?.(event.target.checked)}
-                />
-                <span className="module-menu-switch-slider" aria-hidden="true" />
-                <span className="module-menu-switch-label">Регионы</span>
-              </label>
-              <button
-                type="button"
-                className="module-menu-settings-btn"
-                title="Настроить отображение регионов"
-                onClick={() => onRegionBoundsSettingsOpen?.()}
-              >
-                Настроить
-              </button>
-            </div>
+          <li>
+            <ModuleMenuButton
+              id={MODULE_IDS.REGIONS}
+              label="Регионы"
+              mapToolAccent
+              activeModule={activeModule}
+              onModuleSelect={onModuleSelect}
+            />
           </li>
           <li className="module-menu-toggle-item">
             <label className="module-menu-switch" title="Показывать подсказки при наведении на точки и кластеры">

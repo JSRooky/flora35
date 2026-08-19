@@ -92,6 +92,18 @@ export function isOoptPointsFilterActive(toolPointsFilterEnabled, selectedBounds
   return Boolean(toolPointsFilterEnabled?.[MODULE_IDS.OOPT] && getOoptWithinFeature(selectedBoundsFeature));
 }
 
+/** GeoJSON выбранного субъекта РФ для фильтра точек. */
+export function getRegionWithinFeature(selectedRegionFeature) {
+  return selectedRegionFeature?.geometry ? selectedRegionFeature : null;
+}
+
+/** Активен ли глобальный фильтр по выбранному субъекту. */
+export function isRegionPointsFilterActive(toolPointsFilterEnabled, selectedRegionFeature) {
+  return Boolean(
+    toolPointsFilterEnabled?.[MODULE_IDS.REGIONS] && getRegionWithinFeature(selectedRegionFeature)
+  );
+}
+
 /**
  * Возвращает GeoJSON Feature для фильтра «Только эти» активного инструмента карты.
  */
@@ -110,7 +122,8 @@ export function getToolWithinFeature({
   activePolygon = null,
   intersectionResult = null,
   areaGeometry = null,
-  selectedBoundsFeature = null
+  selectedBoundsFeature = null,
+  selectedRegionFeature = null
 }) {
   switch (moduleId) {
     case MODULE_IDS.MAP:
@@ -157,6 +170,9 @@ export function getToolWithinFeature({
 
     case MODULE_IDS.OOPT:
       return selectedBoundsFeature?.feature?.geometry ? selectedBoundsFeature.feature : null;
+
+    case MODULE_IDS.REGIONS:
+      return selectedRegionFeature?.geometry ? selectedRegionFeature : null;
 
     default:
       return null;
