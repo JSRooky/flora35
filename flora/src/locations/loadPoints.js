@@ -66,7 +66,7 @@ export const VISIBLE_DATA_SOURCE_OPTIONS = DATA_SOURCE_OPTIONS.filter(
 );
 
 /** Слой данных при открытии карты. */
-export const DEFAULT_DATA_SOURCE_MODE = DATA_SOURCE_MODES.POINTS;
+export const DEFAULT_DATA_SOURCE_MODE = DATA_SOURCE_MODES.NONE;
 
 const EMPTY_SPECIES_COLLECTION = {
   type: "SpeciesCollection",

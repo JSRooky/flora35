@@ -77,7 +77,8 @@ function featureStableKey(feature) {
 export const TEMP_SOURCE_IDS = {
   GBIF: "gbif",
   INAT: "inat",
-  MAP: "map"
+  MAP: "map",
+  REGIONS: "regions"
 };
 
 export const TEMP_SOURCE_TINTS = {
@@ -87,6 +88,9 @@ export const TEMP_SOURCE_TINTS = {
 };
 
 export function normalizeTempSource(source) {
+  if (source === TEMP_SOURCE_IDS.REGIONS || source === "regions") {
+    return TEMP_SOURCE_IDS.REGIONS;
+  }
   if (source === "inat" || source === "inaturalist") {
     return TEMP_SOURCE_IDS.INAT;
   }
@@ -103,6 +107,9 @@ export function formatTempSourceLabel(source) {
   }
   if (normalized === TEMP_SOURCE_IDS.MAP) {
     return "Карта";
+  }
+  if (normalized === TEMP_SOURCE_IDS.REGIONS) {
+    return "Регионы";
   }
   return "GBIF";
 }
@@ -242,6 +249,15 @@ function emit() {
   });
 }
 
+export function isRegionTempLayer(layer) {
+  return (
+    layer?.kind === "regions" ||
+    layer?.source === TEMP_SOURCE_IDS.REGIONS ||
+    (Array.isArray(layer?.overlays) &&
+      layer.overlays.some((overlay) => overlay?.kind === "regions"))
+  );
+}
+
 export function subscribeTempLayers(listener) {
   listeners.add(listener);
   listener();
@@ -364,6 +380,9 @@ function sourceLabel(source) {
   }
   if (normalized === TEMP_SOURCE_IDS.MAP) {
     return "Карта";
+  }
+  if (normalized === TEMP_SOURCE_IDS.REGIONS) {
+    return "Регионы";
   }
   return "GBIF";
 }
@@ -702,6 +721,71 @@ export function createTempLayerFromFilterSnapshot({ features, filters, overlays 
   return { ok: true, layers: created };
 }
 
+function nextUnusedMarkerColor() {
+  const used = new Set(
+    layers.map((layer) => normalizeTempLayerMarkerColor(layer.markerColor)).filter(Boolean)
+  );
+  return TEMP_LAYER_MARKER_PALETTE.find((color) => !used.has(color)) ?? TEMP_LAYER_MARKER_PALETTE[0];
+}
+
+export function commitRegionSelectionTempLayer({
+  label,
+  isos = [],
+  features = [],
+  bufferKm = 0
+} = {}) {
+  const regionIds = [...new Set((isos ?? []).filter(Boolean).map(String))];
+  const polygonFeatures = (features ?? []).filter((feature) => {
+    const type = feature?.geometry?.type;
+    return type === "Polygon" || type === "MultiPolygon";
+  });
+  if (regionIds.length === 0 || polygonFeatures.length === 0) {
+    return null;
+  }
+
+  const id = createLayerId();
+  const title = String(label || "").trim() || `Субъекты (${regionIds.length})`;
+  const markerColor = nextUnusedMarkerColor();
+  const overlayFeatures = cloneFeatures(polygonFeatures).map((feature) => ({
+    ...feature,
+    properties: {
+      ...(feature.properties ?? {}),
+      color: markerColor,
+      fillOpacity: 0.18
+    }
+  }));
+  const layer = {
+    id,
+    kind: "regions",
+    label: title,
+    source: TEMP_SOURCE_IDS.REGIONS,
+    groupKey: `regions:${id}`,
+    taxonName: title,
+    taxonMode: null,
+    taxonKey: null,
+    familyKey: null,
+    inatTaxonId: null,
+    regionIds,
+    bufferKm: Number.isFinite(Number(bufferKm)) ? Number(bufferKm) : 0,
+    createdAt: new Date().toISOString(),
+    visible: true,
+    heatmapEnabled: false,
+    markerColor,
+    archiveId: null,
+    overlays: [
+      {
+        kind: "regions",
+        label: title,
+        features: overlayFeatures
+      }
+    ],
+    features: []
+  };
+  layers = [layer, ...layers];
+  emit();
+  return layer;
+}
+
 export function setTempLayerVisible(layerId, visible) {
   layers = layers.map((layer) =>
     layer.id === layerId ? { ...layer, visible: Boolean(visible) } : layer
@@ -713,6 +797,9 @@ export function setTempLayerHeatmapEnabled(layerId, enabled) {
   const target = layers.find((layer) => layer.id === layerId);
   const groupKey = target ? layerGroupKey(target) : null;
   const next = Boolean(enabled);
+  if (isRegionTempLayer(target)) {
+    return;
+  }
   layers = layers.map((layer) =>
     layer.id === layerId || (groupKey && layerGroupKey(layer) === groupKey)
       ? { ...layer, heatmapEnabled: next }
@@ -723,7 +810,9 @@ export function setTempLayerHeatmapEnabled(layerId, enabled) {
 
 export function setAllTempLayersHeatmapEnabled(enabled) {
   const next = Boolean(enabled);
-  layers = layers.map((layer) => ({ ...layer, heatmapEnabled: next }));
+  layers = layers.map((layer) =>
+    isRegionTempLayer(layer) ? layer : { ...layer, heatmapEnabled: next }
+  );
   emit();
 }
 
@@ -762,6 +851,7 @@ function normalizePersistedLayer(layer) {
     (layer?.id ? `id:${layer.id}` : `id:${createLayerId()}`);
   return {
     ...layer,
+    kind: layer?.kind === "regions" ? "regions" : layer?.kind ?? "points",
     source,
     groupKey,
     taxonMode: layer?.taxonMode ?? null,
@@ -829,6 +919,9 @@ export function getTempLayerFeatureGroups() {
   }
 
   layers.forEach((layer) => {
+    if (isRegionTempLayer(layer)) {
+      return;
+    }
     if (!layer.visible || !Array.isArray(layer.features) || layer.features.length === 0) {
       return;
     }
@@ -855,7 +948,6 @@ export function getVisibleTempLayerFeatures() {
   return getTempLayerFeatureGroups().flatMap((group) => group.features);
 }
 
-/** Фигуры видимых временных слоёв (полигоны, буферы, радиусы, области). */
 export function getVisibleTempLayerOverlays() {
   const overlays = [];
   const seenGroups = new Set();
@@ -875,6 +967,7 @@ export function getVisibleTempLayerOverlays() {
 
   return overlays;
 }
+}
 
 /** Все точки временных слоёв и staging, включая скрытые слои. */
 export function getAllTempLayerFeatures() {
@@ -883,6 +976,9 @@ export function getAllTempLayerFeatures() {
     features.push(...staging.features);
   }
   layers.forEach((layer) => {
+    if (isRegionTempLayer(layer)) {
+      return;
+    }
     if (Array.isArray(layer?.features) && layer.features.length > 0) {
       features.push(...layer.features);
     }
@@ -908,6 +1004,9 @@ export function getTempLayerPlaqueFeatureGroups() {
 
   const byPlaque = new Map();
   layers.forEach((layer) => {
+    if (isRegionTempLayer(layer)) {
+      return;
+    }
     if (!layer.visible || !Array.isArray(layer.features) || layer.features.length === 0) {
       return;
     }
@@ -1049,6 +1148,7 @@ export function restorePlaqueLayers(nextLayers) {
 function serializeLayer(layer) {
   return {
     id: layer.id,
+    kind: isRegionTempLayer(layer) ? "regions" : layer.kind ?? "points",
     label: layer.label,
     source: normalizeTempSource(layer.source),
     groupKey: layerGroupKey(layer),
@@ -1058,6 +1158,7 @@ function serializeLayer(layer) {
     familyKey: layer.familyKey ?? null,
     inatTaxonId: layer.inatTaxonId ?? null,
     regionIds: layer.regionIds,
+    bufferKm: layer.bufferKm ?? 0,
     createdAt: layer.createdAt,
     visible: layer.visible,
     heatmapEnabled: Boolean(layer.heatmapEnabled),
@@ -1110,6 +1211,10 @@ export function toArchiveIndexEntry(record) {
   let filterSnapshot = [];
   const overlayLabels = [];
   recordLayers.forEach((layer) => {
+    if (isRegionTempLayer(layer)) {
+      (layer.regionIds || []).forEach((id) => regionIds.add(id));
+      return;
+    }
     pointCount += layer.features?.length ?? 0;
     (layer.regionIds || []).forEach((id) => regionIds.add(id));
     if (!filterSnapshot.length && layer.filterSnapshot?.length) {

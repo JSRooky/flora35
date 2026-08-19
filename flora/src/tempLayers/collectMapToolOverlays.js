@@ -10,14 +10,16 @@ export const TEMP_OVERLAY_KINDS = {
   POLYGON: "polygon",
   BUFFER: "buffer",
   AREAL: "areal",
-  AREA: "area"
+  AREA: "area",
+  REGIONS: "regions"
 };
 
 export const TEMP_OVERLAY_LABELS = {
   [TEMP_OVERLAY_KINDS.POLYGON]: "Полигон",
   [TEMP_OVERLAY_KINDS.BUFFER]: "Буфер",
   [TEMP_OVERLAY_KINDS.AREAL]: "Радиус",
-  [TEMP_OVERLAY_KINDS.AREA]: "Область"
+  [TEMP_OVERLAY_KINDS.AREA]: "Область",
+  [TEMP_OVERLAY_KINDS.REGIONS]: "Регионы"
 };
 
 function cloneOverlayFeature(feature, extraProperties = {}) {

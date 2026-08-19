@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   getTempLayers,
+  isRegionTempLayer,
   listTempLayerOriginItems,
   listTempLayerPlaques,
   normalizeTempSource,
@@ -61,6 +62,21 @@ function HeatmapIcon({ className }) {
 }
 
 function formatPlaqueMeta(plaque) {
+  if (plaque.layers.some(isRegionTempLayer)) {
+    const count = plaque.layers.reduce(
+      (sum, layer) => sum + (layer.regionIds?.length || layer.features?.length || 0),
+      0
+    );
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    if (mod10 === 1 && mod100 !== 11) {
+      return `${count} субъект`;
+    }
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+      return `${count} субъекта`;
+    }
+    return `${count} субъектов`;
+  }
   const regionIds = new Set();
   let points = 0;
   plaque.layers.forEach((layer) => {
@@ -354,6 +370,7 @@ export default function TempLayersPicker({
               const mapSource = sourceLayer(plaque, TEMP_SOURCE_IDS.MAP);
               const anyVisible = plaque.layers.some((layer) => layer.visible);
               const heatmapOn = plaque.layers.some((layer) => layer.heatmapEnabled);
+              const isRegionsPlaque = plaque.layers.some(isRegionTempLayer);
               const splitStripe = Boolean(gbif && inat);
               const title = plaqueTitle(plaque);
               const originItems = plaqueOriginItems(plaque);
@@ -395,6 +412,7 @@ export default function TempLayersPicker({
                 </button>
                 <div className="temp-layers-picker-option-meta-row">
                   <span className="temp-layers-picker-option-meta">{formatPlaqueMeta(plaque)}</span>
+                  {isRegionsPlaque ? null : (
                   <span className="temp-layers-picker-sources" role="group" aria-label="Источники">
                   <button
                     type="button"
@@ -445,8 +463,10 @@ export default function TempLayersPicker({
                     </button>
                   ) : null}
                 </span>
+                  )}
                 </div>
                 </div>
+                {isRegionsPlaque ? null : (
                 <button
                   type="button"
                   className={`temp-layers-picker-info${infoOpen ? " temp-layers-picker-info--on" : ""}`}
@@ -519,6 +539,7 @@ export default function TempLayersPicker({
                 >
                   <HeatmapIcon className="temp-layers-picker-heatmap-icon" />
                 </button>
+                )}
                 <button
                   type="button"
                   className="temp-layers-picker-delete"

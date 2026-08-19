@@ -279,6 +279,34 @@
   flex-shrink: 0;
 }
 
+.module-menu-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.module-menu-settings-btn {
+  appearance: none;
+  flex-shrink: 0;
+  margin-right: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  color: #444;
+  border-radius: 5px;
+  padding: 3px 7px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.module-menu-settings-btn:hover {
+  background: rgba(0, 122, 255, 0.08);
+  border-color: rgba(0, 122, 255, 0.28);
+  color: #1a4f8b;
+}
+
 .module-menu-account-item {
   display: flex;
   align-items: center;

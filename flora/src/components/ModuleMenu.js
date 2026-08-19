@@ -43,6 +43,7 @@ export const MODULE_IDS = {
   SEARCH: "search",
   // Поиск редких видов по пользовательскому списку (Красная книга).
   REDBOOK: "redbook",
+  REGIONS: "regions",
   ABOUT: "about"
 };
 
@@ -401,6 +402,15 @@ export default function ModuleMenu({
                 tempArchivePanelOpen ? MODULE_IDS.TEMP_ARCHIVE : activeModule
               }
               onModuleSelect={onTempArchivePanelToggle}
+            />
+          </li>
+          <li>
+            <ModuleMenuButton
+              id={MODULE_IDS.REGIONS}
+              label="Регионы"
+              mapToolAccent
+              activeModule={activeModule}
+              onModuleSelect={onModuleSelect}
             />
           </li>
           <li className="module-menu-toggle-item">

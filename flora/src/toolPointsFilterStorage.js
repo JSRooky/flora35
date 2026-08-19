@@ -9,7 +9,8 @@ export const TOOL_POINTS_FILTER_MODULES = [
   MODULE_IDS.BUFFER,
   MODULE_IDS.POLYGON,
   MODULE_IDS.AREA,
-  MODULE_IDS.OOPT
+  MODULE_IDS.OOPT,
+  MODULE_IDS.REGIONS
 ];
 
 // Состояние по умолчанию — все переключатели выключены.
