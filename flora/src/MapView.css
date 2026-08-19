@@ -409,10 +409,43 @@
 
 .region-action-popup-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 
+.region-action-popup-icon-btn {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  color: #333;
+  cursor: pointer;
+}
+
+.region-action-popup-icon-btn:hover,
+.region-action-popup-icon-btn:focus,
+.region-action-popup-icon-btn:focus-visible,
+.region-action-popup-icon-btn:active {
+  background: rgba(42, 157, 143, 0.14);
+  outline: none;
+}
+
+.region-action-popup-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
 .region-action-popup .feature-popup-action-btn {
+  flex: 1 1 auto;
   border: none;
   outline: none;
   background: rgba(0, 0, 0, 0.05);

@@ -934,6 +934,110 @@ export function commitRegionSelectionTempLayer({
   return layer;
 }
 
+function mergeUniqueFeatures(existing, incoming) {
+  const keys = new Set(
+    (existing ?? []).map((feature) => featureStableKey(feature)).filter(Boolean)
+  );
+  const features = [...(existing ?? [])];
+  let added = 0;
+  (incoming ?? []).forEach((feature) => {
+    if (!feature?.geometry) {
+      return;
+    }
+    const cloned = cloneSnapshotFeature(feature);
+    const key = featureStableKey(cloned);
+    if (key && keys.has(key)) {
+      return;
+    }
+    if (key) {
+      keys.add(key);
+    }
+    features.push(cloned);
+    added += 1;
+  });
+  return { features, added };
+}
+
+function mergeRegionIds(existing, incoming) {
+  const next = [...(existing ?? [])];
+  (incoming ?? []).forEach((id) => {
+    const value = id == null ? "" : String(id);
+    if (value && !next.includes(value)) {
+      next.push(value);
+    }
+  });
+  return next;
+}
+
+/**
+ * Кладёт точки в видимый временный слой с контурами регионов.
+ * Если такого слоя нет, создаёт его из переданных overlays.
+ */
+export function saveFeaturesIntoRegionOverlayTempLayer({
+  features = [],
+  overlays = [],
+  regionIds = [],
+  label
+} = {}) {
+  const incoming = Array.isArray(features) ? features.filter((feature) => feature?.geometry) : [];
+  if (incoming.length === 0) {
+    return { ok: false, reason: "empty" };
+  }
+
+  const target = layers.find((layer) => layer.visible && layerHasRegionOverlays(layer));
+  if (target) {
+    const merged = mergeUniqueFeatures(target.features, incoming);
+    if (merged.added === 0) {
+      return { ok: true, appended: true, added: 0, layer: target };
+    }
+    const nextLayer = {
+      ...target,
+      regionIds: mergeRegionIds(target.regionIds, regionIds),
+      features: merged.features
+    };
+    layers = layers.map((layer) => (layer.id === target.id ? nextLayer : layer));
+    emit();
+    return { ok: true, appended: true, added: merged.added, layer: nextLayer };
+  }
+
+  const overlaySnapshot = normalizeOverlays(overlays);
+  if (overlaySnapshot.length === 0) {
+    return { ok: false, reason: "no-overlay" };
+  }
+
+  const id = createLayerId();
+  const createdAt = new Date().toISOString();
+  const title = String(label || "").trim() || overlaySnapshot[0]?.label || "Регионы";
+  const merged = mergeUniqueFeatures([], incoming);
+  const layer = {
+    id,
+    kind: "regions",
+    label: title,
+    source: TEMP_SOURCE_IDS.REGIONS,
+    groupKey: `regions:${id}`,
+    taxonName: title,
+    taxonMode: null,
+    taxonKey: null,
+    familyKey: null,
+    inatTaxonId: null,
+    regionIds: mergeRegionIds([], regionIds),
+    bufferKm: 0,
+    createdAt,
+    visible: true,
+    heatmapEnabled: false,
+    markerColor: nextUnusedMarkerColor(),
+    archiveId: null,
+    overlays: overlaySnapshot,
+    features: merged.features
+  };
+  layers = [
+    layer,
+    ...layers.map((item) => ({ ...item, visible: false }))
+  ];
+  emit();
+  return { ok: true, appended: false, added: merged.added, layer };
+}
+
 export function setTempLayerVisible(layerId, visible) {
   layers = layers.map((layer) =>
     layer.id === layerId ? { ...layer, visible: Boolean(visible) } : layer
@@ -945,7 +1049,7 @@ export function setTempLayerHeatmapEnabled(layerId, enabled) {
   const target = layers.find((layer) => layer.id === layerId);
   const groupKey = target ? layerGroupKey(target) : null;
   const next = Boolean(enabled);
-  if (isRegionTempLayer(target)) {
+  if (isRegionTempLayer(target) && !(target.features?.length > 0)) {
     return;
   }
   layers = layers.map((layer) =>
@@ -959,7 +1063,9 @@ export function setTempLayerHeatmapEnabled(layerId, enabled) {
 export function setAllTempLayersHeatmapEnabled(enabled) {
   const next = Boolean(enabled);
   layers = layers.map((layer) =>
-    isRegionTempLayer(layer) ? layer : { ...layer, heatmapEnabled: next }
+    isRegionTempLayer(layer) && !(layer.features?.length > 0)
+      ? layer
+      : { ...layer, heatmapEnabled: next }
   );
   emit();
 }
@@ -1029,7 +1135,7 @@ function stampGroupFeatures(rawFeatures, layerId, markerColor, source) {
     if (markerColor) {
       properties.temp_marker_color = markerColor;
     }
-    const inferred = tempSource || inferFeatureTempSource(feature);
+    const inferred = inferFeatureTempSource(feature) || tempSource;
     if (inferred) {
       properties.temp_source = inferred;
     }
@@ -1067,9 +1173,6 @@ export function getTempLayerFeatureGroups() {
   }
 
   layers.forEach((layer) => {
-    if (isRegionTempLayer(layer)) {
-      return;
-    }
     if (!layer.visible || !Array.isArray(layer.features) || layer.features.length === 0) {
       return;
     }
@@ -1123,9 +1226,6 @@ export function getAllTempLayerFeatures() {
     features.push(...staging.features);
   }
   layers.forEach((layer) => {
-    if (isRegionTempLayer(layer)) {
-      return;
-    }
     if (Array.isArray(layer?.features) && layer.features.length > 0) {
       features.push(...layer.features);
     }
@@ -1151,9 +1251,6 @@ export function getTempLayerPlaqueFeatureGroups() {
 
   const byPlaque = new Map();
   layers.forEach((layer) => {
-    if (isRegionTempLayer(layer)) {
-      return;
-    }
     if (!layer.visible || !Array.isArray(layer.features) || layer.features.length === 0) {
       return;
     }
@@ -1362,6 +1459,16 @@ export function toArchiveIndexEntry(record) {
   recordLayers.forEach((layer) => {
     if (isRegionTempLayer(layer)) {
       (layer.regionIds || []).forEach((id) => regionIds.add(id));
+      pointCount += layer.features?.length ?? 0;
+      if (!filterSnapshot.length && layer.filterSnapshot?.length) {
+        filterSnapshot = normalizeFilterSnapshot(layer.filterSnapshot);
+      }
+      (layer.overlays || []).forEach((overlay) => {
+        const label = String(overlay?.label || "").trim();
+        if (label && !overlayLabels.includes(label)) {
+          overlayLabels.push(label);
+        }
+      });
       return;
     }
     pointCount += layer.features?.length ?? 0;

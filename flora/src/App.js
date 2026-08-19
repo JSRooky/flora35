@@ -237,7 +237,7 @@ import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegist
 import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
 import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles } from "./components/addTempLayersLayer";
 import { addTempLayerOverlaysLayer, applyTempRegionOverlayPaint } from "./components/addTempLayerOverlaysLayer";
-import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
+import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
 import {
   collectMapToolOverlays,
   TEMP_OVERLAY_KINDS,
@@ -273,8 +273,8 @@ import {
   exportArchivedPlaque,
   restoreArchivedPlaque
 } from "./tempLayers/tempLayerArchive";
-import { findGbifFeatureByKey } from "./gbif/gbifStore";
-import { findInatFeatureById } from "./inaturalist/inatStore";
+import { findGbifFeatureByKey, getGbifFeaturesForRegionIds } from "./gbif/gbifStore";
+import { findInatFeatureById, getInatFeaturesForRegionIds } from "./inaturalist/inatStore";
 import {
   createDefaultExternalProcessingFilters,
   toGbifProcessingFiltersFromExternal,
@@ -291,6 +291,8 @@ import {
   saveRussianNameChoice
 } from "./names/russianNameResolver";
 import DataSourcesPanel from "./components/DataSourcesPanel";
+import { matchMapRegionsToExternal } from "./externalSources/matchMapRegionToExternal";
+import { applyBufferToExternalRegion } from "./externalSources/bufferedSpatialRegion";
 import ExternalSourcesLoadStatusBar from "./components/ExternalSourcesLoadStatusBar";
 import ExternalProcessingPanel from "./components/ExternalProcessingPanel";
 import {
@@ -596,6 +598,7 @@ export default function MapView() {
   const [panelMinimized, setPanelMinimized] = useState({});
   /** Отдельный флаг: panelMinimized для этой панели сбрасывают другие обработчики. */
   const [dataSourcesPanelOpen, setDataSourcesPanelOpen] = useState(false);
+  const [dataSourcesFocusRequest, setDataSourcesFocusRequest] = useState(null);
   const [tempArchivePanelOpen, setTempArchivePanelOpen] = useState(false);
   const [tempArchiveStatus, setTempArchiveStatus] = useState("");
   /** Порядок иконок в taskbar (открытая панель остаётся в ряду и подсвечивается). */
@@ -2150,6 +2153,60 @@ export default function MapView() {
     restorePanel(PANEL_IDS.DATA_SOURCES);
   }, [dataSourceMode, handleDataSourceModeChange, restorePanel]);
 
+  const handleRegionOpenDataLoad = useCallback(
+    (kind, includeBuffer = false) => {
+      const overlayActive = overlayRegionEdit.active;
+      const entries = overlayActive
+        ? overlayRegionEdit.isos.map((iso) => {
+            const catalogEntry = regionCatalog.find((item) => item.iso === iso);
+            const overlayFeature =
+              overlayRegionEdit.features.find((feature) => feature.properties?.iso === iso) ||
+              catalogEntry?.feature;
+            return (
+              catalogEntry || {
+                iso,
+                name: overlayFeature?.properties?.name || iso,
+                nameEn: overlayFeature?.properties?.name_en || "",
+                feature: overlayFeature
+              }
+            );
+          })
+        : selectedRegionIsos
+            .map((iso) => regionCatalog.find((item) => item.iso === iso))
+            .filter(Boolean);
+
+      const { matched, unmatched } = matchMapRegionsToExternal(entries);
+      const activeBufferKm = overlayActive ? overlayRegionBufferKm : regionBufferKm;
+      const spatialByRegionId = {};
+      if (includeBuffer && activeBufferKm > 0) {
+        matched.forEach(({ region, feature }) => {
+          spatialByRegionId[region.id] = applyBufferToExternalRegion(
+            region,
+            feature,
+            activeBufferKm
+          );
+        });
+      }
+
+      setDataSourcesFocusRequest({
+        kind,
+        regions: matched.map((item) => item.region),
+        spatialByRegionId:
+          Object.keys(spatialByRegionId).length > 0 ? spatialByRegionId : null,
+        unmatchedLabels: unmatched
+      });
+      handleOpenExternalLoadPanel();
+    },
+    [
+      handleOpenExternalLoadPanel,
+      overlayRegionBufferKm,
+      overlayRegionEdit,
+      regionBufferKm,
+      regionCatalog,
+      selectedRegionIsos
+    ]
+  );
+
   const handleDataSourcesPanelToggle = useCallback(() => {
     if (dataSourcesPanelOpen) {
       if (isExternalSourcesLoadActive()) {
@@ -2157,6 +2214,7 @@ export default function MapView() {
         return;
       }
       setDataSourcesPanelOpen(false);
+      setDataSourcesFocusRequest(null);
       setExternalProcessingActive(false);
       setPanelMinimized((prev) => ({
         ...prev,
@@ -3673,11 +3731,12 @@ export default function MapView() {
       setActiveModule(MODULE_IDS.REGIONS);
       setRegionBoundsVisible(true);
 
-      const nextSelection = regionAddModeRef.current
-        ? selectedRegionIsosRef.current.includes(entry.iso)
-          ? selectedRegionIsosRef.current
-          : [...selectedRegionIsosRef.current, entry.iso]
-        : [entry.iso];
+      const alreadySelected = selectedRegionIsosRef.current.includes(entry.iso);
+      const nextSelection = alreadySelected
+        ? selectedRegionIsosRef.current
+        : regionAddModeRef.current
+          ? [...selectedRegionIsosRef.current, entry.iso]
+          : [entry.iso];
 
       selectedRegionIsosRef.current = nextSelection;
       setSelectedRegionIsos(nextSelection);
@@ -3685,12 +3744,23 @@ export default function MapView() {
       showRegionActionPopup(map.current, {
         title: entry.name,
         lngLat,
+        selected: alreadySelected,
         onAdd: () => {
           regionAddModeRef.current = true;
           setRegionAddMode(true);
           if (hiddenRegionIsosRef.current.length > 0) {
             hiddenRegionIsosRef.current = [];
             setHiddenRegionIsos([]);
+          }
+          hideRegionActionPopup();
+        },
+        onRemove: () => {
+          const next = selectedRegionIsosRef.current.filter((iso) => iso !== entry.iso);
+          selectedRegionIsosRef.current = next;
+          setSelectedRegionIsos(next);
+          if (next.length === 0) {
+            regionAddModeRef.current = false;
+            setRegionAddMode(false);
           }
           hideRegionActionPopup();
         },
@@ -4597,6 +4667,76 @@ export default function MapView() {
     locationFilters
   ]);
 
+  const handleSaveRegionSearchPointsToTempLayer = useCallback(
+    (explicitFeatures = null, explicitRegionIds = null) => {
+      const overlayActive = overlayRegionEdit.active;
+      const entries = overlayActive
+        ? overlayRegionEdit.isos.map((iso) => {
+            const catalogEntry = regionCatalog.find((item) => item.iso === iso);
+            const overlayFeature =
+              overlayRegionEdit.features.find((feature) => feature.properties?.iso === iso) ||
+              catalogEntry?.feature;
+            return (
+              catalogEntry || {
+                iso,
+                name: overlayFeature?.properties?.name || iso,
+                nameEn: overlayFeature?.properties?.name_en || "",
+                feature: overlayFeature
+              }
+            );
+          })
+        : selectedRegionIsos
+            .map((iso) => regionCatalog.find((item) => item.iso === iso))
+            .filter(Boolean);
+
+      const { matched } = matchMapRegionsToExternal(entries);
+      const regionIds = Array.isArray(explicitRegionIds)
+        ? explicitRegionIds.filter(Boolean).map(String)
+        : matched.map((item) => item.region.id);
+
+      let features = Array.isArray(explicitFeatures) ? explicitFeatures : null;
+      if (!features) {
+        features = [
+          ...getGbifFeaturesForRegionIds(regionIds),
+          ...getInatFeaturesForRegionIds(regionIds)
+        ];
+        if (!overlayActive) {
+          features = [...features, ...getMapFilterSnapshotFeatures(locationFilters)];
+        }
+      }
+
+      const overlays = overlayActive
+        ? []
+        : collectCurrentToolOverlays([TEMP_OVERLAY_KINDS.REGIONS]);
+      const label = overlayActive
+        ? overlayRegionEdit.isos
+            .map((iso) => {
+              const entry = regionCatalog.find((item) => item.iso === iso);
+              return entry?.name || iso;
+            })
+            .filter(Boolean)
+            .join(", ")
+        : selectedRegionNames.join(", ");
+
+      const result = saveFeaturesIntoRegionOverlayTempLayer({
+        features,
+        overlays,
+        regionIds,
+        label
+      });
+      return commitTempLayerSnapshot(result);
+    },
+    [
+      collectCurrentToolOverlays,
+      commitTempLayerSnapshot,
+      locationFilters,
+      overlayRegionEdit,
+      regionCatalog,
+      selectedRegionIsos,
+      selectedRegionNames
+    ]
+  );
+
   const handleSaveToolGeometryToTempLayer = useCallback(
     (kind) => {
       const overlays = collectCurrentToolOverlays([kind]);
@@ -5343,6 +5483,7 @@ export default function MapView() {
             break;
           }
           setDataSourcesPanelOpen(false);
+          setDataSourcesFocusRequest(null);
           setExternalProcessingActive(false);
           setPanelMinimized((prev) => ({
             ...prev,
@@ -6530,6 +6671,12 @@ export default function MapView() {
               }
               overlayMode={overlayRegionEdit.active}
               overlayCount={overlayRegionEdit.isos.length}
+              onLoadSelectedRegions={(includeBuffer) =>
+                handleRegionOpenDataLoad("regions", includeBuffer)
+              }
+              onSelectiveSearch={(includeBuffer) =>
+                handleRegionOpenDataLoad("selective", includeBuffer)
+              }
               collapsed={isPanelCollapsed(PANEL_IDS.REGIONS)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.REGIONS)}
               onMinimize={handleMinimizePanel(PANEL_IDS.REGIONS)}
@@ -6587,6 +6734,9 @@ export default function MapView() {
                   }))
                 }
                 onTempLayersChange={handleTempLayersChange}
+                onSaveToRegionTempLayer={handleSaveRegionSearchPointsToTempLayer}
+                focusRequest={dataSourcesFocusRequest}
+                onClearFocusRequest={() => setDataSourcesFocusRequest(null)}
               />
             )}
           {dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&

@@ -28,6 +28,7 @@ import {
   toGbifSpatialRegion,
   toInatSpatialRegion
 } from "../externalSources/regions";
+import { withLoadSpatialOverride } from "../externalSources/bufferedSpatialRegion";
 import {
   AVG_EXTERNAL_FEATURE_BYTES,
   KINGDOM_TO_INAT_ICONIC,
@@ -128,14 +129,24 @@ function formatLoadedKingdoms(query) {
  * Источник переключается: GBIF | iNaturalist.
  * Царства выбираются кликом по ячейкам со счётчиками (можно несколько).
  */
-export default function RegionsLoadTable({ map = null, onLoadError }) {
+export default function RegionsLoadTable({
+  map = null,
+  onLoadError,
+  regions = null,
+  spatialByRegionId = null
+}) {
+  const regionList = Array.isArray(regions) ? regions : EXTERNAL_REGIONS;
+  const previewRegions = useMemo(
+    () => regionList.map((region) => withLoadSpatialOverride(region, spatialByRegionId)),
+    [regionList, spatialByRegionId]
+  );
   const [source, setSource] = useState("gbif");
   const [previews, setPreviews] = useState(() =>
-    createEmptyRegionPreviewMap(EXTERNAL_REGIONS)
+    createEmptyRegionPreviewMap(previewRegions)
   );
   const [kingdomsByRegion, setKingdomsByRegion] = useState(() => {
     const initial = {};
-    EXTERNAL_REGIONS.forEach((region) => {
+    previewRegions.forEach((region) => {
       initial[region.id] = [];
     });
     return initial;
@@ -150,9 +161,9 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
     const controller = new AbortController();
     abortRef.current = controller;
     setPreviewStatus("loading");
-    setPreviews(createEmptyRegionPreviewMap(EXTERNAL_REGIONS));
+    setPreviews(createEmptyRegionPreviewMap(previewRegions));
 
-    fetchRegionKingdomPreviews(EXTERNAL_REGIONS, {
+    fetchRegionKingdomPreviews(previewRegions, {
       source,
       signal: controller.signal,
       onRegion: (regionId, preview) => {
@@ -173,20 +184,20 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
     return () => {
       controller.abort();
     };
-  }, [source]);
+  }, [previewRegions, source]);
 
   const filteredRegions = useMemo(() => {
     const query = filter.trim().toLowerCase();
     if (!query) {
-      return EXTERNAL_REGIONS;
+      return regionList;
     }
-    return EXTERNAL_REGIONS.filter(
+    return regionList.filter(
       (region) =>
         region.label.toLowerCase().includes(query) ||
         region.labelEn?.toLowerCase().includes(query) ||
         region.id.includes(query)
     );
-  }, [filter]);
+  }, [filter, regionList]);
 
   const isInat = source === "inat";
   // Перечитываем store после загрузки/удаления.
@@ -276,9 +287,10 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
   const loadOneRegion = useCallback(
     async (region, { incremental }) => {
       const kingdomIds = kingdomsByRegion[region.id] || [];
+      const loadRegion = withLoadSpatialOverride(region, spatialByRegionId);
 
       if (source === "inat") {
-        const inatRegion = toInatSpatialRegion(region);
+        const inatRegion = toInatSpatialRegion(loadRegion);
         if (!inatRegion) {
           throw new Error(`У региона «${region.label}» нет placeId iNaturalist`);
         }
@@ -314,7 +326,7 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
         return;
       }
 
-      const gbifRegion = toGbifSpatialRegion(region);
+      const gbifRegion = toGbifSpatialRegion(loadRegion);
       if (!gbifRegion) {
         throw new Error(`У региона «${region.label}» нет GADM-идентификатора`);
       }
@@ -354,7 +366,7 @@ export default function RegionsLoadTable({ map = null, onLoadError }) {
         });
       }
     },
-    [kingdomsByRegion, previews, source, syncedAt]
+    [kingdomsByRegion, previews, source, spatialByRegionId, syncedAt]
   );
 
   const runRegionLoad = useCallback(

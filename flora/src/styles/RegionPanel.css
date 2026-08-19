@@ -234,8 +234,15 @@
   opacity: 0.5;
 }
 
-.region-panel-buffer-range {
-  width: 95%;
+.region-panel-load-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.region-panel-switch--disabled {
+  opacity: 0.5;
 }
 
 .region-panel .heatmap-settings-actions {

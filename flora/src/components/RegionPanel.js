@@ -93,6 +93,8 @@ export default function RegionPanel({
   onBufferKmChange,
   overlayMode = false,
   overlayCount = 0,
+  onLoadSelectedRegions,
+  onSelectiveSearch,
   collapsed: collapsedProp,
   onCollapsedChange,
   onMinimize,
@@ -107,7 +109,9 @@ export default function RegionPanel({
   const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const hidden = hiddenIsoSet instanceof Set ? hiddenIsoSet : new Set();
+  const [includeBuffer, setIncludeBuffer] = useState(false);
   const hasSelection = overlayMode || selectedIsos.length > 0;
+  const canIncludeBuffer = hasSelection && Number(bufferKm) > 0;
   const selectedIsoSet = useMemo(() => new Set(selectedIsos), [selectedIsos]);
   const query = normalizeSearchQuery(searchQuery);
   const searchResults = useMemo(() => {
@@ -228,6 +232,45 @@ export default function RegionPanel({
                 }
               />
             </span>
+          </div>
+
+          <h4 className="region-panel-section-title">Загрузка точек</h4>
+          <label
+            className={`region-panel-switch${canIncludeBuffer ? "" : " region-panel-switch--disabled"}`}
+            title={
+              canIncludeBuffer
+                ? "GBIF: полигон буфера по координатам. iNaturalist: охватывающий прямоугольник (place_id буфер не включает)."
+                : "Сначала задайте буфер больше 0 км"
+            }
+          >
+            <input
+              type="checkbox"
+              checked={canIncludeBuffer && includeBuffer}
+              disabled={!canIncludeBuffer}
+              onChange={(event) => setIncludeBuffer(event.target.checked)}
+            />
+            <span className="region-panel-switch-slider" aria-hidden="true" />
+            <span>Учитывать буфер</span>
+          </label>
+          <div className="region-panel-load-actions">
+            <button
+              type="button"
+              className="heatmap-settings-reset"
+              disabled={!hasSelection}
+              onClick={() => onLoadSelectedRegions?.(canIncludeBuffer && includeBuffer)}
+              title="Открыть таблицу загрузки выбранных субъектов"
+            >
+              Загрузить выбранные регионы
+            </button>
+            <button
+              type="button"
+              className="heatmap-settings-reset"
+              disabled={!hasSelection}
+              onClick={() => onSelectiveSearch?.(canIncludeBuffer && includeBuffer)}
+              title="Открыть выборочную загрузку с фильтром выбранных субъектов"
+            >
+              Выборочный поиск
+            </button>
           </div>
 
           {overlayMode ? null : (

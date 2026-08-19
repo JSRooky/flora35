@@ -22,6 +22,7 @@ import {
   toGbifSpatialRegion,
   toInatSpatialRegion
 } from "../externalSources/regions";
+import { withLoadSpatialOverride } from "../externalSources/bufferedSpatialRegion";
 import {
   createEmptyRegionTaxonCountMap,
   fetchRegionTaxonCounts
@@ -31,8 +32,10 @@ import TaxonLoadPicker, {
   suggestionLabel
 } from "./TaxonLoadPicker";
 import {
+  getTempLayerStaging,
   getTempLayerStagingCount,
-  commitTempLayerStaging
+  commitTempLayerStaging,
+  clearTempLayerStaging
 } from "../tempLayers/tempLayerStore";
 import { persistTempLayers } from "../tempLayers/tempLayerPersistence";
 import { DownloadIcon, SearchIcon } from "../images/buttons";
@@ -145,7 +148,11 @@ export default function SelectiveLoadPopup({
   loadError = null,
   onClose,
   onLoadError,
-  onTempLayersChange
+  onTempLayersChange,
+  onSaveToRegionTempLayer,
+  focusRegions = null,
+  spatialByRegionId = null,
+  unmatchedLabels = []
 }) {
   const [source, setSource] = useState(SOURCE_GBIF);
   const [mode, setMode] = useState(TAXON_LOAD_MODES.SPECIES);
@@ -168,6 +175,10 @@ export default function SelectiveLoadPopup({
 
   const isInat = source === SOURCE_INAT;
   const isAll = source === SOURCE_ALL;
+  const saveIntoSelectedMapRegions =
+    Boolean(onSaveToRegionTempLayer) &&
+    Array.isArray(focusRegions) &&
+    focusRegions.length > 0;
   void datasetRevision;
 
   const selectSource = (next) => {
@@ -214,15 +225,21 @@ export default function SelectiveLoadPopup({
     cancelInatExternalLoad();
   }, []);
 
-  const gbifRegions = useMemo(
-    () => EXTERNAL_REGIONS.filter((region) => Boolean(toGbifSpatialRegion(region))),
-    []
-  );
-  const inatRegions = useMemo(
-    () => EXTERNAL_REGIONS.filter((region) => Boolean(toInatSpatialRegion(region))),
-    []
-  );
-  const availableRegions = isAll ? EXTERNAL_REGIONS : isInat ? inatRegions : gbifRegions;
+  const gbifRegions = useMemo(() => {
+    const list = Array.isArray(focusRegions) ? focusRegions : EXTERNAL_REGIONS;
+    return list.filter((region) => Boolean(toGbifSpatialRegion(withLoadSpatialOverride(region, spatialByRegionId))));
+  }, [focusRegions, spatialByRegionId]);
+  const inatRegions = useMemo(() => {
+    const list = Array.isArray(focusRegions) ? focusRegions : EXTERNAL_REGIONS;
+    return list.filter((region) => Boolean(toInatSpatialRegion(withLoadSpatialOverride(region, spatialByRegionId))));
+  }, [focusRegions, spatialByRegionId]);
+  const catalogRegions = useMemo(() => {
+    if (Array.isArray(focusRegions)) {
+      return focusRegions;
+    }
+    return EXTERNAL_REGIONS;
+  }, [focusRegions]);
+  const availableRegions = isAll ? catalogRegions : isInat ? inatRegions : gbifRegions;
 
   const totalGbif = useMemo(
     () => sumRegionCounts(gbifCounts, gbifRegions),
@@ -255,8 +272,8 @@ export default function SelectiveLoadPopup({
     searchAbortRef.current = controller;
     setSearching(true);
     setSearchStatus("loading");
-    setGbifCounts(createEmptyRegionTaxonCountMap(EXTERNAL_REGIONS));
-    setInatCounts(createEmptyRegionTaxonCountMap(EXTERNAL_REGIONS));
+      setGbifCounts(createEmptyRegionTaxonCountMap(catalogRegions));
+      setInatCounts(createEmptyRegionTaxonCountMap(catalogRegions));
     onLoadError?.(null);
 
     try {
@@ -324,24 +341,30 @@ export default function SelectiveLoadPopup({
           return;
         }
         if (source === SOURCE_GBIF || source === SOURCE_ALL) {
-          await fetchRegionTaxonCounts(EXTERNAL_REGIONS, {
+          await fetchRegionTaxonCounts(
+            gbifRegions.map((region) => withLoadSpatialOverride(region, spatialByRegionId)),
+            {
             source: SOURCE_GBIF,
             extras: buildGbifLoadExtras(taxon),
             signal: controller.signal,
             onRegion: (regionId, preview) => {
               setGbifCounts((prev) => mergeCountPreview(prev, regionId, preview));
             }
-          });
+          }
+          );
         }
         if ((source === SOURCE_INAT || source === SOURCE_ALL) && taxon.inatTaxonId != null) {
-          await fetchRegionTaxonCounts(EXTERNAL_REGIONS, {
+          await fetchRegionTaxonCounts(
+            inatRegions.map((region) => withLoadSpatialOverride(region, spatialByRegionId)),
+            {
             source: SOURCE_INAT,
             extras: { taxon_id: taxon.inatTaxonId },
             signal: controller.signal,
             onRegion: (regionId, preview) => {
               setInatCounts((prev) => mergeCountPreview(prev, regionId, preview));
             }
-          });
+          }
+          );
         }
       }
 
@@ -369,7 +392,7 @@ export default function SelectiveLoadPopup({
         setSearching(false);
       }
     }
-  }, [mode, onLoadError, query, selectedSuggestions, source]);
+  }, [catalogRegions, gbifRegions, inatRegions, mode, onLoadError, query, selectedSuggestions, source, spatialByRegionId]);
 
   const loadOneRegion = useCallback(
     async (region, sourceId) => {
@@ -380,11 +403,12 @@ export default function SelectiveLoadPopup({
 
       const bundleTaxon = toBundleTaxon(taxa);
       const bundleKey = taxaBundleKey(sourceId, taxa);
+      const loadRegion = withLoadSpatialOverride(region, spatialByRegionId);
 
-      if (sourceId === SOURCE_INAT && !toInatSpatialRegion(region)) {
+      if (sourceId === SOURCE_INAT && !toInatSpatialRegion(loadRegion)) {
         return;
       }
-      if (sourceId !== SOURCE_INAT && !toGbifSpatialRegion(region)) {
+      if (sourceId !== SOURCE_INAT && !toGbifSpatialRegion(loadRegion)) {
         return;
       }
 
@@ -400,7 +424,7 @@ export default function SelectiveLoadPopup({
             qualityGrade: INAT_QUALITY_MODES.RESEARCH
           };
           await startInatExternalLoad({
-            region: toInatSpatialRegion(region),
+            region: toInatSpatialRegion(loadRegion),
             kingdomId: querySnapshot.kingdomId || "",
             qualityGrade: INAT_QUALITY_MODES.RESEARCH,
             extras,
@@ -414,7 +438,7 @@ export default function SelectiveLoadPopup({
         }
 
         await startGbifExternalLoad({
-          region: toGbifSpatialRegion(region),
+          region: toGbifSpatialRegion(loadRegion),
           kingdomId: taxon.kingdomId || "",
           extras: buildGbifLoadExtras(taxon),
           query: buildLoadQuery(region.id, taxon),
@@ -425,7 +449,7 @@ export default function SelectiveLoadPopup({
         });
       }
     },
-    [gbifCounts, inatCounts, resolvedTaxa, resolvedTaxon]
+    [gbifCounts, inatCounts, resolvedTaxa, resolvedTaxon, spatialByRegionId]
   );
 
   const commitStagingIfAny = useCallback(() => {
@@ -528,12 +552,33 @@ export default function SelectiveLoadPopup({
     try {
       if (isAll) {
         await loadRegionsForSource(SOURCE_GBIF, gbifRegions);
-        const gbifLayer = commitStagingIfAny();
-        await loadRegionsForSource(SOURCE_INAT, inatRegions);
-        const inatLayer = commitStagingIfAny();
-        if (!gbifLayer && !inatLayer) {
-          onLoadError?.("Нет точек для временного слоя");
-          return;
+        if (saveIntoSelectedMapRegions) {
+          const gbifStaging = getTempLayerStaging();
+          const gbifFeatures = [...(gbifStaging.features ?? [])];
+          const gbifRegionIds = [...(gbifStaging.regionIds ?? [])];
+          clearTempLayerStaging();
+          await loadRegionsForSource(SOURCE_INAT, inatRegions);
+          const inatStaging = getTempLayerStaging();
+          const features = [...gbifFeatures, ...(inatStaging.features ?? [])];
+          const regionIds = [...gbifRegionIds, ...(inatStaging.regionIds ?? [])];
+          clearTempLayerStaging();
+          if (features.length === 0) {
+            onLoadError?.("Нет точек для временного слоя");
+            return;
+          }
+          const ok = onSaveToRegionTempLayer(features, regionIds);
+          if (!ok) {
+            onLoadError?.("Не удалось сохранить точки в слой регионов");
+            return;
+          }
+        } else {
+          const gbifLayer = commitStagingIfAny();
+          await loadRegionsForSource(SOURCE_INAT, inatRegions);
+          const inatLayer = commitStagingIfAny();
+          if (!gbifLayer && !inatLayer) {
+            onLoadError?.("Нет точек для временного слоя");
+            return;
+          }
         }
       } else {
         await loadRegionsForSource(isInat ? SOURCE_INAT : SOURCE_GBIF, availableRegions);
@@ -542,7 +587,17 @@ export default function SelectiveLoadPopup({
           onLoadError?.("Нет точек для временного слоя");
           return;
         }
-        commitTempLayerStaging();
+        if (saveIntoSelectedMapRegions) {
+          const staging = getTempLayerStaging();
+          const ok = onSaveToRegionTempLayer(staging.features, staging.regionIds);
+          clearTempLayerStaging();
+          if (!ok) {
+            onLoadError?.("Не удалось сохранить точки в слой регионов");
+            return;
+          }
+        } else {
+          commitTempLayerStaging();
+        }
       }
       setDatasetRevision((value) => value + 1);
       await persistTempLayers();
@@ -558,6 +613,7 @@ export default function SelectiveLoadPopup({
     availableRegions,
     busyRegionId,
     commitStagingIfAny,
+    focusRegions,
     gbifRegions,
     inatRegions,
     isAll,
@@ -566,8 +622,10 @@ export default function SelectiveLoadPopup({
     loading,
     map,
     onLoadError,
+    onSaveToRegionTempLayer,
     onTempLayersChange,
     resolvedTaxon,
+    saveIntoSelectedMapRegions,
     sourcesLoading
   ]);
 
@@ -605,6 +663,17 @@ export default function SelectiveLoadPopup({
           ×
         </button>
         <h3 className="regions-load-title">Выборочная загрузка</h3>
+        {Array.isArray(focusRegions) && focusRegions.length > 0 ? (
+          <PanelHint>
+            Фильтр регионов включён: {focusRegions.length} субъект(ов) с карты.
+            {saveIntoSelectedMapRegions
+              ? " «Во временный слой» сохранит точки в тот же слой, что и выделенные регионы."
+              : ""}
+            {unmatchedLabels.length > 0
+              ? ` Не сопоставлены: ${unmatchedLabels.join(", ")}.`
+              : ""}
+          </PanelHint>
+        ) : null}
 
         <div className="selective-load-toolbar">
           <TaxonLoadPicker
@@ -796,11 +865,11 @@ export default function SelectiveLoadPopup({
                   </tr>
                 </thead>
                 <tbody>
-                  {EXTERNAL_REGIONS.map((region) => {
+                  {availableRegions.map((region) => {
                     const gbifPreview = gbifCounts[region.id];
                     const inatPreview = inatCounts[region.id];
-                    const hasGbif = Boolean(toGbifSpatialRegion(region));
-                    const hasInat = Boolean(toInatSpatialRegion(region));
+                    const hasGbif = Boolean(toGbifSpatialRegion(withLoadSpatialOverride(region, spatialByRegionId)));
+                    const hasInat = Boolean(toInatSpatialRegion(withLoadSpatialOverride(region, spatialByRegionId)));
                     const hasSpatial = isAll
                       ? hasGbif || hasInat
                       : isInat
@@ -869,6 +938,11 @@ export default function SelectiveLoadPopup({
                   className="gbif-panel-btn gbif-panel-btn--secondary"
                   disabled={!canLoad || availableRegions.length === 0}
                   onClick={saveToTempLayer}
+                  title={
+                    saveIntoSelectedMapRegions
+                      ? "Сохранить найденные точки в тот же временный слой, что и выделенные на карте регионы"
+                      : undefined
+                  }
                 >
                   Во временный слой
                 </button>

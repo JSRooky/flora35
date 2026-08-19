@@ -211,6 +211,24 @@ export function getInatFeaturesByIndices(indices) {
   return features;
 }
 
+export function getInatFeaturesForRegionIds(regionIds) {
+  const wanted = new Set(
+    [...(regionIds ?? [])].map((id) => String(id || "")).filter(Boolean)
+  );
+  if (wanted.size === 0 || table.rowCount === 0) {
+    return [];
+  }
+
+  const indices = [];
+  for (let i = 0; i < table.rowCount; i += 1) {
+    const regionId = readInatRegionId(table, i);
+    if (regionId && wanted.has(String(regionId))) {
+      indices.push(i);
+    }
+  }
+  return getInatFeaturesByIndices(indices);
+}
+
 function rememberLoadedRegionId(regionId) {
   if (!regionId) {
     return;

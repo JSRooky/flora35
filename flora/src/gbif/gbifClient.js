@@ -111,7 +111,7 @@ export function bboxToWktPolygon(bbox) {
 
 /**
  * Собирает query-параметры Occurrence Search для региона.
- * Приоритет: gadmGid → geometry → bbox.
+ * Приоритет: geometry → gadmGid → bbox.
  */
 export function buildOccurrenceSearchParams(region, extras = {}) {
   const spatial = toGbifSpatialRegion(region);
@@ -123,10 +123,10 @@ export function buildOccurrenceSearchParams(region, extras = {}) {
   params.set("hasCoordinate", "true");
   params.set("hasGeospatialIssue", "false");
 
-  if (spatial.gadmGid) {
-    params.set("gadmGid", spatial.gadmGid);
-  } else if (spatial.geometry) {
+  if (spatial.geometry) {
     params.set("geometry", spatial.geometry);
+  } else if (spatial.gadmGid) {
+    params.set("gadmGid", spatial.gadmGid);
   } else if (spatial.bbox) {
     params.set("geometry", bboxToWktPolygon(spatial.bbox));
   } else {

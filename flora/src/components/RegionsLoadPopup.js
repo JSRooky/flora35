@@ -19,7 +19,10 @@ export default function RegionsLoadPopup({
   loadSnapshot = null,
   loadError = null,
   onClose,
-  onLoadError
+  onLoadError,
+  focusRegions = null,
+  spatialByRegionId = null,
+  unmatchedLabels = []
 }) {
   const handleClose = useCallback(() => {
     onClose?.();
@@ -57,9 +60,12 @@ export default function RegionsLoadPopup({
         </button>
         <h3 className="regions-load-title">Регионы России</h3>
         <PanelHint>
-          Кликайте по числам царств, чтобы выбрать одно или несколько (пусто —
-          все). Затем «Загрузить» / «Обновить». Корзина удаляет локальный набор
-          выбранного региона. Источник: GBIF или iNaturalist.
+          {Array.isArray(focusRegions) && focusRegions.length > 0
+            ? `Показаны выбранные субъекты (${focusRegions.length}). Кликайте по числам царств, затем «Загрузить».`
+            : "Кликайте по числам царств, чтобы выбрать одно или несколько (пусто — все). Затем «Загрузить» / «Обновить». Корзина удаляет локальный набор выбранного региона. Источник: GBIF или iNaturalist."}
+          {unmatchedLabels.length > 0
+            ? ` Не сопоставлены с базами: ${unmatchedLabels.join(", ")}.`
+            : ""}
         </PanelHint>
 
         {loading ? (
@@ -86,7 +92,12 @@ export default function RegionsLoadPopup({
 
         {loadError ? <p className="regions-load-error">{loadError}</p> : null}
 
-        <RegionsLoadTable map={map} onLoadError={onLoadError} />
+        <RegionsLoadTable
+          map={map}
+          onLoadError={onLoadError}
+          regions={focusRegions}
+          spatialByRegionId={spatialByRegionId}
+        />
       </div>
     </div>
   );

@@ -74,7 +74,10 @@ export default function DataSourcesPanel({
   storeRevision = 0,
   hiddenRegionIds = [],
   onHiddenRegionIdsChange,
-  onTempLayersChange
+  onTempLayersChange,
+  onSaveToRegionTempLayer,
+  focusRequest = null,
+  onClearFocusRequest
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [regionsTableOpen, setRegionsTableOpen] = useState(false);
@@ -106,6 +109,20 @@ export default function DataSourcesPanel({
   useEffect(() => {
     refreshStats();
   }, [storeRevision, refreshStats]);
+
+  useEffect(() => {
+    if (!focusRequest?.kind) {
+      return;
+    }
+    setLoadError(null);
+    if (focusRequest.kind === "selective") {
+      setSelectiveTableOpen(true);
+      setRegionsTableOpen(false);
+      return;
+    }
+    setRegionsTableOpen(true);
+    setSelectiveTableOpen(false);
+  }, [focusRequest]);
 
   const handleClearAll = useCallback(async () => {
     if (loading || clearing || isExternalSourcesLoadActive()) {
@@ -187,6 +204,7 @@ export default function DataSourcesPanel({
                   title="Загрузить"
                   aria-label="Загрузить"
                   onClick={() => {
+                    onClearFocusRequest?.();
                     setLoadError(null);
                     setRegionsTableOpen(true);
                   }}
@@ -225,6 +243,7 @@ export default function DataSourcesPanel({
                 className="gbif-panel-btn gbif-panel-btn--secondary data-sources-selective-btn"
                 disabled={!map}
                 onClick={() => {
+                  onClearFocusRequest?.();
                   setLoadError(null);
                   setSelectiveTableOpen(true);
                 }}
@@ -278,15 +297,18 @@ export default function DataSourcesPanel({
         <ModuleHelpPanel sectionId={MODULE_IDS.DATA_SOURCES} open={helpOpen} />
       </div>
 
-      <RegionsLoadPopup
-        open={regionsTableOpen}
-        map={map}
-        loading={loading}
-        loadSnapshot={loadSnapshot}
-        loadError={loadError}
-        onClose={() => setRegionsTableOpen(false)}
-        onLoadError={setLoadError}
-      />
+        <RegionsLoadPopup
+          open={regionsTableOpen}
+          map={map}
+          loading={loading}
+          loadSnapshot={loadSnapshot}
+          loadError={loadError}
+          onClose={() => setRegionsTableOpen(false)}
+          onLoadError={setLoadError}
+          focusRegions={focusRequest?.regions}
+          spatialByRegionId={focusRequest?.spatialByRegionId}
+          unmatchedLabels={focusRequest?.unmatchedLabels}
+        />
       <SelectiveLoadPopup
         open={selectiveTableOpen}
         map={map}
@@ -296,6 +318,14 @@ export default function DataSourcesPanel({
         onClose={() => setSelectiveTableOpen(false)}
         onLoadError={setLoadError}
         onTempLayersChange={onTempLayersChange}
+        onSaveToRegionTempLayer={
+          Array.isArray(focusRequest?.regions) && focusRequest.regions.length > 0
+            ? onSaveToRegionTempLayer
+            : undefined
+        }
+        focusRegions={focusRequest?.regions}
+        spatialByRegionId={focusRequest?.spatialByRegionId}
+        unmatchedLabels={focusRequest?.unmatchedLabels}
       />
       <RegionsFilterPopup
         open={regionsFilterOpen}

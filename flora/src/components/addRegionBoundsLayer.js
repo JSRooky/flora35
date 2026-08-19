@@ -711,7 +711,10 @@ export function hideRegionActionPopup() {
   popup?.remove();
 }
 
-export function showRegionActionPopup(map, { title, lngLat, onAdd, onIsolate }) {
+const REGION_PLUS_ICON = `<svg class="region-action-popup-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.5" d="M12 5v14M5 12h14"/></svg>`;
+const REGION_MINUS_ICON = `<svg class="region-action-popup-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.5" d="M5 12h14"/></svg>`;
+
+export function showRegionActionPopup(map, { title, lngLat, selected = false, onAdd, onRemove, onIsolate }) {
   if (!map || !lngLat) {
     return;
   }
@@ -728,12 +731,15 @@ export function showRegionActionPopup(map, { title, lngLat, onAdd, onIsolate }) 
     className: "region-action-popup"
   });
 
+  const toggleLabel = selected ? "Убрать из выбора" : "Добавить к выбору";
+  const toggleIcon = selected ? REGION_MINUS_ICON : REGION_PLUS_ICON;
+
   popup
     .setLngLat(lngLat)
     .setHTML(
       `<div class="region-action-popup-title">${escapeHtml(title || "Регион")}</div>
       <div class="region-action-popup-actions">
-        <button type="button" class="feature-popup-action-btn" data-region-action-add>Добавить</button>
+        <button type="button" class="region-action-popup-icon-btn" data-region-action-add title="${toggleLabel}" aria-label="${toggleLabel}">${toggleIcon}</button>
         <button type="button" class="feature-popup-action-btn" data-region-action-isolate>Изолировать</button>
       </div>`
     );
@@ -750,12 +756,13 @@ export function showRegionActionPopup(map, { title, lngLat, onAdd, onIsolate }) 
   const popupElement = popup.getElement();
   const addButton = popupElement?.querySelector("[data-region-action-add]");
   const isolateButton = popupElement?.querySelector("[data-region-action-isolate]");
+  const toggleHandler = selected ? onRemove : onAdd;
 
-  if (addButton && onAdd) {
+  if (addButton && toggleHandler) {
     regionActionPopupAddHandler = (event) => {
       event.preventDefault();
       event.stopPropagation();
-      onAdd();
+      toggleHandler();
     };
     addButton.addEventListener("click", regionActionPopupAddHandler);
   }

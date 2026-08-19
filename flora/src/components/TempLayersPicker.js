@@ -64,18 +64,28 @@ function HeatmapIcon({ className }) {
 function formatPlaqueMeta(plaque) {
   if (plaque.layers.some(isRegionTempLayer)) {
     const count = plaque.layers.reduce(
-      (sum, layer) => sum + (layer.regionIds?.length || layer.features?.length || 0),
+      (sum, layer) => sum + (layer.regionIds?.length || 0),
+      0
+    ) || plaque.layers.reduce(
+      (sum, layer) => sum + (layer.overlays?.find((item) => item.kind === "regions")?.features?.length || 0),
+      0
+    );
+    const points = plaque.layers.reduce(
+      (sum, layer) => sum + (layer.features?.length ?? 0),
       0
     );
     const mod10 = count % 10;
     const mod100 = count % 100;
+    let regionsText = `${count} субъектов`;
     if (mod10 === 1 && mod100 !== 11) {
-      return `${count} субъект`;
+      regionsText = `${count} субъект`;
+    } else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+      regionsText = `${count} субъекта`;
     }
-    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-      return `${count} субъекта`;
+    if (points > 0) {
+      return `${regionsText} · ${new Intl.NumberFormat("ru-RU").format(points)} т.`;
     }
-    return `${count} субъектов`;
+    return regionsText;
   }
   const regionIds = new Set();
   let points = 0;
@@ -517,7 +527,8 @@ export default function TempLayersPicker({
                     )}
                   </div>
                 ) : null}
-                {isRegionsPlaque ? null : (
+                {isRegionsPlaque &&
+                !plaque.layers.some((layer) => (layer.features?.length ?? 0) > 0) ? null : (
                 <button
                   type="button"
                   className={`temp-layers-picker-heatmap${
