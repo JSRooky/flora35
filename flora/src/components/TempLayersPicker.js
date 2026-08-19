@@ -466,7 +466,6 @@ export default function TempLayersPicker({
                   )}
                 </div>
                 </div>
-                {isRegionsPlaque ? null : (
                 <button
                   type="button"
                   className={`temp-layers-picker-info${infoOpen ? " temp-layers-picker-info--on" : ""}`}
@@ -518,6 +517,7 @@ export default function TempLayersPicker({
                     )}
                   </div>
                 ) : null}
+                {isRegionsPlaque ? null : (
                 <button
                   type="button"
                   className={`temp-layers-picker-heatmap${

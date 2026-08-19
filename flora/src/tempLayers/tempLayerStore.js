@@ -967,7 +967,6 @@ export function getVisibleTempLayerOverlays() {
 
   return overlays;
 }
-}
 
 /** Все точки временных слоёв и staging, включая скрытые слои. */
 export function getAllTempLayerFeatures() {
