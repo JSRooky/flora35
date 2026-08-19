@@ -1,6 +1,6 @@
 import { TEMP_LAYER_MARKER_PALETTE } from "../tempLayers/tempLayerStore";
 
-const STORAGE_KEY = "flora35-region-bounds-settings";
+const STORAGE_KEY = "flora35-region-bounds-settings-v2";
 
 export const REGION_RANDOM_STYLE_IDS = {
   BRIGHT: "bright",
@@ -10,7 +10,7 @@ export const REGION_RANDOM_STYLE_IDS = {
   GRAY: "gray"
 };
 
-export const DEFAULT_REGION_RANDOM_STYLE = REGION_RANDOM_STYLE_IDS.BRIGHT;
+export const DEFAULT_REGION_RANDOM_STYLE = REGION_RANDOM_STYLE_IDS.BLUE;
 
 export const REGION_RANDOM_STYLE_PRESETS = [
   {
@@ -117,11 +117,111 @@ export function getRegionRandomStylePreset(styleId) {
 
 export function createDefaultRegionBoundsSettings() {
   return {
-    fillOpacity: 0.05,
+    fillOpacity: 0.03,
     lineWidth: 1.1,
-    fillColor: "#7a5a2d",
-    lineColor: "#6b4f2a"
+    fillColor: "#93c5fd",
+    lineColor: "#2563eb"
   };
+}
+
+function hashToUnit(value) {
+  let hash = 2166136261;
+  const text = String(value);
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return ((hash >>> 0) % 10000) / 10000;
+}
+
+function hexToRgb(hex) {
+  const normalized = normalizeHexColor(hex, "#93c5fd");
+  return {
+    r: Number.parseInt(normalized.slice(1, 3), 16) / 255,
+    g: Number.parseInt(normalized.slice(3, 5), 16) / 255,
+    b: Number.parseInt(normalized.slice(5, 7), 16) / 255
+  };
+}
+
+function rgbToHsl({ r, g, b }) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2;
+  if (max === min) {
+    return { h: 210, s: 0, l: lightness };
+  }
+
+  const delta = max - min;
+  const saturation =
+    lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+  let hue = 0;
+  if (max === r) {
+    hue = (g - b) / delta + (g < b ? 6 : 0);
+  } else if (max === g) {
+    hue = (b - r) / delta + 2;
+  } else {
+    hue = (r - g) / delta + 4;
+  }
+
+  return { h: hue * 60, s: saturation, l: lightness };
+}
+
+function hueToRgb(p, q, t) {
+  let tone = t;
+  if (tone < 0) {
+    tone += 1;
+  }
+  if (tone > 1) {
+    tone -= 1;
+  }
+  if (tone < 1 / 6) {
+    return p + (q - p) * 6 * tone;
+  }
+  if (tone < 1 / 2) {
+    return q;
+  }
+  if (tone < 2 / 3) {
+    return p + (q - p) * (2 / 3 - tone) * 6;
+  }
+  return p;
+}
+
+function hslToHex({ h, s, l }) {
+  const saturation = Math.min(1, Math.max(0, s));
+  const lightness = Math.min(1, Math.max(0, l));
+  if (saturation === 0) {
+    const gray = Math.round(lightness * 255);
+    const hex = gray.toString(16).padStart(2, "0");
+    return `#${hex}${hex}${hex}`;
+  }
+
+  const q = lightness < 0.5 ? lightness * (1 + saturation) : lightness + saturation - lightness * saturation;
+  const p = 2 * lightness - q;
+  const hue = ((h % 360) + 360) % 360 / 360;
+  const r = Math.round(hueToRgb(p, q, hue + 1 / 3) * 255);
+  const g = Math.round(hueToRgb(p, q, hue) * 255);
+  const b = Math.round(hueToRgb(p, q, hue - 1 / 3) * 255);
+  return `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** Небольшой разброс оттенка вокруг базового цвета — стабилен для каждого ISO. */
+export function createSubtleRegionColorMap(isos = [], baseHex) {
+  const base = rgbToHsl(hexToRgb(baseHex || createDefaultRegionBoundsSettings().fillColor));
+  return Object.fromEntries(
+    isos.filter(Boolean).map((iso) => {
+      const hueShift = (hashToUnit(`${iso}:h`) * 2 - 1) * 14;
+      const satShift = (hashToUnit(`${iso}:s`) * 2 - 1) * 0.1;
+      const lightShift = (hashToUnit(`${iso}:l`) * 2 - 1) * 0.08;
+      return [
+        iso,
+        hslToHex({
+          h: base.h + hueShift,
+          s: Math.min(0.85, Math.max(0.28, base.s + satShift)),
+          l: Math.min(0.82, Math.max(0.42, base.l + lightShift))
+        })
+      ];
+    })
+  );
 }
 
 export function createRandomRegionColorMap(isos = [], styleId = DEFAULT_REGION_RANDOM_STYLE) {

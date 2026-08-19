@@ -44,7 +44,7 @@ function RangeInput({ value, min, max, step, onChange, formatValue }) {
 }
 
 function PaletteColorButton({ color, label, open, onToggle, onSelect }) {
-  const current = normalizeHexColor(color, "#7a5a2d");
+  const current = normalizeHexColor(color, "#93c5fd");
   const buttonRef = useRef(null);
   const [paletteStyle, setPaletteStyle] = useState(null);
 

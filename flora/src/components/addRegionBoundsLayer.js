@@ -1,5 +1,5 @@
 import mapboxgl from "mapbox-gl";
-import { bbox, booleanPointInPolygon, polygon } from "@turf/turf";
+import { bbox, booleanPointInPolygon, buffer, difference, featureCollection, polygon, simplify, union } from "@turf/turf";
 import { applyMapCursor, getFirstLocationsLayerId } from "./addLocationsLayer";
 import {
   createDefaultRegionBoundsSettings,
@@ -10,6 +10,12 @@ import { safeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
 export const REGION_BOUNDS_SOURCE_ID = "region-bounds";
 export const REGION_BOUNDS_FILL_LAYER_ID = "region-bounds-fill";
 export const REGION_BOUNDS_OUTLINE_LAYER_ID = "region-bounds-outline";
+export const REGION_BUFFER_SOURCE_ID = "region-selection-buffer";
+export const REGION_BUFFER_FILL_LAYER_ID = "region-selection-buffer-fill";
+export const REGION_BUFFER_OUTLINE_LAYER_ID = "region-selection-buffer-outline";
+export const REGION_BUFFER_MIN_KM = 0;
+export const REGION_BUFFER_MAX_KM = 100;
+export const REGION_BUFFER_STEP_KM = 1;
 
 const EMPTY_COLLECTION = {
   type: "FeatureCollection",
@@ -521,30 +527,42 @@ export function applyRegionBoundsIsoFilter(map, visibleIsos) {
   });
 }
 
-export function setRegionBoundsSelectedIso(map, iso) {
+export function setRegionBoundsSelectedIsos(map, isos = []) {
   if (!map?.getSource || !map.getSource(REGION_BOUNDS_SOURCE_ID)) {
     return;
   }
 
+  const nextIds = [...new Set((isos ?? []).filter(Boolean).map(String))];
   const state = mapsWithRegionHover.get(map) ?? {
     hoveredId: null,
     selectedId: null,
+    selectedIds: [],
     attached: false
   };
   mapsWithRegionHover.set(map, state);
 
-  if (state.selectedId != null && state.selectedId !== iso) {
-    map.setFeatureState(
-      { source: REGION_BOUNDS_SOURCE_ID, id: state.selectedId },
-      { selected: false }
-    );
-  }
+  const previousIds = Array.isArray(state.selectedIds)
+    ? state.selectedIds
+    : state.selectedId != null
+      ? [state.selectedId]
+      : [];
 
-  if (iso != null) {
-    map.setFeatureState({ source: REGION_BOUNDS_SOURCE_ID, id: iso }, { selected: true });
-  }
+  previousIds.forEach((id) => {
+    if (!nextIds.includes(id)) {
+      map.setFeatureState({ source: REGION_BOUNDS_SOURCE_ID, id }, { selected: false });
+    }
+  });
 
-  state.selectedId = iso ?? null;
+  nextIds.forEach((id) => {
+    map.setFeatureState({ source: REGION_BOUNDS_SOURCE_ID, id }, { selected: true });
+  });
+
+  state.selectedIds = nextIds;
+  state.selectedId = nextIds[nextIds.length - 1] ?? null;
+}
+
+export function setRegionBoundsSelectedIso(map, iso) {
+  setRegionBoundsSelectedIsos(map, iso == null ? [] : [iso]);
 }
 
 export function flyToRegionBoundsFeature(map, feature, { padding = 48, maxZoom = 6, duration = 800 } = {}) {
@@ -591,13 +609,19 @@ export function getRegionFeatureAtClick(map, event) {
 
 function setRegionBoundsVisibility(map, visible) {
   const visibility = visible ? "visible" : "none";
-  [REGION_BOUNDS_FILL_LAYER_ID, REGION_BOUNDS_OUTLINE_LAYER_ID].forEach((layerId) => {
+  [
+    REGION_BOUNDS_FILL_LAYER_ID,
+    REGION_BOUNDS_OUTLINE_LAYER_ID,
+    REGION_BUFFER_FILL_LAYER_ID,
+    REGION_BUFFER_OUTLINE_LAYER_ID
+  ].forEach((layerId) => {
     if (map.getLayer(layerId)) {
       map.setLayoutProperty(layerId, "visibility", visibility);
     }
   });
   if (!visible) {
     clearRegionHover(map);
+    hideRegionActionPopup();
   }
 }
 
@@ -610,6 +634,9 @@ function applyRegionBoundsData(map, data) {
 
 const mapsWithRegionHover = new WeakMap();
 let regionHoverPopup = null;
+let regionActionPopup = null;
+let regionActionPopupAddHandler = null;
+let regionActionPopupIsolateHandler = null;
 
 function escapeHtml(text) {
   return String(text ?? "")
@@ -621,6 +648,10 @@ function escapeHtml(text) {
 }
 
 function getRegionFeatureId(feature) {
+  const iso = feature?.properties?.iso;
+  if (iso != null && iso !== "") {
+    return iso;
+  }
   if (feature?.id != null && feature.id !== "") {
     return feature.id;
   }
@@ -636,6 +667,84 @@ function hideRegionHoverPopup() {
   if (regionHoverPopup) {
     regionHoverPopup.remove();
     regionHoverPopup = null;
+  }
+}
+
+export function hideRegionActionPopup() {
+  const popup = regionActionPopup;
+  const popupElement = popup?.getElement();
+  if (regionActionPopupAddHandler && popupElement) {
+    popupElement
+      .querySelector("[data-region-action-add]")
+      ?.removeEventListener("click", regionActionPopupAddHandler);
+  }
+  if (regionActionPopupIsolateHandler && popupElement) {
+    popupElement
+      .querySelector("[data-region-action-isolate]")
+      ?.removeEventListener("click", regionActionPopupIsolateHandler);
+  }
+  regionActionPopupAddHandler = null;
+  regionActionPopupIsolateHandler = null;
+  regionActionPopup = null;
+  popup?.remove();
+}
+
+export function showRegionActionPopup(map, { title, lngLat, onAdd, onIsolate }) {
+  if (!map || !lngLat) {
+    return;
+  }
+
+  hideRegionHoverPopup();
+  hideRegionActionPopup();
+
+  const popup = new mapboxgl.Popup({
+    closeButton: true,
+    closeOnClick: false,
+    closeOnMove: false,
+    offset: 12,
+    maxWidth: "280px",
+    className: "region-action-popup"
+  });
+
+  popup
+    .setLngLat(lngLat)
+    .setHTML(
+      `<div class="region-action-popup-title">${escapeHtml(title || "Регион")}</div>
+      <div class="region-action-popup-actions">
+        <button type="button" class="feature-popup-action-btn" data-region-action-add>Добавить</button>
+        <button type="button" class="feature-popup-action-btn" data-region-action-isolate>Изолировать</button>
+      </div>`
+    );
+
+  popup.on("close", () => {
+    if (regionActionPopup === popup) {
+      hideRegionActionPopup();
+    }
+  });
+
+  regionActionPopup = popup;
+  popup.addTo(map);
+
+  const popupElement = popup.getElement();
+  const addButton = popupElement?.querySelector("[data-region-action-add]");
+  const isolateButton = popupElement?.querySelector("[data-region-action-isolate]");
+
+  if (addButton && onAdd) {
+    regionActionPopupAddHandler = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onAdd();
+    };
+    addButton.addEventListener("click", regionActionPopupAddHandler);
+  }
+
+  if (isolateButton && onIsolate) {
+    regionActionPopupIsolateHandler = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onIsolate();
+    };
+    isolateButton.addEventListener("click", regionActionPopupIsolateHandler);
   }
 }
 
@@ -699,7 +808,7 @@ function setRegionHover(map, feature, lngLat, point) {
   }
   state.hoveredId = nextId;
 
-  if (hasPointLayerUnderCursor(map, point)) {
+  if (hasPointLayerUnderCursor(map, point) || regionActionPopup) {
     hideRegionHoverPopup();
     return;
   }
@@ -745,8 +854,153 @@ function attachRegionHoverHandlers(map) {
       fo: feature.properties?.fo || "Прочие",
       feature
     };
-    regionSelectListener?.(entry);
+    regionSelectListener?.(entry, event.lngLat);
   });
+}
+
+function unionPolygonFeatures(features) {
+  const polygons = features.filter((feature) => {
+    const type = feature?.geometry?.type;
+    return type === "Polygon" || type === "MultiPolygon";
+  });
+  if (polygons.length === 0) {
+    return null;
+  }
+
+  let result = polygons[0];
+  for (let index = 1; index < polygons.length; index += 1) {
+    try {
+      const merged = union(featureCollection([result, polygons[index]]));
+      if (merged) {
+        result = merged;
+      }
+    } catch {
+      // Самопересечения отдельных субъектов пропускаем.
+    }
+  }
+  return result;
+}
+
+function simplifyForBuffer(feature, radiusKm) {
+  const tolerance = Math.min(0.02, Math.max(0.002, radiusKm / 500));
+  try {
+    return simplify(feature, { tolerance, highQuality: false, mutate: false });
+  } catch {
+    return feature;
+  }
+}
+
+function buildRegionSelectionBufferFeature(features, radiusKm) {
+  const radius = Number(radiusKm);
+  if (!Number.isFinite(radius) || radius <= 0) {
+    return null;
+  }
+
+  const combined = unionPolygonFeatures(features);
+  if (!combined) {
+    return null;
+  }
+
+  const simplified = simplifyForBuffer(combined, radius);
+  let expanded = null;
+  try {
+    expanded = buffer(simplified, radius, { units: "kilometers", steps: 24 });
+  } catch (error) {
+    console.error("Не удалось построить буфер региона", error);
+    return null;
+  }
+  if (!expanded) {
+    return null;
+  }
+
+  try {
+    const halo = difference(featureCollection([expanded, simplified]));
+    if (halo) {
+      return halo;
+    }
+  } catch {
+    // Если кольцо не строится, показываем внешний контур целиком.
+  }
+  return expanded;
+}
+
+function clearRegionSelectionBufferData(map) {
+  const source = map?.getSource?.(REGION_BUFFER_SOURCE_ID);
+  if (source && typeof source.setData === "function") {
+    source.setData(EMPTY_COLLECTION);
+  }
+}
+
+/** Оффсет (буфер) вокруг выделенных субъектов, км. */
+export function updateRegionSelectionBuffer(map, features = [], radiusKm = 0) {
+  if (!map?.getSource?.(REGION_BUFFER_SOURCE_ID)) {
+    return;
+  }
+
+  const list = Array.isArray(features) ? features : [];
+  const radius = Number(radiusKm);
+  if (!list.length || !Number.isFinite(radius) || radius <= 0) {
+    clearRegionSelectionBufferData(map);
+    return;
+  }
+
+  const bufferFeature = buildRegionSelectionBufferFeature(list, radius);
+  const source = map.getSource(REGION_BUFFER_SOURCE_ID);
+  if (!source || typeof source.setData !== "function") {
+    return;
+  }
+  source.setData(
+    bufferFeature
+      ? { type: "FeatureCollection", features: [bufferFeature] }
+      : EMPTY_COLLECTION
+  );
+}
+
+function addRegionSelectionBufferLayers(map, beforeId) {
+  if (!map.getSource(REGION_BUFFER_SOURCE_ID)) {
+    map.addSource(REGION_BUFFER_SOURCE_ID, {
+      type: "geojson",
+      data: EMPTY_COLLECTION
+    });
+  }
+
+  if (!map.getLayer(REGION_BUFFER_FILL_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: REGION_BUFFER_FILL_LAYER_ID,
+        type: "fill",
+        source: REGION_BUFFER_SOURCE_ID,
+        layout: {
+          visibility: "none"
+        },
+        paint: {
+          "fill-color": "#38bdf8",
+          "fill-opacity": 0.16,
+          "fill-antialias": true
+        }
+      },
+      beforeId
+    );
+  }
+
+  if (!map.getLayer(REGION_BUFFER_OUTLINE_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: REGION_BUFFER_OUTLINE_LAYER_ID,
+        type: "line",
+        source: REGION_BUFFER_SOURCE_ID,
+        layout: {
+          visibility: "none"
+        },
+        paint: {
+          "line-color": "#0284c7",
+          "line-width": 1.5,
+          "line-opacity": 0.85
+        }
+      },
+      beforeId
+    );
+  }
 }
 
 /** Добавляет контуры субъектов РФ. По умолчанию слой скрыт. */
@@ -776,6 +1030,7 @@ export function addRegionBoundsLayer(map, { loadData = false } = {}) {
 
 
   const beforeId = getFirstLocationsLayerId(map);
+  addRegionSelectionBufferLayers(map, beforeId);
 
   if (!map.getLayer(REGION_BOUNDS_FILL_LAYER_ID)) {
     map.addLayer(

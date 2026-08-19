@@ -4,59 +4,16 @@ import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import RegionBoundsDisplaySettings from "./RegionBoundsSettingsPanel";
-import { FilterIcon } from "../images/buttons";
+import {
+  REGION_BUFFER_MAX_KM,
+  REGION_BUFFER_MIN_KM,
+  REGION_BUFFER_STEP_KM
+} from "./addRegionBoundsLayer";
+import { TrashIcon } from "../images/buttons";
+import "../styles/HeatmapSettingsPanel.css";
 import "../styles/RegionPanel.css";
 
-const FEDERAL_DISTRICT_ORDER = ["ЦФО", "СЗФО", "ЮФО", "СКФО", "ПФО", "УФО", "СФО", "ДФО"];
-
-function normalizeSearchQuery(value) {
-  return value.trim().toLocaleLowerCase("ru");
-}
-
-function matchesSearch(entry, query) {
-  if (!query) {
-    return true;
-  }
-
-  const haystack = [entry.name, entry.nameEn, entry.iso, entry.fo]
-    .filter(Boolean)
-    .join(" ")
-    .toLocaleLowerCase("ru");
-
-  return haystack.includes(query);
-}
-
-function groupCatalog(catalog) {
-  const groups = new Map();
-
-  catalog.forEach((entry) => {
-    const key = entry.fo || "Прочие";
-    if (!groups.has(key)) {
-      groups.set(key, []);
-    }
-    groups.get(key).push(entry);
-  });
-
-  const orderedKeys = [
-    ...FEDERAL_DISTRICT_ORDER.filter((key) => groups.has(key)),
-    ...[...groups.keys()].filter((key) => !FEDERAL_DISTRICT_ORDER.includes(key)).sort((a, b) =>
-      a.localeCompare(b, "ru")
-    )
-  ];
-
-  return orderedKeys.map((fo) => ({
-    fo,
-    entries: groups.get(fo).slice().sort((a, b) => a.name.localeCompare(b.name, "ru"))
-  }));
-}
-
-function getCollapsedSummary({
-  layerEnabled,
-  catalog,
-  hiddenIsoSet,
-  selectedName,
-  pointsFilterEnabled
-}) {
+function getCollapsedSummary({ layerEnabled, catalog, hiddenIsoSet, selectedCount, bufferKm }) {
   if (!layerEnabled) {
     return "Контуры скрыты";
   }
@@ -68,120 +25,41 @@ function getCollapsedSummary({
 
   if (!total) {
     parts.push("Список загружается…");
-  } else if (!visible) {
-    parts.push(`Субъектов: ${total}, все скрыты`);
-  } else {
+  } else if (hidden > 0) {
     parts.push(`Показано: ${visible} из ${total}`);
+  } else {
+    parts.push(`Субъектов: ${total}`);
   }
 
-  if (selectedName) {
-    parts.push(selectedName);
+  if (selectedCount) {
+    parts.push(`выделено: ${selectedCount}`);
   }
 
-  if (pointsFilterEnabled) {
-    parts.push("фильтр точек");
+  if (selectedCount && bufferKm > 0) {
+    parts.push(`буфер ${bufferKm} км`);
   }
 
   return parts.join(", ");
 }
 
-function DistrictGroup({
-  fo,
-  entries,
-  hiddenIsoSet,
-  selectedIso,
-  layerEnabled,
-  collapsed,
-  onCollapsedChange,
-  onVisibilityChange,
-  onGroupVisibilityChange,
-  onSelect
-}) {
-  const visibleCount = entries.filter((entry) => !hiddenIsoSet.has(entry.iso)).length;
-  const allVisible = entries.length > 0 && visibleCount === entries.length;
-  const someVisible = visibleCount > 0 && !allVisible;
-
-  return (
-    <section className="region-panel-group">
-      <div className="region-panel-group-header">
-        <button
-          type="button"
-          className="region-panel-group-toggle"
-          onClick={() => onCollapsedChange?.(!collapsed)}
-          aria-expanded={!collapsed}
-          disabled={!layerEnabled}
-        >
-          <span aria-hidden="true">{collapsed ? "▸" : "▾"}</span>
-          <span>
-            {fo}
-            <span className="region-panel-group-count"> ({entries.length})</span>
-          </span>
-        </button>
-        {entries.length > 0 ? (
-          <label
-            className={`region-panel-switch${!layerEnabled ? " region-panel-switch--disabled" : ""}`}
-            title={allVisible ? "Скрыть все в округе" : "Показать все в округе"}
-          >
-            <input
-              type="checkbox"
-              checked={allVisible}
-              disabled={!layerEnabled}
-              ref={(element) => {
-                if (element) {
-                  element.indeterminate = someVisible;
-                }
-              }}
-              onChange={(event) =>
-                onGroupVisibilityChange?.(
-                  entries.map((entry) => entry.iso),
-                  event.target.checked
-                )
-              }
-            />
-            <span className="region-panel-switch-slider" aria-hidden="true" />
-          </label>
-        ) : null}
-      </div>
-      {!collapsed ? (
-        <div className="region-panel-group-body">
-          <ul className="region-panel-object-list">
-            {entries.map((entry) => {
-              const visible = !hiddenIsoSet.has(entry.iso);
-              const selected = selectedIso === entry.iso;
-              return (
-                <li key={entry.iso} className="region-panel-object-item">
-                  <label className="region-panel-checkbox" title={entry.name}>
-                    <input
-                      type="checkbox"
-                      checked={visible}
-                      disabled={!layerEnabled}
-                      onChange={(event) =>
-                        onVisibilityChange?.(entry.iso, event.target.checked)
-                      }
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className={`region-panel-object-btn${
-                      selected ? " region-panel-object-btn--selected" : ""
-                    }`}
-                    disabled={!layerEnabled}
-                    onClick={() => onSelect?.(entry)}
-                    title="Выбрать субъект и показать на карте"
-                  >
-                    <span className="region-panel-object-title">{entry.name}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
-    </section>
-  );
+function normalizeSearchQuery(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
 }
 
-/** Панель контуров субъектов РФ: слой, стиль, каталог и фильтр точек. */
+function matchesRegionSearch(entry, query) {
+  if (!query) {
+    return false;
+  }
+  const haystack = [entry.name, entry.nameEn, entry.iso, entry.fo]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(query);
+}
+
+/** Панель контуров субъектов РФ: слой и стиль. */
 export default function RegionPanel({
   layerEnabled = false,
   onLayerEnabledChange,
@@ -191,41 +69,54 @@ export default function RegionPanel({
   onClearFeatureColors,
   catalog = [],
   hiddenIsoSet,
-  selectedIso = null,
-  selectedName = null,
-  pointsFilterEnabled = false,
-  pointsFilterAvailable = false,
-  onVisibilityChange,
-  onGroupVisibilityChange,
-  onSelect,
-  onPointsFilterToggle,
+  selectedNames = [],
+  selectedIsos = [],
+  onSearchSelect,
+  onSearchRemove,
+  onSaveTempLayer,
+  bufferKm = 0,
+  onBufferKmChange,
   collapsed: collapsedProp,
   onCollapsedChange,
   onMinimize,
   onClose
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [collapsedGroups, setCollapsedGroups] = useState({});
   const [helpOpen, setHelpOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [foundEntries, setFoundEntries] = useState([]);
   const isControlled = collapsedProp !== undefined;
   const collapsed = isControlled ? collapsedProp : collapsedInternal;
   const setCollapsed = onCollapsedChange ?? setCollapsedInternal;
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
-  const query = normalizeSearchQuery(searchQuery);
   const hidden = hiddenIsoSet instanceof Set ? hiddenIsoSet : new Set();
+  const hasSelection = selectedIsos.length > 0;
+  const selectedIsoSet = useMemo(() => new Set(selectedIsos), [selectedIsos]);
+  const query = normalizeSearchQuery(searchQuery);
+  const searchResults = useMemo(() => {
+    if (!query) {
+      return [];
+    }
+    const foundIsoSet = new Set(foundEntries.map((entry) => entry.iso));
+    return catalog
+      .filter((entry) => matchesRegionSearch(entry, query) && !foundIsoSet.has(entry.iso))
+      .slice(0, 24);
+  }, [catalog, foundEntries, query]);
 
-  const filteredCatalog = useMemo(
-    () => catalog.filter((entry) => matchesSearch(entry, query)),
-    [catalog, query]
-  );
-  const searchResults = query ? filteredCatalog : [];
-  const groups = useMemo(
-    () => (query ? [] : groupCatalog(catalog)),
-    [catalog, query]
-  );
-  const allVisible =
-    catalog.length > 0 && catalog.every((entry) => !hidden.has(entry.iso));
+  const handleSearchResultClick = (entry) => {
+    setFoundEntries((current) =>
+      current.some((item) => item.iso === entry.iso) ? current : [...current, entry]
+    );
+    onSearchSelect?.(entry);
+    setSearchQuery("");
+  };
+
+  const handleFoundRemove = (entry, event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setFoundEntries((current) => current.filter((item) => item.iso !== entry.iso));
+    onSearchRemove?.(entry.iso);
+  };
 
   return (
     <aside
@@ -261,8 +152,8 @@ export default function RegionPanel({
             layerEnabled,
             catalog,
             hiddenIsoSet: hidden,
-            selectedName,
-            pointsFilterEnabled
+            selectedCount: selectedNames.length,
+            bufferKm
           })}
         </p>
       ) : (
@@ -286,47 +177,31 @@ export default function RegionPanel({
             randomizeDisabled={!catalog.length}
           />
 
-          {selectedName ? (
-            <div className="region-panel-selected">
-              <span className="region-panel-selected-name">{selectedName}</span>
-              <button
-                type="button"
-                className={`region-panel-filter-btn${
-                  pointsFilterEnabled ? " region-panel-filter-btn--active" : ""
-                }`}
-                onClick={onPointsFilterToggle}
-                disabled={!pointsFilterAvailable}
-                aria-pressed={pointsFilterEnabled}
-                aria-label="Только эти"
-                title="Только эти"
-              >
-                <FilterIcon className="region-panel-filter-btn-icon" />
-              </button>
-            </div>
-          ) : (
-            <p className="region-panel-note">
-              Выберите субъект в списке или кликните по контуру на карте.
-            </p>
-          )}
-
-          <label
-            className={`region-panel-switch${!layerEnabled || !catalog.length ? " region-panel-switch--disabled" : ""}`}
-            title="Показать или скрыть контуры всех субъектов"
-          >
-            <input
-              type="checkbox"
-              checked={allVisible}
-              disabled={!layerEnabled || !catalog.length}
-              onChange={(event) =>
-                onGroupVisibilityChange?.(
-                  catalog.map((entry) => entry.iso),
-                  event.target.checked
-                )
-              }
-            />
-            <span className="region-panel-switch-slider" aria-hidden="true" />
-            <span>Показать все субъекты</span>
-          </label>
+          <h4 className="region-panel-section-title">Буфер</h4>
+          <div className={`region-panel-buffer${hasSelection ? "" : " region-panel-buffer--disabled"}`}>
+            <span className="heatmap-settings-field-label">Оффсет контура</span>
+            <span className="heatmap-settings-range region-panel-buffer-range">
+              <span className="heatmap-settings-range-value">{`${bufferKm} км`}</span>
+              <input
+                type="range"
+                className="heatmap-settings-slider"
+                min={REGION_BUFFER_MIN_KM}
+                max={REGION_BUFFER_MAX_KM}
+                step={REGION_BUFFER_STEP_KM}
+                value={bufferKm}
+                disabled={!hasSelection}
+                style={{
+                  "--range-progress": `${(bufferKm / REGION_BUFFER_MAX_KM) * 100}%`
+                }}
+                onChange={(event) => onBufferKmChange?.(Number(event.target.value))}
+                title={
+                  hasSelection
+                    ? "Ширина буфера вокруг выделенных регионов"
+                    : "Сначала выделите регион на карте"
+                }
+              />
+            </span>
+          </div>
 
           <label className="region-panel-search">
             <span className="region-panel-search-label">Поиск</span>
@@ -334,91 +209,80 @@ export default function RegionPanel({
               type="search"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Название, округ или ISO…"
+              placeholder="Название субъекта…"
+              disabled={!catalog.length}
             />
           </label>
 
-          <div className="region-panel-search-results" role="list" aria-label="Результаты поиска">
-            {!catalog.length ? (
-              <p className="region-panel-note">Список загружается…</p>
-            ) : !query ? (
-              <p className="region-panel-note">Начните вводить название субъекта</p>
-            ) : searchResults.length === 0 ? (
-              <p className="region-panel-note">Ничего не найдено</p>
-            ) : (
-              <ul className="region-panel-object-list">
-                {searchResults.map((entry) => {
-                  const visible = !hidden.has(entry.iso);
-                  const selected = selectedIso === entry.iso;
-                  return (
-                    <li key={entry.iso} className="region-panel-search-result" role="listitem">
-                      <button
-                        type="button"
-                        className={`region-panel-object-btn${
-                          selected ? " region-panel-object-btn--selected" : ""
-                        }`}
-                        onClick={() => onSelect?.(entry)}
-                        title="Выбрать субъект и показать на карте"
-                      >
-                        <span className="region-panel-object-title">{entry.name}</span>
-                      </button>
-                      <label
-                        className="region-panel-switch"
-                        title={
-                          visible && layerEnabled
-                            ? "Скрыть регион на карте"
-                            : "Показать только этот регион"
-                        }
-                      >
-                        <input
-                          type="checkbox"
-                          checked={visible && layerEnabled}
-                          onChange={(event) => {
-                            const nextVisible = event.target.checked;
-                            if (nextVisible) {
-                              if (!layerEnabled) {
-                                onLayerEnabledChange?.(true);
-                              }
-                              const otherIsos = catalog
-                                .map((item) => item.iso)
-                                .filter((iso) => iso !== entry.iso);
-                              onGroupVisibilityChange?.(otherIsos, false);
-                              onVisibilityChange?.(entry.iso, true);
-                              return;
-                            }
-                            onVisibilityChange?.(entry.iso, false);
-                          }}
-                        />
-                        <span className="region-panel-switch-slider" aria-hidden="true" />
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-
-          {!query && layerEnabled && groups.length > 0 ? (
-            <div className="region-panel-catalog">
-              {groups.map(({ fo, entries }) => (
-                <DistrictGroup
-                  key={fo}
-                  fo={fo}
-                  entries={entries}
-                  hiddenIsoSet={hidden}
-                  selectedIso={selectedIso}
-                  layerEnabled={layerEnabled}
-                  collapsed={collapsedGroups[fo] ?? true}
-                  onCollapsedChange={(nextCollapsed) =>
-                    setCollapsedGroups((prev) => ({ ...prev, [fo]: nextCollapsed }))
-                  }
-                  onVisibilityChange={onVisibilityChange}
-                  onGroupVisibilityChange={onGroupVisibilityChange}
-                  onSelect={onSelect}
-                />
-              ))}
-            </div>
+          {query && searchResults.length === 0 ? (
+            <p className="region-panel-note">Ничего не найдено</p>
           ) : null}
+
+          {searchResults.length > 0 ? (
+            <ul className="region-panel-search-results" aria-label="Совпадения поиска">
+              {searchResults.map((entry) => (
+                <li key={entry.iso}>
+                  <button
+                    type="button"
+                    className="region-panel-search-result"
+                    onClick={() => handleSearchResultClick(entry)}
+                  >
+                    <span className="region-panel-search-result-name">{entry.name}</span>
+                    {entry.fo ? (
+                      <span className="region-panel-search-result-meta">{entry.fo}</span>
+                    ) : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {foundEntries.length > 0 ? (
+            <ul className="region-panel-search-results" aria-label="Найденные регионы">
+              {foundEntries.map((entry) => {
+                const selected = selectedIsoSet.has(entry.iso);
+                return (
+                  <li key={entry.iso} className="region-panel-found-item">
+                    <button
+                      type="button"
+                      className={`region-panel-search-result${
+                        selected ? " region-panel-search-result--selected" : ""
+                      }`}
+                      onClick={() => onSearchSelect?.(entry)}
+                    >
+                      <span className="region-panel-search-result-name">{entry.name}</span>
+                      {entry.fo ? (
+                        <span className="region-panel-search-result-meta">{entry.fo}</span>
+                      ) : null}
+                    </button>
+                    <button
+                      type="button"
+                      className="region-panel-found-remove"
+                      title="Удалить"
+                      aria-label={`Удалить ${entry.name}`}
+                      onClick={(event) => handleFoundRemove(entry, event)}
+                    >
+                      <TrashIcon className="region-panel-found-remove-icon" aria-hidden="true" focusable="false" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+
+          <button
+            type="button"
+            className="heatmap-settings-reset"
+            disabled={!hasSelection || !onSaveTempLayer}
+            onClick={() => onSaveTempLayer?.()}
+            title={
+              hasSelection
+                ? "Сохранить выбранные субъекты во временный слой"
+                : "Сначала выделите регион"
+            }
+          >
+            Во временный слой
+          </button>
         </div>
       )}
 

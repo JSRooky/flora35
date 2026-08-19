@@ -2,6 +2,7 @@ import { DEFAULT_CLUSTER_COLOR, DEFAULT_POINT_COLOR, getPointColorExpression } f
 import {
   getTempLayerFeatureGroups,
   getTempLayerPlaqueFeatureGroups,
+  getVisibleRegionTempLayerFeatures,
   getVisibleTempLayerFeatures,
   TEMP_LAYER_MARKER_PALETTE
 } from "../tempLayers/tempLayerStore";
@@ -32,6 +33,10 @@ export const TEMP_LAYERS_SOURCE_ID = "temp-layers";
 export const TEMP_LAYERS_LAYER_ID = "temp-layers-unclustered";
 export const TEMP_LAYERS_CLUSTER_LAYER_ID = "temp-layers-clusters";
 export const TEMP_LAYERS_CLUSTER_COUNT_LAYER_ID = "temp-layers-cluster-count";
+const TEMP_REGION_OVERLAY_SOURCE_ID = "temp-region-overlay";
+const TEMP_REGION_OVERLAY_FILL_LAYER_ID = "temp-region-overlay-fill";
+const TEMP_REGION_OVERLAY_OUTLINE_LAYER_ID = "temp-region-overlay-outline";
+const EMPTY_REGION_OVERLAY = { type: "FeatureCollection", features: [] };
 
 const CLUSTER_OPTIONS = {
   clusterMaxZoom: 14,
@@ -572,6 +577,53 @@ function addUnitToMap(map, unit) {
   activeUnits.push(ids);
 }
 
+function setTempRegionOverlayData(map) {
+  if (!map?.getStyle?.()) {
+    return;
+  }
+
+  if (!map.getSource(TEMP_REGION_OVERLAY_SOURCE_ID)) {
+    map.addSource(TEMP_REGION_OVERLAY_SOURCE_ID, {
+      type: "geojson",
+      data: EMPTY_REGION_OVERLAY
+    });
+  }
+
+  if (!map.getLayer(TEMP_REGION_OVERLAY_FILL_LAYER_ID)) {
+    map.addLayer({
+      id: TEMP_REGION_OVERLAY_FILL_LAYER_ID,
+      type: "fill",
+      source: TEMP_REGION_OVERLAY_SOURCE_ID,
+      paint: {
+        "fill-color": ["coalesce", ["to-color", ["get", "temp_marker_color"]], "#2563eb"],
+        "fill-opacity": 0.18,
+        "fill-antialias": true
+      }
+    });
+  }
+
+  if (!map.getLayer(TEMP_REGION_OVERLAY_OUTLINE_LAYER_ID)) {
+    map.addLayer({
+      id: TEMP_REGION_OVERLAY_OUTLINE_LAYER_ID,
+      type: "line",
+      source: TEMP_REGION_OVERLAY_SOURCE_ID,
+      paint: {
+        "line-color": ["coalesce", ["to-color", ["get", "temp_marker_color"]], "#1d4ed8"],
+        "line-width": 1.6,
+        "line-opacity": 0.9
+      }
+    });
+  }
+
+  const source = map.getSource(TEMP_REGION_OVERLAY_SOURCE_ID);
+  if (source && typeof source.setData === "function") {
+    source.setData({
+      type: "FeatureCollection",
+      features: getVisibleRegionTempLayerFeatures()
+    });
+  }
+}
+
 export function setTempLayersData(map) {
   if (!map?.getSource || !map.getStyle()) {
     return;
@@ -597,6 +649,7 @@ export function setTempLayersData(map) {
   syncTempDensePilesLayers(map, denseClusterFeatures);
   attachInteractions(map);
   applyVisibility(map);
+  setTempRegionOverlayData(map);
 }
 
 export function applyTempLayersGroupingMode(
