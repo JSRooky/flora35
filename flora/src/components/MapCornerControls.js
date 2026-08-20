@@ -24,6 +24,7 @@ export default function MapCornerControls({
   onTempLayerDelete,
   onTempLayerArchive,
   onOpenTempArchive,
+  onTempLayerRename,
   onTempLayerColorChange,
   onTempLayerHeatmapChange,
   onTempLayersHeatmapAllChange,
@@ -212,6 +213,7 @@ export default function MapCornerControls({
           onDeleteLayer={onTempLayerDelete}
           onArchiveLayer={onTempLayerArchive}
           onOpenArchive={onOpenTempArchive}
+          onRenameLayer={onTempLayerRename}
           onColorChange={onTempLayerColorChange}
           onHeatmapChange={onTempLayerHeatmapChange}
           onHeatmapAllChange={onTempLayersHeatmapAllChange}

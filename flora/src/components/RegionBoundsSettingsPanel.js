@@ -7,7 +7,7 @@ import {
   normalizeHexColor,
   REGION_RANDOM_STYLE_PRESETS
 } from "./regionBoundsSettings";
-import { TEMP_LAYER_MARKER_PALETTE } from "../tempLayers/tempLayerStore";
+import { TEMP_LAYER_MARKER_PALETTE } from "../tempLayers/tempLayerPalette";
 import "../styles/HeatmapSettingsPanel.css";
 import "../styles/TempLayersPicker.css";
 import "../styles/RegionBoundsSettingsPanel.css";

@@ -602,6 +602,13 @@ export function setRegionBoundsSelectHandler(handler) {
   regionSelectListener = typeof handler === "function" ? handler : null;
 }
 
+export function emitRegionBoundsSelect(entry, lngLat) {
+  if (!entry?.iso) {
+    return;
+  }
+  regionSelectListener?.(entry, lngLat);
+}
+
 export function getRegionFeatureAtClick(map, event) {
   if (!map || !event?.point) {
     return null;
@@ -875,6 +882,7 @@ function attachRegionHoverHandlers(map) {
     if (!feature) {
       return;
     }
+    event.preventDefault?.();
     const iso = getRegionFeatureId(feature);
     const entry = getRegionEntryByIso(iso) ?? {
       iso,
@@ -953,6 +961,7 @@ export function collectRegionSelectionOverlayFeatures(features = [], bufferKm = 
       geometry: feature.geometry,
       properties: {
         ...(feature.properties ?? {}),
+        overlayRole: "region",
         fillOpacity: 0.18
       }
     });

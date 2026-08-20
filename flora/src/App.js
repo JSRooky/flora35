@@ -91,6 +91,7 @@ import {
   applyRegionBoundsIsoFilter,
   applyRegionBoundsPaintSettings,
   buildRegionCatalog,
+  emitRegionBoundsSelect,
   flyToRegionBoundsFeature,
   getRegionFeatureAtClick,
   hideRegionActionPopup,
@@ -237,7 +238,7 @@ import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegist
 import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
 import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles } from "./components/addTempLayersLayer";
 import { addTempLayerOverlaysLayer, applyTempRegionOverlayPaint } from "./components/addTempLayerOverlaysLayer";
-import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
+import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerLabel, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
 import {
   collectMapToolOverlays,
   TEMP_OVERLAY_KINDS,
@@ -271,6 +272,7 @@ import {
   archiveWorkingPlaque,
   deleteArchivedPlaque,
   exportArchivedPlaque,
+  renameArchivedPlaque,
   restoreArchivedPlaque
 } from "./tempLayers/tempLayerArchive";
 import { findGbifFeatureByKey, getGbifFeaturesForRegionIds } from "./gbif/gbifStore";
@@ -1449,6 +1451,24 @@ export default function MapView() {
 
   const handleTempArchiveDelete = useCallback(async (archiveId) => {
     await deleteArchivedPlaque(archiveId).catch(() => {});
+  }, []);
+
+  const handleTempArchiveRename = useCallback(async (archiveId, title) => {
+    const result = await renameArchivedPlaque(archiveId, title).catch(() => ({
+      ok: false
+    }));
+    if (!result?.ok) {
+      setTempArchiveStatus("Не удалось переименовать слой.");
+    }
+  }, []);
+
+  const handleTempLayerRename = useCallback((layerId, title) => {
+    const result = setTempLayerLabel(layerId, title);
+    if (!result?.ok) {
+      return;
+    }
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
   }, []);
 
   const handleTempLayerColorChange = useCallback((layerId, color) => {
@@ -5795,6 +5815,7 @@ export default function MapView() {
             if (regionHit?.iso) {
               setPopupData(null);
               updateSelectedPointHighlight(map.current, null);
+              emitRegionBoundsSelect(regionHit, event.lngLat);
               return;
             }
 
@@ -6280,6 +6301,7 @@ export default function MapView() {
               onRestore={handleTempArchiveRestore}
               onExport={handleTempArchiveExport}
               onDelete={handleTempArchiveDelete}
+              onRename={handleTempArchiveRename}
               statusMessage={tempArchiveStatus}
             />
           )}
@@ -6868,6 +6890,7 @@ export default function MapView() {
         onTempLayerDelete={handleTempLayerDelete}
         onTempLayerArchive={handleTempLayerArchive}
         onOpenTempArchive={handleOpenTempArchive}
+        onTempLayerRename={handleTempLayerRename}
         onTempLayerColorChange={handleTempLayerColorChange}
         onTempLayerHeatmapChange={handleTempLayerHeatmapChange}
         onTempLayersHeatmapAllChange={handleTempLayersHeatmapAllChange}

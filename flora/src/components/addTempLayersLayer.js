@@ -598,7 +598,7 @@ export function setTempLayersData(map) {
   syncTempDensePilesLayers(map, denseClusterFeatures);
   attachInteractions(map);
   applyVisibility(map);
-  setTempLayerOverlaysData(map, { visible: layerVisible });
+  setTempLayerOverlaysData(map);
 }
 
 export function applyTempLayersGroupingMode(
@@ -662,12 +662,13 @@ export function setTempLayersVisibility(map, visible) {
     if (layerVisible) {
       setTempLayersData(map);
     } else {
-      setTempLayerOverlaysData(map, { visible: false });
+      applyVisibility(map);
+      setTempLayerOverlaysData(map);
     }
     return;
   }
   applyVisibility(map);
-  setTempLayerOverlaysData(map, { visible: layerVisible });
+  setTempLayerOverlaysData(map);
 }
 
 export function getTempLayersInteractiveLayerIds() {

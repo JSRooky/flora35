@@ -13,6 +13,7 @@ import "../styles/ExternalLayersPicker.css";
 import "../styles/TempLayersPicker.css";
 import {
   ClockIcon,
+  EditIcon,
   EyeIcon,
   EyeOffIcon,
   LayersIcon,
@@ -201,6 +202,7 @@ export default function TempLayersPicker({
   onDeleteLayer,
   onArchiveLayer,
   onOpenArchive,
+  onRenameLayer,
   onColorChange,
   onHeatmapChange,
   onHeatmapAllChange
@@ -208,8 +210,11 @@ export default function TempLayersPicker({
   const [open, setOpen] = useState(false);
   const [colorMenuLayerId, setColorMenuLayerId] = useState(null);
   const [infoMenuLayerId, setInfoMenuLayerId] = useState(null);
+  const [renamingKey, setRenamingKey] = useState(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const rootRef = useRef(null);
   const closeTimerRef = useRef(null);
+  const renamingKeyRef = useRef(null);
   void dataRevision;
   const plaques = listTempLayerPlaques();
   const layers = getTempLayers();
@@ -253,6 +258,9 @@ export default function TempLayersPicker({
   };
 
   const handleClose = (event) => {
+    if (renamingKeyRef.current) {
+      return;
+    }
     if (event && isPointerInsidePicker(event)) {
       return;
     }
@@ -280,6 +288,12 @@ export default function TempLayersPicker({
           setInfoMenuLayerId(null);
           return;
         }
+        if (renamingKeyRef.current) {
+          setRenamingKey(null);
+          setRenameDraft("");
+          renamingKeyRef.current = null;
+          return;
+        }
         setOpen(false);
       }
     };
@@ -296,6 +310,31 @@ export default function TempLayersPicker({
   const heatmapCount = layers.filter((layer) => layer.heatmapEnabled).length;
   const allHeatmapsOn = layers.length > 0 && heatmapCount === layers.length;
 
+  const startRename = (plaque) => {
+    clearCloseTimer();
+    setColorMenuLayerId(null);
+    setInfoMenuLayerId(null);
+    setRenamingKey(plaque.key);
+    renamingKeyRef.current = plaque.key;
+    setRenameDraft(plaqueTitle(plaque));
+  };
+
+  const cancelRename = () => {
+    setRenamingKey(null);
+    renamingKeyRef.current = null;
+    setRenameDraft("");
+  };
+
+  const commitRename = (plaque) => {
+    const next = renameDraft.trim();
+    const current = plaqueTitle(plaque);
+    cancelRename();
+    if (!next || next === current) {
+      return;
+    }
+    onRenameLayer?.(plaque.layers[0]?.id, next);
+  };
+
   return (
     <div
       className="external-layers-picker temp-layers-picker"
@@ -304,6 +343,9 @@ export default function TempLayersPicker({
       onMouseLeave={handleClose}
       onFocus={handleOpen}
       onBlur={(event) => {
+        if (renamingKeyRef.current) {
+          return;
+        }
         if (!rootRef.current?.contains(event.relatedTarget)) {
           setOpen(false);
           setColorMenuLayerId(null);
@@ -381,10 +423,12 @@ export default function TempLayersPicker({
               const anyVisible = plaque.layers.some((layer) => layer.visible);
               const heatmapOn = plaque.layers.some((layer) => layer.heatmapEnabled);
               const isRegionsPlaque = plaque.layers.some(isRegionTempLayer);
+              const showSourceToggles = Boolean(gbif || inat || mapSource);
               const splitStripe = Boolean(gbif && inat);
               const title = plaqueTitle(plaque);
               const originItems = plaqueOriginItems(plaque);
               const infoOpen = infoMenuLayerId === primary.id;
+              const renaming = renamingKey === plaque.key;
 
               return (
               <div
@@ -405,24 +449,71 @@ export default function TempLayersPicker({
                 style={plaqueRowStyle(plaque)}
               >
                 <div className="temp-layers-picker-main">
+                <div className="temp-layers-picker-title-row">
+                {renaming ? (
+                  <input
+                    className="temp-layers-picker-rename"
+                    value={renameDraft}
+                    maxLength={120}
+                    aria-label="Название слоя"
+                    autoFocus
+                    onClick={(event) => event.stopPropagation()}
+                    onChange={(event) => setRenameDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        commitRename(plaque);
+                      } else if (event.key === "Escape") {
+                        event.preventDefault();
+                        cancelRename();
+                      }
+                    }}
+                    onBlur={() => commitRename(plaque)}
+                  />
+                ) : (
                 <button
                   type="button"
                   role="option"
                   aria-selected={anyVisible}
                   tabIndex={open ? 0 : -1}
                   className="temp-layers-picker-toggle"
-                  title={anyVisible ? `Скрыть «${title}»` : `Показать «${title}»`}
+                  title={`${anyVisible ? "Скрыть" : "Показать"} «${title}». Двойной щелчок — переименовать`}
                   onClick={() => {
                     plaque.layers.forEach((layer) => {
                       onToggleLayer?.(layer.id, !anyVisible);
                     });
                   }}
+                  onDoubleClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    startRename(plaque);
+                  }}
                 >
                   <span className="external-layers-picker-option-label">{title}</span>
                 </button>
+                )}
+                <button
+                  type="button"
+                  className={`temp-layers-picker-rename-btn${renaming ? " temp-layers-picker-rename-btn--on" : ""}`}
+                  tabIndex={open ? 0 : -1}
+                  aria-label={`Переименовать слой «${title}»`}
+                  title="Переименовать"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (renaming) {
+                      commitRename(plaque);
+                      return;
+                    }
+                    startRename(plaque);
+                  }}
+                  onMouseDown={(event) => event.preventDefault()}
+                >
+                  <EditIcon className="temp-layers-picker-rename-icon" aria-hidden="true" focusable="false" />
+                </button>
+                </div>
                 <div className="temp-layers-picker-option-meta-row">
                   <span className="temp-layers-picker-option-meta">{formatPlaqueMeta(plaque)}</span>
-                  {isRegionsPlaque ? null : (
+                  {showSourceToggles ? (
                   <span className="temp-layers-picker-sources" role="group" aria-label="Источники">
                   <button
                     type="button"
@@ -473,7 +564,7 @@ export default function TempLayersPicker({
                     </button>
                   ) : null}
                 </span>
-                  )}
+                  ) : null}
                 </div>
                 </div>
                 <button

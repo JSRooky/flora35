@@ -175,7 +175,7 @@ export default function SelectiveLoadPopup({
 
   const isInat = source === SOURCE_INAT;
   const isAll = source === SOURCE_ALL;
-  const saveIntoSelectedMapRegions =
+  const canSaveIntoCurrentLayer =
     Boolean(onSaveToRegionTempLayer) &&
     Array.isArray(focusRegions) &&
     focusRegions.length > 0;
@@ -542,17 +542,19 @@ export default function SelectiveLoadPopup({
     sourcesLoading
   ]);
 
-  const saveToTempLayer = useCallback(async () => {
+  const saveToTempLayer = useCallback(async (intoCurrentLayer = false) => {
     if (!map || sourcesLoading || loading || busyRegionId || !resolvedTaxon) {
       return;
     }
     abortCountSearch();
 
+    const saveIntoCurrent = Boolean(intoCurrentLayer) && canSaveIntoCurrentLayer;
+
     onLoadError?.(null);
     try {
       if (isAll) {
         await loadRegionsForSource(SOURCE_GBIF, gbifRegions);
-        if (saveIntoSelectedMapRegions) {
+        if (saveIntoCurrent) {
           const gbifStaging = getTempLayerStaging();
           const gbifFeatures = [...(gbifStaging.features ?? [])];
           const gbifRegionIds = [...(gbifStaging.regionIds ?? [])];
@@ -587,7 +589,7 @@ export default function SelectiveLoadPopup({
           onLoadError?.("Нет точек для временного слоя");
           return;
         }
-        if (saveIntoSelectedMapRegions) {
+        if (saveIntoCurrent) {
           const staging = getTempLayerStaging();
           const ok = onSaveToRegionTempLayer(staging.features, staging.regionIds);
           clearTempLayerStaging();
@@ -613,7 +615,6 @@ export default function SelectiveLoadPopup({
     availableRegions,
     busyRegionId,
     commitStagingIfAny,
-    focusRegions,
     gbifRegions,
     inatRegions,
     isAll,
@@ -625,7 +626,7 @@ export default function SelectiveLoadPopup({
     onSaveToRegionTempLayer,
     onTempLayersChange,
     resolvedTaxon,
-    saveIntoSelectedMapRegions,
+    canSaveIntoCurrentLayer,
     sourcesLoading
   ]);
 
@@ -666,8 +667,8 @@ export default function SelectiveLoadPopup({
         {Array.isArray(focusRegions) && focusRegions.length > 0 ? (
           <PanelHint>
             Фильтр регионов включён: {focusRegions.length} субъект(ов) с карты.
-            {saveIntoSelectedMapRegions
-              ? " «Во временный слой» сохранит точки в тот же слой, что и выделенные регионы."
+            {canSaveIntoCurrentLayer
+              ? " Точки можно сохранить в текущий слой выделенных регионов или в новый временный слой."
               : ""}
             {unmatchedLabels.length > 0
               ? ` Не сопоставлены: ${unmatchedLabels.join(", ")}.`
@@ -933,19 +934,37 @@ export default function SelectiveLoadPopup({
                   : ""}
               </span>
               <div className="selective-load-footer-actions">
-                <button
-                  type="button"
-                  className="gbif-panel-btn gbif-panel-btn--secondary"
-                  disabled={!canLoad || availableRegions.length === 0}
-                  onClick={saveToTempLayer}
-                  title={
-                    saveIntoSelectedMapRegions
-                      ? "Сохранить найденные точки в тот же временный слой, что и выделенные на карте регионы"
-                      : undefined
-                  }
-                >
-                  Во временный слой
-                </button>
+                {canSaveIntoCurrentLayer ? (
+                  <>
+                    <button
+                      type="button"
+                      className="gbif-panel-btn gbif-panel-btn--secondary"
+                      disabled={!canLoad || availableRegions.length === 0}
+                      onClick={() => saveToTempLayer(true)}
+                      title="Сохранить найденные точки в тот же временный слой, что и выделенные на карте регионы"
+                    >
+                      В текущий слой
+                    </button>
+                    <button
+                      type="button"
+                      className="gbif-panel-btn gbif-panel-btn--secondary"
+                      disabled={!canLoad || availableRegions.length === 0}
+                      onClick={() => saveToTempLayer(false)}
+                      title="Сохранить найденные точки в новый временный слой"
+                    >
+                      В новый слой
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="gbif-panel-btn gbif-panel-btn--secondary"
+                    disabled={!canLoad || availableRegions.length === 0}
+                    onClick={() => saveToTempLayer(false)}
+                  >
+                    Во временный слой
+                  </button>
+                )}
                 <button
                   type="button"
                   className="gbif-panel-btn"

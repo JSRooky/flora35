@@ -1,4 +1,4 @@
-import { TEMP_LAYER_MARKER_PALETTE } from "../tempLayers/tempLayerStore";
+import { TEMP_LAYER_MARKER_PALETTE } from "../tempLayers/tempLayerPalette";
 
 const STORAGE_KEY = "flora35-region-bounds-settings-v2";
 

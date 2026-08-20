@@ -1,5 +1,8 @@
 import { stampFeatureRegionIds } from "../externalSources/regionVisibility";
 import { getExternalRegionById } from "../externalSources/regions";
+import { TEMP_LAYER_MARKER_PALETTE } from "./tempLayerPalette";
+
+export { TEMP_LAYER_MARKER_PALETTE } from "./tempLayerPalette";
 
 const listeners = new Set();
 
@@ -182,33 +185,6 @@ function createEmptyStaging() {
 }
 
 let staging = createEmptyStaging();
-export const TEMP_LAYER_MARKER_PALETTE = [
-  "#d5254c",
-  "#d85a1c",
-  "#c18b14",
-  "#20a04c",
-  "#16958a",
-  "#3267e0",
-  "#7e43e3",
-  "#d02e7a",
-  "#ae2222",
-  "#ba4318",
-  "#4d7b15",
-  "#16756f",
-  "#233c85",
-  "#6f2ed3",
-  "#78716d",
-  "#e84763",
-  "#ed751e",
-  "#e1b316",
-  "#2dc160",
-  "#1eb6a6",
-  "#4584ec",
-  "#8f62ed",
-  "#e44e9c",
-  "#d02c2c",
-  "#64a016"
-];
 
 const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{6})$/;
 
@@ -263,15 +239,7 @@ export function getRegionOverlayFeatureIso(feature, fallbackIndex = 0) {
 }
 
 export function isRegionOverlayBufferFeature(feature) {
-  const role = feature?.properties?.overlayRole;
-  if (role === "buffer") {
-    return true;
-  }
-  if (role === "region") {
-    return false;
-  }
-  const iso = feature?.properties?.iso || feature?.properties?.ISO_1;
-  return iso == null || String(iso).trim() === "";
+  return feature?.properties?.overlayRole === "buffer";
 }
 
 function layerHasRegionOverlays(layer) {
@@ -898,6 +866,7 @@ export function commitRegionSelectionTempLayer({
     ...feature,
     properties: {
       ...(feature.properties ?? {}),
+      overlayRole: "region",
       color: markerColor,
       fillOpacity: 0.18
     }
@@ -969,6 +938,119 @@ function mergeRegionIds(existing, incoming) {
   return next;
 }
 
+function bucketFeaturesBySource(features) {
+  const buckets = {
+    [TEMP_SOURCE_IDS.GBIF]: [],
+    [TEMP_SOURCE_IDS.INAT]: [],
+    [TEMP_SOURCE_IDS.MAP]: []
+  };
+  (features ?? []).forEach((feature) => {
+    if (!feature?.geometry) {
+      return;
+    }
+    buckets[classifySnapshotSource(feature)].push(cloneSnapshotFeature(feature));
+  });
+  return buckets;
+}
+
+function createPointSourceLayer(base, source, features) {
+  return {
+    id: createLayerId(),
+    kind: "points",
+    label: base.label,
+    source,
+    groupKey: layerGroupKey(base),
+    taxonName: base.taxonName,
+    taxonMode: base.taxonMode ?? null,
+    taxonKey: base.taxonKey ?? null,
+    familyKey: base.familyKey ?? null,
+    inatTaxonId: base.inatTaxonId ?? null,
+    regionIds: [...(base.regionIds || [])],
+    bufferKm: base.bufferKm ?? 0,
+    createdAt: base.createdAt,
+    visible: base.visible,
+    heatmapEnabled: Boolean(base.heatmapEnabled),
+    markerColor: base.markerColor ?? null,
+    archiveId: base.archiveId ?? null,
+    filterSnapshot: normalizeFilterSnapshot(base.filterSnapshot),
+    overlays: [],
+    features
+  };
+}
+
+function mergeBucketsIntoPlaque(base, buckets, regionIds) {
+  const groupKey = layerGroupKey(base);
+  let nextLayers = [...layers];
+  let added = 0;
+
+  [TEMP_SOURCE_IDS.GBIF, TEMP_SOURCE_IDS.INAT, TEMP_SOURCE_IDS.MAP].forEach((source) => {
+    const incoming = buckets[source] ?? [];
+    if (incoming.length === 0) {
+      return;
+    }
+    const existing = nextLayers.find(
+      (layer) =>
+        layerGroupKey(layer) === groupKey && normalizeTempSource(layer.source) === source
+    );
+    if (existing) {
+      const merged = mergeUniqueFeatures(existing.features, incoming);
+      added += merged.added;
+      nextLayers = nextLayers.map((layer) =>
+        layer.id === existing.id
+          ? {
+              ...layer,
+              regionIds: mergeRegionIds(layer.regionIds, regionIds),
+              features: merged.features
+            }
+          : layer
+      );
+      return;
+    }
+    added += incoming.length;
+    nextLayers = [
+      createPointSourceLayer(
+        { ...base, regionIds: mergeRegionIds(base.regionIds, regionIds) },
+        source,
+        mergeUniqueFeatures([], incoming).features
+      ),
+      ...nextLayers
+    ];
+  });
+
+  nextLayers = nextLayers.map((layer) => {
+    if (layer.id !== base.id) {
+      return layer;
+    }
+    return {
+      ...layer,
+      regionIds: mergeRegionIds(layer.regionIds, regionIds),
+      features: []
+    };
+  });
+
+  layers = nextLayers;
+  return added;
+}
+
+function explodeMixedRegionPointLayers(list) {
+  const extra = [];
+  const next = (list ?? []).map((layer) => {
+    const holdsRegionOverlay = isRegionTempLayer(layer) || layerHasRegionOverlays(layer);
+    if (!holdsRegionOverlay || !(layer.features?.length > 0)) {
+      return layer;
+    }
+    const buckets = bucketFeaturesBySource(layer.features);
+    [TEMP_SOURCE_IDS.GBIF, TEMP_SOURCE_IDS.INAT, TEMP_SOURCE_IDS.MAP].forEach((source) => {
+      if (!buckets[source].length) {
+        return;
+      }
+      extra.push(createPointSourceLayer(layer, source, buckets[source]));
+    });
+    return { ...layer, features: [] };
+  });
+  return extra.length > 0 ? [...extra, ...next] : list;
+}
+
 /**
  * Кладёт точки в видимый временный слой с контурами регионов.
  * Если такого слоя нет, создаёт его из переданных overlays.
@@ -984,20 +1066,13 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
     return { ok: false, reason: "empty" };
   }
 
+  layers = explodeMixedRegionPointLayers(layers);
+  const buckets = bucketFeaturesBySource(incoming);
   const target = layers.find((layer) => layer.visible && layerHasRegionOverlays(layer));
   if (target) {
-    const merged = mergeUniqueFeatures(target.features, incoming);
-    if (merged.added === 0) {
-      return { ok: true, appended: true, added: 0, layer: target };
-    }
-    const nextLayer = {
-      ...target,
-      regionIds: mergeRegionIds(target.regionIds, regionIds),
-      features: merged.features
-    };
-    layers = layers.map((layer) => (layer.id === target.id ? nextLayer : layer));
+    const added = mergeBucketsIntoPlaque(target, buckets, regionIds);
     emit();
-    return { ok: true, appended: true, added: merged.added, layer: nextLayer };
+    return { ok: true, appended: true, added, layer: target };
   }
 
   const overlaySnapshot = normalizeOverlays(overlays);
@@ -1008,7 +1083,7 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
   const id = createLayerId();
   const createdAt = new Date().toISOString();
   const title = String(label || "").trim() || overlaySnapshot[0]?.label || "Регионы";
-  const merged = mergeUniqueFeatures([], incoming);
+  const markerColor = nextUnusedMarkerColor();
   const layer = {
     id,
     kind: "regions",
@@ -1025,17 +1100,35 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
     createdAt,
     visible: true,
     heatmapEnabled: false,
-    markerColor: nextUnusedMarkerColor(),
+    markerColor,
     archiveId: null,
     overlays: overlaySnapshot,
-    features: merged.features
+    features: []
   };
   layers = [
     layer,
     ...layers.map((item) => ({ ...item, visible: false }))
   ];
+  const added = mergeBucketsIntoPlaque(layer, buckets, regionIds);
   emit();
-  return { ok: true, appended: false, added: merged.added, layer };
+  return { ok: true, appended: false, added, layer };
+}
+
+export function setTempLayerLabel(layerId, nextLabel) {
+  const title = String(nextLabel || "").trim();
+  if (!title) {
+    return { ok: false, reason: "empty" };
+  }
+  const plaqueLayers = getWorkingPlaqueLayers(layerId);
+  if (plaqueLayers.length === 0) {
+    return { ok: false, reason: "missing" };
+  }
+  const ids = new Set(plaqueLayers.map((layer) => layer.id));
+  layers = layers.map((layer) =>
+    ids.has(layer.id) ? { ...layer, label: title, taxonName: title } : layer
+  );
+  emit();
+  return { ok: true };
 }
 
 export function setTempLayerVisible(layerId, visible) {
@@ -1049,7 +1142,11 @@ export function setTempLayerHeatmapEnabled(layerId, enabled) {
   const target = layers.find((layer) => layer.id === layerId);
   const groupKey = target ? layerGroupKey(target) : null;
   const next = Boolean(enabled);
-  if (isRegionTempLayer(target) && !(target.features?.length > 0)) {
+  const groupHasPoints = Boolean(
+    groupKey &&
+      layers.some((layer) => layerGroupKey(layer) === groupKey && (layer.features?.length > 0))
+  );
+  if (isRegionTempLayer(target) && !(target.features?.length > 0) && !groupHasPoints) {
     return;
   }
   layers = layers.map((layer) =>
@@ -1062,11 +1159,16 @@ export function setTempLayerHeatmapEnabled(layerId, enabled) {
 
 export function setAllTempLayersHeatmapEnabled(enabled) {
   const next = Boolean(enabled);
-  layers = layers.map((layer) =>
-    isRegionTempLayer(layer) && !(layer.features?.length > 0)
-      ? layer
-      : { ...layer, heatmapEnabled: next }
-  );
+  layers = layers.map((layer) => {
+    const key = layerGroupKey(layer);
+    const groupHasPoints = layers.some(
+      (item) => layerGroupKey(item) === key && (item.features?.length > 0)
+    );
+    if (!groupHasPoints) {
+      return layer;
+    }
+    return { ...layer, heatmapEnabled: next };
+  });
   emit();
 }
 
@@ -1121,7 +1223,9 @@ function normalizePersistedLayer(layer) {
 }
 
 export function replaceTempLayers(nextLayers) {
-  layers = Array.isArray(nextLayers) ? nextLayers.map(normalizePersistedLayer) : [];
+  layers = explodeMixedRegionPointLayers(
+    Array.isArray(nextLayers) ? nextLayers.map(normalizePersistedLayer) : []
+  );
   emit();
 }
 
@@ -1212,8 +1316,11 @@ export function getVisibleTempLayerOverlays() {
       return;
     }
     seenGroups.add(key);
-    const list = normalizeOverlays(layer.overlays);
-    list.forEach((overlay) => overlays.push(overlay));
+    const overlayOwner =
+      layers.find(
+        (item) => layerGroupKey(item) === key && normalizeOverlays(item.overlays).length > 0
+      ) || layer;
+    normalizeOverlays(overlayOwner.overlays).forEach((overlay) => overlays.push(overlay));
   });
 
   return overlays;
@@ -1291,6 +1398,7 @@ export function getTempLayerPlaqueFeatureGroups() {
 }
 
 export function listTempLayerPlaques() {
+  layers = explodeMixedRegionPointLayers(layers);
   const plaques = [];
   const indexByKey = new Map();
 
@@ -1370,7 +1478,9 @@ export function removeWorkingPlaque(layerId) {
 }
 
 export function restorePlaqueLayers(nextLayers) {
-  const incoming = Array.isArray(nextLayers) ? nextLayers.map(normalizePersistedLayer) : [];
+  const incoming = explodeMixedRegionPointLayers(
+    Array.isArray(nextLayers) ? nextLayers.map(normalizePersistedLayer) : []
+  );
   if (incoming.length === 0) {
     return { ok: false, reason: "empty" };
   }

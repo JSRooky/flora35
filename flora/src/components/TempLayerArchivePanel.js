@@ -10,6 +10,7 @@ import {
 import {
   CameraIcon,
   DownloadIcon,
+  EditIcon,
   LayersIcon,
   TrashIcon
 } from "../images/buttons";
@@ -107,6 +108,7 @@ export default function TempLayerArchivePanel({
   onRestore,
   onExport,
   onDelete,
+  onRename,
   statusMessage = ""
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
@@ -120,6 +122,8 @@ export default function TempLayerArchivePanel({
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## temp-archive в docs/moduleHelp.md
   const [collapsedIds, setCollapsedIds] = useState(() => new Set());
   const [infoMenuArchiveId, setInfoMenuArchiveId] = useState(null);
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const infoMenuRef = useRef(null);
 
   useEffect(() => {
@@ -164,6 +168,11 @@ export default function TempLayerArchivePanel({
 
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
+        if (renamingId) {
+          setRenamingId(null);
+          setRenameDraft("");
+          return;
+        }
         setInfoMenuArchiveId(null);
       }
     };
@@ -182,7 +191,7 @@ export default function TempLayerArchivePanel({
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("mousedown", handlePointerDown);
     };
-  }, [infoMenuArchiveId]);
+  }, [infoMenuArchiveId, renamingId]);
 
   const run = async (archiveId, action) => {
     setBusyId(archiveId);
@@ -191,6 +200,26 @@ export default function TempLayerArchivePanel({
     } finally {
       setBusyId("");
     }
+  };
+
+  const startRename = (entry) => {
+    setInfoMenuArchiveId(null);
+    setRenamingId(entry.archiveId);
+    setRenameDraft(entry.title || "");
+  };
+
+  const cancelRename = () => {
+    setRenamingId(null);
+    setRenameDraft("");
+  };
+
+  const commitRename = (entry) => {
+    const next = renameDraft.trim();
+    cancelRename();
+    if (!next || next === entry.title) {
+      return;
+    }
+    onRename?.(entry.archiveId, next);
   };
 
   return (
@@ -270,7 +299,56 @@ export default function TempLayerArchivePanel({
                   style={archiveRowStyle(entry)}
                 >
                   <div className="temp-archive-row-body">
-                    <div className="temp-archive-row-title">{entry.title}</div>
+                    <div className="temp-archive-row-title-row">
+                    {renamingId === entry.archiveId ? (
+                      <input
+                        className="temp-archive-row-rename"
+                        value={renameDraft}
+                        maxLength={120}
+                        aria-label="Название слоя"
+                        autoFocus
+                        disabled={Boolean(busyId)}
+                        onChange={(event) => setRenameDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            commitRename(entry);
+                          } else if (event.key === "Escape") {
+                            event.preventDefault();
+                            cancelRename();
+                          }
+                        }}
+                        onBlur={() => commitRename(entry)}
+                      />
+                    ) : (
+                      <div
+                        className="temp-archive-row-title"
+                        title="Двойной щелчок — переименовать"
+                        onDoubleClick={() => startRename(entry)}
+                      >
+                        {entry.title}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className={`temp-archive-row-button temp-archive-row-rename-btn${
+                        renamingId === entry.archiveId ? " temp-archive-row-info--on" : ""
+                      }`}
+                      title="Переименовать"
+                      aria-label={`Переименовать «${entry.title}»`}
+                      disabled={Boolean(busyId)}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        if (renamingId === entry.archiveId) {
+                          commitRename(entry);
+                          return;
+                        }
+                        startRename(entry);
+                      }}
+                    >
+                      <EditIcon className="temp-archive-row-icon" aria-hidden="true" focusable="false" />
+                    </button>
+                    </div>
                     {plaqueCollapsed ? null : (
                       <div className="temp-archive-row-meta">{formatMeta(entry)}</div>
                     )}

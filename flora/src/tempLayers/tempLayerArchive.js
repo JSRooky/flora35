@@ -42,6 +42,33 @@ export async function archiveWorkingPlaque(layerId) {
   return { ok: true, record: toArchiveIndexEntry(record) };
 }
 
+export async function renameArchivedPlaque(archiveId, nextTitle) {
+  const title = String(nextTitle || "").trim();
+  if (!title) {
+    return { ok: false, reason: "empty" };
+  }
+
+  const record = await getTempLayerArchiveRecord(archiveId);
+  if (!record) {
+    return { ok: false, reason: "missing" };
+  }
+
+  const now = new Date().toISOString();
+  const next = {
+    ...record,
+    title,
+    updatedAt: now,
+    layers: (Array.isArray(record.layers) ? record.layers : []).map((layer) => ({
+      ...layer,
+      label: title,
+      taxonName: title
+    }))
+  };
+  await putTempLayerArchiveRecord(next);
+  await refreshTempLayerArchiveIndex();
+  return { ok: true };
+}
+
 export async function restoreArchivedPlaque(archiveId) {
   const record = await getTempLayerArchiveRecord(archiveId);
   if (!record) {
