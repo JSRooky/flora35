@@ -13,16 +13,21 @@ function getRangeProgress(value, min, max) {
   return ((value - min) / (max - min)) * 100;
 }
 
-function getCollapsedSummary(enabled, range, lockedByPropertyFilter) {
+function getCollapsedSummary(enabled, range, lockedByPropertyFilter, hideMissingYear) {
   if (lockedByPropertyFilter) {
     return "Отключён: фильтр по точке";
   }
 
-  if (!enabled) {
-    return "Фильтр выключен";
+  const parts = [];
+  if (enabled) {
+    parts.push(`${range.min} — ${range.max}`);
+  } else {
+    parts.push("Фильтр выключен");
   }
-
-  return `${range.min} — ${range.max}`;
+  if (hideMissingYear) {
+    parts.push("без года скрыты");
+  }
+  return parts.join(" · ");
 }
 
 function rangesEqual(a, b) {
@@ -33,6 +38,8 @@ function rangesEqual(a, b) {
 export default function YearFilterPanel({
   enabled = false,
   onEnabledChange,
+  hideMissingYear = false,
+  onHideMissingYearChange,
   yearBounds,
   range,
   onRangeChange,
@@ -124,11 +131,12 @@ export default function YearFilterPanel({
 
       {collapsed ? (
         <p className="year-filter-panel-summary">
-          {getCollapsedSummary(enabled, range, lockedByPropertyFilter)}
+          {getCollapsedSummary(enabled, range, lockedByPropertyFilter, hideMissingYear)}
         </p>
       ) : (
         <div className="year-filter-panel-content">
           <div className="year-filter-controls-row">
+            <div className="year-filter-switches">
             <label
               className={`year-filter-switch${
                 lockedByPropertyFilter ? " year-filter-switch--disabled" : ""
@@ -148,6 +156,26 @@ export default function YearFilterPanel({
               <span className="year-filter-switch-slider" />
               <span className="year-filter-switch-label">Фильтровать по годам</span>
             </label>
+            <label
+              className={`year-filter-switch${
+                lockedByPropertyFilter ? " year-filter-switch--disabled" : ""
+              }`}
+              title={
+                lockedByPropertyFilter
+                  ? "Недоступно: включён фильтр по году в сведениях о точке"
+                  : "Скрыть точки, у которых нет года находки"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={hideMissingYear}
+                disabled={lockedByPropertyFilter}
+                onChange={(e) => onHideMissingYearChange?.(e.target.checked)}
+              />
+              <span className="year-filter-switch-slider" />
+              <span className="year-filter-switch-label">Скрыть точки без года</span>
+            </label>
+            </div>
 
             <button
               type="button"

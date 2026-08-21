@@ -98,6 +98,32 @@
   gap: 8px;
 }
 
+.redbook-search-actions--row {
+  flex-wrap: nowrap;
+}
+
+.redbook-search-actions--row .redbook-search-btn {
+  flex: 1 1 0;
+  white-space: nowrap;
+  padding: 6px 8px;
+}
+
+.redbook-search-write {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.redbook-search-write-meta {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #444;
+}
+
+.redbook-search-write-meta p {
+  margin: 0;
+}
+
 .redbook-search-actions--secondary {
   padding-top: 4px;
   border-top: 1px solid rgba(0, 0, 0, 0.08);

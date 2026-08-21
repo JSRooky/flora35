@@ -142,8 +142,10 @@
   gap: 8px;
 }
 
-.map-display-dense-row .map-display-switch-label {
-  white-space: nowrap;
+.map-display-switch--nested {
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
 }
 
 .map-display-dense-row--disabled {

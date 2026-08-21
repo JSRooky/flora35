@@ -4,10 +4,12 @@ import {
   booleanPointInPolygon,
   buffer,
   cleanCoords,
+  concave,
   convex,
   distance,
   featureCollection,
   intersect,
+  kinks,
   lineString,
   multiPolygon,
   nearestPointOnLine,
@@ -51,8 +53,16 @@ const BOUNDARY_SNAP_TOLERANCE_KM = 0.01;
 
 export const POLYGON_BUILD_MODES = {
   CONVEX: "convex",
+  EXTREME_POINTS: "extreme_points",
   ALL_POINTS: "all_points"
 };
+
+/** Режим «все точки» даёт самопересечения при большой выборке — ограничиваем число вершин. */
+export const ALL_POINTS_MAX_UNIQUE = 200;
+
+export function canBuildAllPointsPolygon(uniqueCount) {
+  return uniqueCount >= 3 && uniqueCount <= ALL_POINTS_MAX_UNIQUE;
+}
 
 /** Ключ вида — латинское название. */
 export function getSpeciesKey(feature) {
@@ -77,6 +87,13 @@ export function getPointsForSpecies(feature) {
   );
 }
 
+export function getUniqueCoordinateCountForSpecies(feature) {
+  const coordinates = getPointsForSpecies(feature)
+    .map((speciesFeature) => speciesFeature.geometry?.coordinates)
+    .filter(Boolean);
+  return dedupeCoordinates(coordinates).length;
+}
+
 /** Убирает повторяющиеся координаты (с точностью до 6 знаков после запятой). */
 function dedupeCoordinates(coordinates) {
   const seen = new Set();
@@ -98,19 +115,161 @@ function dedupeCoordinates(coordinates) {
  * Turf convex требует минимум три точки; для одной и двух — буфер вокруг точки/отрезка.
  */
 function buildConvexPolygon(coordinates) {
-  if (coordinates.length === 0) {
+  const uniqueCoordinates = dedupeCoordinates(coordinates);
+
+  if (uniqueCoordinates.length === 0) {
     return null;
   }
 
-  if (coordinates.length === 1) {
-    return buffer(point(coordinates[0]), 0.5, { units: "kilometers" });
+  if (uniqueCoordinates.length === 1) {
+    return buffer(point(uniqueCoordinates[0]), 0.5, { units: "kilometers" });
   }
 
-  if (coordinates.length === 2) {
-    return buffer(lineString(coordinates), 0.3, { units: "kilometers" });
+  if (uniqueCoordinates.length === 2) {
+    return buffer(lineString(uniqueCoordinates), 0.3, { units: "kilometers" });
   }
 
-  return convex(featureCollection(coordinates.map((coords) => point(coords))));
+  return convex(featureCollection(uniqueCoordinates.map((coords) => point(coords))));
+}
+
+function sampleEvenly(items, limit) {
+  if (items.length <= limit) {
+    return items;
+  }
+
+  const sampled = [];
+  const step = (items.length - 1) / (limit - 1);
+  for (let index = 0; index < limit; index += 1) {
+    sampled.push(items[Math.round(index * step)]);
+  }
+  return sampled;
+}
+
+function percentile(sorted, ratio) {
+  if (!sorted.length) {
+    return 0;
+  }
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.floor(ratio * (sorted.length - 1))));
+  return sorted[index];
+}
+
+/** Оценка maxEdge для вогнутой оболочки: чуть больше типичного расстояния до соседа. */
+function estimateConcaveMaxEdgeKm(coordinates) {
+  const sample = sampleEvenly(coordinates, 600);
+  const nearest = [];
+
+  for (let i = 0; i < sample.length; i += 1) {
+    let minDistance = Infinity;
+    const origin = point(sample[i]);
+    for (let j = 0; j < sample.length; j += 1) {
+      if (i === j) {
+        continue;
+      }
+      const meters = distance(origin, point(sample[j]), { units: "kilometers" });
+      if (meters > 0 && meters < minDistance) {
+        minDistance = meters;
+      }
+    }
+    if (minDistance < Infinity) {
+      nearest.push(minDistance);
+    }
+  }
+
+  nearest.sort((left, right) => left - right);
+  const typical = percentile(nearest, 0.85) || 1;
+  return Math.max(typical * 3.2, 0.05);
+}
+
+function bboxDiagonalKm(coordinates) {
+  let minLon = Infinity;
+  let minLat = Infinity;
+  let maxLon = -Infinity;
+  let maxLat = -Infinity;
+
+  coordinates.forEach(([lon, lat]) => {
+    if (lon < minLon) minLon = lon;
+    if (lat < minLat) minLat = lat;
+    if (lon > maxLon) maxLon = lon;
+    if (lat > maxLat) maxLat = lat;
+  });
+
+  if (!Number.isFinite(minLon) || (minLon === maxLon && minLat === maxLat)) {
+    return 1;
+  }
+
+  return Math.max(
+    distance(point([minLon, minLat]), point([maxLon, maxLat]), { units: "kilometers" }),
+    0.05
+  );
+}
+
+/** Один внешний контур без дыр, без самопересечений и без разрыва на несколько полигонов. */
+function toSingleOuterPolygon(feature) {
+  const geometry = feature?.geometry;
+  if (geometry?.type !== "Polygon") {
+    return null;
+  }
+
+  const outerRing = geometry.coordinates?.[0];
+  if (!Array.isArray(outerRing) || outerRing.length < 4) {
+    return null;
+  }
+
+  try {
+    const simple = rewind(cleanCoords(polygon([outerRing])));
+    if (simple?.geometry?.type !== "Polygon") {
+      return null;
+    }
+
+    if ((simple.geometry.coordinates?.length ?? 0) !== 1) {
+      return null;
+    }
+
+    const crossings = kinks(simple);
+    if (Array.isArray(crossings?.features) && crossings.features.length > 0) {
+      return null;
+    }
+
+    return simple;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Граница выборки: одна неразрывная вогнутая оболочка по всем крайним точкам.
+ * Внутренние точки в контур не входят. Несколько кусков не допускается.
+ */
+function buildBoundaryPolygon(coordinates) {
+  const uniqueCoordinates = dedupeCoordinates(coordinates);
+
+  if (uniqueCoordinates.length <= 3) {
+    return buildConvexPolygon(uniqueCoordinates);
+  }
+
+  const points = featureCollection(uniqueCoordinates.map((coords) => point(coords)));
+  const convexHull = buildConvexPolygon(uniqueCoordinates);
+  const diagonalKm = bboxDiagonalKm(uniqueCoordinates);
+  let maxEdge = estimateConcaveMaxEdgeKm(uniqueCoordinates);
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    try {
+      const hull = concave(points, { maxEdge, units: "kilometers" });
+      const single = toSingleOuterPolygon(hull);
+      if (single) {
+        return single;
+      }
+    } catch {
+      // Слишком короткое ребро — оболочка с дырами или самопересечениями; удлиняем maxEdge.
+    }
+
+    if (maxEdge >= diagonalKm) {
+      break;
+    }
+    maxEdge = Math.min(maxEdge * 1.65, diagonalKm);
+  }
+
+  return convexHull;
 }
 
 /** Полигон через все точки: вершины упорядочены по углу относительно центра. */
@@ -140,10 +299,14 @@ function buildAllPointsPolygon(coordinates) {
   return polygon([ring]);
 }
 
-/** Строит полигон по координатам: режим ALL_POINTS — через все точки, иначе — выпуклая оболочка. */
+/** Строит полигон: все точки / граница выборки / выпуклая оболочка. */
 export function buildPolygonFromCoordinates(coordinates, mode = POLYGON_BUILD_MODES.CONVEX) {
   if (mode === POLYGON_BUILD_MODES.ALL_POINTS) {
     return buildAllPointsPolygon(coordinates);
+  }
+
+  if (mode === POLYGON_BUILD_MODES.EXTREME_POINTS) {
+    return buildBoundaryPolygon(coordinates);
   }
 
   return buildConvexPolygon(coordinates);
@@ -166,7 +329,9 @@ const SPECIES_POLYGON_OUTLINE_PAINT = {
   "line-color": ["get", "outlineColor"],
   "line-width": POLYGON_OUTLINE_WIDTH,
   "line-opacity": POLYGON_OUTLINE_OPACITY,
-  "line-dasharray": POLYGON_OUTLINE_DASHARRAY
+  "line-dasharray": POLYGON_OUTLINE_DASHARRAY,
+  "line-join": "round",
+  "line-cap": "round"
 };
 
 const INTERSECTION_FILL_PAINT = {
@@ -186,7 +351,9 @@ const INTERSECTION_OUTLINE_PAINT = {
   "line-color": INTERSECTION_OUTLINE_COLOR,
   "line-width": INTERSECTION_OUTLINE_WIDTH,
   "line-opacity": INTERSECTION_OUTLINE_OPACITY,
-  "line-dasharray": INTERSECTION_OUTLINE_DASHARRAY
+  "line-dasharray": INTERSECTION_OUTLINE_DASHARRAY,
+  "line-join": "round",
+  "line-cap": "round"
 };
 
 function applyPaintProperties(map, layerId, paint) {
@@ -366,7 +533,8 @@ export function toggleSpeciesPolygonBuildMode(polygons, polygonId) {
       ? POLYGON_BUILD_MODES.CONVEX
       : POLYGON_BUILD_MODES.ALL_POINTS;
 
-  if (nextMode === POLYGON_BUILD_MODES.ALL_POINTS && existing.pointCount < 3) {
+  const uniqueCount = existing.uniquePointCount ?? existing.pointCount;
+  if (nextMode === POLYGON_BUILD_MODES.ALL_POINTS && !canBuildAllPointsPolygon(uniqueCount)) {
     return polygons;
   }
 
@@ -387,6 +555,7 @@ export function buildSpeciesPolygonEntry(
   const coordinates = speciesPoints
     .map((speciesFeature) => speciesFeature.geometry?.coordinates)
     .filter(Boolean);
+  const uniqueCoordinates = dedupeCoordinates(coordinates);
 
   const polygonFeature = buildPolygonFromCoordinates(coordinates, mode);
 
@@ -402,6 +571,7 @@ export function buildSpeciesPolygonEntry(
     name_latin: nameLatin,
     name_ru: nameRu,
     pointCount: coordinates.length,
+    uniquePointCount: uniqueCoordinates.length,
     polygonId: nameLatin
   };
 
@@ -409,6 +579,7 @@ export function buildSpeciesPolygonEntry(
     id: nameLatin,
     built: true,
     pointCount: coordinates.length,
+    uniquePointCount: uniqueCoordinates.length,
     nameRu,
     nameLatin,
     polygon: polygonFeature,

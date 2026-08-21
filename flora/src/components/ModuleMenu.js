@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ReactComponent as MainLogo } from "../images/main_logo.svg";
+import { DatabaseIcon, LayersArchiveIcon } from "../images/buttons";
 import { DATA_SOURCE_OPTIONS, VISIBLE_DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
 import { FEATURE_FLAGS, FEATURE_UNAVAILABLE_TITLE } from "../config/featureFlags";
 import UserAccountControl from "./UserAccountControl";
@@ -34,6 +35,7 @@ export const MODULE_IDS = {
   /** @deprecated Используйте DATA_SOURCES */
   GBIF_LEGACY: "gbif",
   DATA_SOURCES: "data-sources",
+  TEMP_ARCHIVE: "temp-archive",
   EXTERNAL_PROCESSING: "external-processing",
   /** @deprecated Используйте EXTERNAL_PROCESSING */
   GBIF_PROCESSING: "external-processing",
@@ -42,6 +44,7 @@ export const MODULE_IDS = {
   SEARCH: "search",
   // Поиск редких видов по пользовательскому списку (Красная книга).
   REDBOOK: "redbook",
+  REGIONS: "regions",
   ABOUT: "about"
 };
 
@@ -89,6 +92,11 @@ const DATA_SOURCES_MODULE_ITEM = {
   label: "Источники данных"
 };
 
+const TEMP_ARCHIVE_MODULE_ITEM = {
+  id: MODULE_IDS.TEMP_ARCHIVE,
+  label: "Архив слоёв"
+};
+
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
 
 function isPointRequiredModule(id) {
@@ -103,30 +111,7 @@ const DISABLED_POINT_REQUIRED_TITLE = "Выберите точку";
 const DISABLED_AREAL_BY_BUFFER_TITLE = 'Сначала сбросьте инструмент «Буфер»';
 const DISABLED_BUFFER_BY_AREAL_TITLE = 'Сначала сбросьте инструмент «Радиус»';
 
-function DatabaseIcon() {
-  return (
-    <svg
-      className="module-menu-btn-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <ellipse cx="12" cy="6" rx="7" ry="3" fill="none" stroke="currentColor" strokeWidth="2" />
-      <path
-        d="M5 6v8c0 1.7 3.1 3 7 3s7-1.3 7-3V6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-      <path
-        d="M5 10c0 1.7 3.1 3 7 3s7-1.3 7-3"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-    </svg>
-  );
-}
+
 
 function ModuleMenuButton({
   id,
@@ -314,6 +299,8 @@ export default function ModuleMenu({
   onDataSourceModeChange,
   dataSourcesPanelOpen = false,
   onDataSourcesPanelToggle,
+  tempArchivePanelOpen = false,
+  onTempArchivePanelToggle,
   accountUser = null,
   onAccountClick
 }) {
@@ -420,11 +407,31 @@ export default function ModuleMenu({
             <ModuleMenuButton
               id={DATA_SOURCES_MODULE_ITEM.id}
               label={DATA_SOURCES_MODULE_ITEM.label}
-              icon={<DatabaseIcon />}
+              icon={<DatabaseIcon className="module-menu-btn-icon" aria-hidden="true" focusable="false" />}
               activeModule={
                 dataSourcesPanelOpen ? MODULE_IDS.DATA_SOURCES : activeModule
               }
               onModuleSelect={onDataSourcesPanelToggle}
+            />
+          </li>
+          <li>
+            <ModuleMenuButton
+              id={TEMP_ARCHIVE_MODULE_ITEM.id}
+              label={TEMP_ARCHIVE_MODULE_ITEM.label}
+              icon={<LayersArchiveIcon className="module-menu-btn-icon" aria-hidden="true" focusable="false" />}
+              activeModule={
+                tempArchivePanelOpen ? MODULE_IDS.TEMP_ARCHIVE : activeModule
+              }
+              onModuleSelect={onTempArchivePanelToggle}
+            />
+          </li>
+          <li>
+            <ModuleMenuButton
+              id={MODULE_IDS.REGIONS}
+              label="Регионы"
+              mapToolAccent
+              activeModule={activeModule}
+              onModuleSelect={onModuleSelect}
             />
           </li>
           <li className="module-menu-toggle-item">

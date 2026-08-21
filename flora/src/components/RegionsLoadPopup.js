@@ -4,6 +4,7 @@ import {
   cancelGbifExternalLoad,
   cancelInatExternalLoad
 } from "../externalSources/externalSourcesLoadManager";
+import PanelHint from "./PanelHint";
 import "../styles/RegionsLoadPopup.css";
 import "../styles/GbifPanel.css";
 
@@ -18,7 +19,10 @@ export default function RegionsLoadPopup({
   loadSnapshot = null,
   loadError = null,
   onClose,
-  onLoadError
+  onLoadError,
+  focusRegions = null,
+  spatialByRegionId = null,
+  unmatchedLabels = []
 }) {
   const handleClose = useCallback(() => {
     onClose?.();
@@ -55,11 +59,14 @@ export default function RegionsLoadPopup({
           ×
         </button>
         <h3 className="regions-load-title">Регионы России</h3>
-        <p className="regions-load-hint">
-          Кликайте по числам царств, чтобы выбрать одно или несколько (пусто —
-          все). Затем «Загрузить» / «Обновить». Корзина удаляет локальный набор
-          выбранного региона. Источник: GBIF или iNaturalist.
-        </p>
+        <PanelHint>
+          {Array.isArray(focusRegions) && focusRegions.length > 0
+            ? `Показаны выбранные субъекты (${focusRegions.length}). Кликайте по числам царств, затем «Загрузить».`
+            : "Кликайте по числам царств, чтобы выбрать одно или несколько (пусто — все). Затем «Загрузить» / «Обновить». Корзина удаляет локальный набор выбранного региона. Источник: GBIF или iNaturalist."}
+          {unmatchedLabels.length > 0
+            ? ` Не сопоставлены с базами: ${unmatchedLabels.join(", ")}.`
+            : ""}
+        </PanelHint>
 
         {loading ? (
           <div className="regions-load-progress">
@@ -85,7 +92,12 @@ export default function RegionsLoadPopup({
 
         {loadError ? <p className="regions-load-error">{loadError}</p> : null}
 
-        <RegionsLoadTable map={map} onLoadError={onLoadError} />
+        <RegionsLoadTable
+          map={map}
+          onLoadError={onLoadError}
+          regions={focusRegions}
+          spatialByRegionId={spatialByRegionId}
+        />
       </div>
     </div>
   );

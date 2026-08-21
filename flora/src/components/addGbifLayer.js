@@ -1028,6 +1028,12 @@ export function isGbifDenseClustersHighlightEnabled() {
   return gbifDenseClustersHighlightEnabled;
 }
 
+/** Сворачивает раскрытые плотные группы GBIF обратно в кластеры. */
+export function collapseGbifExpandedDensePiles(map) {
+  expandedGbifDensePileKeys = new Set();
+  refreshGbifDensePiles(map);
+}
+
 /**
  * Раскрывает плотную группу GBIF по ключу координат и зумирует к разведённым точкам.
  */

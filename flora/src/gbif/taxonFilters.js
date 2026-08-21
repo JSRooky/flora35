@@ -86,10 +86,11 @@ export function buildTaxonSearchExtras({
     extras.kingdomKey = kingdom.kingdomKey;
   }
 
-  if (taxon?.taxonKey != null) {
-    extras.taxonKey = taxon.taxonKey;
-  } else if (family?.familyKey != null) {
-    extras.familyKey = family.familyKey;
+  const taxonKey = taxon?.taxonKey;
+  if (taxonKey != null && Number.isFinite(Number(taxonKey))) {
+    extras.taxonKey = Number(taxonKey);
+  } else if (family?.familyKey != null && Number.isFinite(Number(family.familyKey))) {
+    extras.familyKey = Number(family.familyKey);
   }
 
   return extras;

@@ -1,5 +1,5 @@
 import { getFeatureCoordinates } from "./spreadCoincidentPoints";
-import { getPointColorForRegnum } from "./pointColors";
+import { DEFAULT_POINT_COLOR, getPointColorForRegnum } from "./pointColors";
 
 /** Минимум точек с полностью одинаковыми координатами для сверхплотного кластера (по умолчанию). */
 export const MIN_DENSE_PILE_SIZE = 10;
@@ -27,6 +27,17 @@ export function setDensePileMinSize(value) {
   return densePileMinSize;
 }
 
+let hiddenDensePileKeys = new Set();
+
+/** Ключи плотных групп, скрытых с карты из списка обработки. */
+export function setHiddenDensePileKeys(keys) {
+  hiddenDensePileKeys = new Set((keys ?? []).map(String).filter(Boolean));
+}
+
+export function isDensePileHidden(key) {
+  return Boolean(key) && hiddenDensePileKeys.has(String(key));
+}
+
 export const DENSE_HIGHLIGHT_COLOR = "#ea580c";
 export const DENSE_HIGHLIGHT_STROKE_COLOR = "#9a3412";
 
@@ -41,6 +52,10 @@ export const GBIF_DENSE_PILES_COUNT_LAYER_ID = "gbif-dense-piles-count";
 export const INAT_DENSE_PILES_SOURCE_ID = "inat-dense-piles";
 export const INAT_DENSE_PILES_CLUSTER_LAYER_ID = "inat-dense-piles-clusters";
 export const INAT_DENSE_PILES_COUNT_LAYER_ID = "inat-dense-piles-count";
+
+export const TEMP_DENSE_PILES_SOURCE_ID = "temp-dense-piles";
+export const TEMP_DENSE_PILES_CLUSTER_LAYER_ID = "temp-dense-piles-clusters";
+export const TEMP_DENSE_PILES_COUNT_LAYER_ID = "temp-dense-piles-count";
 
 /** Ключ по точным координатам точки. */
 export function exactCoordKey(lng, lat) {
@@ -93,6 +108,11 @@ export function partitionFeaturesByDensePiles(
   groups.forEach((group) => {
     const isDense = group.members.length >= minSize;
     const isExpanded = expandedPileKeys?.has(group.key);
+    const isHidden = hiddenDensePileKeys.has(group.key);
+
+    if (isHidden) {
+      return;
+    }
 
     if (!isDense) {
       // Ключ мог быть раскрыт на другом источнике (локальные/GBIF) —
@@ -148,6 +168,44 @@ export function partitionFeaturesByDensePiles(
  * Список всех плотных групп (≥ minSize точек с одинаковыми координатами),
  * по убыванию числа точек. color — цвет точек группы на карте (по regnum).
  */
+function densePileItemColor(properties) {
+  const markerColor = properties?.temp_marker_color;
+  if (typeof markerColor === "string" && markerColor) {
+    return markerColor;
+  }
+  return getPointColorForRegnum(properties?.regnum);
+}
+
+function densePileFeatureStableKey(feature, fallback) {
+  const properties = feature?.properties ?? {};
+  if (properties.gbif_key != null && properties.gbif_key !== "") {
+    return `gbif:${properties.gbif_key}`;
+  }
+  if (properties.inat_id != null && properties.inat_id !== "") {
+    return `inat:${properties.inat_id}`;
+  }
+  if (properties.finding_id != null && properties.finding_id !== "") {
+    return `finding:${properties.finding_id}`;
+  }
+  return fallback;
+}
+
+function densePileItemId(properties, key, index) {
+  if (properties?.finding_id != null) {
+    return `finding-${properties.finding_id}`;
+  }
+  if (properties?.gbif_key != null) {
+    return `gbif-${properties.gbif_key}`;
+  }
+  if (properties?.inat_id != null) {
+    return `inat-${properties.inat_id}`;
+  }
+  if (properties?.temp_layer_id) {
+    return `temp-${properties.temp_layer_id}-${index}`;
+  }
+  return `member-${key}-${index}`;
+}
+
 export function listDensePiles(features, { minSize = getDensePileMinSize() } = {}) {
   const groups = new Map();
 
@@ -172,35 +230,26 @@ export function listDensePiles(features, { minSize = getDensePileMinSize() } = {
   return [...groups.values()]
     .filter((group) => group.members.length >= minSize)
     .map(({ key, coordinates, members }) => {
-      const regnumCounts = new Map();
+      const colorCounts = new Map();
       const items = members.map((feature, index) => {
         const props = feature.properties ?? {};
-        const regnum = props.regnum ?? null;
-        regnumCounts.set(regnum, (regnumCounts.get(regnum) ?? 0) + 1);
-
-        const findingId = props.finding_id;
-        const gbifKey = props.gbif_key;
-        const id =
-          findingId != null
-            ? `finding-${findingId}`
-            : gbifKey != null
-              ? `gbif-${gbifKey}`
-              : `member-${key}-${index}`;
+        const color = densePileItemColor(props);
+        colorCounts.set(color, (colorCounts.get(color) ?? 0) + 1);
 
         return {
-          id,
+          id: densePileItemId(props, key, index),
           label: props.name_ru || props.name_latin || "Без названия",
-          color: getPointColorForRegnum(regnum),
+          color,
           feature
         };
       });
 
-      let dominantRegnum = null;
+      let dominantColor = DEFAULT_POINT_COLOR;
       let dominantCount = -1;
-      regnumCounts.forEach((count, regnum) => {
+      colorCounts.forEach((count, color) => {
         if (count > dominantCount) {
           dominantCount = count;
-          dominantRegnum = regnum;
+          dominantColor = color;
         }
       });
 
@@ -208,7 +257,7 @@ export function listDensePiles(features, { minSize = getDensePileMinSize() } = {
         key,
         coordinates,
         pointCount: members.length,
-        color: getPointColorForRegnum(dominantRegnum),
+        color: dominantColor,
         items
       };
     })
@@ -248,27 +297,41 @@ export function mergeDensePileLists(pileLists) {
 
   return [...byKey.values()]
     .map(({ key, coordinates, items }) => {
-      const regnumCounts = new Map();
-      items.forEach((item) => {
-        const regnum = item?.feature?.properties?.regnum ?? null;
-        regnumCounts.set(regnum, (regnumCounts.get(regnum) ?? 0) + 1);
+      const seen = new Set();
+      const uniqueItems = [];
+      items.forEach((item, index) => {
+        const stable = densePileFeatureStableKey(
+          item?.feature,
+          `fallback-${key}-${index}`
+        );
+        if (seen.has(stable)) {
+          return;
+        }
+        seen.add(stable);
+        uniqueItems.push(item);
       });
 
-      let dominantRegnum = null;
+      const colorCounts = new Map();
+      uniqueItems.forEach((item) => {
+        const color = item?.color || densePileItemColor(item?.feature?.properties);
+        colorCounts.set(color, (colorCounts.get(color) ?? 0) + 1);
+      });
+
+      let dominantColor = DEFAULT_POINT_COLOR;
       let dominantCount = -1;
-      regnumCounts.forEach((count, regnum) => {
+      colorCounts.forEach((count, color) => {
         if (count > dominantCount) {
           dominantCount = count;
-          dominantRegnum = regnum;
+          dominantColor = color;
         }
       });
 
       return {
         key,
         coordinates,
-        pointCount: items.length,
-        color: getPointColorForRegnum(dominantRegnum),
-        items
+        pointCount: uniqueItems.length,
+        color: dominantColor,
+        items: uniqueItems
       };
     })
     .sort((a, b) => b.pointCount - a.pointCount || a.key.localeCompare(b.key));

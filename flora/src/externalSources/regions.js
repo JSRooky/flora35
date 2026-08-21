@@ -81,6 +81,10 @@ export function toInatSpatialRegion(region) {
     return { id: region.id, ...region.inaturalist };
   }
 
+  if (region.inaturalist?.bbox) {
+    return { id: region.id, ...region.inaturalist };
+  }
+
   if (region.placeId != null || region.bbox) {
     return region;
   }

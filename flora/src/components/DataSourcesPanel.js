@@ -5,6 +5,7 @@ import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import RegionsLoadPopup from "./RegionsLoadPopup";
 import RegionsFilterPopup from "./RegionsFilterPopup";
+import SelectiveLoadPopup from "./SelectiveLoadPopup";
 import { getGbifFeatureCount, getGbifLoadedRegionIds, getGbifPackedBytes } from "../gbif/gbifStore";
 import {
   getInatFeatureCount,
@@ -19,6 +20,7 @@ import {
   isExternalSourcesLoadActive
 } from "../externalSources/externalSourcesLoadManager";
 import "../styles/GbifPanel.css";
+import { DownloadIcon, FilterIcon, TrashIcon } from "../images/buttons";
 
 function formatCount(value) {
   if (value == null || Number.isNaN(Number(value))) {
@@ -38,25 +40,6 @@ function formatMegabytes(bytes) {
   return `${mb.toFixed(1)} МБ`;
 }
 
-function ActionIcon({ path }) {
-  return (
-    <svg
-      className="data-sources-action-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d={path} fill="currentColor" />
-    </svg>
-  );
-}
-
-const DOWNLOAD_ICON =
-  "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z";
-const FILTER_ICON =
-  "M3 5h18l-7 8v5l-4 2v-7L3 5z";
-const DELETE_ICON =
-  "M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z";
 
 function getLoadedRegionIds() {
   const ids = new Set();
@@ -90,10 +73,15 @@ export default function DataSourcesPanel({
   onClose,
   storeRevision = 0,
   hiddenRegionIds = [],
-  onHiddenRegionIdsChange
+  onHiddenRegionIdsChange,
+  onTempLayersChange,
+  onSaveToRegionTempLayer,
+  focusRequest = null,
+  onClearFocusRequest
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [regionsTableOpen, setRegionsTableOpen] = useState(false);
+  const [selectiveTableOpen, setSelectiveTableOpen] = useState(false);
   const [regionsFilterOpen, setRegionsFilterOpen] = useState(false);
   const [loadSnapshot, setLoadSnapshot] = useState(() => getExternalSourcesLoadSnapshot());
   const [stats, setStats] = useState(() => getLoadedDataStats());
@@ -121,6 +109,20 @@ export default function DataSourcesPanel({
   useEffect(() => {
     refreshStats();
   }, [storeRevision, refreshStats]);
+
+  useEffect(() => {
+    if (!focusRequest?.kind) {
+      return;
+    }
+    setLoadError(null);
+    if (focusRequest.kind === "selective") {
+      setSelectiveTableOpen(true);
+      setRegionsTableOpen(false);
+      return;
+    }
+    setRegionsTableOpen(true);
+    setSelectiveTableOpen(false);
+  }, [focusRequest]);
 
   const handleClearAll = useCallback(async () => {
     if (loading || clearing || isExternalSourcesLoadActive()) {
@@ -202,11 +204,12 @@ export default function DataSourcesPanel({
                   title="Загрузить"
                   aria-label="Загрузить"
                   onClick={() => {
+                    onClearFocusRequest?.();
                     setLoadError(null);
                     setRegionsTableOpen(true);
                   }}
                 >
-                  <ActionIcon path={DOWNLOAD_ICON} />
+                  <DownloadIcon className="data-sources-action-icon" aria-hidden="true" focusable="false" />
                 </button>
                 <button
                   type="button"
@@ -216,7 +219,7 @@ export default function DataSourcesPanel({
                   aria-label="Фильтр"
                   onClick={() => setRegionsFilterOpen(true)}
                 >
-                  <ActionIcon path={FILTER_ICON} />
+                  <FilterIcon className="data-sources-action-icon" aria-hidden="true" focusable="false" />
                 </button>
                 <button
                   type="button"
@@ -231,10 +234,22 @@ export default function DataSourcesPanel({
                       …
                     </span>
                   ) : (
-                    <ActionIcon path={DELETE_ICON} />
+                    <TrashIcon className="data-sources-action-icon" aria-hidden="true" focusable="false" />
                   )}
                 </button>
               </div>
+              <button
+                type="button"
+                className="gbif-panel-btn gbif-panel-btn--secondary data-sources-selective-btn"
+                disabled={!map}
+                onClick={() => {
+                  onClearFocusRequest?.();
+                  setLoadError(null);
+                  setSelectiveTableOpen(true);
+                }}
+              >
+                Выборочная загрузка
+              </button>
             </section>
 
             {loading ? (
@@ -247,7 +262,7 @@ export default function DataSourcesPanel({
               </p>
             ) : null}
 
-            {loadError && !regionsTableOpen ? (
+            {loadError && !regionsTableOpen && !selectiveTableOpen ? (
               <p className="gbif-panel-error">{loadError}</p>
             ) : null}
 
@@ -282,14 +297,35 @@ export default function DataSourcesPanel({
         <ModuleHelpPanel sectionId={MODULE_IDS.DATA_SOURCES} open={helpOpen} />
       </div>
 
-      <RegionsLoadPopup
-        open={regionsTableOpen}
+        <RegionsLoadPopup
+          open={regionsTableOpen}
+          map={map}
+          loading={loading}
+          loadSnapshot={loadSnapshot}
+          loadError={loadError}
+          onClose={() => setRegionsTableOpen(false)}
+          onLoadError={setLoadError}
+          focusRegions={focusRequest?.regions}
+          spatialByRegionId={focusRequest?.spatialByRegionId}
+          unmatchedLabels={focusRequest?.unmatchedLabels}
+        />
+      <SelectiveLoadPopup
+        open={selectiveTableOpen}
         map={map}
         loading={loading}
         loadSnapshot={loadSnapshot}
         loadError={loadError}
-        onClose={() => setRegionsTableOpen(false)}
+        onClose={() => setSelectiveTableOpen(false)}
         onLoadError={setLoadError}
+        onTempLayersChange={onTempLayersChange}
+        onSaveToRegionTempLayer={
+          Array.isArray(focusRequest?.regions) && focusRequest.regions.length > 0
+            ? onSaveToRegionTempLayer
+            : undefined
+        }
+        focusRegions={focusRequest?.regions}
+        spatialByRegionId={focusRequest?.spatialByRegionId}
+        unmatchedLabels={focusRequest?.unmatchedLabels}
       />
       <RegionsFilterPopup
         open={regionsFilterOpen}

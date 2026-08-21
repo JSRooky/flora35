@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { hasGbifDataset } from "../gbif/gbifStore";
 import { hasInatDataset } from "../inaturalist/inatStore";
 import "../styles/ExternalLayersPicker.css";
+import { CheckSmallIcon, LayersIcon } from "../images/buttons";
 
 export const EXTERNAL_LAYER_IDS = {
   GBIF: "gbif",
@@ -22,39 +23,6 @@ export const EXTERNAL_LAYER_OPTIONS = [
 ];
 
 const HOVER_CLOSE_DELAY_MS = 160;
-
-function LayersIcon() {
-  return (
-    <svg
-      className="external-layers-picker-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M12 3.5 3.5 8 12 12.5 20.5 8 12 3.5Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M3.5 12.2 12 16.7 20.5 12.2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M3.5 16.4 12 20.9 20.5 16.4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 /**
  * Выбор слоёв внешних баз (GBIF / iNaturalist) в режиме «Внешние источники».
@@ -223,16 +191,7 @@ export default function ExternalLayersPicker({
                   aria-hidden="true"
                 >
                   {selected ? (
-                    <svg viewBox="0 0 16 16" className="external-layers-picker-check-icon">
-                      <path
-                        d="M3.5 8.2 6.4 11.1 12.5 4.8"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                    <CheckSmallIcon className="external-layers-picker-check-icon" aria-hidden="true" focusable="false" />
                   ) : null}
                 </span>
                 <span className="external-layers-picker-option-label">{option.label}</span>
@@ -256,7 +215,7 @@ export default function ExternalLayersPicker({
           aria-label="Слои внешних источников"
           title="Слои внешних источников"
         >
-          <LayersIcon />
+          <LayersIcon className="external-layers-picker-icon" aria-hidden="true" focusable="false" />
           {activeCount > 0 ? (
             <span className="external-layers-picker-count">{activeCount}</span>
           ) : null}

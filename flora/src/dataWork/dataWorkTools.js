@@ -14,7 +14,7 @@ export const DATA_WORK_TOOLS = [
     id: DATA_WORK_TOOL_IDS.NEAR_SPECIES_MATCHES,
     title: "Близкие точки",
     description:
-      "Пары GBIF ↔ iNaturalist с одинаковым латинским названием в заданном радиусе; год сравнивается, если указан у обеих точек."
+      "Пары GBIF ↔ iNaturalist (основные и временные слои) с одинаковым латинским названием в заданном радиусе; год сравнивается, если указан у обеих точек."
   },
   {
     id: DATA_WORK_TOOL_IDS.UNATTRIBUTED_POINTS,

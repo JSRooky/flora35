@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 24 24">
+  <defs>
+    <style>
+      .st0 {
+        fill: none;
+        stroke: #000;
+        stroke-width: 2px;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+    </style>
+  </defs>
+  <path class="st0" d="M4.5,9.5V18c0,1.1,.9,2,2,2h11c1.1,0,2-.9,2-2v-8.5"/>
+  <path class="st0" d="M20.5,9.5V5.5c0-1.1-.9-2-2-2H5.5c-1.1,0-2,.9-2,2v4h17Z"/>
+  <path class="st0" d="M10,12h4"/>
+</svg>

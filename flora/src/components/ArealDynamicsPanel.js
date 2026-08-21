@@ -3,6 +3,7 @@ import { POLYGON_BUILD_MODES } from "./addSpeciesPolygonLayer";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import PolygonModeIcon from "./PolygonModeIcon";
 import "../styles/ArealDynamicsPanel.css";
+import { TrashIcon } from "../images/buttons";
 
 // Не показываем площадь для пустых/некорректных значений и округляем малые площади.
 function formatAreaKm2(value) {
@@ -31,52 +32,6 @@ function formatNewPointsCount(count) {
   }
 
   return `+${count} находок`;
-}
-
-function TrashIcon() {
-  return (
-    <svg
-      className="areal-dynamics-reset-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <polyline
-        points="3 6 5 6 21 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <line
-        x1="10"
-        y1="11"
-        x2="10"
-        y2="17"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <line
-        x1="14"
-        y1="11"
-        x2="14"
-        y2="17"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
 }
 
 /** Панель «Динамика ареала» — надстройка над таймлайном. */
@@ -183,8 +138,14 @@ export default function ArealDynamicsPanel({
             }`}
             onClick={onBuildModeToggle}
             disabled={!canToggleAllPoints && !isAllPointsMode}
-            aria-label={isAllPointsMode ? "Оболочка" : "Все точки"}
-            title={isAllPointsMode ? "Оболочка" : "Все точки"}
+            aria-label={isAllPointsMode ? "По крайним точкам" : "Все точки"}
+            title={
+              !canToggleAllPoints && !isAllPointsMode
+                ? "Слишком много уникальных точек — постройте полигон по крайним точкам"
+                : isAllPointsMode
+                  ? "По крайним точкам"
+                  : "Все точки"
+            }
           >
             <PolygonModeIcon allPoints={isAllPointsMode} className="areal-dynamics-mode-icon" />
           </button>
@@ -197,7 +158,7 @@ export default function ArealDynamicsPanel({
             aria-label="Сбросить динамику ареала"
             title="Сбросить"
           >
-            <TrashIcon />
+            <TrashIcon className="areal-dynamics-reset-icon" aria-hidden="true" focusable="false" />
           </button>
         ) : null}
         <ModuleHelpButton open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />

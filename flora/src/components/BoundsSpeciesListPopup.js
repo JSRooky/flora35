@@ -8,6 +8,7 @@ import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/FeaturePopup.css";
 import "../styles/ArealPopup.css";
 import "../styles/BoundsSpeciesListPopup.css";
+import { EyeIcon, EyeOffIcon } from "../images/buttons";
 
 // Русское имя, если есть; иначе латынь. Плейсхолдер «Без названия» не показываем.
 function getSpeciesPrimaryName(species) {
@@ -77,73 +78,6 @@ function getRegnumNodeKey(regnum) {
 
 function getFamilyNodeKey(regnum, family) {
   return `family:${regnum || "__unknown__"}:${family || "__unknown__"}`;
-}
-
-function EyeIcon({ hidden = false }) {
-  if (hidden) {
-    return (
-      <svg
-        className="bounds-species-tree-eye-svg"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-        focusable="false"
-      >
-        <path
-          d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <line
-          x1="1"
-          y1="1"
-          x2="23"
-          y2="23"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-      </svg>
-    );
-  }
-
-  return (
-    <svg
-      className="bounds-species-tree-eye-svg"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle
-        cx="12"
-        cy="12"
-        r="3"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
 }
 
 function collectTreeNodeKeys(tree) {
@@ -229,7 +163,7 @@ function SpeciesRegnumFamilyTree({
                     markersVisible ? "Скрыть эту группу" : "Показать эту группу"
                   }
                 >
-                  <EyeIcon hidden={!markersVisible} />
+                  {!markersVisible ? <EyeOffIcon className="bounds-species-tree-eye-svg" aria-hidden="true" focusable="false" /> : <EyeIcon className="bounds-species-tree-eye-svg" aria-hidden="true" focusable="false" />}
                 </button>
                 ) : null
               }

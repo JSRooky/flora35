@@ -386,3 +386,75 @@
 .popup-images-btn:hover {
   background: #3a78c2;
 }
+
+.region-action-popup.mapboxgl-popup {
+  z-index: 1003;
+}
+
+.region-action-popup .mapboxgl-popup-content {
+  padding: 10px 12px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  font-family: Arial, sans-serif;
+}
+
+.region-action-popup-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.region-action-popup-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.region-action-popup-icon-btn {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  color: #333;
+  cursor: pointer;
+}
+
+.region-action-popup-icon-btn:hover,
+.region-action-popup-icon-btn:focus,
+.region-action-popup-icon-btn:focus-visible,
+.region-action-popup-icon-btn:active {
+  background: rgba(42, 157, 143, 0.14);
+  outline: none;
+}
+
+.region-action-popup-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.region-action-popup .feature-popup-action-btn {
+  flex: 1 1 auto;
+  border: none;
+  outline: none;
+  background: rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.region-action-popup .feature-popup-action-btn:hover:not(:disabled),
+.region-action-popup .feature-popup-action-btn:focus,
+.region-action-popup .feature-popup-action-btn:focus-visible,
+.region-action-popup .feature-popup-action-btn:active {
+  background: rgba(42, 157, 143, 0.14);
+}

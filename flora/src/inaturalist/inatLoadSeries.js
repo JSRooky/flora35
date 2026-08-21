@@ -139,7 +139,17 @@ export async function planInatLoadSeries(
     return [buildSeriesItem({ id: "all", label: "Все наблюдения", extras })];
   }
 
-  // Уже сужено по iconic taxa — не разбиваем на другие группы.
+  // Уже сужено по таксону или iconic taxa — не режем на другие группы.
+  if (extras.taxon_id != null && extras.taxon_id !== "") {
+    return [
+      buildSeriesItem({
+        id: `taxon-id-${extras.taxon_id}`,
+        label: `taxon ${extras.taxon_id}`,
+        extras
+      })
+    ];
+  }
+
   if (extras.iconicTaxa) {
     const label = Array.isArray(extras.iconicTaxa)
       ? extras.iconicTaxa.join(", ")

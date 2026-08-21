@@ -9,7 +9,8 @@ import { toGbifSpatialRegion, toInatSpatialRegion } from "./regions";
 /** Оценка среднего размера одной точки в колоночном снимке IndexedDB. */
 export const AVG_EXTERNAL_FEATURE_BYTES = 120;
 
-const PREVIEW_CONCURRENCY = 4;
+const PREVIEW_CONCURRENCY = 2;
+const GBIF_PREVIEW_DELAY_MS = 400;
 /** iNat ~60 req/min — ниже параллелизм и пауза между запросами. */
 const INAT_PREVIEW_CONCURRENCY = 2;
 const INAT_PREVIEW_DELAY_MS = 600;
@@ -81,7 +82,22 @@ function wait(ms, signal) {
   });
 }
 
-async function fetchGbifRegionPreview(region, { signal, onRegion }) {
+function kingdomsForPreview(taxonKingdomId) {
+  if (!taxonKingdomId) {
+    return GBIF_KINGDOMS;
+  }
+  const match = GBIF_KINGDOMS.find((item) => item.id === taxonKingdomId);
+  return match ? [match] : GBIF_KINGDOMS;
+}
+
+function mergeTaxonExtras(baseExtras, taxonExtras) {
+  if (!taxonExtras || typeof taxonExtras !== "object") {
+    return baseExtras;
+  }
+  return { ...baseExtras, ...taxonExtras };
+}
+
+async function fetchGbifRegionPreview(region, { signal, onRegion, taxonExtras, taxonKingdomId }) {
   const preview = emptyPreview();
   preview.status = "loading";
   onRegion?.(region.id, { ...preview });
@@ -95,14 +111,14 @@ async function fetchGbifRegionPreview(region, { signal, onRegion }) {
   }
 
   try {
-    for (const kingdom of GBIF_KINGDOMS) {
+    for (const kingdom of kingdomsForPreview(taxonKingdomId)) {
       if (signal?.aborted) {
         return;
       }
 
       const count = await previewOccurrenceCount(spatial, {
         signal,
-        extras: buildTaxonSearchExtras({ kingdomId: kingdom.id })
+        extras: mergeTaxonExtras(buildTaxonSearchExtras({ kingdomId: kingdom.id }), taxonExtras)
       });
       preview[kingdom.id] = typeof count === "number" ? count : null;
       preview.total = sumKnownCounts(preview);
@@ -124,7 +140,7 @@ async function fetchGbifRegionPreview(region, { signal, onRegion }) {
   }
 }
 
-async function fetchInatRegionPreview(region, { signal, onRegion }) {
+async function fetchInatRegionPreview(region, { signal, onRegion, taxonExtras, taxonKingdomId }) {
   const preview = emptyPreview();
   preview.status = "loading";
   onRegion?.(region.id, { ...preview });
@@ -138,16 +154,23 @@ async function fetchInatRegionPreview(region, { signal, onRegion }) {
   }
 
   try {
-    for (const kingdom of GBIF_KINGDOMS) {
+    const hasTaxonId = taxonExtras?.taxon_id != null && taxonExtras.taxon_id !== "";
+    const kingdoms = hasTaxonId
+      ? kingdomsForPreview(taxonKingdomId).slice(0, taxonKingdomId ? undefined : 1)
+      : kingdomsForPreview(taxonKingdomId);
+    for (const kingdom of kingdoms) {
       if (signal?.aborted) {
         return;
       }
 
       const iconic = KINGDOM_TO_INAT_ICONIC[kingdom.id];
+      const extras = hasTaxonId
+        ? { ...taxonExtras }
+        : mergeTaxonExtras(iconic ? { iconicTaxa: iconic } : {}, taxonExtras);
       const count = await previewObservationCount(spatial, {
         signal,
         qualityGrade: INAT_QUALITY_MODES.RESEARCH,
-        extras: iconic ? { iconicTaxa: iconic } : {}
+        extras
       });
       preview[kingdom.id] = typeof count === "number" ? count : null;
       preview.total = sumKnownCounts(preview);
@@ -181,7 +204,7 @@ async function fetchInatRegionPreview(region, { signal, onRegion }) {
  */
 export async function fetchRegionKingdomPreviews(
   regions,
-  { source = "gbif", signal, onRegion } = {}
+  { source = "gbif", signal, onRegion, taxonExtras = null, taxonKingdomId = null } = {}
 ) {
   const list = Array.isArray(regions) ? regions : [];
   let cursor = 0;
@@ -204,7 +227,10 @@ export async function fetchRegionKingdomPreviews(
         continue;
       }
 
-      await fetchOne(region, { signal, onRegion });
+      await fetchOne(region, { signal, onRegion, taxonExtras, taxonKingdomId });
+      if (source === "gbif") {
+        await wait(GBIF_PREVIEW_DELAY_MS, signal);
+      }
     }
   }
 
@@ -219,4 +245,102 @@ export function createEmptyRegionPreviewMap(regions) {
   });
   return map;
 }
-
+
+function emptyTaxonCount() {
+  return { count: null, status: "idle", error: null };
+}
+
+async function fetchOneRegionTaxonCount(region, { source, extras, signal }) {
+  if (source === "inat") {
+    const spatial = toInatSpatialRegion(region);
+    if (!spatial) {
+      return { count: null, status: "unavailable", error: "Нет placeId iNaturalist" };
+    }
+    const count = await previewObservationCount(spatial, {
+      signal,
+      qualityGrade: INAT_QUALITY_MODES.RESEARCH,
+      extras
+    });
+    return {
+      count: typeof count === "number" ? count : null,
+      status: "ready",
+      error: null
+    };
+  }
+
+  const spatial = toGbifSpatialRegion(region);
+  if (!spatial) {
+    return { count: null, status: "error", error: "Нет GADM-идентификатора" };
+  }
+  const count = await previewOccurrenceCount(spatial, { signal, extras });
+  return {
+    count: typeof count === "number" ? count : null,
+    status: "ready",
+    error: null
+  };
+}
+
+/**
+ * Одна оценка на регион для выбранного таксона (без разбивки по царствам).
+ */
+export async function fetchRegionTaxonCounts(
+  regions,
+  { source = "gbif", extras = {}, signal, onRegion } = {}
+) {
+  const list = Array.isArray(regions) ? regions : [];
+  let cursor = 0;
+  const concurrency =
+    source === "inat"
+      ? Math.min(INAT_PREVIEW_CONCURRENCY, Math.max(1, list.length))
+      : Math.min(PREVIEW_CONCURRENCY, Math.max(1, list.length));
+
+  async function worker() {
+    while (cursor < list.length) {
+      if (signal?.aborted) {
+        return;
+      }
+
+      const index = cursor;
+      cursor += 1;
+      const region = list[index];
+      if (!region) {
+        continue;
+      }
+
+      onRegion?.(region.id, { ...emptyTaxonCount(), status: "loading" });
+      try {
+        const result = await fetchOneRegionTaxonCount(region, { source, extras, signal });
+        if (signal?.aborted) {
+          return;
+        }
+        onRegion?.(region.id, result);
+        if (source === "inat") {
+          await wait(INAT_PREVIEW_DELAY_MS, signal);
+        } else {
+          await wait(GBIF_PREVIEW_DELAY_MS, signal);
+        }
+      } catch (error) {
+        if (signal?.aborted || error?.name === "AbortError") {
+          return;
+        }
+        onRegion?.(region.id, {
+          count: null,
+          status: "error",
+          error: error?.message || "Ошибка оценки"
+        });
+      }
+    }
+  }
+
+  const workers = Array.from({ length: concurrency }, () => worker());
+  await Promise.all(workers);
+}
+
+export function createEmptyRegionTaxonCountMap(regions) {
+  const map = {};
+  (regions ?? []).forEach((region) => {
+    map[region.id] = emptyTaxonCount();
+  });
+  return map;
+}
+

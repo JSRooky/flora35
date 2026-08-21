@@ -87,6 +87,13 @@
   line-height: 1.3;
 }
 
+.map-corner-filters-popover-item-details {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.72;
+}
+
 .map-corner-filters-popover-trash {
   flex-shrink: 0;
   display: inline-flex;
@@ -132,6 +139,25 @@
 
 .map-corner-filters-popover-reset-all:hover {
   background: rgba(42, 157, 143, 0.2);
+}
+
+.map-corner-filters-popover-save-temp {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 8px;
+  border: 1px solid var(--map-tool-accent, #2a9d8f);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--map-tool-accent-text, #1a6b62);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.map-corner-filters-popover-save-temp:hover {
+  background: var(--map-tool-accent-soft, rgba(42, 157, 143, 0.12));
 }
 
 .map-corner-controls-bar:hover {

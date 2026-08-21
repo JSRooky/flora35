@@ -2,6 +2,7 @@ import { bboxPolygon, circle, featureCollection, union } from "@turf/turf";
 import { getUnclusteredFeatures } from "./addLocationsLayer";
 import { geometryToFeature } from "./addAreaSelectionLayer";
 import { getBufferOuterFeature } from "./addBufferLayer";
+import { getRegionSelectionWithinFeature } from "./addRegionBoundsLayer";
 import { MODULE_IDS } from "./ModuleMenu";
 
 function unionCircleFeatures(circleFeatures) {
@@ -92,6 +93,20 @@ export function isOoptPointsFilterActive(toolPointsFilterEnabled, selectedBounds
   return Boolean(toolPointsFilterEnabled?.[MODULE_IDS.OOPT] && getOoptWithinFeature(selectedBoundsFeature));
 }
 
+/** GeoJSON выбранных субъектов РФ (с буфером) для фильтра точек. */
+export function getRegionWithinFeature(selectedRegionFeature, extraFeatures = [], bufferKm = 0) {
+  const features = [
+    ...(Array.isArray(extraFeatures) ? extraFeatures : []),
+    ...(selectedRegionFeature?.geometry ? [selectedRegionFeature] : [])
+  ];
+  return getRegionSelectionWithinFeature(features, bufferKm);
+}
+
+/** Активен ли пространственный фильтр по выбранным субъектам. */
+export function isRegionPointsFilterActive(selectedRegionFeature, extraFeatures = [], bufferKm = 0) {
+  return Boolean(getRegionWithinFeature(selectedRegionFeature, extraFeatures, bufferKm));
+}
+
 /**
  * Возвращает GeoJSON Feature для фильтра «Только эти» активного инструмента карты.
  */
@@ -110,7 +125,10 @@ export function getToolWithinFeature({
   activePolygon = null,
   intersectionResult = null,
   areaGeometry = null,
-  selectedBoundsFeature = null
+  selectedBoundsFeature = null,
+  selectedRegionFeature = null,
+  selectedRegionFeatures = [],
+  regionBufferKm = 0
 }) {
   switch (moduleId) {
     case MODULE_IDS.MAP:
@@ -158,15 +176,37 @@ export function getToolWithinFeature({
     case MODULE_IDS.OOPT:
       return selectedBoundsFeature?.feature?.geometry ? selectedBoundsFeature.feature : null;
 
+    case MODULE_IDS.REGIONS:
+      return getRegionSelectionWithinFeature(
+        selectedRegionFeatures.length
+          ? selectedRegionFeatures
+          : selectedRegionFeature?.geometry
+            ? [selectedRegionFeature]
+            : [],
+        regionBufferKm
+      );
+
     default:
       return null;
   }
 }
 
+/** Панель полигона открыта как модуль или пристыкована к «О точке». */
+export function isPolygonToolActive(activeModule, polygonDockedWithFeature = false) {
+  return (
+    activeModule === MODULE_IDS.POLYGON ||
+    (activeModule === MODULE_IDS.FEATURE && polygonDockedWithFeature)
+  );
+}
+
 /** Определяет, какой инструмент сейчас управляет фильтром точек (учитывает док-панели). */
 export function resolveToolPointsFilterModule(
   activeModule,
-  { arealDockedWithFeature = false, bufferDockedWithFeature = false } = {}
+  {
+    arealDockedWithFeature = false,
+    bufferDockedWithFeature = false,
+    polygonDockedWithFeature = false
+  } = {}
 ) {
   if (activeModule === MODULE_IDS.FEATURE && arealDockedWithFeature) {
     return MODULE_IDS.AREAL;
@@ -174,6 +214,10 @@ export function resolveToolPointsFilterModule(
 
   if (activeModule === MODULE_IDS.FEATURE && bufferDockedWithFeature) {
     return MODULE_IDS.BUFFER;
+  }
+
+  if (activeModule === MODULE_IDS.FEATURE && polygonDockedWithFeature) {
+    return MODULE_IDS.POLYGON;
   }
 
   return activeModule;

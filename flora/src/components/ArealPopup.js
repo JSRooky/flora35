@@ -67,6 +67,8 @@ export default function ArealPopup({
   onAllMarkersChange,
   onRadiusChange,
   onReset,
+  onSaveToTempLayer,
+  canSaveToTempLayer = false,
   toolBlocked = false,
   toolBlockedTitle,
   collapsed = false,
@@ -178,6 +180,14 @@ export default function ArealPopup({
         ) : null}
 
         <div className="areal-actions">
+          <button
+            type="button"
+            className="areal-save-temp-btn"
+            onClick={onSaveToTempLayer}
+            disabled={!canSaveToTempLayer || toolBlocked}
+          >
+            Во временный слой
+          </button>
           <button
             type="button"
             className="areal-reset-btn"

@@ -1,4 +1,5 @@
 import React from "react";
+import { CloseIcon } from "../images/buttons";
 import "../styles/PanelCloseButton.css";
 
 /** Кнопка полного закрытия плавающей панели (не в панель задач). */
@@ -12,7 +13,7 @@ export default function PanelCloseButton({ onClick, disabled = false }) {
       aria-label="Закрыть"
       title="Закрыть"
     >
-      ×
+      <CloseIcon className="panel-close-btn-icon" aria-hidden="true" focusable="false" />
     </button>
   );
 }

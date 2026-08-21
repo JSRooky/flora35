@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
+import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import {
   DENSE_PILE_MIN_SIZE_MAX,
@@ -10,6 +11,7 @@ import {
 } from "./densePiles";
 import { DEFAULT_POINT_COLOR } from "./pointColors";
 import "../styles/DenseClustersPanel.css";
+import { ListIcon, EyeIcon, EyeOffIcon, ZoomOutIcon } from "../images/buttons";
 
 function formatCoordinates(coordinates) {
   if (!Array.isArray(coordinates) || coordinates.length < 2) {
@@ -24,80 +26,6 @@ function formatCoordinates(coordinates) {
   return `${lat.toFixed(3)}, ${lng.toFixed(3)}`;
 }
 
-function ListIcon({ className = "" }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <line
-        x1="8"
-        y1="6"
-        x2="21"
-        y2="6"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <line
-        x1="8"
-        y1="12"
-        x2="21"
-        y2="12"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <line
-        x1="8"
-        y1="18"
-        x2="21"
-        y2="18"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <circle cx="4" cy="6" r="1" fill="currentColor" />
-      <circle cx="4" cy="12" r="1" fill="currentColor" />
-      <circle cx="4" cy="18" r="1" fill="currentColor" />
-    </svg>
-  );
-}
-
-function ZoomOutIcon({ className = "" }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-      fill="none"
-    >
-      <circle cx="10.5" cy="10.5" r="6" stroke="currentColor" strokeWidth="2" />
-      <line
-        x1="8"
-        y1="10.5"
-        x2="13"
-        y2="10.5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <line
-        x1="15.5"
-        y1="15.5"
-        x2="20"
-        y2="20"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 /**
  * Панель «Обработка плотных групп».
  * Открывается кнопкой «Обработка» в «Группы точек» и скрывает остальные панели.
@@ -109,11 +37,15 @@ export default function DenseClustersPanel({
   selectedPileKey = null,
   canZoomBack = false,
   speciesListOpen = false,
+  groupsHidden = false,
+  hiddenPileKeys = [],
   minPileSize = MIN_DENSE_PILE_SIZE,
   onMinPileSizeChange,
   onSelectPile,
   onZoomBack,
   onToggleSpeciesList,
+  onTogglePileHidden,
+  onToggleGroupsHidden,
   onClose,
   collapsed: collapsedProp,
   onCollapsedChange,
@@ -135,6 +67,11 @@ export default function DenseClustersPanel({
     }
     return ((minPileSize - DENSE_PILE_MIN_SIZE_MIN) / span) * 100;
   }, [minPileSize]);
+
+  const hiddenPileKeySet = useMemo(
+    () => new Set((hiddenPileKeys ?? []).map(String)),
+    [hiddenPileKeys]
+  );
 
   useEffect(() => {
     if (selectedPileKey) {
@@ -204,15 +141,18 @@ export default function DenseClustersPanel({
       {collapsed ? (
         <p className="dense-clusters-panel-summary">
           {typeof pileCount === "number"
-            ? `групп: ${pileCount} · порог ≥${minPileSize}`
-            : `порог ≥${minPileSize}`}
+            ? `групп: ${pileCount} · порог ≥${minPileSize}${
+                groupsHidden ? " · скрыты" : ""
+              }`
+            : `порог ≥${minPileSize}${groupsHidden ? " · скрыты" : ""}`}
         </p>
       ) : (
         <div className="dense-clusters-panel-content">
-          <p className="dense-clusters-panel-note">
-            На карте только группы из ≥{minPileSize} точек с полностью одинаковыми
-            координатами. Остальные панели скрыты на время обработки.
-          </p>
+          <PanelHint>
+            {groupsHidden
+              ? "Плотные группы скрыты на карте. Список и порог остаются доступны; остальные панели скрыты на время обработки."
+              : `На карте только группы из ≥${minPileSize} точек с полностью одинаковыми координатами. Остальные панели скрыты на время обработки.`}
+          </PanelHint>
 
           <div className="dense-clusters-panel-threshold">
             <label
@@ -263,6 +203,21 @@ export default function DenseClustersPanel({
             <button
               type="button"
               className={`dense-clusters-panel-btn${
+                groupsHidden ? " dense-clusters-panel-btn--active" : ""
+              }`}
+              onClick={() => onToggleGroupsHidden?.()}
+              aria-pressed={groupsHidden}
+              title={
+                groupsHidden
+                  ? "Снова показать плотные группы на карте"
+                  : "Скрыть плотные группы на карте, не закрывая панель"
+              }
+            >
+              {groupsHidden ? "Показать группы" : "Скрыть группы"}
+            </button>
+            <button
+              type="button"
+              className={`dense-clusters-panel-btn${
                 listOpen ? " dense-clusters-panel-btn--active" : ""
               }`}
               onClick={() => setListOpen((value) => !value)}
@@ -291,6 +246,7 @@ export default function DenseClustersPanel({
                 <ul className="dense-clusters-panel-list">
                   {piles.map((pile, index) => {
                     const selected = pile.key === selectedPileKey;
+                    const pileHidden = hiddenPileKeySet.has(String(pile.key));
 
                     return (
                       <li
@@ -298,7 +254,7 @@ export default function DenseClustersPanel({
                         ref={selected ? selectedPileRowRef : null}
                         className={`dense-clusters-panel-list-row${
                           selected ? " dense-clusters-panel-list-row--selected" : ""
-                        }`}
+                        }${pileHidden ? " dense-clusters-panel-list-row--hidden" : ""}`}
                       >
                         <div className="dense-clusters-panel-list-main">
                           <button
@@ -368,6 +324,23 @@ export default function DenseClustersPanel({
                               }}
                               aria-hidden="true"
                             />
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`dense-clusters-panel-icon-btn dense-clusters-panel-list-hide-btn${
+                              pileHidden ? " dense-clusters-panel-icon-btn--hidden" : ""
+                            }`}
+                            onClick={() => onTogglePileHidden?.(pile)}
+                            aria-pressed={pileHidden}
+                            title={pileHidden ? "Показать группу на карте" : "Скрыть группу на карте"}
+                            aria-label={pileHidden ? "Показать группу на карте" : "Скрыть группу на карте"}
+                          >
+                            {pileHidden ? (
+                              <EyeOffIcon className="dense-clusters-panel-icon-btn-svg" aria-hidden="true" focusable="false" />
+                            ) : (
+                              <EyeIcon className="dense-clusters-panel-icon-btn-svg" aria-hidden="true" focusable="false" />
+                            )}
                           </button>
                         </div>
                       </li>

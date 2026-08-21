@@ -9,113 +9,9 @@ import {
 } from "../dataWork/findUnattributedPoints";
 import { getStablePointKey, getToolFeatures, setToolFeaturesContext } from "./addLocationsLayer";
 import UnattributedAttributionEditor from "./UnattributedAttributionEditor";
+import PanelHint from "./PanelHint";
 import "../styles/UnattributedPointsPopup.css";
-
-function ShowPointIcon() {
-  return (
-    <svg
-      className="unattributed-points-show-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-      fill="none"
-    >
-      <circle cx="10.5" cy="10.5" r="6" stroke="currentColor" strokeWidth="2" />
-      <line
-        x1="8"
-        y1="10.5"
-        x2="13"
-        y2="10.5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <line
-        x1="10.5"
-        y1="8"
-        x2="10.5"
-        y2="13"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <line
-        x1="15.5"
-        y1="15.5"
-        x2="20"
-        y2="20"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function EyeIcon({ hidden = false }) {
-  if (hidden) {
-    return (
-      <svg
-        className="unattributed-points-eye-icon"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-        focusable="false"
-      >
-        <path
-          d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <line
-          x1="1"
-          y1="1"
-          x2="23"
-          y2="23"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-      </svg>
-    );
-  }
-
-  return (
-    <svg
-      className="unattributed-points-eye-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle
-        cx="12"
-        cy="12"
-        r="3"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-    </svg>
-  );
-}
+import { EyeIcon, EyeOffIcon, ZoomInIcon } from "../images/buttons";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const PAGE_SIZE_DEFAULT = 100;
@@ -459,11 +355,11 @@ export default function UnattributedPointsPopup({
         </button>
 
         <h3 className="unattributed-points-title">Без атрибуции</h3>
-        <p className="unattributed-points-hint">
+        <PanelHint>
           Точки всех видимых слоёв, у которых нет царства, семейства, латинского
           названия или года находки. Клик по строке — заполнить пустые поля и
           сохранить в Firebase.
-        </p>
+        </PanelHint>
 
         <div className="unattributed-points-toolbar">
           <button
@@ -579,7 +475,7 @@ export default function UnattributedPointsPopup({
                           aria-label={isHidden ? "Показать на карте" : "Скрыть с карты"}
                           aria-pressed={isHidden}
                         >
-                          <EyeIcon hidden={isHidden} />
+                          {isHidden ? <EyeOffIcon className="unattributed-points-eye-icon" aria-hidden="true" focusable="false" /> : <EyeIcon className="unattributed-points-eye-icon" aria-hidden="true" focusable="false" />}
                         </button>
                         <button
                           type="button"
@@ -589,7 +485,7 @@ export default function UnattributedPointsPopup({
                           aria-label="Показать"
                           disabled={isHidden}
                         >
-                          <ShowPointIcon />
+                          <ZoomInIcon className="unattributed-points-show-icon" aria-hidden="true" focusable="false" />
                         </button>
                       </td>
                     </tr>

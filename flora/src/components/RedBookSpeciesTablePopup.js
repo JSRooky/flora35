@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import PanelCloseButton from "./PanelCloseButton";
+import PanelHint from "./PanelHint";
 import {
   collectLatinNormsFromMatches,
   filterMatchFeaturesByLatinNorm,
@@ -13,6 +14,7 @@ import {
 } from "../redbook/redBookStore";
 import { getGbifFeatureCount } from "../gbif/gbifStore";
 import { getInatFeatureCount } from "../inaturalist/inatStore";
+import { getAllTempLayerFeatureCount } from "../tempLayers/tempLayerStore";
 import "../styles/RedBookSpeciesTablePopup.css";
 
 const SORT_COLUMNS = [
@@ -158,7 +160,7 @@ export default function RedBookSpeciesTablePopup({
         setStatusMessage(
           stats.pointCount > 0
             ? `Найдено ${stats.pointCount} точек у ${stats.matchedSpeciesCount} видов`
-            : "Совпадений в загруженных GBIF/iNat нет"
+            : "Совпадений в загруженных GBIF/iNat и временных слоях нет"
         );
       } catch (error) {
         setStatusMessage(`Ошибка поиска: ${error?.message || "error"}`);
@@ -244,12 +246,13 @@ export default function RedBookSpeciesTablePopup({
           </div>
         </div>
 
-        <p className="redbook-species-table-hint">
+        <PanelHint>
           Виды из загруженного списка. «Поиск» сканирует уже загруженные точки GBIF (
-          {getGbifFeatureCount().toLocaleString("ru-RU")}) и iNaturalist (
-          {getInatFeatureCount().toLocaleString("ru-RU")}) и пишет число совпадений в
+          {getGbifFeatureCount().toLocaleString("ru-RU")}), iNaturalist (
+          {getInatFeatureCount().toLocaleString("ru-RU")}) и временных слоёв (
+          {getAllTempLayerFeatureCount().toLocaleString("ru-RU")}) и пишет число совпадений в
           строку. «Добавить в слой» переносит точки вида на слой Красной книги.
-        </p>
+        </PanelHint>
 
         <div className="redbook-species-table-toolbar">
           <button

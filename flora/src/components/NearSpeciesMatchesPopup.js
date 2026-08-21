@@ -5,78 +5,13 @@ import {
   formatMatchCoordinates
 } from "../dataWork/findNearSpeciesMatches";
 import {
+  collectNearSpeciesSourceFeatures,
   getMatchSourceLabel,
   MATCH_SOURCE_IDS
 } from "../dataWork/matchSources";
-import {
-  getVisibleGbifFeatures,
-  getVisibleInatFeatures
-} from "./addLocationsLayer";
+import PanelHint from "./PanelHint";
 import "../styles/NearSpeciesMatchesPopup.css";
-
-function ShowPairIcon() {
-  return (
-    <svg
-      className="near-species-matches-show-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-      fill="none"
-    >
-      <circle cx="10.5" cy="10.5" r="6" stroke="currentColor" strokeWidth="2" />
-      <line
-        x1="8"
-        y1="10.5"
-        x2="13"
-        y2="10.5"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <line
-        x1="10.5"
-        y1="8"
-        x2="10.5"
-        y2="13"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <line
-        x1="15.5"
-        y1="15.5"
-        x2="20"
-        y2="20"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function MergePairIcon() {
-  // Иконка как у GitHub / Lucide «git-merge»: две ветки сходятся в одну.
-  return (
-    <svg
-      className="near-species-matches-merge-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-      fill="none"
-    >
-      <circle cx="18" cy="18" r="3" stroke="currentColor" strokeWidth="2" />
-      <circle cx="6" cy="6" r="3" stroke="currentColor" strokeWidth="2" />
-      <path
-        d="M6 21V9a9 9 0 0 0 9 9"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+import { MergeIcon, ZoomInIcon } from "../images/buttons";
 
 const THRESHOLD_MIN = 0;
 const THRESHOLD_MAX = 50;
@@ -199,7 +134,7 @@ function clampThreshold(value) {
 
 /**
  * Диалог «Близкие точки»: таблица пар GBIF ↔ iNaturalist
- * с одинаковым латинским названием в заданном радиусе.
+ * (основные и временные слои) с одинаковым латинским названием в заданном радиусе.
  */
 export default function NearSpeciesMatchesPopup({
   open,
@@ -259,16 +194,15 @@ export default function NearSpeciesMatchesPopup({
       return;
     }
 
-    const gbifFeatures = getVisibleGbifFeatures();
-    const inatFeatures = getVisibleInatFeatures();
+    const { leftFeatures, rightFeatures } = collectNearSpeciesSourceFeatures();
 
-    if (gbifFeatures.length === 0 || inatFeatures.length === 0) {
+    if (leftFeatures.length === 0 || rightFeatures.length === 0) {
       if (signal.aborted) {
         return;
       }
       setMatches([]);
       setStatusMessage(
-        "Загрузите слои GBIF и iNaturalist (оба нужны для поиска совпадений)."
+        "Нужны точки GBIF и iNaturalist (основные слои или видимые временные слои)."
       );
       setSearching(false);
       return;
@@ -276,8 +210,8 @@ export default function NearSpeciesMatchesPopup({
 
     const { matches: nextMatches, truncated } = await findNearSpeciesMatchesAsync(
       {
-        leftFeatures: gbifFeatures,
-        rightFeatures: inatFeatures,
+        leftFeatures,
+        rightFeatures,
         thresholdMeters: threshold,
         leftSourceId: MATCH_SOURCE_IDS.GBIF,
         rightSourceId: MATCH_SOURCE_IDS.INATURALIST,
@@ -625,11 +559,11 @@ export default function NearSpeciesMatchesPopup({
         </button>
 
         <h3 className="near-species-matches-title">Близкие точки</h3>
-        <p className="near-species-matches-hint">
+        <PanelHint>
           Пары точек GBIF и iNaturalist с одинаковым латинским названием вида
           в заданном радиусе; если год указан у обеих точек — он тоже должен
           совпадать.
-        </p>
+        </PanelHint>
 
         <div className="near-species-matches-toolbar">
           <label
@@ -802,7 +736,7 @@ export default function NearSpeciesMatchesPopup({
                             aria-label="Слить эту пару"
                             disabled={Boolean(mergingKey) || searching}
                           >
-                            {isMerging ? "…" : <MergePairIcon />}
+                            {isMerging ? "…" : <MergeIcon className="near-species-matches-merge-icon" aria-hidden="true" focusable="false" />}
                           </button>
                         ) : null}
                         <button
@@ -813,7 +747,7 @@ export default function NearSpeciesMatchesPopup({
                           aria-label="Показать"
                           disabled={Boolean(mergingKey)}
                         >
-                          <ShowPairIcon />
+                          <ZoomInIcon className="near-species-matches-show-icon" aria-hidden="true" focusable="false" />
                         </button>
                       </td>
                     </tr>

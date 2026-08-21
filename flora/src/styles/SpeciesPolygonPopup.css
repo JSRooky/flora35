@@ -140,16 +140,57 @@
 
 .species-polygon-actions {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
 }
 
+.species-polygon-save-temp-btn {
+  margin-top: 8px;
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #333;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.species-polygon-save-temp-btn:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
+.species-polygon-save-temp-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.species-polygon-build-btn--secondary {
+  flex: 1 1 auto;
+  min-width: max-content;
+  padding: 5px 8px;
+  border-color: var(--map-tool-accent);
+  background: #fff;
+  color: var(--map-tool-accent);
+}
+
+.species-polygon-build-btn--secondary:hover:not(:disabled) {
+  background: var(--map-tool-accent-soft, rgba(13, 148, 136, 0.12));
+  border-color: var(--map-tool-accent);
+}
+
+.species-polygon-build-btn--active {
+  background: var(--map-tool-accent-soft, rgba(13, 148, 136, 0.16));
+}
+
 .species-polygon-build-btn {
-  flex: 1 1 0;
+  flex: 0 0 auto;
   min-width: 0;
-  padding: 5px 6px;
+  padding: 5px 8px;
   border-radius: 5px;
   font-family: inherit;
   font-size: 11px;

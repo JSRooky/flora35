@@ -4,6 +4,7 @@ import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import { SPECIES_SEARCH_MIN_QUERY_LENGTH } from "../locations/speciesSearchFilter";
 import PanelCloseButton from "./PanelCloseButton";
+import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/SpeciesSearchPanel.css";
 
@@ -116,10 +117,10 @@ export default function SpeciesSearchPanel({
           />
 
           {!queryReady ? (
-            <p className="species-search-hint">
+            <PanelHint>
               Введите не меньше {SPECIES_SEARCH_MIN_QUERY_LENGTH} символов — на карте
               останутся все совпавшие виды.
-            </p>
+            </PanelHint>
           ) : searching ? (
             <p className="species-search-hint">Ищем…</p>
           ) : species.length === 0 ? (

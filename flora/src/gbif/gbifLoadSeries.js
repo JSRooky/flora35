@@ -15,12 +15,12 @@ export const GBIF_SERIES_SOFT_LIMIT = 10000;
 /** Диапазон year, покрывающий facet=year (записи вне диапазона считаем «без года»). */
 const DATED_YEAR_RANGE = "1,3000";
 
-const SERIES_DELAY_MS = 200;
+const SERIES_DELAY_MS = 50;
 const PREVIEW_DELAY_MS = 300;
 const YEAR_FACET_LIMIT = 400;
 const DATASET_FACET_LIMIT = 300;
 /** Parallel datedCount probes for undated dataset planning. */
-export const UNDATED_PROBE_CONCURRENCY = 3;
+export const UNDATED_PROBE_CONCURRENCY = 2;
 
 function wait(ms, signal) {
   return new Promise((resolve, reject) => {
@@ -427,6 +427,7 @@ export async function loadOccurrencesInSeries(
     seriesDelayMs = SERIES_DELAY_MS,
     onPage,
     onProgress,
+    onOverloaded,
     onSeriesStart,
     onSeriesComplete
   } = {}
@@ -482,14 +483,50 @@ export async function loadOccurrencesInSeries(
       });
     };
 
-    const result = await loadOccurrencesForRegion(region, {
-      signal,
-      extras: { ...extras, ...series.extras },
-      pageSize,
-      softLimit: GBIF_SERIES_SOFT_LIMIT,
-      onPage: seriesPageCallback,
-      onProgress: seriesProgressCallback
-    });
+    let result;
+    try {
+      result = await loadOccurrencesForRegion(region, {
+        signal,
+        extras: { ...extras, ...series.extras },
+        pageSize,
+        softLimit: GBIF_SERIES_SOFT_LIMIT,
+        onPage: seriesPageCallback,
+        onProgress: seriesProgressCallback,
+        onOverloaded
+      });
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        throw error;
+      }
+      const status = error?.status;
+      if (status !== 429 && status !== 503) {
+        throw error;
+      }
+      onOverloaded?.();
+      await wait(5000, signal);
+      try {
+        result = await loadOccurrencesForRegion(region, {
+          signal,
+          extras: { ...extras, ...series.extras },
+          pageSize,
+          softLimit: GBIF_SERIES_SOFT_LIMIT,
+          onPage: seriesPageCallback,
+          onProgress: seriesProgressCallback,
+          onOverloaded
+        });
+      } catch (retryError) {
+        if (retryError?.name === "AbortError") {
+          throw retryError;
+        }
+        onSeriesComplete?.({
+          series,
+          index: currentSeriesIndex,
+          result: { loaded: 0, truncated: false, skipped: true }
+        });
+        await wait(seriesDelayMs, signal);
+        continue;
+      }
+    }
 
     completedSeries.push({ series, result });
 

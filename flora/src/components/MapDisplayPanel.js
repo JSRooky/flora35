@@ -11,6 +11,9 @@ function getCollapsedSummary(
   heatmapEnabled,
   clusteringEnabled,
   clusterByRegnum,
+  clusterByTempLayers,
+  clusterByTempSublayers,
+  hasTempLayers,
   clusterPieCharts,
   denseClustersHighlight
 ) {
@@ -25,8 +28,18 @@ function getCollapsedSummary(
   } else if (clusteringEnabled && markersVisible) {
     if (clusterPieCharts) {
       parts.push("диаграммы");
+    } else if (clusterByRegnum && hasTempLayers && clusterByTempLayers && clusterByTempSublayers) {
+      parts.push("по царству, по слоям, внутри слоя");
+    } else if (clusterByRegnum && hasTempLayers && clusterByTempLayers) {
+      parts.push("по царству, по слоям");
+    } else if (hasTempLayers && clusterByTempLayers && clusterByTempSublayers) {
+      parts.push("по слоям, внутри слоя");
+    } else if (clusterByRegnum) {
+      parts.push("по царству");
+    } else if (hasTempLayers && clusterByTempLayers) {
+      parts.push("по слоям");
     } else {
-      parts.push(clusterByRegnum ? "по царству" : "кластеризация");
+      parts.push("кластеризация");
     }
   } else if (markersVisible) {
     parts.push("без кластеризации");
@@ -45,10 +58,17 @@ export default function MapDisplayPanel({
   onMarkersVisibleChange,
   heatmapEnabled = false,
   onHeatmapEnabledChange,
+  heatmapTempLayersOnly = false,
+  onHeatmapSettingsOpen,
   clusteringEnabled = true,
   onClusteringEnabledChange,
   clusterByRegnum = true,
   onClusterByRegnumChange,
+  clusterByTempLayers = true,
+  onClusterByTempLayersChange,
+  clusterByTempSublayers = true,
+  onClusterByTempSublayersChange,
+  hasTempLayers = false,
   clusterPieCharts = false,
   onClusterPieChartsChange,
   denseClustersHighlight = false,
@@ -72,6 +92,10 @@ export default function MapDisplayPanel({
   const clusterPieChartsDisabled = clusteringDisabled || !clusteringEnabled;
   const clusterByRegnumDisabled =
     clusteringDisabled || !clusteringEnabled || clusterPieCharts;
+  const clusterByTempLayersDisabled =
+    clusteringDisabled || !clusteringEnabled || clusterPieCharts;
+  const clusterByTempSublayersDisabled =
+    clusterByTempLayersDisabled || !clusterByTempLayers;
   const denseClustersHighlightDisabled = !markersVisible;
 
   return (
@@ -102,6 +126,9 @@ export default function MapDisplayPanel({
             heatmapEnabled,
             clusteringEnabled,
             clusterByRegnum,
+            clusterByTempLayers,
+            clusterByTempSublayers,
+            hasTempLayers,
             clusterPieCharts,
             denseClustersHighlight
           )}
@@ -156,6 +183,55 @@ export default function MapDisplayPanel({
             <span className="map-display-switch-label">По царству</span>
           </label>
 
+          {hasTempLayers ? (
+            <div className="map-display-dense-row">
+            <label
+              className={`map-display-switch${
+                clusterByTempLayersDisabled ? " map-display-switch--disabled" : ""
+              }`}
+              title={
+                !markersVisible
+                  ? "Доступно только при включённых маркерах"
+                  : denseClustersHighlight
+                    ? "Недоступно в режиме плотных групп"
+                    : !clusteringEnabled
+                      ? "Доступно только при включённой кластеризации"
+                      : clusterPieCharts
+                        ? "Недоступно при включённых диаграммах"
+                        : "Кластеризовать каждый временный слой отдельно"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={clusterByTempLayers}
+                disabled={clusterByTempLayersDisabled}
+                onChange={(e) => onClusterByTempLayersChange?.(e.target.checked)}
+              />
+              <span className="map-display-switch-slider" />
+              <span className="map-display-switch-label">По слоям</span>
+            </label>
+            <label
+              className={`map-display-switch map-display-switch--nested${
+                clusterByTempSublayersDisabled ? " map-display-switch--disabled" : ""
+              }`}
+              title={
+                clusterByTempSublayersDisabled
+                  ? "Доступно при включённой кластеризации по слоям"
+                  : "Кластеризовать GBIF и iNat внутри слоя отдельно"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={clusterByTempLayers && clusterByTempSublayers}
+                disabled={clusterByTempSublayersDisabled}
+                onChange={(e) => onClusterByTempSublayersChange?.(e.target.checked)}
+              />
+              <span className="map-display-switch-slider" />
+              <span className="map-display-switch-label">Внутри слоя</span>
+            </label>
+            </div>
+          ) : null}
+
           <label
             className={`map-display-switch${
               clusterPieChartsDisabled ? " map-display-switch--disabled" : ""
@@ -167,7 +243,7 @@ export default function MapDisplayPanel({
                   ? "Недоступно в режиме плотных групп"
                   : !clusteringEnabled
                     ? "Доступно только при включённой кластеризации"
-                    : "Показывать состав кластера секторной диаграммой; отключает группировку по царству"
+                    : "Показывать состав кластера секторной диаграммой; отключает группировку по царству и по слоям"
             }
           >
             <input
@@ -240,15 +316,32 @@ export default function MapDisplayPanel({
             <span className="map-display-switch-label">Слитые точки</span>
           </label>
 
-          <label className="map-display-switch" title="Показать тепловую карту по всем точкам">
-            <input
-              type="checkbox"
-              checked={heatmapEnabled}
-              onChange={(e) => onHeatmapEnabledChange?.(e.target.checked)}
-            />
-            <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">Тепловая карта</span>
-          </label>
+          <div className="map-display-dense-row">
+            <label
+              className="map-display-switch"
+              title={
+                heatmapTempLayersOnly
+                  ? "Тепловая карта по видимым временным слоям"
+                  : "Показать тепловую карту по всем точкам"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={heatmapEnabled}
+                onChange={(e) => onHeatmapEnabledChange?.(e.target.checked)}
+              />
+              <span className="map-display-switch-slider" />
+              <span className="map-display-switch-label">Тепловая карта</span>
+            </label>
+            <button
+              type="button"
+              className="map-display-dense-process-btn"
+              onClick={() => onHeatmapSettingsOpen?.()}
+              title="Настроить слой heatmap Mapbox"
+            >
+              Настроить
+            </button>
+          </div>
         </div>
       )}
 

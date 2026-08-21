@@ -1,70 +1,33 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ReactComponent as FilterIcon } from "../images/filter_icon.svg";
+import { FilterIcon, LayersIcon, TrashIcon } from "../images/buttons";
 import ExternalLayersPicker from "./ExternalLayersPicker";
+import TempLayersPicker from "./TempLayersPicker";
 import RegnumFilterPicker from "./RegnumFilterPicker";
 import FeedbackWidget from "./FeedbackWidget";
 import "../styles/MapCornerControls.css";
 
-function TrashIcon() {
-  return (
-    <svg
-      className="map-corner-filters-popover-trash-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <polyline
-        points="3 6 5 6 21 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <line
-        x1="10"
-        y1="11"
-        x2="10"
-        y2="17"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <line
-        x1="14"
-        y1="11"
-        x2="14"
-        y2="17"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+
 
 /** Плавающая панель в углу карты: сброс фильтров и виджет обратной связи. */
 export default function MapCornerControls({
   activeFilters = [],
   onFiltersReset,
   onFilterClear,
+  onSaveFiltersToTempLayer,
   externalLayersVisible = false,
   externalLayersEnabled,
   externalLayersDataRevision = 0,
   onExternalLayerToggle,
   onExternalLayerRequestLoad,
+  tempLayersDataRevision = 0,
+  onTempLayerToggle,
+  onTempLayerDelete,
+  onTempLayerArchive,
+  onOpenTempArchive,
+  onTempLayerRename,
+  onTempLayerColorChange,
+  onTempLayerHeatmapChange,
+  onTempLayersHeatmapAllChange,
   regnumFilters = [],
   onRegnumFilterChange
 }) {
@@ -73,7 +36,6 @@ export default function MapCornerControls({
 
   const filterCount = activeFilters.length;
   const filtersActive = filterCount > 0;
-  const multiFilters = filterCount > 1;
 
   // Список остаётся, пока есть хотя бы один фильтр; закрываем только когда все сняты.
   useEffect(() => {
@@ -123,26 +85,14 @@ export default function MapCornerControls({
     ? "Нет активных фильтров"
     : popoverOpen
       ? "Скрыть список фильтров"
-      : multiFilters
-        ? "Активные фильтры"
-        : "Сбросить фильтр";
+      : "Активные фильтры";
 
   const handleFilterButtonClick = () => {
     if (!filtersActive) {
       return;
     }
 
-    if (popoverOpen) {
-      setPopoverOpen(false);
-      return;
-    }
-
-    if (multiFilters) {
-      setPopoverOpen(true);
-      return;
-    }
-
-    onFiltersReset?.();
+    setPopoverOpen((open) => !open);
   };
 
   const handleClearOne = (filterId) => {
@@ -164,12 +114,33 @@ export default function MapCornerControls({
           onClick={handleFilterButtonClick}
           disabled={!filtersActive}
           aria-pressed={filtersActive}
-          aria-haspopup={multiFilters || popoverOpen ? "dialog" : undefined}
+          aria-haspopup={filtersActive ? "dialog" : undefined}
           aria-expanded={popoverOpen}
           aria-label={filterTitle}
           title={filterTitle}
         >
           <FilterIcon className="map-corner-controls-btn-icon" aria-hidden="true" focusable="false" />
+        </button>
+        <button
+          type="button"
+          className={`map-corner-controls-btn${!filtersActive ? " map-corner-controls-btn--disabled" : ""}`}
+          onClick={() => {
+            if (!filtersActive) {
+              return;
+            }
+            if (onSaveFiltersToTempLayer?.()) {
+              setPopoverOpen(false);
+            }
+          }}
+          disabled={!filtersActive}
+          aria-label="Сохранить отфильтрованные точки во временный слой"
+          title={
+            filtersActive
+              ? "Сохранить отфильтрованные точки во временный слой"
+              : "Сначала примените фильтры"
+          }
+        >
+          <LayersIcon className="map-corner-controls-btn-icon" aria-hidden="true" focusable="false" />
         </button>
 
         {popoverOpen && filtersActive ? (
@@ -180,9 +151,16 @@ export default function MapCornerControls({
           >
             <p className="map-corner-filters-popover-title">Активные фильтры</p>
             <ul className="map-corner-filters-popover-list">
-              {activeFilters.map(({ id, label }) => (
+              {activeFilters.map(({ id, label, details }) => (
                 <li key={id} className="map-corner-filters-popover-row">
-                  <span className="map-corner-filters-popover-item-label">{label}</span>
+                  <span className="map-corner-filters-popover-item-label">
+                    {label}
+                    {Array.isArray(details) && details.length > 0 ? (
+                      <span className="map-corner-filters-popover-item-details">
+                        {details.join(" · ")}
+                      </span>
+                    ) : null}
+                  </span>
                   <button
                     type="button"
                     className="map-corner-filters-popover-trash"
@@ -190,7 +168,7 @@ export default function MapCornerControls({
                     aria-label={`Сбросить: ${label}`}
                     title={`Сбросить: ${label}`}
                   >
-                    <TrashIcon />
+                    <TrashIcon className="map-corner-filters-popover-trash-icon" aria-hidden="true" focusable="false" />
                   </button>
                 </li>
               ))}
@@ -201,6 +179,17 @@ export default function MapCornerControls({
               onClick={handleClearAll}
             >
               Сбросить все
+            </button>
+            <button
+              type="button"
+              className="map-corner-filters-popover-save-temp"
+              onClick={() => {
+                if (onSaveFiltersToTempLayer?.()) {
+                  setPopoverOpen(false);
+                }
+              }}
+            >
+              Во временный слой
             </button>
           </div>
         ) : null}
@@ -217,6 +206,17 @@ export default function MapCornerControls({
           dataRevision={externalLayersDataRevision}
           onToggleLayer={onExternalLayerToggle}
           onRequestLoad={onExternalLayerRequestLoad}
+        />
+        <TempLayersPicker
+          dataRevision={tempLayersDataRevision}
+          onToggleLayer={onTempLayerToggle}
+          onDeleteLayer={onTempLayerDelete}
+          onArchiveLayer={onTempLayerArchive}
+          onOpenArchive={onOpenTempArchive}
+          onRenameLayer={onTempLayerRename}
+          onColorChange={onTempLayerColorChange}
+          onHeatmapChange={onTempLayerHeatmapChange}
+          onHeatmapAllChange={onTempLayersHeatmapAllChange}
         />
       </div>
     </div>

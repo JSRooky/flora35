@@ -329,6 +329,12 @@
   gap: 6px;
 }
 
+.data-sources-selective-btn {
+  width: 100%;
+  margin-top: 8px;
+  justify-content: center;
+}
+
 .data-sources-action-btn {
   flex: 0 0 auto;
   width: 32px;

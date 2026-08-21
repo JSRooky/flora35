@@ -13,7 +13,9 @@ import {
 import { saveUserFindings } from "../locations/saveUserFinding";
 import { buildSubmissionSuggestionData } from "../locations/submissionSuggestions";
 import MultiSpeciesConfirmTable from "./MultiSpeciesConfirmTable";
+import PanelHint from "./PanelHint";
 import "../styles/MultiSpeciesPopup.css";
+import { TrashIcon } from "../images/buttons";
 
 const PLACEHOLDER =
   "По одной находке на строку. Поля через ; | : / # ~ или табуляцию:\n" +
@@ -21,36 +23,6 @@ const PLACEHOLDER =
   "Пример:\n" +
   "Медведка обыкновенная; Meles meles; Mustelidae; animalia; LC; 63.456, 32.789; 2021; Иванов; Петров\n" +
   "Клюква; Vaccinium vitis-idaea; Ericaceae; plantae; LC; 63.500 32.800; 2020; Сидоров;";
-
-function TrashIcon() {
-  return (
-    <svg
-      className="multi-species-discard-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <polyline
-        points="3 6 5 6 21 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <line x1="10" y1="11" x2="10" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <line x1="14" y1="11" x2="14" y2="17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 /** Диалог массового добавления находок: ввод текстом или таблицей, затем подтверждение перед сохранением. */
 export default function MultiSpeciesPopup({
@@ -481,10 +453,10 @@ export default function MultiSpeciesPopup({
         {step === "input" && inputMode === "text" ? (
           <>
             <h3 className="multi-species-title">Несколько видов</h3>
-            <p className="multi-species-hint">
+            <PanelHint>
               Координаты — широта и долгота через запятую или пробел. Разделитель полей — любой
               символ, кроме пробела и запятой.
-            </p>
+            </PanelHint>
 
             <label className="multi-species-field">
               <span>Данные находок</span>
@@ -538,7 +510,7 @@ export default function MultiSpeciesPopup({
         {step === "input" && inputMode === "table" ? (
           <>
             <h3 className="multi-species-title">Несколько видов</h3>
-            <p className="multi-species-hint">Заполните ячейки таблицы для каждой находки.</p>
+            <PanelHint>Заполните ячейки таблицы для каждой находки.</PanelHint>
 
             <MultiSpeciesConfirmTable
               rows={pendingRows}
@@ -573,7 +545,7 @@ export default function MultiSpeciesPopup({
                 aria-label="Отменить"
                 title="Отменить"
               >
-                <TrashIcon />
+                <TrashIcon className="multi-species-discard-icon" aria-hidden="true" focusable="false" />
               </button>
               <button
                 type="button"

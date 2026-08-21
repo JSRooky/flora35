@@ -65,7 +65,80 @@ function formatClusterPointsCount(count) {
   return `${count} точек`;
 }
 
-/** Считает точки по царствам из листьев кластера. */
+const SOURCE_TOOLTIP_ORDER = ["gbif", "inat"];
+const SOURCE_TOOLTIP_LABELS = {
+  gbif: "GBIF",
+  inat: "iNat"
+};
+const SOURCE_TOOLTIP_COLORS = {
+  gbif: "#3b82f6",
+  inat: "#22c55e"
+};
+
+function getLeafSourceKey(leaf) {
+  const properties = leaf?.properties ?? {};
+  const raw = String(properties.temp_source || properties.source || "").toLowerCase();
+  if (raw === "inaturalist" || raw === "inat") {
+    return "inat";
+  }
+  if (raw === "gbif") {
+    return "gbif";
+  }
+  if (properties.gbif_key != null && properties.gbif_key !== "") {
+    return "gbif";
+  }
+  if (properties.inat_id != null && properties.inat_id !== "") {
+    return "inat";
+  }
+  return "";
+}
+
+export function getSourceCountsFromLeaves(leaves) {
+  const counts = new Map();
+  (leaves ?? []).forEach((leaf) => {
+    const key = getLeafSourceKey(leaf);
+    if (!key) {
+      return;
+    }
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  });
+  return counts;
+}
+
+export function getSourceCountsFromClusterProps(props = {}) {
+  const counts = new Map();
+  const gbif = Number(props.src_gbif) || 0;
+  const inat = Number(props.src_inat) || 0;
+  if (gbif > 0) {
+    counts.set("gbif", gbif);
+  }
+  if (inat > 0) {
+    counts.set("inat", inat);
+  }
+  return counts;
+}
+
+function buildSourceCountsHtml(sourceCounts) {
+  if (!(sourceCounts instanceof Map) || sourceCounts.size === 0) {
+    return "";
+  }
+
+  const items = SOURCE_TOOLTIP_ORDER.map((key) => {
+    const count = sourceCounts.get(key) ?? 0;
+    if (count <= 0) {
+      return "";
+    }
+    const color = SOURCE_TOOLTIP_COLORS[key];
+    const label = SOURCE_TOOLTIP_LABELS[key];
+    return `<li class="cluster-tooltip-item"><span class="cluster-tooltip-species" style="color: ${color}">${label}</span> <span class="cluster-tooltip-count">— ${count}</span></li>`;
+  }).filter(Boolean);
+
+  if (!items.length) {
+    return "";
+  }
+
+  return `<ul class="cluster-tooltip-list cluster-tooltip-list--sources">${items.join("")}</ul>`;
+}
 export function getRegnumCountsFromLeaves(leaves) {
   const counts = new Map();
 
@@ -101,12 +174,22 @@ export function getRegnumCountsFromClusterProps(props = {}) {
   return counts;
 }
 
-/** HTML-подсказка: количество точек по царствам. */
-export function buildClusterRegnumTooltipHtml(leavesOrCounts, totalOverride = null) {
+/** HTML-подсказка: базы и количество точек по царствам. */
+export function buildClusterRegnumTooltipHtml(
+  leavesOrCounts,
+  totalOverride = null,
+  sourceCountsOverride = null
+) {
   const counts =
     leavesOrCounts instanceof Map
       ? leavesOrCounts
       : getRegnumCountsFromLeaves(leavesOrCounts);
+  const sourceCounts =
+    sourceCountsOverride instanceof Map
+      ? sourceCountsOverride
+      : leavesOrCounts instanceof Map
+        ? null
+        : getSourceCountsFromLeaves(leavesOrCounts);
 
   let total = totalOverride;
   if (total == null) {
@@ -139,9 +222,14 @@ export function buildClusterRegnumTooltipHtml(leavesOrCounts, totalOverride = nu
     .filter(Boolean)
     .join("");
 
+  const kingdomList = items
+    ? `<ul class="cluster-tooltip-list">${items}</ul>`
+    : "";
+
   return `
     <div class="cluster-tooltip-title">${formatClusterPointsCount(total)}</div>
-    <ul class="cluster-tooltip-list">${items}</ul>
+    ${buildSourceCountsHtml(sourceCounts)}
+    ${kingdomList}
   `;
 }
 
@@ -233,17 +321,22 @@ export function showClusterRegnumHover(map, event, { getDensePileLeaves } = {}) 
   }
 
   const props = clusterFeature.properties ?? {};
+  const sourceFromProps = getSourceCountsFromClusterProps(props);
+  const hasSourceProps = sourceFromProps.size > 0;
   const hasRegnumProps = REGNUM_ORDER.some((key) => Number(props[key]) > 0);
-  if (hasRegnumProps) {
+  if (hasRegnumProps || hasSourceProps) {
     showPointHoverPopup(
       map,
       coordinates,
       buildClusterRegnumTooltipHtml(
-        getRegnumCountsFromClusterProps(props),
-        Number(props.point_count) || null
+        hasRegnumProps ? getRegnumCountsFromClusterProps(props) : new Map(),
+        Number(props.point_count) || null,
+        hasSourceProps ? sourceFromProps : null
       )
     );
-    return null;
+    if (hasRegnumProps) {
+      return null;
+    }
   }
 
   const clusterId = props.cluster_id;

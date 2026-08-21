@@ -16,6 +16,7 @@ import {
   filterInatTableIndices
 } from "../inaturalist/inatProcessingFilters";
 import { getOverlayVersion } from "../names/nameRuCache";
+import { parseFoundYear } from "./yearBounds";
 import {
   GBIF_SOURCE_ID,
   getGbifInteractiveLayerIds,
@@ -34,6 +35,8 @@ import {
   setInatData,
   setInatHiddenPointFeatureKeys
 } from "./addInatLayer";
+import { getTempLayerFeatureGroups, getVisibleTempLayerFeatures } from "../tempLayers/tempLayerStore";
+import { isTempLayersVisible, getTempLayersInteractiveLayerIds, getTempLayersClusterSourceIds, isTempLayersClusterPieChartsEnabled, getTempLayerPieSegments, setTempLayersHiddenPointFeatureKeys, setTempLayersData, setTempLayersLocationFeatureFilter } from "./addTempLayersLayer";
 import {
   getMergedFeatures,
   getMergedInteractiveLayerIds
@@ -75,6 +78,9 @@ import {
   DENSE_PILES_COUNT_LAYER_ID,
   DENSE_PILES_SOURCE_ID,
   ensureDensePilesLayers,
+  getDensePileMinSize,
+  listDensePiles,
+  mergeDensePileLists,
   partitionFeaturesByDensePiles,
   removeDensePilesLayers,
   setDensePilesData
@@ -110,6 +116,9 @@ export const WITHIN_FEATURE_FILTER_KEY = "__withinFeature";
 
 /** Ключ массива стабильных id скрытых точек в объекте filters. */
 export const HIDDEN_FEATURE_KEYS_FILTER_KEY = "__hiddenFeatureKeys";
+
+/** Скрывать точки без атрибута found_year. */
+export const REQUIRE_FOUND_YEAR_FILTER_KEY = "__requireFoundYear";
 
 export { SPECIES_SEARCH_FILTER_KEY } from "../locations/speciesSearchFilter";
 
@@ -433,13 +442,25 @@ function donutSegment(start, end, radius, innerRadius, color) {
 }
 
 function getClusterPieChartSignature(props) {
+  const tempSegments = getTempLayerPieSegments(props);
+  if (tempSegments) {
+    return `temp:${tempSegments.map((segment) => segment.count).join(":")}`;
+  }
   return CLUSTER_REGNUM_KEYS.map((key) => Number(props[key]) || 0).join(":");
 }
 
-/** SVG-пончик: доли plantae / animalia / fungi / protozoa и общее число точек в центре. */
+/** SVG-пончик: доли по царству или по временным слоям и общее число точек в центре. */
 function createClusterPieChartElement(props) {
-  const counts = CLUSTER_REGNUM_KEYS.map((key) => Number(props[key]) || 0);
-  const total = Number(props.point_count) || counts.reduce((sum, count) => sum + count, 0);
+  const tempSegments = getTempLayerPieSegments(props);
+  const segments = tempSegments
+    ? tempSegments
+    : CLUSTER_REGNUM_KEYS.map((key) => ({
+        count: Number(props[key]) || 0,
+        color: REGNUM_COLORS[key]
+      }));
+  const total =
+    Number(props.point_count) ||
+    segments.reduce((sum, segment) => sum + segment.count, 0);
 
   if (total <= 0) {
     return null;
@@ -451,24 +472,24 @@ function createClusterPieChartElement(props) {
   const offsets = [];
   let runningTotal = 0;
 
-  counts.forEach((count) => {
+  segments.forEach((segment) => {
     offsets.push(runningTotal);
-    runningTotal += count;
+    runningTotal += segment.count;
   });
 
   let segmentsHtml = "";
 
-  counts.forEach((count, index) => {
-    if (count <= 0) {
+  segments.forEach((segment, index) => {
+    if (segment.count <= 0) {
       return;
     }
 
     segmentsHtml += donutSegment(
       offsets[index] / total,
-      (offsets[index] + count) / total,
+      (offsets[index] + segment.count) / total,
       radius,
       innerRadius,
-      REGNUM_COLORS[CLUSTER_REGNUM_KEYS[index]]
+      segment.color
     );
   });
 
@@ -548,6 +569,12 @@ function getVisibleClusterFeatures(map) {
     collectFromSource(INAT_SOURCE_ID, "inat");
   }
 
+  if (isTempLayersVisible() && isTempLayersClusterPieChartsEnabled()) {
+    getTempLayersClusterSourceIds().forEach((sourceId) => {
+      collectFromSource(sourceId, `temp:${sourceId}`);
+    });
+  }
+
   return clustersById;
 }
 
@@ -555,12 +582,13 @@ function updateClusterPieChartMarkers(map) {
   const showLocations = markersVisible;
   const showGbif = isGbifLayerVisible() && isGbifClusterPieChartsEnabled();
   const showInat = isInatLayerVisible() && isInatClusterPieChartsEnabled();
+  const showTemp = isTempLayersVisible() && isTempLayersClusterPieChartsEnabled();
 
   if (
     !clusterPieChartsEnabled ||
     !isMapboxClusteringActive() ||
     clusterByRegnum ||
-    (!showLocations && !showGbif && !showInat)
+    (!showLocations && !showGbif && !showInat && !showTemp)
   ) {
     removeAllClusterPieChartMarkers();
     removeOrphanedClusterPieChartMarkers(map);
@@ -775,6 +803,10 @@ function applyUnclusteredLayerFilters(map) {
     selectedPointPinFeatureKey
   ]);
   setRedBookHiddenPointFeatureKeys(map, [
+    sharedPointPinFeatureKey,
+    selectedPointPinFeatureKey
+  ]);
+  setTempLayersHiddenPointFeatureKeys(map, [
     sharedPointPinFeatureKey,
     selectedPointPinFeatureKey
   ]);
@@ -1054,7 +1086,9 @@ export function updateSelectedPointHighlight(map, feature) {
 
   removeSelectedPointPinMarker(map);
   selectedPointPinFeatureKey = featureKey;
-  const centerColor = getPointColorForRegnum(feature.properties?.regnum);
+  const centerColor =
+    feature.properties?.temp_marker_color ||
+    getPointColorForRegnum(feature.properties?.regnum);
 
   applyUnclusteredLayerFilters(map);
 
@@ -1380,12 +1414,16 @@ function attachLocationsInteractions(map) {
     const inatLayerIds = getInatInteractiveLayerIds(map);
     const mergedLayerIds = getMergedInteractiveLayerIds(map);
     const redBookLayerIds = getRedBookInteractiveLayerIds(map);
+    const tempLayerIds = getTempLayersInteractiveLayerIds().filter((layerId) =>
+      map.getLayer(layerId)
+    );
     const hitLayerIds = [
       ...locationLayerIds,
       ...gbifLayerIds,
       ...inatLayerIds,
       ...mergedLayerIds,
-      ...redBookLayerIds
+      ...redBookLayerIds,
+      ...tempLayerIds
     ];
 
     if (hitLayerIds.length > 0) {
@@ -1597,6 +1635,14 @@ function isTimelineYearMaxOnlyChange(prevFilters, nextFilters) {
   return isFoundYearOnlyChange(prevFilters, nextFilters);
 }
 
+function featureMatchesYearWindow(feature, yearMin, yearMax, keepMissing) {
+  const year = parseFoundYear(feature.properties?.found_year);
+  if (year == null) {
+    return Boolean(keepMissing);
+  }
+  return year >= yearMin && year <= yearMax;
+}
+
 function locationsSourcesExist(map) {
   if (!isMapboxClusteringActive()) {
     return Boolean(map.getSource("locations"));
@@ -1780,10 +1826,14 @@ function applyTimelineYearChange(map, prevFilters, nextFilters) {
       }
     }
   } else {
-    newFilteredFeatures = currentFilteredFeatures.filter((feature) => {
-      const year = feature.properties?.found_year;
-      return typeof year === "number" && year >= yearMin && year <= nextMax;
-    });
+    newFilteredFeatures = currentFilteredFeatures.filter((feature) =>
+      featureMatchesYearWindow(
+        feature,
+        yearMin,
+        nextMax,
+        !nextFilters[REQUIRE_FOUND_YEAR_FILTER_KEY]
+      )
+    );
   }
 
   setCurrentFilteredFeatures(newFilteredFeatures);
@@ -1893,6 +1943,7 @@ export function filterFeatures(features, filters = {}) {
     [WITHIN_FEATURE_FILTER_KEY]: withinFeature,
     [HIDDEN_FEATURE_KEYS_FILTER_KEY]: _hiddenFeatureKeys,
     [SPECIES_SEARCH_FILTER_KEY]: speciesSearch,
+    [REQUIRE_FOUND_YEAR_FILTER_KEY]: requireFoundYear,
     ...propertyFilters
   } = filters;
   const filterEntries = Object.entries(propertyFilters);
@@ -1902,6 +1953,12 @@ export function filterFeatures(features, filters = {}) {
   if (hiddenPointKeysSet.size > 0) {
     result = result.filter(
       (feature) => !hiddenPointKeysSet.has(getStablePointKey(feature))
+    );
+  }
+
+  if (requireFoundYear) {
+    result = result.filter(
+      (feature) => parseFoundYear(feature.properties?.found_year) != null
     );
   }
 
@@ -1915,12 +1972,24 @@ export function filterFeatures(features, filters = {}) {
     result = result.filter((feature) =>
       filterEntries.every(([key, value]) => {
         if (value && typeof value === "object" && !Array.isArray(value) && "min" in value && "max" in value) {
-          const prop = feature.properties[key];
-          if (prop == null) {
+          const prop = feature.properties?.[key];
+          if (key === "found_year") {
+            const year = parseFoundYear(prop);
+            if (year == null) {
+              return true;
+            }
+            return year >= value.min && year <= value.max;
+          }
+          if (prop == null || prop === "") {
             return false;
           }
 
-          return prop >= value.min && prop <= value.max;
+          const numeric = typeof prop === "number" ? prop : Number(prop);
+          if (!Number.isFinite(numeric)) {
+            return false;
+          }
+
+          return numeric >= value.min && numeric <= value.max;
         }
 
         if (Array.isArray(value)) {
@@ -1932,7 +2001,8 @@ export function filterFeatures(features, filters = {}) {
           if (
             key === "status" &&
             (feature.properties?.source === "gbif" ||
-              feature.properties?.source === "inaturalist")
+              feature.properties?.source === "inaturalist" ||
+              feature.properties?.temp_layer_id)
           ) {
             return true;
           }
@@ -2115,7 +2185,80 @@ export function getToolFeatures(filters = {}) {
     appendFeatures(filterFeatures(getRedBookFeatures(), filters));
   }
 
+  if (isTempLayersVisible()) {
+    appendFeatures(filterFeatures(getVisibleTempLayerFeatures(), filters));
+  }
+
   return features;
+}
+
+/**
+ * Точки текущего фильтра для снимка во временный слой.
+ * Та же выборка, что у инструментов, плюс локальные точки, если они ещё в памяти.
+ */
+export function getMapFilterSnapshotFeatures(filters = {}) {
+  const features = getToolFeatures(filters);
+  if (features.length > 0 || !locationsData?.features?.length) {
+    return features;
+  }
+
+  return filterFeatures(
+    enrichFeaturesWithAttribution(locationsData.features, getStablePointKey),
+    filters
+  );
+}
+
+/** Видимые точки временных слоёв с теми же фильтрами, что у инструментов. */
+export function getVisibleTempLayerToolFeatures(locationFilters = currentFilters) {
+  if (!isTempLayersVisible()) {
+    return [];
+  }
+  return filterFeatures(getVisibleTempLayerFeatures(), locationFilters);
+}
+
+/** Плотные группы по источникам отдельно, затем слияние по координатам (без фантомных куч). */
+export function listToolDensePiles(filters = {}, { minSize = getDensePileMinSize() } = {}) {
+  const options = { minSize };
+  const lists = [];
+
+  if (toolIncludeLocal && locationsData?.features?.length) {
+    lists.push(listDensePiles(filterFeatures(locationsData.features, filters), options));
+  }
+
+  if (toolIncludeGbif && isGbifLayerVisible()) {
+    lists.push(listDensePiles(getVisibleGbifFeatures(filters), options));
+  }
+
+  if (toolIncludeInat && isInatLayerVisible()) {
+    lists.push(listDensePiles(getVisibleInatFeatures(filters), options));
+  }
+
+  if (toolIncludeMerged) {
+    lists.push(
+      listDensePiles(
+        enrichFeaturesWithAttribution(filterFeatures(getMergedFeatures(), filters), getStablePointKey),
+        options
+      )
+    );
+  }
+
+  if (toolIncludeRedBook) {
+    lists.push(listDensePiles(filterFeatures(getRedBookFeatures(), filters), options));
+  }
+
+  if (isTempLayersVisible()) {
+    const tempGroups = getTempLayerFeatureGroups();
+    tempGroups.forEach((group) => {
+      lists.push(listDensePiles(filterFeatures(group.features, filters), options));
+    });
+    if (tempGroups.length > 1) {
+      lists.push(
+        listDensePiles(filterFeatures(getVisibleTempLayerFeatures(), filters), options)
+      );
+    }
+  }
+
+  return mergeDensePileLists(lists);
 }
 
 /** Сводка по точкам внутри GeoJSON-объекта с учётом фильтров (без within-фильтра в base). */
@@ -2443,10 +2586,14 @@ function applyGbifTimelineYearChange(map, prevFilters, nextFilters) {
       }
     }
   } else {
-    nextFeatures = current.filter((feature) => {
-      const year = feature.properties?.found_year;
-      return typeof year === "number" && year >= yearMin && year <= nextMax;
-    });
+    nextFeatures = current.filter((feature) =>
+      featureMatchesYearWindow(
+        feature,
+        yearMin,
+        nextMax,
+        !nextFilters[REQUIRE_FOUND_YEAR_FILTER_KEY]
+      )
+    );
   }
 
   visibleGbifCache = {
@@ -2667,10 +2814,14 @@ function applyInatTimelineYearChange(map, prevFilters, nextFilters) {
       }
     }
   } else {
-    nextFeatures = current.filter((feature) => {
-      const year = feature.properties?.found_year;
-      return typeof year === "number" && year >= yearMin && year <= nextMax;
-    });
+    nextFeatures = current.filter((feature) =>
+      featureMatchesYearWindow(
+        feature,
+        yearMin,
+        nextMax,
+        !nextFilters[REQUIRE_FOUND_YEAR_FILTER_KEY]
+      )
+    );
   }
 
   visibleInatCache = {
@@ -2732,6 +2883,7 @@ export function applyLocationsFilter(map, filters = {}) {
     applyGbifTimelineYearChange(map, prevFilters, filters);
     applyInatTimelineYearChange(map, prevFilters, filters);
     applyRedBookLocationsFilter(map, filters);
+    applyTempLayersLocationsFilter(map, filters);
     return;
   }
 
@@ -2740,6 +2892,7 @@ export function applyLocationsFilter(map, filters = {}) {
     applyGbifLocationsFilter(map, filters);
     applyInatLocationsFilter(map, filters);
     applyRedBookLocationsFilter(map, filters);
+    applyTempLayersLocationsFilter(map, filters);
     return;
   }
 
@@ -2750,6 +2903,7 @@ export function applyLocationsFilter(map, filters = {}) {
       applyGbifLocationsFilter(map, filters);
       applyInatLocationsFilter(map, filters);
       applyRedBookLocationsFilter(map, filters);
+      applyTempLayersLocationsFilter(map, filters);
     }
     return;
   }
@@ -2765,7 +2919,17 @@ export function applyLocationsFilter(map, filters = {}) {
     applyGbifLocationsFilter(map, filters);
     applyInatLocationsFilter(map, filters);
     applyRedBookLocationsFilter(map, filters);
+    applyTempLayersLocationsFilter(map, filters);
   }
+}
+
+function applyTempLayersLocationsFilter(map, filters = currentFilters) {
+  if (!map) {
+    return;
+  }
+
+  setTempLayersLocationFeatureFilter((features) => filterFeatures(features, filters));
+  setTempLayersData(map);
 }
 
 /** Оценка числа точек, попадающих на карту (для порогов производительности). */
@@ -2896,6 +3060,12 @@ export function refreshLocationsDensePiles(map) {
 
 export function isDenseClustersHighlightEnabled() {
   return denseClustersHighlightEnabled;
+}
+
+/** Сворачивает раскрытые плотные группы обратно в кластеры. */
+export function collapseExpandedDensePiles(map) {
+  expandedDensePileKeys = new Set();
+  refreshLocationsDensePiles(map);
 }
 
 /**

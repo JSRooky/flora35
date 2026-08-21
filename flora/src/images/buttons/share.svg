@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 24 24">
+  <!-- Generator: Adobe Illustrator 29.6.1, SVG Export Plug-In . SVG Version: 2.1.1 Build 9)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: none;
+        stroke: #000;
+        stroke-width: 2px;
+      }
+    </style>
+  </defs>
+  <g>
+    <circle class="st0" cx="15.49" cy="5.98" r="3.19"/>
+    <circle class="st0" cx="17.16" cy="18.02" r="3.19"/>
+    <circle class="st0" cx="5.89" cy="13.45" r="3.19"/>
+  </g>
+  <line class="st0" x1="8.41" y1="11.49" x2="12.97" y2="7.94"/>
+  <line class="st0" x1="8.54" y1="15.24" x2="14.07" y2="17.24"/>
+</svg>

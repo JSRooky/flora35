@@ -27,6 +27,7 @@ import {
   reloadLocationsData,
   refreshLocationsDensePiles,
   expandDensePileByKey,
+  collapseExpandedDensePiles,
   setDensePileExpandedHandler,
   setMarkersVisible,
   setHoverTooltipsEnabled,
@@ -36,6 +37,8 @@ import {
   showSharedPointPopup,
   updateSelectedPointHighlight,
   getToolFeatures,
+  getMapFilterSnapshotFeatures,
+  listToolDensePiles,
   getVisibleMapPointCount,
   getStablePointKey,
   setHiddenPointKeysForFilter,
@@ -43,6 +46,7 @@ import {
   setInatProcessingFilters,
   WITHIN_FEATURE_FILTER_KEY,
   HIDDEN_FEATURE_KEYS_FILTER_KEY,
+  REQUIRE_FOUND_YEAR_FILTER_KEY,
   SPECIES_SEARCH_FILTER_KEY
 } from "./components/addLocationsLayer";
 import {
@@ -55,14 +59,17 @@ import {
 } from "./components/mapPerformance";
 import {
   buildSpeciesSummaryFromDensePile,
-  listDensePiles,
   MIN_DENSE_PILE_SIZE,
-  setDensePileMinSize
+  setDensePileMinSize,
+  setHiddenDensePileKeys
 } from "./components/densePiles";
 import DenseClustersPanel from "./components/DenseClustersPanel";
 import {
   addHeatmapLayer,
+  applyHeatmapPaintSettings,
   setHeatmapEnabled,
+  refreshHeatmapSourceOptions,
+  syncTempLayerHeatmaps,
   updateHeatmapData
 } from "./components/addHeatmapLayer";
 import {
@@ -79,7 +86,25 @@ import {
   showBoundsFeaturePopup,
   syncBoundsFeaturesVisibility
 } from "./components/addBoundsLayers";
+import {
+  addRegionBoundsLayer,
+  applyRegionBoundsIsoFilter,
+  applyRegionBoundsPaintSettings,
+  buildRegionCatalog,
+  emitRegionBoundsSelect,
+  flyToRegionBoundsFeature,
+  getRegionFeatureAtClick,
+  hideRegionActionPopup,
+  getRegionSelectionWithinFeature,
+  loadRegionBoundsGeoJSON,
+  setRegionBoundsEnabled,
+  setRegionBoundsSelectHandler,
+  setRegionBoundsSelectedIsos,
+  showRegionActionPopup,
+  updateRegionSelectionBuffer
+} from "./components/addRegionBoundsLayer";
 import OoptPanel from "./components/OoptPanel";
+import RegionPanel from "./components/RegionPanel";
 import OoptFeaturePanel from "./components/OoptFeaturePanel";
 import BoundsSpeciesListPopup from "./components/BoundsSpeciesListPopup";
 import { getBoundsFeatureHeadingParts } from "./components/boundsPropertyLabels";
@@ -118,7 +143,8 @@ import {
   toggleSpeciesPolygonBuildMode,
   updateSpeciesPolygonIntersectionLayer,
   upsertSpeciesPolygon,
-  getPointsForSpecies,
+  getUniqueCoordinateCountForSpecies,
+  canBuildAllPointsPolygon,
   POLYGON_BUILD_MODES
 } from "./components/addSpeciesPolygonLayer";
 import {
@@ -141,6 +167,7 @@ import {
   getToolWithinFeature,
   getOoptWithinFeature,
   isOoptPointsFilterActive,
+  isPolygonToolActive,
   resolveToolPointsFilterModule
 } from "./components/getToolWithinFeature";
 import {
@@ -174,7 +201,16 @@ import AreaSelectionPopup from "./components/AreaSelectionPopup";
 import SpeciesSearchPanel from "./components/SpeciesSearchPanel";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
+import HeatmapSettingsPanel from "./components/HeatmapSettingsPanel";
+import { loadHeatmapSettingsFromStorage, saveHeatmapSettingsToStorage } from "./components/heatmapSettings";
+import {
+  createRandomRegionColorMap,
+  createSubtleRegionColorMap,
+  loadRegionBoundsSettingsFromStorage,
+  saveRegionBoundsSettingsToStorage
+} from "./components/regionBoundsSettings";
 import DataWorkPanel from "./components/DataWorkPanel";
+import TempLayerArchivePanel from "./components/TempLayerArchivePanel";
 import NearSpeciesMatchesPopup from "./components/NearSpeciesMatchesPopup";
 import UnattributedPointsPopup from "./components/UnattributedPointsPopup";
 import UndoMergedPointsPopup from "./components/UndoMergedPointsPopup";
@@ -196,14 +232,24 @@ import TimelineSlider from "./components/TimelineSlider";
 import ArealDynamicsPanel from "./components/ArealDynamicsPanel";
 import AboutProject from "./components/AboutProject";
 import MapCornerControls from "./components/MapCornerControls";
+import MapZoomControl from "./components/MapZoomControl";
 import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
-import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
-import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatDensePiles, expandInatDensePileByKey, setInatDensePileExpandedHandler } from "./components/addInatLayer";
+import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
+import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles } from "./components/addTempLayersLayer";
+import { addTempLayerOverlaysLayer, applyTempRegionOverlayPaint } from "./components/addTempLayerOverlaysLayer";
+import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerLabel, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
+import {
+  collectMapToolOverlays,
+  TEMP_OVERLAY_KINDS,
+  TEMP_OVERLAY_LABELS
+} from "./tempLayers/collectMapToolOverlays";
+import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatDensePiles, expandInatDensePileByKey, collapseInatExpandedDensePiles, setInatDensePileExpandedHandler } from "./components/addInatLayer";
 import {
   addMergedLayer,
   setMergedData,
   setMergedVisibility,
+  applyMergedGroupingMode,
   upsertMergedFeature,
   removeMergedFeature
 } from "./components/addMergedLayer";
@@ -221,8 +267,16 @@ import { deleteMergedPoint } from "./firebase/deleteMergedPoint";
 import { loadPointAttributionsFromFirestore } from "./firebase/loadPointAttributionsFromFirestore";
 import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
 import { hydrateInatStoreFromPersistence } from "./inaturalist/inatPersistence";
-import { findGbifFeatureByKey } from "./gbif/gbifStore";
-import { findInatFeatureById } from "./inaturalist/inatStore";
+import { hydrateTempLayersFromPersistence, persistTempLayers } from "./tempLayers/tempLayerPersistence";
+import {
+  archiveWorkingPlaque,
+  deleteArchivedPlaque,
+  exportArchivedPlaque,
+  renameArchivedPlaque,
+  restoreArchivedPlaque
+} from "./tempLayers/tempLayerArchive";
+import { findGbifFeatureByKey, getGbifFeaturesForRegionIds } from "./gbif/gbifStore";
+import { findInatFeatureById, getInatFeaturesForRegionIds } from "./inaturalist/inatStore";
 import {
   createDefaultExternalProcessingFilters,
   toGbifProcessingFiltersFromExternal,
@@ -239,6 +293,8 @@ import {
   saveRussianNameChoice
 } from "./names/russianNameResolver";
 import DataSourcesPanel from "./components/DataSourcesPanel";
+import { matchMapRegionsToExternal } from "./externalSources/matchMapRegionToExternal";
+import { applyBufferToExternalRegion } from "./externalSources/bufferedSpatialRegion";
 import ExternalSourcesLoadStatusBar from "./components/ExternalSourcesLoadStatusBar";
 import ExternalProcessingPanel from "./components/ExternalProcessingPanel";
 import {
@@ -269,6 +325,7 @@ const PANEL_IDS = {
   BUFFER: "buffer",
   AREA: "area",
   OOPT: "oopt",
+  REGIONS: "regions",
   OOPT_FEATURE: "oopt-feature",
   SUBMIT: "submit",
   DATA_SOURCES: "data-sources",
@@ -276,6 +333,7 @@ const PANEL_IDS = {
   DATA_WORK: "data-work",
   SEARCH: "search",
   REDBOOK: "redbook",
+  TEMP_ARCHIVE: "temp-archive",
   /** @deprecated алиасы для taskbar */
   GBIF: "data-sources",
   GBIF_PROCESSING: "external-processing"
@@ -301,13 +359,15 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.BUFFER,
   PANEL_IDS.AREA,
   PANEL_IDS.OOPT,
+  PANEL_IDS.REGIONS,
   PANEL_IDS.OOPT_FEATURE,
   PANEL_IDS.SUBMIT,
   PANEL_IDS.DATA_SOURCES,
   PANEL_IDS.EXTERNAL_PROCESSING,
   PANEL_IDS.DATA_WORK,
   PANEL_IDS.SEARCH,
-  PANEL_IDS.REDBOOK
+  PANEL_IDS.REDBOOK,
+  PANEL_IDS.TEMP_ARCHIVE
 ];
 
 function isPanelExpandedInState(collapsedState, panelId) {
@@ -324,6 +384,8 @@ export default function MapView() {
   const [statusFilters, setStatusFilters] = useState([]);
   const [regnumFilters, setRegnumFilters] = useState([]);
   const [clusterByRegnum, setClusterByRegnumState] = useState(DEFAULT_CLUSTER_BY_REGNUM);
+  const [clusterByTempLayers, setClusterByTempLayersState] = useState(true);
+  const [clusterByTempSublayers, setClusterByTempSublayersState] = useState(true);
   const [clusteringEnabled, setClusteringEnabledState] = useState(DEFAULT_CLUSTERING_ENABLED);
   const [clusterPieCharts, setClusterPieChartsState] = useState(DEFAULT_CLUSTER_PIE_CHARTS);
   const [denseClustersHighlight, setDenseClustersHighlightState] = useState(
@@ -331,6 +393,8 @@ export default function MapView() {
   );
   const [densePileMinSize, setDensePileMinSizeState] = useState(MIN_DENSE_PILE_SIZE);
   const [denseProcessingActive, setDenseProcessingActive] = useState(false);
+  const [denseGroupsHidden, setDenseGroupsHidden] = useState(false);
+  const [hiddenDensePileKeys, setHiddenDensePileKeysState] = useState([]);
   const [selectedDensePileKey, setSelectedDensePileKey] = useState(null);
   const [densePileSpeciesListOpen, setDensePileSpeciesListOpen] = useState(false);
   // Инвалидация списка плотных групп при смене данных в module-store (локальные/GBIF).
@@ -350,6 +414,32 @@ export default function MapView() {
   const [markersVisible, setMarkersVisibleState] = useState(DEFAULT_MARKERS_VISIBLE);
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
+  const [heatmapSettingsOpen, setHeatmapSettingsOpen] = useState(false);
+  const [heatmapSettings, setHeatmapSettings] = useState(loadHeatmapSettingsFromStorage);
+  const [regionBoundsSettings, setRegionBoundsSettings] = useState(
+    loadRegionBoundsSettingsFromStorage
+  );
+  const handleHeatmapSettingsChange = (next) => {
+    setHeatmapSettings(next);
+    saveHeatmapSettingsToStorage(next);
+  };
+  const handleRegionBoundsSettingsChange = (next) => {
+    setRegionBoundsSettings(next);
+    const overlayEdit = getVisibleRegionOverlayEditState();
+    if (overlayEdit.active) {
+      patchVisibleRegionOverlays({ style: next });
+      persistTempLayers().catch(() => {});
+      if (map.current) {
+        applyTempRegionOverlayPaint(map.current, {
+          settings: next,
+          featureColors: overlayEdit.featureColors
+        });
+      }
+      return;
+    }
+    saveRegionBoundsSettingsToStorage(next);
+  };
+  const [regionFeatureColors, setRegionFeatureColors] = useState(null);
   const [boundsFeatureVisibility, setBoundsFeatureVisibility] = useState({});
   const [boundsCatalogByLayerId, setBoundsCatalogByLayerId] = useState({});
   const [boundsLayerLoading, setBoundsLayerLoading] = useState({});
@@ -364,11 +454,14 @@ export default function MapView() {
   const [arealDockedWithFeature, setArealDockedWithFeature] = useState(false);
   // Буфер, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
   const [bufferDockedWithFeature, setBufferDockedWithFeature] = useState(false);
+  // Полигон, открытый из панели «Сведения о точке» — показывается под ней, не закрывая её.
+  const [polygonDockedWithFeature, setPolygonDockedWithFeature] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [arealEnabled, setArealEnabled] = useState(false);
   const [arealAllMarkers, setArealAllMarkers] = useState(false);
   const [arealRadius, setArealRadius] = useState(DEFAULT_AREAL_RADIUS_KM);
   const [yearFilterEnabled, setYearFilterEnabled] = useState(false);
+  const [hideMissingFoundYear, setHideMissingFoundYear] = useState(false);
   const [yearBounds, setYearBounds] = useState(() => getYearBounds());
   const [yearRange, setYearRange] = useState(() => getYearBounds());
   const [timelineYear, setTimelineYear] = useState(() => getYearBounds().max);
@@ -407,6 +500,72 @@ export default function MapView() {
   const [areaDrawingActive, setAreaDrawingActive] = useState(false);
   const [areaGeometry, setAreaGeometry] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
+  const [regionBoundsEnabled, setRegionBoundsVisible] = useState(false);
+  const [regionCatalog, setRegionCatalog] = useState([]);
+  const [hiddenRegionIsos, setHiddenRegionIsos] = useState([]);
+  const [selectedRegionIsos, setSelectedRegionIsos] = useState([]);
+  const [regionAddMode, setRegionAddMode] = useState(false);
+  const [regionBufferKm, setRegionBufferKm] = useState(0);
+  const [overlayRegionBufferKm, setOverlayRegionBufferKm] = useState(0);
+  const overlayRegionModeRef = useRef(false);
+  const selectedRegionIsosRef = useRef([]);
+  const regionAddModeRef = useRef(false);
+  const hiddenRegionIsosRef = useRef([]);
+  const regionCatalogRef = useRef([]);
+  const selectedRegionIso = selectedRegionIsos[selectedRegionIsos.length - 1] ?? null;
+  const handleRegionBoundsRandomizeColors = useCallback((styleId) => {
+    const overlayEdit = getVisibleRegionOverlayEditState();
+    if (overlayEdit.active) {
+      const colors = createRandomRegionColorMap(overlayEdit.isos, styleId);
+      patchVisibleRegionOverlays({
+        featureColors: colors,
+        style: regionBoundsSettings
+      });
+      persistTempLayers().catch(() => {});
+      if (map.current) {
+        setTempLayersData(map.current);
+        applyTempRegionOverlayPaint(map.current, {
+          settings: regionBoundsSettings,
+          featureColors: colors
+        });
+      }
+      return;
+    }
+    setRegionFeatureColors(
+      createRandomRegionColorMap(
+        regionCatalog.map((entry) => entry.iso),
+        styleId
+      )
+    );
+  }, [regionBoundsSettings, regionCatalog]);
+  const handleRegionBoundsClearFeatureColors = useCallback(() => {
+    const overlayEdit = getVisibleRegionOverlayEditState();
+    if (overlayEdit.active) {
+      const colors = createSubtleRegionColorMap(
+        overlayEdit.isos,
+        regionBoundsSettings.fillColor
+      );
+      patchVisibleRegionOverlays({
+        featureColors: colors,
+        style: regionBoundsSettings
+      });
+      persistTempLayers().catch(() => {});
+      if (map.current) {
+        setTempLayersData(map.current);
+        applyTempRegionOverlayPaint(map.current, {
+          settings: regionBoundsSettings,
+          featureColors: colors
+        });
+      }
+      return;
+    }
+    setRegionFeatureColors(
+      createSubtleRegionColorMap(
+        regionCatalog.map((entry) => entry.iso),
+        regionBoundsSettings.fillColor
+      )
+    );
+  }, [regionCatalog, regionBoundsSettings.fillColor]);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
   const [dataSourceMode, setDataSourceModeState] = useState(DEFAULT_DATA_SOURCE_MODE);
   const localDataActive =
@@ -421,6 +580,11 @@ export default function MapView() {
     [EXTERNAL_LAYER_IDS.GBIF]: true,
     [EXTERNAL_LAYER_IDS.INATURALIST]: true
   });
+  const [tempLayersRevision, setTempLayersRevision] = useState(0);
+  const overlayRegionEdit = useMemo(
+    () => getVisibleRegionOverlayEditState(),
+    [tempLayersRevision]
+  );
   const [externalProcessingActive, setExternalProcessingActive] = useState(false);
   const [nearSpeciesMatchesActive, setNearSpeciesMatchesActive] = useState(false);
   const [unattributedPointsActive, setUnattributedPointsActive] = useState(false);
@@ -437,6 +601,9 @@ export default function MapView() {
   const [panelMinimized, setPanelMinimized] = useState({});
   /** Отдельный флаг: panelMinimized для этой панели сбрасывают другие обработчики. */
   const [dataSourcesPanelOpen, setDataSourcesPanelOpen] = useState(false);
+  const [dataSourcesFocusRequest, setDataSourcesFocusRequest] = useState(null);
+  const [tempArchivePanelOpen, setTempArchivePanelOpen] = useState(false);
+  const [tempArchiveStatus, setTempArchiveStatus] = useState("");
   /** Порядок иконок в taskbar (открытая панель остаётся в ряду и подсвечивается). */
   const [panelTaskbarOrder, setPanelTaskbarOrder] = useState([]);
   /** Актуальный stashVisiblePanelsToTaskbar — вызывается из ранних колбэков. */
@@ -578,6 +745,9 @@ export default function MapView() {
       case TASKBAR_PANEL_IDS.MAP:
         setDenseProcessingActive(false);
         setActiveModule(MODULE_IDS.MAP);
+        break;
+      case TASKBAR_PANEL_IDS.TEMP_ARCHIVE:
+        setTempArchivePanelOpen(true);
         break;
       default: {
         const moduleId = PANEL_TASKBAR_MODULE_ID[panelId];
@@ -800,6 +970,9 @@ export default function MapView() {
       case MODULE_IDS.OOPT:
         expandPanel(PANEL_IDS.OOPT);
         break;
+      case MODULE_IDS.REGIONS:
+        expandPanel(PANEL_IDS.REGIONS);
+        break;
       case MODULE_IDS.SUBMIT:
         expandPanel(PANEL_IDS.SUBMIT);
         break;
@@ -840,10 +1013,15 @@ export default function MapView() {
     if (bufferDockedWithFeature) {
       expandPanel(PANEL_IDS.BUFFER);
     }
+
+    if (polygonDockedWithFeature) {
+      expandPanel(PANEL_IDS.POLYGON);
+    }
   }, [
     activeModule,
     arealDockedWithFeature,
     bufferDockedWithFeature,
+    polygonDockedWithFeature,
     expandPanel,
     isPanelCollapsed,
     panelCollapsed
@@ -1062,6 +1240,13 @@ export default function MapView() {
           return current;
         }
 
+        if (
+          nextModuleId === MODULE_IDS.REGIONS &&
+          selectedRegionIsosRef.current.length > 0
+        ) {
+          return current;
+        }
+
         return null;
       });
     };
@@ -1069,12 +1254,22 @@ export default function MapView() {
     if (moduleId === MODULE_IDS.AREAL) {
       // Из меню «Радиус» открывается отдельно — панель точки не остаётся в стеке.
       setArealDockedWithFeature(false);
+      setPolygonDockedWithFeature(false);
       selectModule(moduleId);
       return;
     }
 
     if (moduleId === MODULE_IDS.BUFFER) {
       // Из меню «Буфер» открывается отдельно — панель точки не остаётся в стеке.
+      setBufferDockedWithFeature(false);
+      setPolygonDockedWithFeature(false);
+      selectModule(moduleId);
+      return;
+    }
+
+    if (moduleId === MODULE_IDS.POLYGON) {
+      setPolygonDockedWithFeature(false);
+      setArealDockedWithFeature(false);
       setBufferDockedWithFeature(false);
       selectModule(moduleId);
       return;
@@ -1084,6 +1279,7 @@ export default function MapView() {
       // Из меню «Область» открывается отдельно — панель точки не остаётся в стеке.
       setArealDockedWithFeature(false);
       setBufferDockedWithFeature(false);
+      setPolygonDockedWithFeature(false);
       selectModule(moduleId);
       return;
     }
@@ -1094,6 +1290,7 @@ export default function MapView() {
 
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature(false);
+    setPolygonDockedWithFeature(false);
     selectModule(moduleId);
   }, [isArealApplied, isBufferApplied, toolPointsFilterEnabled]);
 
@@ -1104,6 +1301,7 @@ export default function MapView() {
 
     setActiveModule(MODULE_IDS.FEATURE);
     setBufferDockedWithFeature(false);
+    setPolygonDockedWithFeature(false);
     setArealDockedWithFeature((open) => !open);
   }, [isBufferApplied]);
 
@@ -1114,8 +1312,16 @@ export default function MapView() {
 
     setActiveModule(MODULE_IDS.FEATURE);
     setArealDockedWithFeature(false);
+    setPolygonDockedWithFeature(false);
     setBufferDockedWithFeature((open) => !open);
   }, [isArealApplied]);
+
+  const handleOpenPolygonFromFeature = useCallback(() => {
+    setActiveModule(MODULE_IDS.FEATURE);
+    setArealDockedWithFeature(false);
+    setBufferDockedWithFeature(false);
+    setPolygonDockedWithFeature((open) => !open);
+  }, []);
 
   const handleYearRangeChange = useCallback((nextRange) => {
     setYearRange((prev) =>
@@ -1149,6 +1355,156 @@ export default function MapView() {
     []
   );
 
+  const handleTempLayerToggle = useCallback((layerId, visible) => {
+    setTempLayerVisible(layerId, visible);
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
+    if (map.current) {
+      setTempLayersData(map.current);
+    }
+    bumpPointsDataRevision();
+  }, [bumpPointsDataRevision]);
+
+  const handleTempLayerDelete = useCallback((layerId) => {
+    deleteTempLayer(layerId);
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
+    if (map.current) {
+      setTempLayersData(map.current);
+    }
+    bumpPointsDataRevision();
+  }, [bumpPointsDataRevision]);
+
+  const refreshTempLayersUi = useCallback(() => {
+    setTempLayersRevision((value) => value + 1);
+    if (map.current) {
+      setTempLayersData(map.current);
+    }
+    bumpPointsDataRevision();
+  }, [bumpPointsDataRevision]);
+
+  const handleOpenTempArchive = useCallback(() => {
+    setTempArchiveStatus("");
+    setTempArchivePanelOpen(true);
+    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.TEMP_ARCHIVE]: false }));
+    pinPanelsToTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
+  }, [pinPanelsToTaskbar]);
+
+  const handleTempArchivePanelToggle = useCallback(() => {
+    if (tempArchivePanelOpen && !isPanelMinimized(PANEL_IDS.TEMP_ARCHIVE)) {
+      setTempArchivePanelOpen(false);
+      unpinPanelsFromTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
+      return;
+    }
+
+    handleOpenTempArchive();
+  }, [
+    handleOpenTempArchive,
+    isPanelMinimized,
+    tempArchivePanelOpen,
+    unpinPanelsFromTaskbar
+  ]);
+
+  const handleTempLayerArchive = useCallback(
+    async (layerId) => {
+      setTempArchiveStatus("");
+      const result = await archiveWorkingPlaque(layerId).catch(() => ({
+        ok: false,
+        reason: "persist"
+      }));
+      refreshTempLayersUi();
+      if (!result?.ok) {
+        setTempArchiveStatus("Не удалось убрать слой в архив.");
+        handleOpenTempArchive();
+        return;
+      }
+      handleOpenTempArchive();
+    },
+    [handleOpenTempArchive, refreshTempLayersUi]
+  );
+
+  const handleTempArchiveRestore = useCallback(
+    async (archiveId) => {
+      const result = await restoreArchivedPlaque(archiveId).catch(() => ({
+        ok: false,
+        reason: "persist"
+      }));
+      refreshTempLayersUi();
+      if (result?.reason === "group-conflict") {
+        setTempArchiveStatus(
+          "Такой слой уже есть во временных. Уберите его в архив или удалите, затем верните этот."
+        );
+        return;
+      }
+      if (!result?.ok) {
+        setTempArchiveStatus("Не удалось вернуть слой из архива.");
+        return;
+      }
+      setTempArchiveStatus("");
+    },
+    [refreshTempLayersUi]
+  );
+
+  const handleTempArchiveExport = useCallback(async (archiveId, format) => {
+    const result = await exportArchivedPlaque(archiveId, format).catch(() => ({
+      ok: false
+    }));
+    if (!result?.ok) {
+      setTempArchiveStatus("Не удалось экспортировать слой.");
+    }
+  }, []);
+
+  const handleTempArchiveDelete = useCallback(async (archiveId) => {
+    await deleteArchivedPlaque(archiveId).catch(() => {});
+  }, []);
+
+  const handleTempArchiveRename = useCallback(async (archiveId, title) => {
+    const result = await renameArchivedPlaque(archiveId, title).catch(() => ({
+      ok: false
+    }));
+    if (!result?.ok) {
+      setTempArchiveStatus("Не удалось переименовать слой.");
+    }
+  }, []);
+
+  const handleTempLayerRename = useCallback((layerId, title) => {
+    const result = setTempLayerLabel(layerId, title);
+    if (!result?.ok) {
+      return;
+    }
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
+  }, []);
+
+  const handleTempLayerColorChange = useCallback((layerId, color) => {
+    setTempLayerMarkerColor(layerId, color);
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
+    if (map.current) {
+      setTempLayersData(map.current);
+    }
+  }, []);
+
+  const handleTempLayerHeatmapChange = useCallback((layerId, enabled) => {
+    setTempLayerHeatmapEnabled(layerId, enabled);
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
+  }, []);
+
+  const handleTempLayersHeatmapAllChange = useCallback((enabled) => {
+    setAllTempLayersHeatmapEnabled(enabled);
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
+  }, []);
+
+  const handleTempLayersChange = useCallback(() => {
+    setTempLayersRevision((value) => value + 1);
+    if (map.current) {
+      setTempLayersData(map.current);
+    }
+    bumpPointsDataRevision();
+  }, [bumpPointsDataRevision]);
+
   const handleExternalLayerToggle = useCallback((layerId, enabled) => {
     setExternalLayersEnabled((prev) => {
       if (prev[layerId] === enabled) {
@@ -1167,8 +1523,25 @@ export default function MapView() {
     [expandGbifDataPanel]
   );
 
+  const yearBoundsSourcesRef = useRef({
+    includeLocal: true,
+    includeGbif: false,
+    includeInat: false,
+    includeMerged: false,
+    includeRedBook: false,
+    includeTemp: false
+  });
+  yearBoundsSourcesRef.current = {
+    includeLocal: localDataActive,
+    includeGbif: externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.GBIF],
+    includeInat: externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST],
+    includeMerged: mergedOnly,
+    includeRedBook: redbookOnly,
+    includeTemp: externalOnly
+  };
+
   const syncYearBounds = useCallback(() => {
-    const bounds = getYearBounds();
+    const bounds = getYearBounds(yearBoundsSourcesRef.current);
     const prevBounds = yearBoundsRef.current;
 
     setYearBounds(bounds);
@@ -1177,12 +1550,17 @@ export default function MapView() {
         prevRange.min === prevBounds.min && prevRange.max === prevBounds.max;
       const wasDegenerate = prevRange.min >= prevRange.max;
       if (wasFull || wasDegenerate) {
-        return bounds;
+        return prevRange.min === bounds.min && prevRange.max === bounds.max
+          ? prevRange
+          : bounds;
       }
 
       const min = Math.min(Math.max(prevRange.min, bounds.min), bounds.max);
       const max = Math.max(Math.min(prevRange.max, bounds.max), bounds.min);
-      return min <= max ? { min, max } : bounds;
+      const next = min <= max ? { min, max } : bounds;
+      return next.min === prevRange.min && next.max === prevRange.max
+        ? prevRange
+        : next;
     });
     setTimelineYear((prev) => Math.min(bounds.max, Math.max(bounds.min, prev)));
   }, []);
@@ -1264,7 +1642,8 @@ export default function MapView() {
   const polygonStateRef = useRef({});
   polygonStateRef.current = {
     polygonAddMode,
-    activeModule
+    activeModule,
+    polygonDockedWithFeature
   };
 
   const pointSelectionStateRef = useRef({});
@@ -1281,8 +1660,10 @@ export default function MapView() {
     polygonAddMode,
     arealDockedWithFeature,
     bufferDockedWithFeature,
+    polygonDockedWithFeature,
     activeModule,
-    ooptPointsFilterEnabled: Boolean(toolPointsFilterEnabled[MODULE_IDS.OOPT])
+    ooptPointsFilterEnabled: Boolean(toolPointsFilterEnabled[MODULE_IDS.OOPT]),
+    regionPointsFilterEnabled: selectedRegionIsos.length > 0
   };
 
   const submissionStateRef = useRef({});
@@ -1442,9 +1823,10 @@ export default function MapView() {
     () =>
       resolveToolPointsFilterModule(activeModule, {
         arealDockedWithFeature,
-        bufferDockedWithFeature
+        bufferDockedWithFeature,
+        polygonDockedWithFeature
       }),
-    [activeModule, arealDockedWithFeature, bufferDockedWithFeature]
+    [activeModule, arealDockedWithFeature, bufferDockedWithFeature, polygonDockedWithFeature]
   );
 
   const bufferFilterFeatures = useMemo(() => {
@@ -1476,6 +1858,47 @@ export default function MapView() {
     return visibleBuiltPolygons[0] ?? null;
   }, [speciesPolygons, activePolygonId, visibleBuiltPolygons]);
 
+  const hiddenRegionIsoSet = useMemo(() => new Set(hiddenRegionIsos), [hiddenRegionIsos]);
+
+  useEffect(() => {
+    selectedRegionIsosRef.current = selectedRegionIsos;
+  }, [selectedRegionIsos]);
+
+  useEffect(() => {
+    regionAddModeRef.current = regionAddMode;
+  }, [regionAddMode]);
+
+  useEffect(() => {
+    hiddenRegionIsosRef.current = hiddenRegionIsos;
+  }, [hiddenRegionIsos]);
+
+  useEffect(() => {
+    regionCatalogRef.current = regionCatalog;
+  }, [regionCatalog]);
+
+  const selectedRegionNames = useMemo(
+    () =>
+      selectedRegionIsos
+        .map((iso) => regionCatalog.find((entry) => entry.iso === iso)?.name)
+        .filter(Boolean),
+    [regionCatalog, selectedRegionIsos]
+  );
+
+  const selectedRegionFeatures = useMemo(
+    () =>
+      selectedRegionIsos
+        .map((iso) => regionCatalog.find((entry) => entry.iso === iso)?.feature)
+        .filter(Boolean),
+    [regionCatalog, selectedRegionIsos]
+  );
+
+  const regionWithinFeature = useMemo(
+    () => getRegionSelectionWithinFeature(selectedRegionFeatures, regionBufferKm),
+    [regionBufferKm, selectedRegionFeatures]
+  );
+
+  const regionPointsFilterActive = selectedRegionFeatures.length > 0;
+
   const activeToolWithinFeature = useMemo(() => {
     const mapInstance = mapReady ? map.current : null;
 
@@ -1494,7 +1917,9 @@ export default function MapView() {
       activePolygon,
       intersectionResult,
       areaGeometry,
-      selectedBoundsFeature
+      selectedBoundsFeature,
+      selectedRegionFeatures,
+      regionBufferKm
     });
   }, [
     activeToolFilterModule,
@@ -1511,6 +1936,8 @@ export default function MapView() {
     intersectionResult,
     areaGeometry,
     selectedBoundsFeature,
+    selectedRegionFeatures,
+    regionBufferKm,
     mapReady
   ]);
 
@@ -1584,7 +2011,11 @@ export default function MapView() {
       ids.push(PANEL_IDS.SEASONALITY);
     }
 
-    if (activeModule === MODULE_IDS.POLYGON && !isMin(PANEL_IDS.POLYGON)) {
+    if (
+      (activeModule === MODULE_IDS.POLYGON ||
+        (activeModule === MODULE_IDS.FEATURE && polygonDockedWithFeature)) &&
+      !isMin(PANEL_IDS.POLYGON)
+    ) {
       ids.push(PANEL_IDS.POLYGON);
     }
 
@@ -1606,6 +2037,10 @@ export default function MapView() {
 
     if (activeModule === MODULE_IDS.OOPT && !isMin(PANEL_IDS.OOPT)) {
       ids.push(PANEL_IDS.OOPT);
+    }
+
+    if (activeModule === MODULE_IDS.REGIONS && !isMin(PANEL_IDS.REGIONS)) {
+      ids.push(PANEL_IDS.REGIONS);
     }
 
     if (activeModule === MODULE_IDS.SUBMIT && !isMin(PANEL_IDS.SUBMIT)) {
@@ -1641,6 +2076,11 @@ export default function MapView() {
       ids.push(PANEL_IDS.DATA_SOURCES);
     }
 
+    if (tempArchivePanelOpen && !isMin(PANEL_IDS.TEMP_ARCHIVE)) {
+      ids.push(PANEL_IDS.TEMP_ARCHIVE);
+    }
+
+
     if (
       dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
       externalProcessingActive &&
@@ -1655,8 +2095,10 @@ export default function MapView() {
     arealDockedWithFeature,
     boundsSpeciesListOpen,
     bufferDockedWithFeature,
+    polygonDockedWithFeature,
     dataSourceMode,
     dataSourcesPanelOpen,
+    tempArchivePanelOpen,
     densePileSpeciesListOpen,
     denseProcessingActive,
     externalProcessingActive,
@@ -1737,6 +2179,61 @@ export default function MapView() {
     restorePanel(PANEL_IDS.DATA_SOURCES);
   }, [dataSourceMode, handleDataSourceModeChange, restorePanel]);
 
+  const handleRegionOpenDataLoad = useCallback(
+    (kind, includeBuffer = false) => {
+      const overlayActive = overlayRegionEdit.active;
+      const entries = overlayActive
+        ? overlayRegionEdit.isos.map((iso) => {
+            const catalogEntry = regionCatalog.find((item) => item.iso === iso);
+            const overlayFeature =
+              overlayRegionEdit.features.find((feature) => feature.properties?.iso === iso) ||
+              catalogEntry?.feature;
+            return (
+              catalogEntry || {
+                iso,
+                name: overlayFeature?.properties?.name || iso,
+                nameEn: overlayFeature?.properties?.name_en || "",
+                feature: overlayFeature
+              }
+            );
+          })
+        : selectedRegionIsos
+            .map((iso) => regionCatalog.find((item) => item.iso === iso))
+            .filter(Boolean);
+
+      const { matched, unmatched } = matchMapRegionsToExternal(entries);
+      const activeBufferKm = overlayActive ? overlayRegionBufferKm : regionBufferKm;
+      const spatialByRegionId = {};
+      if (includeBuffer && activeBufferKm > 0) {
+        matched.forEach(({ region, feature }) => {
+          spatialByRegionId[region.id] = applyBufferToExternalRegion(
+            region,
+            feature,
+            activeBufferKm
+          );
+        });
+      }
+
+      setDataSourcesFocusRequest({
+        kind,
+        regions: matched.map((item) => item.region),
+        spatialByRegionId:
+          Object.keys(spatialByRegionId).length > 0 ? spatialByRegionId : null,
+        unmatchedLabels: unmatched
+      });
+      handleOpenExternalLoadPanel();
+    },
+    [
+      handleOpenExternalLoadPanel,
+      overlayRegionBufferKm,
+      overlayRegionEdit,
+      regionBufferKm,
+      regionCatalog,
+      selectedRegionIsos
+    ]
+  );
+
+
   const handleDataSourcesPanelToggle = useCallback(() => {
     if (dataSourcesPanelOpen) {
       if (isExternalSourcesLoadActive()) {
@@ -1744,6 +2241,7 @@ export default function MapView() {
         return;
       }
       setDataSourcesPanelOpen(false);
+      setDataSourcesFocusRequest(null);
       setExternalProcessingActive(false);
       setPanelMinimized((prev) => ({
         ...prev,
@@ -1770,8 +2268,12 @@ export default function MapView() {
       return ooptWithinFeature;
     }
 
+    if (regionPointsFilterActive && regionWithinFeature) {
+      return regionWithinFeature;
+    }
+
     return null;
-  }, [ooptPointsFilterActive, ooptWithinFeature]);
+  }, [ooptPointsFilterActive, ooptWithinFeature, regionPointsFilterActive, regionWithinFeature]);
 
   const effectiveHiddenPointKeys = useMemo(() => {
     if (hiddenPointKeys.length === 0 && mergeHiddenKeys.length === 0) {
@@ -1813,6 +2315,10 @@ export default function MapView() {
       filters[HIDDEN_FEATURE_KEYS_FILTER_KEY] = effectiveHiddenPointKeys;
     }
 
+    if (hideMissingFoundYear) {
+      filters[REQUIRE_FOUND_YEAR_FILTER_KEY] = true;
+    }
+
     const speciesSearch = createSpeciesSearchFilter({
       query: speciesSearchQuery,
       nameLatin: speciesSearchSelectedLatin
@@ -1827,6 +2333,7 @@ export default function MapView() {
     boundsSpeciesRegnumFilter,
     effectiveWithinFeature,
     effectiveHiddenPointKeys,
+    hideMissingFoundYear,
     speciesSearchQuery,
     speciesSearchSelectedLatin
   ]);
@@ -1878,7 +2385,7 @@ export default function MapView() {
     void externalProcessingFilters;
     void dataSourceMode;
 
-    const piles = listDensePiles(getToolFeatures(locationFilters), {
+    const piles = listToolDensePiles(locationFilters, {
       minSize: densePileMinSize
     });
     const pileCount = piles.length;
@@ -1990,12 +2497,19 @@ export default function MapView() {
       animateCamera: false,
       notify: false
     });
+    expandTempDensePileByKey(map.current, key, {
+      coordinates,
+      pointCount,
+      animateCamera: false,
+      notify: false
+    });
 
     setSelectedDensePileKey(key);
 
     // Клик по плотной группе на карте открывает панель обработки, если она скрыта.
     setMarkersVisibleState(true);
     setDenseClustersHighlightState(true);
+    setDenseGroupsHidden(false);
     setDenseProcessingActive(true);
     setActiveModule(MODULE_IDS.MAP);
     expandDenseProcessingPanel();
@@ -2005,17 +2519,48 @@ export default function MapView() {
     setDensePileExpandedHandler(handleDensePileExpanded);
     setGbifDensePileExpandedHandler(handleDensePileExpanded);
     setInatDensePileExpandedHandler(handleDensePileExpanded);
+    setTempDensePileExpandedHandler(handleDensePileExpanded);
 
     return () => {
       setDensePileExpandedHandler(null);
       setGbifDensePileExpandedHandler(null);
       setInatDensePileExpandedHandler(null);
+      setTempDensePileExpandedHandler(null);
     };
   }, [handleDensePileExpanded]);
 
   const handleDensePileSelect = useCallback((pile) => {
     if (!map.current || !pile?.key) {
       return;
+    }
+
+    if (hiddenDensePileKeys.some((key) => String(key) === String(pile.key))) {
+      const next = hiddenDensePileKeys.filter((key) => String(key) !== String(pile.key));
+      setHiddenDensePileKeysState(next);
+      setHiddenDensePileKeys(next);
+    }
+
+    if (denseGroupsHidden) {
+      setDenseGroupsHidden(false);
+      setMarkersVisibleState(true);
+      setDenseClustersHighlightState(true);
+      const grouping = {
+        clusteringEnabled,
+        clusterByRegnum,
+        clusterPieCharts,
+        denseClustersHighlight: true
+      };
+      applyLocationsGroupingMode(map.current, grouping);
+      applyGbifGroupingMode(map.current, grouping);
+      applyInatGroupingMode(map.current, grouping);
+      applyMergedGroupingMode(map.current, grouping);
+      applyTempLayersGroupingMode(map.current, {
+        clusterByTempLayers,
+        clusterByTempSublayers,
+        clusterPieCharts,
+        clusteringEnabled,
+        denseClustersHighlight: true
+      });
     }
 
     expandDensePileByKey(map.current, pile.key, {
@@ -2036,7 +2581,21 @@ export default function MapView() {
       animateCamera: false,
       notify: false
     });
-  }, []);
+    expandTempDensePileByKey(map.current, pile.key, {
+      coordinates: pile.coordinates,
+      pointCount: pile.pointCount,
+      animateCamera: false,
+      notify: false
+    });
+  }, [
+    clusterByRegnum,
+    clusterByTempLayers,
+    clusterByTempSublayers,
+    clusterPieCharts,
+    clusteringEnabled,
+    denseGroupsHidden,
+    hiddenDensePileKeys
+  ]);
 
   const handleDensePileZoomBack = useCallback(() => {
     const previous = densePileCameraBeforeRef.current;
@@ -2047,10 +2606,39 @@ export default function MapView() {
       });
     }
 
+    if (map.current) {
+      collapseExpandedDensePiles(map.current);
+      collapseGbifExpandedDensePiles(map.current);
+      collapseInatExpandedDensePiles(map.current);
+      collapseTempExpandedDensePiles(map.current);
+    }
+
     densePileCameraBeforeRef.current = null;
     setSelectedDensePileKey(null);
     setDensePileSpeciesListOpen(false);
   }, []);
+
+  const handleToggleDensePileHidden = useCallback((pile) => {
+    if (!pile?.key) {
+      return;
+    }
+
+    const pileKey = String(pile.key);
+    const alreadyHidden = hiddenDensePileKeys.some((key) => String(key) === pileKey);
+    const next = alreadyHidden
+      ? hiddenDensePileKeys.filter((key) => String(key) !== pileKey)
+      : [...hiddenDensePileKeys, pileKey];
+
+    setHiddenDensePileKeysState(next);
+    setHiddenDensePileKeys(next);
+
+    if (
+      !alreadyHidden &&
+      String(selectedDensePileKeyRef.current) === pileKey
+    ) {
+      handleDensePileZoomBack();
+    }
+  }, [handleDensePileZoomBack, hiddenDensePileKeys]);
 
   const handleDensePileSpeciesListToggle = useCallback((pile) => {
     if (!pile?.key) {
@@ -2385,11 +2973,11 @@ export default function MapView() {
   }, [builtSpeciesPolygons, intersectionSpeciesA, intersectionSpeciesB]);
 
   useEffect(() => {
-    if (activeModule !== MODULE_IDS.POLYGON) {
+    if (!isPolygonToolActive(activeModule, polygonDockedWithFeature)) {
       setPolygonAddMode(false);
       clearIntersectionState();
     }
-  }, [activeModule, clearIntersectionState]);
+  }, [activeModule, clearIntersectionState, polygonDockedWithFeature]);
 
   useEffect(() => {
     if (activeModule !== MODULE_IDS.TIMELINE) {
@@ -3052,6 +3640,177 @@ export default function MapView() {
     if (!map.current || !mapReady) {
       return;
     }
+    setRegionBoundsEnabled(map.current, regionBoundsEnabled);
+    if (!overlayRegionEdit.active) {
+      applyRegionBoundsPaintSettings(map.current, regionBoundsSettings, regionFeatureColors);
+    } else {
+      const overlayEdit = getVisibleRegionOverlayEditState();
+      applyTempRegionOverlayPaint(map.current, {
+        settings: overlayEdit.style || regionBoundsSettings,
+        featureColors: overlayEdit.featureColors
+      });
+    }
+
+    const allVisible = hiddenRegionIsos.length === 0;
+    const visibleIsos = allVisible
+      ? null
+      : regionCatalog
+          .map((entry) => entry.iso)
+          .filter((iso) => !hiddenRegionIsoSet.has(iso));
+    applyRegionBoundsIsoFilter(map.current, visibleIsos);
+    setRegionBoundsSelectedIsos(map.current, selectedRegionIsos);
+  }, [
+    mapReady,
+    regionBoundsEnabled,
+    regionBoundsSettings,
+    regionFeatureColors,
+    hiddenRegionIsos,
+    hiddenRegionIsoSet,
+    regionCatalog,
+    selectedRegionIsos,
+    overlayRegionEdit
+  ]);
+
+  useEffect(() => {
+    if (overlayRegionEdit.active && !overlayRegionModeRef.current) {
+      setOverlayRegionBufferKm(overlayRegionEdit.bufferKm);
+      if (overlayRegionEdit.style) {
+        setRegionBoundsSettings(overlayRegionEdit.style);
+      }
+    } else if (!overlayRegionEdit.active && overlayRegionModeRef.current) {
+      setRegionBoundsSettings(loadRegionBoundsSettingsFromStorage());
+    }
+    overlayRegionModeRef.current = overlayRegionEdit.active;
+  }, [overlayRegionEdit.active, overlayRegionEdit.bufferKm, overlayRegionEdit.style]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    if (overlayRegionEdit.active) {
+      updateRegionSelectionBuffer(
+        map.current,
+        overlayRegionEdit.features,
+        overlayRegionBufferKm
+      );
+      return;
+    }
+
+    const features = regionBoundsEnabled
+      ? selectedRegionIsos
+          .map((iso) => regionCatalog.find((entry) => entry.iso === iso)?.feature)
+          .filter(Boolean)
+      : [];
+    updateRegionSelectionBuffer(map.current, features, regionBufferKm);
+  }, [
+    mapReady,
+    overlayRegionEdit,
+    overlayRegionBufferKm,
+    regionBoundsEnabled,
+    regionCatalog,
+    selectedRegionIsos,
+    regionBufferKm
+  ]);
+
+  useEffect(() => {
+    if (!mapReady) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    loadRegionBoundsGeoJSON()
+      .then((data) => {
+        if (!cancelled) {
+          setRegionCatalog(buildRegionCatalog(data));
+        }
+      })
+      .catch((error) => {
+        console.error("Не удалось загрузить каталог регионов", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mapReady]);
+
+  useEffect(() => {
+    if (!regionCatalog.length) {
+      return;
+    }
+    setRegionFeatureColors((current) => {
+      if (current && Object.keys(current).length > 0) {
+        return current;
+      }
+      return createSubtleRegionColorMap(
+        regionCatalog.map((entry) => entry.iso),
+        regionBoundsSettings.fillColor
+      );
+    });
+  }, [regionCatalog, regionBoundsSettings.fillColor]);
+
+  useEffect(() => {
+    setRegionBoundsSelectHandler((entry, lngLat) => {
+      if (!entry?.iso || !map.current) {
+        return;
+      }
+
+      setActiveModule(MODULE_IDS.REGIONS);
+      setRegionBoundsVisible(true);
+
+      const alreadySelected = selectedRegionIsosRef.current.includes(entry.iso);
+      const nextSelection = alreadySelected
+        ? selectedRegionIsosRef.current
+        : regionAddModeRef.current
+          ? [...selectedRegionIsosRef.current, entry.iso]
+          : [entry.iso];
+
+      selectedRegionIsosRef.current = nextSelection;
+      setSelectedRegionIsos(nextSelection);
+
+      showRegionActionPopup(map.current, {
+        title: entry.name,
+        lngLat,
+        selected: alreadySelected,
+        onAdd: () => {
+          regionAddModeRef.current = true;
+          setRegionAddMode(true);
+          if (hiddenRegionIsosRef.current.length > 0) {
+            hiddenRegionIsosRef.current = [];
+            setHiddenRegionIsos([]);
+          }
+          hideRegionActionPopup();
+        },
+        onRemove: () => {
+          const next = selectedRegionIsosRef.current.filter((iso) => iso !== entry.iso);
+          selectedRegionIsosRef.current = next;
+          setSelectedRegionIsos(next);
+          if (next.length === 0) {
+            regionAddModeRef.current = false;
+            setRegionAddMode(false);
+          }
+          hideRegionActionPopup();
+        },
+        onIsolate: () => {
+          const keep = new Set(selectedRegionIsosRef.current);
+          const hidden = regionCatalogRef.current
+            .map((item) => item.iso)
+            .filter((iso) => !keep.has(iso));
+          hiddenRegionIsosRef.current = hidden;
+          setHiddenRegionIsos(hidden);
+          regionAddModeRef.current = false;
+          setRegionAddMode(false);
+          hideRegionActionPopup();
+        }
+      });
+    });
+    return () => setRegionBoundsSelectHandler(null);
+  }, []);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
 
     if (basemapMode === BASEMAP_MODES.YANDEX) {
       setOsmBasemapEnabled(map.current, false);
@@ -3140,7 +3899,8 @@ export default function MapView() {
     }
   }, [popupData, mapReady]);
 
-  const handleExternalDataChange = useCallback(() => {
+  const handleExternalDataChange = useCallback((detail = {}) => {
+    const source = detail?.source;
     clearArealDynamicsSliceCache();
     syncYearBounds();
     bumpPointsDataRevision();
@@ -3149,8 +3909,15 @@ export default function MapView() {
       return;
     }
 
-    applyGbifLocationsFilter(map.current, locationFilters);
-    applyInatLocationsFilter(map.current, locationFilters);
+    if (!source || source === "gbif") {
+      applyGbifLocationsFilter(map.current, locationFilters);
+    }
+    if (!source || source === "inat") {
+      applyInatLocationsFilter(map.current, locationFilters);
+    }
+    if (source === "temp") {
+      setTempLayersData(map.current);
+    }
     updateHeatmapData(map.current, locationFilters);
     refreshAreal();
   }, [mapReady, locationFilters, refreshAreal, syncYearBounds, bumpPointsDataRevision]);
@@ -3172,6 +3939,7 @@ export default function MapView() {
       const showInat = externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST];
       setGbifVisibility(map.current, showGbif);
       setInatVisibility(map.current, showInat);
+      setTempLayersVisibility(map.current, externalOnly);
     }
 
     prevExternalOnlyRef.current = externalOnly;
@@ -3185,6 +3953,7 @@ export default function MapView() {
       includeMerged: mergedOnly,
       includeRedBook: redbookOnly
     });
+    refreshHeatmapSourceOptions(externalOnly);
 
     if (!map.current || !mapReady) {
       return;
@@ -3203,6 +3972,9 @@ export default function MapView() {
     refreshAreal();
     syncYearBounds();
     bumpPointsDataRevision();
+    // locationFilters нарочно не в зависимостях: иначе syncYearBounds даёт
+    // новый объект yearRange и сбрасывает debounce applyLocationsFilter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     localDataActive,
     externalOnly,
@@ -3213,10 +3985,10 @@ export default function MapView() {
     redBookPointsVisible,
     mapMarkersVisible,
     mapReady,
-    locationFilters,
     refreshAreal,
     syncYearBounds,
-    bumpPointsDataRevision
+    bumpPointsDataRevision,
+    tempLayersRevision
   ]);
 
   useEffect(() => {
@@ -3261,6 +4033,8 @@ export default function MapView() {
       }
     }
 
+    setTempLayersVisibility(map.current, externalOnly && mapMarkersVisible);
+
     setMergedVisibility(
       map.current,
       mergedOnly && mergedPointsVisible && mapMarkersVisible
@@ -3296,10 +4070,20 @@ export default function MapView() {
     applyLocationsGroupingMode(map.current, grouping);
     applyGbifGroupingMode(map.current, grouping);
     applyInatGroupingMode(map.current, grouping);
+    applyMergedGroupingMode(map.current, grouping);
+    applyTempLayersGroupingMode(map.current, {
+      clusterByTempLayers,
+      clusterByTempSublayers,
+      clusterPieCharts,
+      clusteringEnabled,
+      denseClustersHighlight
+    });
     refreshClusterPieChartMarkers(map.current);
   }, [
     clusteringEnabled,
     clusterByRegnum,
+    clusterByTempLayers,
+    clusterByTempSublayers,
     clusterPieCharts,
     denseClustersHighlight,
     mapReady
@@ -3320,6 +4104,7 @@ export default function MapView() {
 
   useEffect(() => {
     setDensePileMinSize(densePileMinSize);
+    setHiddenDensePileKeys(hiddenDensePileKeys);
     if (!map.current || !mapReady || !denseClustersHighlight) {
       return;
     }
@@ -3327,7 +4112,8 @@ export default function MapView() {
     refreshLocationsDensePiles(map.current);
     refreshGbifDensePiles(map.current);
     refreshInatDensePiles(map.current);
-  }, [densePileMinSize, denseClustersHighlight, mapReady]);
+    refreshTempLayersDensePiles(map.current);
+  }, [densePileMinSize, hiddenDensePileKeys, denseClustersHighlight, mapReady]);
 
   // После режимов кластеризации: иначе rebuild*Layers мог вернуть полную выборку.
   useEffect(() => {
@@ -3356,14 +4142,21 @@ export default function MapView() {
       if (!map.current) {
         return;
       }
-      // Heatmap строится по getToolFeatures; coords-only внутри слоя.
+      refreshHeatmapSourceOptions(externalOnly);
+      // Общая тепловая карта: в режиме временных слоёв — только они.
       setHeatmapEnabled(map.current, heatmapEnabled, locationFilters);
+      syncTempLayerHeatmaps(map.current, {
+        active: externalOnly,
+        filters: locationFilters,
+        layers: getTempLayers()
+      });
+      applyHeatmapPaintSettings(map.current, heatmapSettings);
     }, LOCATION_FILTERS_DEBOUNCE_MS);
 
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [heatmapEnabled, locationFilters]);
+  }, [heatmapEnabled, locationFilters, externalOnly, tempLayersRevision, heatmapSettings]);
 
   useEffect(() => {
     if (!mapReady || !map.current || !isFirebaseConfigured()) {
@@ -3468,6 +4261,21 @@ export default function MapView() {
       cancelled = true;
     };
   }, [activeModule, mapReady]);
+
+  useEffect(() => {
+    if (activeModule !== MODULE_IDS.REGIONS && selectedRegionIsos.length === 0) {
+      hideRegionActionPopup();
+    }
+  }, [activeModule, selectedRegionIsos.length]);
+
+  useEffect(() => {
+    if (!selectedRegionIso) {
+      return;
+    }
+    if (hiddenRegionIsoSet.has(selectedRegionIso)) {
+      setSelectedRegionIsos((current) => current.filter((iso) => !hiddenRegionIsoSet.has(iso)));
+    }
+  }, [hiddenRegionIsoSet, selectedRegionIso]);
 
   useEffect(() => {
     if (toolPointsFilterEnabled[MODULE_IDS.OOPT] && selectedBoundsFeature) {
@@ -3633,9 +4441,25 @@ export default function MapView() {
     setClusterByRegnumState(enabled);
   };
 
+  const handleClusterByTempLayersChange = (enabled) => {
+    if (enabled) {
+      setClusterPieChartsState(false);
+    }
+    setClusterByTempLayersState(enabled);
+  };
+
+  const handleClusterByTempSublayersChange = (enabled) => {
+    if (enabled) {
+      setClusterPieChartsState(false);
+      setClusterByTempLayersState(true);
+    }
+    setClusterByTempSublayersState(enabled);
+  };
+
   const handleClusterPieChartsChange = (enabled) => {
     if (enabled) {
       setClusterByRegnumState(false);
+      setClusterByTempLayersState(false);
     }
 
     setClusterPieChartsState(enabled);
@@ -3644,8 +4468,12 @@ export default function MapView() {
   const handleDenseClustersHighlightChange = (enabled) => {
     if (enabled) {
       setMarkersVisibleState(true);
+      setDenseGroupsHidden(false);
     } else {
       setDenseProcessingActive(false);
+      setDenseGroupsHidden(false);
+      setHiddenDensePileKeysState([]);
+      setHiddenDensePileKeys([]);
       setSelectedDensePileKey(null);
       setDensePileSpeciesListOpen(false);
       densePileCameraBeforeRef.current = null;
@@ -3654,10 +4482,34 @@ export default function MapView() {
     setDenseClustersHighlightState(enabled);
   };
 
+  const handleDenseGroupsHiddenToggle = useCallback(() => {
+    if (denseGroupsHidden) {
+      setDenseGroupsHidden(false);
+      setMarkersVisibleState(true);
+      setDenseClustersHighlightState(true);
+      return;
+    }
+
+    setDenseGroupsHidden(true);
+    setSelectedDensePileKey(null);
+    setDensePileSpeciesListOpen(false);
+    densePileCameraBeforeRef.current = null;
+    if (map.current) {
+      collapseExpandedDensePiles(map.current);
+      collapseGbifExpandedDensePiles(map.current);
+      collapseInatExpandedDensePiles(map.current);
+      collapseTempExpandedDensePiles(map.current);
+    }
+    setDenseClustersHighlightState(false);
+  }, [denseGroupsHidden]);
+
   const handleDenseProcessingOpen = useCallback(() => {
     stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DENSE);
     setMarkersVisibleState(true);
     setDenseClustersHighlightState(true);
+    setDenseGroupsHidden(false);
+    setHiddenDensePileKeysState([]);
+    setHiddenDensePileKeys([]);
     setDenseProcessingActive(true);
     setActiveModule(MODULE_IDS.MAP);
     expandDenseProcessingPanel();
@@ -3665,6 +4517,9 @@ export default function MapView() {
 
   const handleDenseProcessingClose = useCallback(() => {
     setDenseProcessingActive(false);
+    setDenseGroupsHidden(false);
+    setHiddenDensePileKeysState([]);
+    setHiddenDensePileKeys([]);
     setSelectedDensePileKey(null);
     setDensePileSpeciesListOpen(false);
     densePileCameraBeforeRef.current = null;
@@ -3679,6 +4534,8 @@ export default function MapView() {
         statusFilters,
         regnumFilters,
         yearFilterEnabled,
+        yearRange,
+        hideMissingFoundYear,
         toolPointsFilterEnabled,
         boundsSpeciesRegnumFilter,
         denseClustersHighlight,
@@ -3690,13 +4547,19 @@ export default function MapView() {
             query: speciesSearchQuery,
             nameLatin: speciesSearchSelectedLatin
           })
-        )
+        ),
+        speciesSearchQuery,
+        speciesSearchSelectedLatin,
+        selectedRegionNames,
+        regionBufferKm
       }),
     [
       propertyFilters,
       statusFilters,
       regnumFilters,
       yearFilterEnabled,
+      yearRange,
+      hideMissingFoundYear,
       toolPointsFilterEnabled,
       boundsSpeciesRegnumFilter,
       denseClustersHighlight,
@@ -3704,7 +4567,9 @@ export default function MapView() {
       externalProcessingFilters,
       hiddenPointKeys,
       speciesSearchQuery,
-      speciesSearchSelectedLatin
+      speciesSearchSelectedLatin,
+      selectedRegionNames,
+      regionBufferKm
     ]
   );
 
@@ -3713,8 +4578,17 @@ export default function MapView() {
     setStatusFilters([]);
     setRegnumFilters([]);
     setYearFilterEnabled(false);
+    setHideMissingFoundYear(false);
     setToolPointsFilterEnabled(createDefaultToolPointsFilterState());
     setOoptFilterBoundsFeature(null);
+    setSelectedRegionIsos([]);
+    selectedRegionIsosRef.current = [];
+    setHiddenRegionIsos([]);
+    hiddenRegionIsosRef.current = [];
+    setRegionBufferKm(0);
+    setRegionAddMode(false);
+    regionAddModeRef.current = false;
+    hideRegionActionPopup();
     setBoundsSpeciesRegnumFilter(null);
     setDenseClustersHighlightState(false);
     setDenseProcessingActive(false);
@@ -3728,6 +4602,234 @@ export default function MapView() {
     setSpeciesSearchSelectedLatin(null);
     expandPanel(PANEL_IDS.MAP);
   }, [expandPanel]);
+
+  const collectCurrentToolOverlays = useCallback(
+    (kinds) =>
+      collectMapToolOverlays({
+        kinds,
+        map: mapReady ? map.current : null,
+        baseFilters: baseLocationFilters,
+        visibleBuiltPolygons,
+        intersectionResult,
+        bufferEnabled,
+        bufferFeatures: bufferFilterFeatures,
+        bufferRadiiKm: bufferRadii,
+        arealEnabled,
+        arealAllMarkers,
+        arealRadius,
+        arealCenterFeature: popupData,
+        areaGeometry,
+        selectedRegionFeatures,
+        regionBufferKm
+      }),
+    [
+      arealAllMarkers,
+      arealEnabled,
+      arealRadius,
+      areaGeometry,
+      baseLocationFilters,
+      bufferEnabled,
+      bufferFilterFeatures,
+      bufferRadii,
+      intersectionResult,
+      mapReady,
+      popupData,
+      regionBufferKm,
+      selectedRegionFeatures,
+      visibleBuiltPolygons
+    ]
+  );
+
+  const commitTempLayerSnapshot = useCallback(
+    (result) => {
+      if (!result?.ok) {
+        return false;
+      }
+
+      handleMapFiltersReset();
+      handleArealReset();
+      handleBufferReset();
+      handleSpeciesPolygonResetAll();
+      handleAreaReset();
+      handleDataSourceModeChange(DATA_SOURCE_MODES.EXTERNAL);
+      setExternalLayersEnabled({
+        [EXTERNAL_LAYER_IDS.GBIF]: false,
+        [EXTERNAL_LAYER_IDS.INATURALIST]: false
+      });
+      persistTempLayers().catch(() => {});
+      setTempLayersRevision((value) => value + 1);
+      if (map.current) {
+        setTempLayersData(map.current);
+        setTempLayersVisibility(map.current, true);
+      }
+      bumpPointsDataRevision();
+      return true;
+    },
+    [
+      bumpPointsDataRevision,
+      handleAreaReset,
+      handleArealReset,
+      handleBufferReset,
+      handleDataSourceModeChange,
+      handleMapFiltersReset,
+      handleSpeciesPolygonResetAll
+    ]
+  );
+
+  const handleSaveFiltersToTempLayer = useCallback(() => {
+    if (activeMapFilters.length === 0) {
+      return false;
+    }
+
+    const result = createTempLayerFromFilterSnapshot({
+      features: getMapFilterSnapshotFeatures(locationFilters),
+      filters: activeMapFilters,
+      overlays: collectCurrentToolOverlays()
+    });
+    return commitTempLayerSnapshot(result);
+  }, [
+    activeMapFilters,
+    collectCurrentToolOverlays,
+    commitTempLayerSnapshot,
+    locationFilters
+  ]);
+
+  const handleSaveRegionSearchPointsToTempLayer = useCallback(
+    (explicitFeatures = null, explicitRegionIds = null) => {
+      const overlayActive = overlayRegionEdit.active;
+      const entries = overlayActive
+        ? overlayRegionEdit.isos.map((iso) => {
+            const catalogEntry = regionCatalog.find((item) => item.iso === iso);
+            const overlayFeature =
+              overlayRegionEdit.features.find((feature) => feature.properties?.iso === iso) ||
+              catalogEntry?.feature;
+            return (
+              catalogEntry || {
+                iso,
+                name: overlayFeature?.properties?.name || iso,
+                nameEn: overlayFeature?.properties?.name_en || "",
+                feature: overlayFeature
+              }
+            );
+          })
+        : selectedRegionIsos
+            .map((iso) => regionCatalog.find((item) => item.iso === iso))
+            .filter(Boolean);
+
+      const { matched } = matchMapRegionsToExternal(entries);
+      const regionIds = Array.isArray(explicitRegionIds)
+        ? explicitRegionIds.filter(Boolean).map(String)
+        : matched.map((item) => item.region.id);
+
+      let features = Array.isArray(explicitFeatures) ? explicitFeatures : null;
+      if (!features) {
+        features = [
+          ...getGbifFeaturesForRegionIds(regionIds),
+          ...getInatFeaturesForRegionIds(regionIds)
+        ];
+        if (!overlayActive) {
+          features = [...features, ...getMapFilterSnapshotFeatures(locationFilters)];
+        }
+      }
+
+      const overlays = overlayActive
+        ? []
+        : collectCurrentToolOverlays([TEMP_OVERLAY_KINDS.REGIONS]);
+      const label = overlayActive
+        ? overlayRegionEdit.isos
+            .map((iso) => {
+              const entry = regionCatalog.find((item) => item.iso === iso);
+              return entry?.name || iso;
+            })
+            .filter(Boolean)
+            .join(", ")
+        : selectedRegionNames.join(", ");
+
+      const result = saveFeaturesIntoRegionOverlayTempLayer({
+        features,
+        overlays,
+        regionIds,
+        label
+      });
+      return commitTempLayerSnapshot(result);
+    },
+    [
+      collectCurrentToolOverlays,
+      commitTempLayerSnapshot,
+      locationFilters,
+      overlayRegionEdit,
+      regionCatalog,
+      selectedRegionIsos,
+      selectedRegionNames
+    ]
+  );
+
+  const handleSaveToolGeometryToTempLayer = useCallback(
+    (kind) => {
+      const overlays = collectCurrentToolOverlays([kind]);
+      if (!overlays.length) {
+        return false;
+      }
+
+      const moduleByKind = {
+        [TEMP_OVERLAY_KINDS.POLYGON]: MODULE_IDS.POLYGON,
+        [TEMP_OVERLAY_KINDS.BUFFER]: MODULE_IDS.BUFFER,
+        [TEMP_OVERLAY_KINDS.AREAL]: MODULE_IDS.AREAL,
+        [TEMP_OVERLAY_KINDS.AREA]: MODULE_IDS.AREA
+      };
+      const within = getToolWithinFeature({
+        moduleId: moduleByKind[kind],
+        map: mapReady ? map.current : null,
+        baseFilters: baseLocationFilters,
+        arealEnabled,
+        arealAllMarkers,
+        arealRadius,
+        arealCenterFeature: popupData,
+        bufferEnabled,
+        bufferFeatures: bufferFilterFeatures,
+        bufferRadiiKm: bufferRadii,
+        visibleBuiltPolygons,
+        activePolygon,
+        intersectionResult,
+        areaGeometry
+      });
+      const snapshotFilters = { ...locationFilters };
+      if (within) {
+        snapshotFilters[WITHIN_FEATURE_FILTER_KEY] = within;
+      }
+
+      const overlayLabel = TEMP_OVERLAY_LABELS[kind];
+      const filters = activeMapFilters.some((entry) => entry.label === overlayLabel)
+        ? activeMapFilters
+        : [...activeMapFilters, { id: `overlay:${kind}`, label: overlayLabel }];
+
+      const result = createTempLayerFromFilterSnapshot({
+        features: getMapFilterSnapshotFeatures(snapshotFilters),
+        filters,
+        overlays
+      });
+      return commitTempLayerSnapshot(result);
+    },
+    [
+      activeMapFilters,
+      activePolygon,
+      arealAllMarkers,
+      arealEnabled,
+      arealRadius,
+      areaGeometry,
+      baseLocationFilters,
+      bufferEnabled,
+      bufferFilterFeatures,
+      bufferRadii,
+      collectCurrentToolOverlays,
+      commitTempLayerSnapshot,
+      intersectionResult,
+      locationFilters,
+      mapReady,
+      popupData,
+      visibleBuiltPolygons
+    ]
+  );
 
   const handleMapFilterClear = useCallback(
     (filterId) => {
@@ -3748,6 +4850,23 @@ export default function MapView() {
 
       if (filterId === MAP_FILTER_IDS.YEAR) {
         setYearFilterEnabled(false);
+        setHideMissingFoundYear(false);
+        return;
+      }
+
+      if (filterId === MAP_FILTER_IDS.REGION_BOUNDS) {
+        setToolPointsFilterEnabled((current) => ({
+          ...current,
+          [MODULE_IDS.REGIONS]: false
+        }));
+        setSelectedRegionIsos([]);
+        selectedRegionIsosRef.current = [];
+        setHiddenRegionIsos([]);
+        hiddenRegionIsosRef.current = [];
+        setRegionBufferKm(0);
+        setRegionAddMode(false);
+        regionAddModeRef.current = false;
+        hideRegionActionPopup();
         return;
       }
 
@@ -3776,6 +4895,9 @@ export default function MapView() {
 
       if (filterId === MAP_FILTER_IDS.DENSE) {
         setDenseProcessingActive(false);
+        setDenseGroupsHidden(false);
+        setHiddenDensePileKeysState([]);
+        setHiddenDensePileKeys([]);
         setSelectedDensePileKey(null);
         setDensePileSpeciesListOpen(false);
         densePileCameraBeforeRef.current = null;
@@ -3817,6 +4939,16 @@ export default function MapView() {
           ...current,
           [moduleId]: false
         }));
+        if (moduleId === MODULE_IDS.REGIONS) {
+          setSelectedRegionIsos([]);
+          selectedRegionIsosRef.current = [];
+          setHiddenRegionIsos([]);
+          hiddenRegionIsosRef.current = [];
+          setRegionBufferKm(0);
+          setRegionAddMode(false);
+          regionAddModeRef.current = false;
+          hideRegionActionPopup();
+        }
       }
     },
     [expandPanel]
@@ -3917,15 +5049,7 @@ export default function MapView() {
     }
   }, []);
 
-  const handleArealDynamicsBuildModeToggle = useCallback(() => {
-    setArealDynamicsBuildMode((mode) =>
-      mode === POLYGON_BUILD_MODES.ALL_POINTS
-        ? POLYGON_BUILD_MODES.CONVEX
-        : POLYGON_BUILD_MODES.ALL_POINTS
-    );
-  }, []);
-
-  const arealDynamicsPointCount = useMemo(() => {
+  const arealDynamicsUniquePointCount = useMemo(() => {
     if (!arealDynamicsFeature) {
       return 0;
     }
@@ -3933,8 +5057,20 @@ export default function MapView() {
     void pointsDataRevision;
     void dataSourceMode;
 
-    return getPointsForSpecies(arealDynamicsFeature).length;
+    return getUniqueCoordinateCountForSpecies(arealDynamicsFeature);
   }, [arealDynamicsFeature, pointsDataRevision, dataSourceMode]);
+
+  const handleArealDynamicsBuildModeToggle = useCallback(() => {
+    setArealDynamicsBuildMode((mode) => {
+      if (mode === POLYGON_BUILD_MODES.ALL_POINTS) {
+        return POLYGON_BUILD_MODES.CONVEX;
+      }
+      if (!canBuildAllPointsPolygon(arealDynamicsUniquePointCount)) {
+        return POLYGON_BUILD_MODES.CONVEX;
+      }
+      return POLYGON_BUILD_MODES.ALL_POINTS;
+    });
+  }, [arealDynamicsUniquePointCount]);
 
   const handleArealDynamicsYearSelect = useCallback((year) => {
     setTimelineYear(year);
@@ -3979,6 +5115,14 @@ export default function MapView() {
     applySpeciesPolygonBuild(popupData, POLYGON_BUILD_MODES.CONVEX);
   }, [popupData, applySpeciesPolygonBuild]);
 
+  const handleSpeciesPolygonBuildExtremePoints = useCallback(() => {
+    if (!popupData) {
+      return;
+    }
+
+    applySpeciesPolygonBuild(popupData, POLYGON_BUILD_MODES.EXTREME_POINTS);
+  }, [popupData, applySpeciesPolygonBuild]);
+
   const handleSpeciesPolygonBuildAllPoints = useCallback(() => {
     if (!popupData) {
       return;
@@ -3988,6 +5132,13 @@ export default function MapView() {
     const existing = speciesPolygons.find((entry) => entry.nameLatin === selectedSpecies);
     const isAllPointsActive =
       existing?.built && existing.mode === POLYGON_BUILD_MODES.ALL_POINTS;
+    const uniqueCount =
+      existing?.uniquePointCount ?? getUniqueCoordinateCountForSpecies(popupData);
+
+    if (!isAllPointsActive && !canBuildAllPointsPolygon(uniqueCount)) {
+      applySpeciesPolygonBuild(popupData, POLYGON_BUILD_MODES.EXTREME_POINTS);
+      return;
+    }
 
     applySpeciesPolygonBuild(
       popupData,
@@ -4154,6 +5305,34 @@ export default function MapView() {
     });
   }, [selectedBoundsFeature]);
 
+  const handleRegionSearchSelect = useCallback((entry) => {
+    if (!entry?.iso) {
+      return;
+    }
+
+    setRegionBoundsVisible(true);
+    setSelectedRegionIsos((current) =>
+      current.includes(entry.iso) ? current : [...current, entry.iso]
+    );
+    setHiddenRegionIsos((current) => current.filter((iso) => iso !== entry.iso));
+    if (map.current && entry.feature) {
+      flyToRegionBoundsFeature(map.current, entry.feature);
+    }
+  }, []);
+
+  const handleRegionSearchRemove = useCallback((iso) => {
+    if (!iso) {
+      return;
+    }
+    setSelectedRegionIsos((current) => current.filter((item) => item !== iso));
+  }, []);
+
+  const handleOverlayRegionBufferChange = useCallback((km) => {
+    setOverlayRegionBufferKm(km);
+    patchVisibleRegionOverlays({ bufferKm: km });
+    persistTempLayers().catch(() => {});
+  }, []);
+
   const handleBoundsSpeciesListToggle = useCallback(() => {
     setBoundsSpeciesListOpen((open) => {
       if (open) {
@@ -4216,6 +5395,7 @@ export default function MapView() {
       !state.polygonAddMode &&
       !state.arealDockedWithFeature &&
       !state.bufferDockedWithFeature &&
+      !state.polygonDockedWithFeature &&
       state.activeModule !== MODULE_IDS.FEATURE &&
       (!state.activeModule || state.activeModule === MODULE_IDS.POLYGON)
     ) {
@@ -4259,6 +5439,7 @@ export default function MapView() {
     });
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature(false);
+    setPolygonDockedWithFeature(false);
   }, []);
 
   const closePanel = useCallback(
@@ -4269,7 +5450,8 @@ export default function MapView() {
           unpinPanelsFromTaskbar([
             PANEL_IDS.FEATURE,
             PANEL_IDS.AREAL,
-            PANEL_IDS.BUFFER
+            PANEL_IDS.BUFFER,
+            PANEL_IDS.POLYGON
           ]);
           break;
         }
@@ -4291,6 +5473,17 @@ export default function MapView() {
           } else {
             setActiveModule((current) =>
               current === MODULE_IDS.BUFFER ? null : current
+            );
+          }
+          break;
+        }
+        case PANEL_IDS.POLYGON: {
+          unpinPanelsFromTaskbar([PANEL_IDS.POLYGON]);
+          if (polygonDockedWithFeature) {
+            setPolygonDockedWithFeature(false);
+          } else {
+            setActiveModule((current) =>
+              current === MODULE_IDS.POLYGON ? null : current
             );
           }
           break;
@@ -4317,6 +5510,7 @@ export default function MapView() {
             break;
           }
           setDataSourcesPanelOpen(false);
+          setDataSourcesFocusRequest(null);
           setExternalProcessingActive(false);
           setPanelMinimized((prev) => ({
             ...prev,
@@ -4334,6 +5528,11 @@ export default function MapView() {
         case PANEL_IDS.GBIF_PROCESSING: {
           setExternalProcessingActive(false);
           unpinPanelsFromTaskbar([PANEL_IDS.EXTERNAL_PROCESSING]);
+          break;
+        }
+        case PANEL_IDS.TEMP_ARCHIVE: {
+          setTempArchivePanelOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
           break;
         }
         case PANEL_IDS.DATA_WORK: {
@@ -4369,6 +5568,7 @@ export default function MapView() {
     [
       arealDockedWithFeature,
       bufferDockedWithFeature,
+      polygonDockedWithFeature,
       clearPointSelection,
       handleBoundsSpeciesListClose,
       handleCloseNearSpeciesMatches,
@@ -4518,6 +5718,7 @@ export default function MapView() {
         await initLocationsFromFirestore();
         await hydrateGbifStoreFromPersistence();
         await hydrateInatStoreFromPersistence();
+        await hydrateTempLayersFromPersistence();
         hydrateRedBookStoreFromPersistence();
 
         // Cleanup (HMR / размонтирование) мог уничтожить карту, пока ждали hydrate.
@@ -4595,10 +5796,10 @@ export default function MapView() {
               }
             }
 
-            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule, polygonDockedWithFeature: polygonDocked } =
               polygonStateRef.current;
 
-            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+            if (isPolygonToolActive(currentPolygonModule, polygonDocked) && addMode) {
               const nameLatin = feature.properties?.name_latin;
 
               setSpeciesPolygons((prev) =>
@@ -4648,6 +5849,16 @@ export default function MapView() {
               return;
             }
 
+            const regionHit = getRegionFeatureAtClick(map.current, event);
+            if (regionHit?.iso) {
+              setPopupData(null);
+              updateSelectedPointHighlight(map.current, null);
+              emitRegionBoundsSelect(regionHit, event.lngLat);
+              return;
+            }
+
+            hideRegionActionPopup();
+
             if (!pointSelectionStateRef.current.ooptPointsFilterEnabled) {
               setSelectedBoundsFeature(null);
             }
@@ -4658,12 +5869,14 @@ export default function MapView() {
           clusterPieChartsEnabled: DEFAULT_CLUSTER_PIE_CHARTS,
           markersVisible: DEFAULT_MARKERS_VISIBLE
         });
+        addRegionBoundsLayer(mapInstance);
         addBoundsLayers(mapInstance);
         addArealLayer(mapInstance);
         addSpeciesPolygonLayer(mapInstance); // слой экспериментального модуля «Полигон»
         addArealDynamicsLayer(mapInstance);
         addBufferLayer(mapInstance);
         addAreaSelectionLayer(mapInstance);
+        addTempLayerOverlaysLayer(mapInstance);
         addHeatmapLayer(mapInstance);
         addGbifLayer(mapInstance, {
           onPointClick: (feature) => {
@@ -4718,10 +5931,10 @@ export default function MapView() {
               }
             }
 
-            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule, polygonDockedWithFeature: polygonDocked } =
               polygonStateRef.current;
 
-            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+            if (isPolygonToolActive(currentPolygonModule, polygonDocked) && addMode) {
               const nameLatin = feature.properties?.name_latin;
 
               setSpeciesPolygons((prev) =>
@@ -4735,6 +5948,30 @@ export default function MapView() {
               setPolygonAddMode(false);
             }
 
+            setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
+          }
+        });
+        addTempLayersLayer(mapInstance, {
+          onPointClick: (feature) => {
+            if (isAreaDrawingActive()) {
+              return;
+            }
+
+            if (
+              submissionStateRef.current.active &&
+              submissionStateRef.current.pickingLocation
+            ) {
+              const coords = feature?.geometry?.coordinates;
+              if (coords) {
+                submissionStateRef.current.setCoordinates(coords);
+              }
+              return;
+            }
+
+            dismissArealPointHintOnPointClick(feature);
+            clearSharedPointPin(map.current);
+            setPopupData(feature);
+            updateSelectedPointHighlight(map.current, feature);
             setActiveModule((current) => current ?? MODULE_IDS.FEATURE);
           }
         });
@@ -4791,10 +6028,10 @@ export default function MapView() {
               }
             }
 
-            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule, polygonDockedWithFeature: polygonDocked } =
               polygonStateRef.current;
 
-            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+            if (isPolygonToolActive(currentPolygonModule, polygonDocked) && addMode) {
               const nameLatin = feature.properties?.name_latin;
 
               setSpeciesPolygons((prev) =>
@@ -4864,10 +6101,10 @@ export default function MapView() {
               }
             }
 
-            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule, polygonDockedWithFeature: polygonDocked } =
               polygonStateRef.current;
 
-            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+            if (isPolygonToolActive(currentPolygonModule, polygonDocked) && addMode) {
               const nameLatin = feature.properties?.name_latin;
 
               setSpeciesPolygons((prev) =>
@@ -4937,10 +6174,10 @@ export default function MapView() {
               }
             }
 
-            const { polygonAddMode: addMode, activeModule: currentPolygonModule } =
+            const { polygonAddMode: addMode, activeModule: currentPolygonModule, polygonDockedWithFeature: polygonDocked } =
               polygonStateRef.current;
 
-            if (currentPolygonModule === MODULE_IDS.POLYGON && addMode) {
+            if (isPolygonToolActive(currentPolygonModule, polygonDocked) && addMode) {
               const nameLatin = feature.properties?.name_latin;
 
               setSpeciesPolygons((prev) =>
@@ -5051,6 +6288,7 @@ export default function MapView() {
     (activeModule !== null && activeModule !== MODULE_IDS.TIMELINE) ||
     (showOoptFeaturePanel && activeModule !== MODULE_IDS.TIMELINE) ||
     dataSourcesPanelOpen ||
+    tempArchivePanelOpen ||
     dataSourceMode === DATA_SOURCE_MODES.EXTERNAL ||
     denseProcessingActive;
 
@@ -5068,6 +6306,8 @@ export default function MapView() {
         onDataSourceModeChange={handleDataSourceModeChange}
         dataSourcesPanelOpen={dataSourcesPanelOpen}
         onDataSourcesPanelToggle={handleDataSourcesPanelToggle}
+        tempArchivePanelOpen={tempArchivePanelOpen}
+        onTempArchivePanelToggle={handleTempArchivePanelToggle}
       />
       <div
         ref={ref}
@@ -5090,6 +6330,19 @@ export default function MapView() {
       <BasemapPicker basemapMode={basemapMode} onBasemapModeChange={setBasemapMode} />
       {showModulePanelStack && (
         <div className="module-panel-stack">
+          {tempArchivePanelOpen && !isPanelMinimized(PANEL_IDS.TEMP_ARCHIVE) && (
+            <TempLayerArchivePanel
+              collapsed={isPanelCollapsed(PANEL_IDS.TEMP_ARCHIVE)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.TEMP_ARCHIVE)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.TEMP_ARCHIVE)}
+              onClose={handleClosePanel(PANEL_IDS.TEMP_ARCHIVE)}
+              onRestore={handleTempArchiveRestore}
+              onExport={handleTempArchiveExport}
+              onDelete={handleTempArchiveDelete}
+              onRename={handleTempArchiveRename}
+              statusMessage={tempArchiveStatus}
+            />
+          )}
           {denseProcessingExclusive ? (
             <>
               {activeModule === MODULE_IDS.FEATURE &&
@@ -5113,6 +6366,8 @@ export default function MapView() {
                   bufferDockedOpen={bufferDockedWithFeature}
                   bufferDisabled={isArealApplied}
                   bufferDisabledTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
+                  onOpenPolygon={handleOpenPolygonFromFeature}
+                  polygonDockedOpen={polygonDockedWithFeature}
                   onLookupRussianName={handleLookupRussianName}
                   onApplyRussianName={handleApplyRussianName}
                   onClearRussianName={handleClearRussianName}
@@ -5126,6 +6381,8 @@ export default function MapView() {
                 selectedPileKey={selectedDensePileKey}
                 canZoomBack={Boolean(selectedDensePileKey)}
                 speciesListOpen={densePileSpeciesListOpen}
+                groupsHidden={denseGroupsHidden}
+                hiddenPileKeys={hiddenDensePileKeys}
                 minPileSize={densePileMinSize}
                 onMinPileSizeChange={(value) => {
                   setDensePileMinSizeState(setDensePileMinSize(value));
@@ -5133,6 +6390,8 @@ export default function MapView() {
                 onSelectPile={handleDensePileSelect}
                 onZoomBack={handleDensePileZoomBack}
                 onToggleSpeciesList={handleDensePileSpeciesListToggle}
+                onTogglePileHidden={handleToggleDensePileHidden}
+                onToggleGroupsHidden={handleDenseGroupsHiddenToggle}
                 onClose={handleDenseProcessingClose}
                 collapsed={isPanelCollapsed(PANEL_IDS.DENSE)}
                 onCollapsedChange={handleDensePanelCollapsedChange}
@@ -5163,6 +6422,8 @@ export default function MapView() {
               bufferDockedOpen={bufferDockedWithFeature}
               bufferDisabled={isArealApplied}
               bufferDisabledTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
+              onOpenPolygon={handleOpenPolygonFromFeature}
+              polygonDockedOpen={polygonDockedWithFeature}
               onLookupRussianName={handleLookupRussianName}
               onApplyRussianName={handleApplyRussianName}
               onClearRussianName={handleClearRussianName}
@@ -5183,6 +6444,10 @@ export default function MapView() {
               toolBlockedTitle={AREAL_BLOCKED_BY_BUFFER_TITLE}
               onRadiusChange={setArealRadius}
               onReset={handleArealReset}
+              onSaveToTempLayer={() =>
+                handleSaveToolGeometryToTempLayer(TEMP_OVERLAY_KINDS.AREAL)
+              }
+              canSaveToTempLayer={arealEnabled || arealAllMarkers}
               collapsed={isPanelCollapsed(PANEL_IDS.AREAL)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.AREAL)}
               onMinimize={handleMinimizePanel(PANEL_IDS.AREAL)}
@@ -5206,10 +6471,17 @@ export default function MapView() {
               onMarkersVisibleChange={setMarkersVisibleState}
               heatmapEnabled={heatmapEnabled}
               onHeatmapEnabledChange={setHeatmapEnabledState}
+              heatmapTempLayersOnly={externalOnly}
+              onHeatmapSettingsOpen={() => setHeatmapSettingsOpen(true)}
               clusteringEnabled={clusteringEnabled}
               onClusteringEnabledChange={handleClusteringEnabledChange}
               clusterByRegnum={clusterByRegnum}
               onClusterByRegnumChange={handleClusterByRegnumChange}
+              clusterByTempLayers={clusterByTempLayers}
+              onClusterByTempLayersChange={handleClusterByTempLayersChange}
+              clusterByTempSublayers={clusterByTempSublayers}
+              onClusterByTempSublayersChange={handleClusterByTempSublayersChange}
+              hasTempLayers={getTempLayers().length > 0}
               clusterPieCharts={clusterPieCharts}
               onClusterPieChartsChange={handleClusterPieChartsChange}
               denseClustersHighlight={denseClustersHighlight}
@@ -5238,6 +6510,8 @@ export default function MapView() {
             <YearFilterPanel
               enabled={yearFilterEnabled}
               onEnabledChange={setYearFilterEnabled}
+              hideMissingYear={hideMissingFoundYear}
+              onHideMissingYearChange={setHideMissingFoundYear}
               yearBounds={yearBounds}
               range={yearRange}
               onRangeChange={handleYearRangeChange}
@@ -5261,7 +6535,8 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.SEASONALITY)}
             />
           )}
-          {activeModule === MODULE_IDS.POLYGON &&
+          {(activeModule === MODULE_IDS.POLYGON ||
+            (activeModule === MODULE_IDS.FEATURE && polygonDockedWithFeature)) &&
             !isPanelMinimized(PANEL_IDS.POLYGON) && (
             <SpeciesPolygonPopup
               feature={popupData}
@@ -5270,8 +6545,13 @@ export default function MapView() {
               addMode={polygonAddMode}
               containedSpecies={speciesPolygonContainedSpecies}
               onBuild={handleSpeciesPolygonBuild}
+              onBuildExtremePoints={handleSpeciesPolygonBuildExtremePoints}
               onBuildAllPoints={handleSpeciesPolygonBuildAllPoints}
               onResetAll={handleSpeciesPolygonResetAll}
+              onSaveToTempLayer={() =>
+                handleSaveToolGeometryToTempLayer(TEMP_OVERLAY_KINDS.POLYGON)
+              }
+              canSaveToTempLayer={visibleBuiltPolygons.length > 0}
               onResetOne={handleSpeciesPolygonResetOne}
               onToggleHidden={handleSpeciesPolygonToggleHidden}
               onToggleBuildMode={handleSpeciesPolygonToggleBuildMode}
@@ -5309,6 +6589,12 @@ export default function MapView() {
               onSelectionModeChange={handleBufferSelectionModeChange}
               onRadiusChange={handleBufferRadiusChange}
               onReset={handleBufferReset}
+              onSaveToTempLayer={() =>
+                handleSaveToolGeometryToTempLayer(TEMP_OVERLAY_KINDS.BUFFER)
+              }
+              canSaveToTempLayer={
+                bufferEnabled && bufferFilterFeatures.length > 0
+              }
               toolBlocked={isArealApplied}
               toolBlockedTitle={BUFFER_BLOCKED_BY_AREAL_TITLE}
               collapsed={isPanelCollapsed(PANEL_IDS.BUFFER)}
@@ -5329,6 +6615,10 @@ export default function MapView() {
               containedPoints={areaContainedPoints}
               onPointSelect={handleAreaPointSelect}
               onReset={handleAreaReset}
+              onSaveToTempLayer={() =>
+                handleSaveToolGeometryToTempLayer(TEMP_OVERLAY_KINDS.AREA)
+              }
+              canSaveToTempLayer={Boolean(areaGeometry)}
               collapsed={isPanelCollapsed(PANEL_IDS.AREA)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.AREA)}
               onMinimize={handleMinimizePanel(PANEL_IDS.AREA)}
@@ -5420,6 +6710,39 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.OOPT)}
             />
           )}
+          {activeModule === MODULE_IDS.REGIONS &&
+            !isPanelMinimized(PANEL_IDS.REGIONS) && (
+            <RegionPanel
+              layerEnabled={regionBoundsEnabled}
+              onLayerEnabledChange={setRegionBoundsVisible}
+              settings={regionBoundsSettings}
+              onSettingsChange={handleRegionBoundsSettingsChange}
+              onRandomizeColors={handleRegionBoundsRandomizeColors}
+              onClearFeatureColors={handleRegionBoundsClearFeatureColors}
+              catalog={regionCatalog}
+              hiddenIsoSet={hiddenRegionIsoSet}
+              selectedNames={selectedRegionNames}
+              selectedIsos={selectedRegionIsos}
+              onSearchSelect={handleRegionSearchSelect}
+              onSearchRemove={handleRegionSearchRemove}
+              bufferKm={overlayRegionEdit.active ? overlayRegionBufferKm : regionBufferKm}
+              onBufferKmChange={
+                overlayRegionEdit.active ? handleOverlayRegionBufferChange : setRegionBufferKm
+              }
+              overlayMode={overlayRegionEdit.active}
+              overlayCount={overlayRegionEdit.isos.length}
+              onLoadSelectedRegions={(includeBuffer) =>
+                handleRegionOpenDataLoad("regions", includeBuffer)
+              }
+              onSelectiveSearch={(includeBuffer) =>
+                handleRegionOpenDataLoad("selective", includeBuffer)
+              }
+              collapsed={isPanelCollapsed(PANEL_IDS.REGIONS)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.REGIONS)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.REGIONS)}
+              onClose={handleClosePanel(PANEL_IDS.REGIONS)}
+            />
+          )}
           {showOoptFeaturePanel && !isPanelMinimized(PANEL_IDS.OOPT_FEATURE) ? (
             <OoptFeaturePanel
               layerDefinition={selectedBoundsFeature.definition}
@@ -5470,6 +6793,10 @@ export default function MapView() {
                     hiddenRegionIds
                   }))
                 }
+                onTempLayersChange={handleTempLayersChange}
+                onSaveToRegionTempLayer={handleSaveRegionSearchPointsToTempLayer}
+                focusRequest={dataSourcesFocusRequest}
+                onClearFocusRequest={() => setDataSourcesFocusRequest(null)}
               />
             )}
           {dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
@@ -5510,7 +6837,7 @@ export default function MapView() {
           computing={arealDynamicsComputing}
           buildMode={arealDynamicsBuildMode}
           onBuildModeToggle={handleArealDynamicsBuildModeToggle}
-          canToggleAllPoints={arealDynamicsPointCount >= 3}
+          canToggleAllPoints={canBuildAllPointsPolygon(arealDynamicsUniquePointCount)}
         />
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
@@ -5585,17 +6912,34 @@ export default function MapView() {
         bottomOccupyPx={timelineBottomOccupyPx}
         onOpenPanel={handleOpenExternalLoadPanel}
       />
+      <MapZoomControl map={mapReady ? map.current : null} />
       <MapCornerControls
         activeFilters={activeMapFilters}
         onFiltersReset={handleMapFiltersReset}
         onFilterClear={handleMapFilterClear}
+        onSaveFiltersToTempLayer={handleSaveFiltersToTempLayer}
         externalLayersVisible={externalOnly}
         externalLayersEnabled={externalLayersEnabled}
         externalLayersDataRevision={pointsDataRevision}
         onExternalLayerToggle={handleExternalLayerToggle}
         onExternalLayerRequestLoad={handleExternalLayerRequestLoad}
+        tempLayersDataRevision={tempLayersRevision}
+        onTempLayerToggle={handleTempLayerToggle}
+        onTempLayerDelete={handleTempLayerDelete}
+        onTempLayerArchive={handleTempLayerArchive}
+        onOpenTempArchive={handleOpenTempArchive}
+        onTempLayerRename={handleTempLayerRename}
+        onTempLayerColorChange={handleTempLayerColorChange}
+        onTempLayerHeatmapChange={handleTempLayerHeatmapChange}
+        onTempLayersHeatmapAllChange={handleTempLayersHeatmapAllChange}
         regnumFilters={regnumFilters}
         onRegnumFilterChange={handleRegnumFilterChange}
+      />
+      <HeatmapSettingsPanel
+        open={heatmapSettingsOpen}
+        settings={heatmapSettings}
+        onSettingsChange={handleHeatmapSettingsChange}
+        onClose={() => setHeatmapSettingsOpen(false)}
       />
     </>
   );

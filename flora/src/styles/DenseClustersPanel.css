@@ -287,11 +287,12 @@
 
 .dense-clusters-panel-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .dense-clusters-panel-actions .dense-clusters-panel-btn {
-  flex: 1;
+  flex: 1 1 calc(50% - 4px);
 }
 
 .dense-clusters-panel-list-wrap {
@@ -376,6 +377,20 @@
   gap: 2px;
   flex-shrink: 0;
   margin-right: auto;
+}
+
+.dense-clusters-panel-list-row--hidden {
+  opacity: 0.55;
+}
+
+.dense-clusters-panel-list-hide-btn {
+  flex-shrink: 0;
+}
+
+.dense-clusters-panel-icon-btn--hidden {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.18);
+  color: #666;
 }
 
 .dense-clusters-panel-list-meta {

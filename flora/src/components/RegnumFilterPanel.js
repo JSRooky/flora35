@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
+import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import { REGNUM_ORDER, getRegnumLabel } from "./featurePropertyLabels";
 import { getPointColorForRegnum } from "./pointColors";
@@ -60,9 +61,9 @@ export default function RegnumFilterPanel({
 
       {!collapsed && (
         <div className="regnum-filter-panel-content">
-          <p className="regnum-filter-hint">
+          <PanelHint>
             Отметьте одно или несколько царств. Без отметок показываются все точки.
-          </p>
+          </PanelHint>
           <div className="regnum-filter-list">
             {REGNUM_FILTER_OPTIONS.map(({ code, label }) => {
               const color = getPointColorForRegnum(code || null);

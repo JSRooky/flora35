@@ -249,11 +249,14 @@
 
 .areal-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   padding-top: 10px;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+.areal-save-temp-btn,
 .areal-reset-btn {
   padding: 5px 12px;
   border-radius: 5px;
@@ -267,11 +270,13 @@
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
+.areal-save-temp-btn:hover:not(:disabled),
 .areal-reset-btn:hover:not(:disabled) {
   background: #f5f5f5;
   border-color: #999;
 }
 
+.areal-save-temp-btn:disabled,
 .areal-reset-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;

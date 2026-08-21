@@ -3,6 +3,7 @@ import { DATA_WORK_TOOLS } from "../dataWork/dataWorkTools";
 import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
+import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import "../styles/DataWorkPanel.css";
 
@@ -57,9 +58,9 @@ export default function DataWorkPanel({
         <p className="data-work-panel-summary">список инструментов</p>
       ) : (
         <div className="data-work-panel-content">
-          <p className="data-work-panel-note">
+          <PanelHint>
             Выберите инструмент — он откроется в отдельном окне.
-          </p>
+          </PanelHint>
 
           <ul className="data-work-tool-list">
             {DATA_WORK_TOOLS.map((tool) => {

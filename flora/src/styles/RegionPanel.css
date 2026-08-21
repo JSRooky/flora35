@@ -1,0 +1,255 @@
+.region-panel {
+  box-sizing: border-box;
+  width: 380px;
+  max-width: calc(100vw - 40px);
+  overflow: visible;
+  background-color: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 12px 16px;
+  font-family: Arial, sans-serif;
+  animation: regionPanelSlideIn 0.3s ease-out;
+}
+
+@keyframes regionPanelSlideIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.region-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.region-panel-title {
+  margin: 0;
+  font-size: 15px;
+  color: #333;
+  border-bottom: 2px solid var(--map-tool-accent);
+  padding-bottom: 6px;
+  flex: 1;
+}
+
+.region-panel--collapsed .region-panel-title {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.region-panel-summary,
+.region-panel-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.region-panel-content {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(70vh, 640px);
+}
+
+.region-panel-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.region-panel-switch--disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.region-panel-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.region-panel-switch-slider {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: #ccc;
+  transition: background 0.15s ease;
+}
+
+.region-panel-switch-slider::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+
+.region-panel-switch input:checked + .region-panel-switch-slider {
+  background: var(--map-tool-accent);
+}
+
+.region-panel-switch input:checked + .region-panel-switch-slider::after {
+  transform: translateX(14px);
+}
+
+.region-panel-search {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.region-panel-search-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.region-panel-search input {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.region-panel-search input:focus {
+  outline: 2px solid rgba(42, 157, 143, 0.35);
+  border-color: var(--map-tool-accent, #2a9d8f);
+}
+
+.region-panel-search input:disabled {
+  opacity: 0.55;
+}
+
+.region-panel-search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.region-panel-search-result {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.region-panel-search-result:hover,
+.region-panel-search-result--selected {
+  background: rgba(42, 157, 143, 0.12);
+}
+
+.region-panel-search-result-name {
+  display: block;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #222;
+}
+
+.region-panel-search-result-meta {
+  display: block;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.region-panel-found-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.region-panel-found-item .region-panel-search-result {
+  flex: 1;
+  min-width: 0;
+}
+
+.region-panel-found-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.region-panel-found-remove:hover {
+  background: rgba(185, 28, 28, 0.1);
+  color: #b91c1c;
+}
+
+.region-panel-found-remove-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.region-panel-section-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #6b7280;
+}
+
+.region-panel-buffer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.region-panel-buffer--disabled {
+  opacity: 0.5;
+}
+
+.region-panel-load-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.region-panel-switch--disabled {
+  opacity: 0.5;
+}
+
+.region-panel .heatmap-settings-actions {
+  margin-top: 2px;
+}
+
+.region-panel .heatmap-settings-reset:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

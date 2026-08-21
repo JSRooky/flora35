@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { EXTERNAL_REGIONS, getExternalRegionById } from "../externalSources/regions";
 import { normalizeHiddenRegionIds } from "../externalSources/regionVisibility";
+import PanelHint from "./PanelHint";
 import "../styles/RegionsLoadPopup.css";
 import "../styles/GbifPanel.css";
 
@@ -83,10 +84,10 @@ export default function RegionsFilterPopup({
           ×
         </button>
         <h3 className="regions-load-title">Фильтр регионов</h3>
-        <p className="regions-load-hint">
+        <PanelHint>
           Снимите галочку, чтобы скрыть точки региона на карте. Данные в локальной
           копии не удаляются.
-        </p>
+        </PanelHint>
 
         {rows.length === 0 ? (
           <p className="regions-load-hint">Нет загруженных регионов.</p>
