@@ -21,7 +21,7 @@ const EMPTY_COLLECTION = {
 /**
  * Оставляет на карте только выбранную точку: остальные слои очищаются,
  * точка рисуется на отдельном preview-маркере.
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {{ feature?: object, coordinates?: number[] }|null|undefined} row
  */
 export function isolateUnattributedPointOnMap(map, row) {
@@ -40,7 +40,7 @@ export function isolateUnattributedPointOnMap(map, row) {
 
 /**
  * Возвращает слои точек к состоянию по текущим фильтрам.
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {object} [locationFilters]
  */
 export function restoreUnattributedMapLayers(map, locationFilters = {}) {

@@ -2,7 +2,7 @@
  * Приближает карту так, чтобы были видны обе точки [lng, lat].
  * При совпадении координат — easeTo к точке.
  *
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {number[]} leftCoordinates
  * @param {number[]} rightCoordinates
  * @param {{ padding?: number, maxZoom?: number, duration?: number }} [options]

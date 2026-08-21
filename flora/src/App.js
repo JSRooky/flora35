@@ -373,7 +373,7 @@ function isPanelExpandedInState(collapsedState, panelId) {
   return collapsedState[panelId] !== true;
 }
 
-/** Корневой компонент карты: состояние всех инструментов/фильтров/слоёв и инициализация Mapbox. */
+/** Корневой компонент карты: состояние всех инструментов/фильтров/слоёв и инициализация MapLibre. */
 export default function MapView() {
   const ref = useRef(null);
   const map = useRef(null);
@@ -5666,12 +5666,19 @@ export default function MapView() {
     });
   }, [mapReady, dataSourceMode, handleDataSourceModeChange]);
 
-  // Инициализация карты Mapbox и всех слоёв/обработчиков — выполняется один раз при монтировании.
+  // Инициализация карты MapLibre и всех слоёв/обработчиков — выполняется один раз при монтировании.
   useEffect(() => {
-    if (!map.current && ref.current) {
-      map.current = initMap(ref.current);
+    let cancelled = false;
 
-      map.current.on("load", async () => {
+    if (!map.current && ref.current) {
+      initMap(ref.current)
+        .then((instance) => {
+          if (cancelled) {
+            instance.remove();
+            return;
+          }
+          map.current = instance;
+          instance.on("load", async () => {
         const mapInstance = map.current;
         if (!mapInstance) {
           return;
@@ -6163,9 +6170,16 @@ export default function MapView() {
 
         setMapReady(true);
       });
+        })
+        .catch((error) => {
+          if (!cancelled) {
+            console.error(error);
+          }
+        });
     }
 
     return () => {
+      cancelled = true;
       setMapReady(false);
       arealRefreshScheduledRef.current = false;
       clearBoundsLayerCache();

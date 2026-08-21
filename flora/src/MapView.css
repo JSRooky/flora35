@@ -1,4 +1,4 @@
-.map-container {
+﻿.map-container {
   width: 100%;
   height: 100vh;
   position: relative;
@@ -6,7 +6,7 @@
 }
 
 /* Логотип Mapbox — только при использовании карт Mapbox. */
-.map-container--alt-basemap .mapboxgl-ctrl-logo {
+.map-container--alt-basemap .maplibregl-ctrl-logo {
   display: none !important;
 }
 
@@ -57,7 +57,7 @@
 
 
 /* Перемещаем атрибуцию внутрь карты */
-.mapboxgl-ctrl-attrib {
+.maplibregl-ctrl-attrib {
   position: absolute !important;
   bottom: 16px;        /* чуть выше, чтобы не упираться в край */
   right: 16px;         /* немного левее */
@@ -73,11 +73,11 @@
   white-space: nowrap;
 }
 
-.mapboxgl-ctrl-attrib-inner {
+.maplibregl-ctrl-attrib-inner {
   white-space: nowrap;
 }
 
-.point-hover-tooltip.mapboxgl-popup {
+.point-hover-tooltip.maplibregl-popup {
   max-width: 240px;
   z-index: 1001;
   opacity: 0;
@@ -89,7 +89,7 @@
   opacity: 1;
 }
 
-.point-hover-tooltip .mapboxgl-popup-content {
+.point-hover-tooltip .maplibregl-popup-content {
   padding: 6px 10px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.92);
@@ -99,7 +99,7 @@
   line-height: 1.35;
 }
 
-.point-hover-tooltip .mapboxgl-popup-tip {
+.point-hover-tooltip .maplibregl-popup-tip {
   border-top-color: rgba(255, 255, 255, 0.92);
 }
 
@@ -118,7 +118,7 @@
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
 }
 
-.point-hover-tooltip.mapboxgl-popup:has(.cluster-tooltip-title) {
+.point-hover-tooltip.maplibregl-popup:has(.cluster-tooltip-title) {
   max-width: 280px;
 }
 
@@ -176,13 +176,13 @@
   font-style: italic;
 }
 
-.areal-point-hint.mapboxgl-popup {
+.areal-point-hint.maplibregl-popup {
   max-width: 220px;
   z-index: 1001;
   pointer-events: none;
 }
 
-.areal-point-hint .mapboxgl-popup-content {
+.areal-point-hint .maplibregl-popup-content {
   padding: 6px 10px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.92);
@@ -192,7 +192,7 @@
   line-height: 1.35;
 }
 
-.areal-point-hint .mapboxgl-popup-tip {
+.areal-point-hint .maplibregl-popup-tip {
   border-top-color: rgba(255, 255, 255, 0.92);
 }
 
@@ -202,12 +202,12 @@
   font-weight: 600;
 }
 
-.bounds-feature-popup.mapboxgl-popup {
+.bounds-feature-popup.maplibregl-popup {
   max-width: 320px;
   z-index: 1002;
 }
 
-.bounds-feature-popup .mapboxgl-popup-content {
+.bounds-feature-popup .maplibregl-popup-content {
   padding: 10px 12px 12px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
@@ -217,11 +217,11 @@
   line-height: 1.35;
 }
 
-.bounds-feature-popup .mapboxgl-popup-tip {
+.bounds-feature-popup .maplibregl-popup-tip {
   border-top-color: rgba(255, 255, 255, 0.96);
 }
 
-.bounds-feature-popup .mapboxgl-popup-close-button {
+.bounds-feature-popup .maplibregl-popup-close-button {
   font-size: 18px;
   padding: 4px 8px;
   color: #666;
@@ -288,12 +288,12 @@
 }
 
 
-.shared-point-popup.mapboxgl-popup {
+.shared-point-popup.maplibregl-popup {
   max-width: 280px;
   z-index: 1002;
 }
 
-.shared-point-popup .mapboxgl-popup-content {
+.shared-point-popup .maplibregl-popup-content {
   padding: 10px 12px 12px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
@@ -303,11 +303,11 @@
   line-height: 1.35;
 }
 
-.shared-point-popup .mapboxgl-popup-tip {
+.shared-point-popup .maplibregl-popup-tip {
   border-top-color: rgba(255, 255, 255, 0.96);
 }
 
-.shared-point-popup .mapboxgl-popup-close-button {
+.shared-point-popup .maplibregl-popup-close-button {
   font-size: 18px;
   padding: 4px 8px;
   color: #666;
@@ -387,11 +387,11 @@
   background: #3a78c2;
 }
 
-.region-action-popup.mapboxgl-popup {
+.region-action-popup.maplibregl-popup {
   z-index: 1003;
 }
 
-.region-action-popup .mapboxgl-popup-content {
+.region-action-popup .maplibregl-popup-content {
   padding: 10px 12px 12px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);

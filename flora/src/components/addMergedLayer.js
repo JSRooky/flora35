@@ -284,7 +284,7 @@ function rebuildMergedLayers(map) {
 
 /**
  * Создаёт слой слитых точек (кластеризация как у остальных точек карты).
- * @param {import("mapbox-gl").Map} map
+ * @param {import("maplibre-gl").Map} map
  * @param {{ onPointClick?: Function }} [options]
  */
 export function addMergedLayer(map, { onPointClick } = {}) {
@@ -306,7 +306,7 @@ export function addMergedLayer(map, { onPointClick } = {}) {
 }
 
 /**
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {GeoJSON.FeatureCollection|object[]|null|undefined} collectionOrFeatures
  * @param {{ preview?: boolean }} [options]
  */
@@ -365,7 +365,7 @@ export function upsertMergedFeature(map, feature) {
 
 /**
  * Удаляет feature со слоя по merged_id / id.
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {string} featureId
  * @returns {object[]} оставшиеся features
  */

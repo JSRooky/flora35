@@ -2,7 +2,7 @@ const SOURCE_ID = "yandex";
 const LAYER_ID = "yandex-raster";
 const YANDEX_LAYER_TYPE = "map";
 
-/** @type {WeakMap<import("mapbox-gl").Map, { layerIds: string[], visibility: Map<string, string> }>} */
+/** @type {WeakMap<import("maplibre-gl").Map, { layerIds: string[], visibility: Map<string, string> }>} */
 const mapState = new WeakMap();
 
 function getState(map) {

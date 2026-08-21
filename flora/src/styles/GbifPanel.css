@@ -1,4 +1,4 @@
-.gbif-map-popup .mapboxgl-popup-content {
+﻿.gbif-map-popup .maplibregl-popup-content {
   padding: 10px 12px;
   border-radius: 8px;
   font-family: Arial, sans-serif;

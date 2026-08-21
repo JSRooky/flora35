@@ -1,11 +1,11 @@
-import mapboxgl from "mapbox-gl";
+import maplibregl from "../map/mapEngine";
 import { getFeatureCoordinates } from "../components/spreadCoincidentPoints";
 import pairPinUrl from "../images/pair_pin.svg";
 
 const PAIR_PIN_SIZE_PX = 32;
 const PAIR_PIN_ANCHOR_OFFSET_Y_PX = 4;
 
-/** @type {import("mapbox-gl").Marker[]} */
+/** @type {import("maplibre-gl").Marker[]} */
 let pairPinMarkers = [];
 
 function getPointCoordinates(point) {
@@ -47,7 +47,7 @@ function removePairPinMarkers() {
 
 /**
  * Рисует пару точек уникальными красными пинами (без кластеризации).
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {{ left?: object, right?: object }|null|undefined} match
  */
 export function showNearSpeciesPairPreview(map, match) {
@@ -65,7 +65,7 @@ export function showNearSpeciesPairPreview(map, match) {
       return;
     }
 
-    const marker = new mapboxgl.Marker({
+    const marker = new maplibregl.Marker({
       element: createPairPinElement(),
       anchor: "bottom",
       offset: [0, PAIR_PIN_ANCHOR_OFFSET_Y_PX]

@@ -3,7 +3,7 @@ const LAYER_ID = "osm-raster";
 
 const OSM_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 
-/** @type {WeakMap<import("mapbox-gl").Map, { layerIds: string[], visibility: Map<string, string> }>} */
+/** @type {WeakMap<import("maplibre-gl").Map, { layerIds: string[], visibility: Map<string, string> }>} */
 const mapState = new WeakMap();
 
 function getState(map) {

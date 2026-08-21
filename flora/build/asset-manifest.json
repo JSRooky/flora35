@@ -1,0 +1,34 @@
+{
+  "files": {
+    "main.css": "/flora35/static/css/main.22d24200.css",
+    "main.js": "/flora35/static/js/main.9843173a.js",
+    "static/css/889.c7a81e73.chunk.css": "/flora35/static/css/889.c7a81e73.chunk.css",
+    "static/js/889.effce0b4.chunk.js": "/flora35/static/js/889.effce0b4.chunk.js",
+    "static/js/815.a56594e7.chunk.js": "/flora35/static/js/815.a56594e7.chunk.js",
+    "static/js/37.a258bd92.chunk.js": "/flora35/static/js/37.a258bd92.chunk.js",
+    "static/js/206.9a9cdd37.chunk.js": "/flora35/static/js/206.9a9cdd37.chunk.js",
+    "static/js/741.1cd2ab15.chunk.js": "/flora35/static/js/741.1cd2ab15.chunk.js",
+    "static/js/mapbox-gl-csp-worker.f16d141d.worker.js": "/flora35/static/js/mapbox-gl-csp-worker.f16d141d.worker.js",
+    "static/media/moduleHelp.md": "/flora35/static/media/moduleHelp.79efd0f5e13f9bccdc34.md",
+    "static/media/yndex_logo_ru.svg": "/flora35/static/media/yndex_logo_ru.01ba11e81eb5e7ebdf9c461397eb6c43.svg",
+    "static/media/map_os_map_icon.svg": "/flora35/static/media/map_os_map_icon.732a03a7a4cc8a85da182e88d99191d6.svg",
+    "static/media/primula_veris.md": "/flora35/static/media/primula_veris.58e7d34d22850cd74fc8.md",
+    "static/media/main_logo.svg": "/flora35/static/media/main_logo.571a899f26e94928fbc09a52ed210f26.svg",
+    "static/media/aboutProject.md": "/flora35/static/media/aboutProject.92c1627ed4e8912c2a69.md",
+    "static/media/draw-poly.svg": "/flora35/static/media/draw-poly.2b5aa76fe9f0c88855d417bf0a74f410.svg",
+    "static/media/draw-free.svg": "/flora35/static/media/draw-free.aac38c6a0ce9372fbb10e7ada91350d7.svg",
+    "static/media/map_mb_map_icon.svg": "/flora35/static/media/map_mb_map_icon.d057f3e9bdb32709644401b7dfe440a1.svg",
+    "static/media/map_ya_map_icon.svg": "/flora35/static/media/map_ya_map_icon.57b3d35aa01b21298da8c873828a40b0.svg",
+    "static/media/draw-rect.svg": "/flora35/static/media/draw-rect.25eea9be1a5a5d301182b1e0c5fc1bee.svg",
+    "index.html": "/flora35/index.html",
+    "static/media/cursor_get_location.svg": "/flora35/static/media/cursor_get_location.c22aa861b520553a3e09beb7a5fafdb7.svg",
+    "static/media/filter_icon.svg": "/flora35/static/media/filter_icon.aca78c5119d217a19b8f42162e4cf651.svg",
+    "static/media/telegram_icon.svg": "/flora35/static/media/telegram_icon.43b1c03067225612776ef26fe233805c.svg",
+    "static/media/max_icon.svg": "/flora35/static/media/max_icon.0d4686fc2274e23bd3712ffa133309df.svg",
+    "static/media/user_account.svg": "/flora35/static/media/user_account.717b5250aca8cd93841f49e6376b9605.svg"
+  },
+  "entrypoints": [
+    "static/css/main.22d24200.css",
+    "static/js/main.9843173a.js"
+  ]
+}

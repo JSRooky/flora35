@@ -1,4 +1,4 @@
-import mapboxgl from "mapbox-gl";
+import maplibregl from "../map/mapEngine";
 import { getRegnumLabel, REGNUM_ORDER } from "./featurePropertyLabels";
 import { getPointColorForRegnum } from "./pointColors";
 
@@ -241,7 +241,7 @@ export function showPointHoverPopup(map, coordinates, html) {
   clearPointHoverHideTimer();
 
   if (!pointHoverPopup) {
-    pointHoverPopup = new mapboxgl.Popup({
+    pointHoverPopup = new maplibregl.Popup({
       closeButton: false,
       closeOnClick: false,
       className: "point-hover-tooltip",

@@ -1,11 +1,11 @@
-import mapboxgl from "mapbox-gl";
+import maplibregl from "../map/mapEngine";
 import { getFeatureCoordinates } from "../components/spreadCoincidentPoints";
 import pairPinUrl from "../images/pair_pin.svg";
 
 const PIN_SIZE_PX = 32;
 const PIN_ANCHOR_OFFSET_Y_PX = 4;
 
-/** @type {import("mapbox-gl").Marker|null} */
+/** @type {import("maplibre-gl").Marker|null} */
 let previewMarker = null;
 
 function getPointCoordinates(row) {
@@ -47,7 +47,7 @@ function removePreviewMarker() {
 
 /**
  * Рисует одну точку красным пином (без кластеризации).
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {{ feature?: object, coordinates?: number[] }|null|undefined} row
  */
 export function showUnattributedPointPreview(map, row) {
@@ -62,7 +62,7 @@ export function showUnattributedPointPreview(map, row) {
     return;
   }
 
-  previewMarker = new mapboxgl.Marker({
+  previewMarker = new maplibregl.Marker({
     element: createPinElement(),
     anchor: "bottom",
     offset: [0, PIN_ANCHOR_OFFSET_Y_PX]

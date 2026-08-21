@@ -197,7 +197,7 @@ function addRedBookCircleLayer(map) {
 
 /**
  * Создаёт слой совпадений Красной книги (без кластеризации).
- * @param {import("mapbox-gl").Map} map
+ * @param {import("maplibre-gl").Map} map
  * @param {{ onPointClick?: Function }} [options]
  */
 export function addRedBookLayer(map, { onPointClick } = {}) {
@@ -236,7 +236,7 @@ export function addRedBookLayer(map, { onPointClick } = {}) {
 }
 
 /**
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {GeoJSON.FeatureCollection|object[]|null|undefined} collectionOrFeatures
  * @param {{ persist?: boolean }} [options]
  */
@@ -298,7 +298,7 @@ export function getRedBookFeatureCollection() {
 
 /**
  * Добавляет/обновляет точки на слое Красной книги (по id / redbook_match_id).
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {object[]} features
  * @returns {{ added: number, updated: number, total: number, collection: GeoJSON.FeatureCollection }}
  */
@@ -344,7 +344,7 @@ export function upsertRedBookFeatures(map, features) {
 /**
  * Скрывает обычные маркеры Красной книги для точек, показанных булавкой
  * (выделение в «Сведения о точке» или share-ссылка).
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {Iterable<string>|null|undefined} keys
  */
 export function setRedBookHiddenPointFeatureKeys(map, keys) {
@@ -356,7 +356,7 @@ export function setRedBookHiddenPointFeatureKeys(map, keys) {
 
 /**
  * Фильтр слоя по статусу (и при необходимости по царству/году — через properties).
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {object} [filters]
  */
 export function applyRedBookLocationsFilter(map, filters = {}) {

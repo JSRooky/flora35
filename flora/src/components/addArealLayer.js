@@ -1,4 +1,4 @@
-import mapboxgl from "mapbox-gl";
+import maplibregl from "../map/mapEngine";
 import { circle } from "@turf/turf";
 import { getHaversineDistanceKm } from "../geo/getHaversineDistanceKm";
 import {
@@ -366,7 +366,7 @@ export function showArealPointHint(map, feature) {
 
   const generation = arealPointHintGeneration;
 
-  arealPointHintPopup = new mapboxgl.Popup({
+  arealPointHintPopup = new maplibregl.Popup({
     closeButton: false,
     closeOnClick: false,
     className: "areal-point-hint",

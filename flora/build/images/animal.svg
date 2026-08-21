@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <rect width="480" height="360" fill="#fff3e0"/>
+  <ellipse cx="240" cy="200" rx="90" ry="60" fill="#ffb74d"/>
+  <circle cx="210" cy="170" r="8" fill="#5d4037"/>
+  <circle cx="270" cy="170" r="8" fill="#5d4037"/>
+  <text x="240" y="330" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" fill="#e65100">82>B=>5</text>
+</svg>

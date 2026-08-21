@@ -1,8 +1,10 @@
 const { spawn } = require("child_process");
 const path = require("path");
 const { copyHelpDocs, watchHelpDocs } = require("./copy-help-docs");
+const { copyMapLibreWorker } = require("./copy-maplibre-worker");
 
 copyHelpDocs();
+copyMapLibreWorker();
 watchHelpDocs();
 
 const child = spawn(

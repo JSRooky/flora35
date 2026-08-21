@@ -1,4 +1,4 @@
-import mapboxgl from "mapbox-gl";
+import maplibregl from "../map/mapEngine";
 import { bbox, booleanPointInPolygon, buffer, difference, featureCollection, polygon, simplify, union } from "@turf/turf";
 import { applyMapCursor, getFirstLocationsLayerId } from "./addLocationsLayer";
 import {
@@ -729,7 +729,7 @@ export function showRegionActionPopup(map, { title, lngLat, selected = false, on
   hideRegionHoverPopup();
   hideRegionActionPopup();
 
-  const popup = new mapboxgl.Popup({
+  const popup = new maplibregl.Popup({
     closeButton: true,
     closeOnClick: false,
     closeOnMove: false,
@@ -786,7 +786,7 @@ export function showRegionActionPopup(map, { title, lngLat, selected = false, on
 
 function showRegionHoverPopup(map, lngLat, title) {
   if (!regionHoverPopup) {
-    regionHoverPopup = new mapboxgl.Popup({
+    regionHoverPopup = new maplibregl.Popup({
       closeButton: false,
       closeOnClick: false,
       closeOnMove: false,

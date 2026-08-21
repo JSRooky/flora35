@@ -22,7 +22,7 @@ const EMPTY_COLLECTION = {
 /**
  * Оставляет на карте только пару точек: остальные слои очищаются,
  * пара рисуется на отдельном preview-слое (всегда видимом).
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {{ left?: object, right?: object }|null|undefined} match
  */
 export function isolateNearSpeciesPairOnMap(map, match) {
@@ -42,7 +42,7 @@ export function isolateNearSpeciesPairOnMap(map, match) {
 
 /**
  * Возвращает слои точек к состоянию по текущим фильтрам.
- * @param {import("mapbox-gl").Map|null|undefined} map
+ * @param {import("maplibre-gl").Map|null|undefined} map
  * @param {object} [locationFilters]
  */
 export function restoreNearSpeciesMapLayers(map, locationFilters = {}) {

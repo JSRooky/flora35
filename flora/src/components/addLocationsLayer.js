@@ -1,4 +1,4 @@
-import mapboxgl from "mapbox-gl";
+import maplibregl from "../map/mapEngine";
 import { booleanPointInPolygon, point } from "@turf/turf";
 import {
   formatPropertyValue,
@@ -516,7 +516,7 @@ function removeOrphanedClusterPieChartMarkers(map) {
   }
 
   map.getContainer().querySelectorAll(".cluster-pie-chart-marker").forEach((element) => {
-    element.closest(".mapboxgl-marker")?.remove();
+    element.closest(".maplibregl-marker")?.remove();
   });
 }
 
@@ -611,7 +611,7 @@ function updateClusterPieChartMarkers(map) {
         return;
       }
 
-      marker = new mapboxgl.Marker({ element, anchor: "center" })
+      marker = new maplibregl.Marker({ element, anchor: "center" })
         .setLngLat(coordinates)
         .addTo(map);
       marker.__pieChartSignature = signature;
@@ -623,7 +623,7 @@ function updateClusterPieChartMarkers(map) {
         return;
       }
 
-      marker = new mapboxgl.Marker({ element, anchor: "center" })
+      marker = new maplibregl.Marker({ element, anchor: "center" })
         .setLngLat(coordinates)
         .addTo(map);
       marker.__pieChartSignature = signature;
@@ -953,7 +953,7 @@ export function showSharedPointPopup(map, feature, { onOpenDetails } = {}) {
 
   removeSharedPointPopup();
 
-  const popup = new mapboxgl.Popup({
+  const popup = new maplibregl.Popup({
     closeButton: true,
     closeOnClick: false,
     className: "shared-point-popup",
@@ -1016,7 +1016,7 @@ export function showSharedPointPin(map, feature) {
         new Blob([colorizeMapPinSvg(svgText, centerColor)], { type: "image/svg+xml" })
       );
 
-      sharedPointPinMarker = new mapboxgl.Marker({
+      sharedPointPinMarker = new maplibregl.Marker({
         element: createPinMarkerElement(sharedPointPinObjectUrl),
         anchor: "bottom",
         offset: [0, MAP_PIN_ANCHOR_OFFSET_Y_PX]
@@ -1029,7 +1029,7 @@ export function showSharedPointPin(map, feature) {
         return;
       }
 
-      sharedPointPinMarker = new mapboxgl.Marker({
+      sharedPointPinMarker = new maplibregl.Marker({
         element: createPinMarkerElement(MAP_PIN_IMAGE),
         anchor: "bottom",
         offset: [0, MAP_PIN_ANCHOR_OFFSET_Y_PX]
@@ -1103,7 +1103,7 @@ export function updateSelectedPointHighlight(map, feature) {
         new Blob([colorizeMapPinSvg(svgText, centerColor)], { type: "image/svg+xml" })
       );
 
-      selectedPointPinMarker = new mapboxgl.Marker({
+      selectedPointPinMarker = new maplibregl.Marker({
         element: createPinMarkerElement(selectedPointPinObjectUrl),
         anchor: "bottom",
         offset: [0, MAP_PIN_ANCHOR_OFFSET_Y_PX]
@@ -1116,7 +1116,7 @@ export function updateSelectedPointHighlight(map, feature) {
         return;
       }
 
-      selectedPointPinMarker = new mapboxgl.Marker({
+      selectedPointPinMarker = new maplibregl.Marker({
         element: createPinMarkerElement(MAP_PIN_IMAGE),
         anchor: "bottom",
         offset: [0, MAP_PIN_ANCHOR_OFFSET_Y_PX]

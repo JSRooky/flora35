@@ -1,4 +1,4 @@
-import mapboxgl from "mapbox-gl";
+import maplibregl from "../map/mapEngine";
 import { bbox, booleanPointInPolygon, center, point } from "@turf/turf";
 import {
   BOUNDS_LAYER_DEFINITIONS,
@@ -174,7 +174,7 @@ export function showBoundsFeaturePopup(
   const pointsSummary = getBoundsContainedPointsSummary(hit.feature, filters);
   const speciesSummary = getBoundsContainedSpeciesSummary(hit.feature, filters);
 
-  const popup = new mapboxgl.Popup({
+  const popup = new maplibregl.Popup({
     closeButton: true,
     closeOnClick: false,
     className: "bounds-feature-popup",
@@ -331,7 +331,7 @@ function getFeatureIdentityKey(properties = {}) {
 }
 
 /**
- * mapboxgl.queryRenderedFeatures возвращает геометрию, обрезанную по тайлу —
+ * queryRenderedFeatures возвращает геометрию, обрезанную по тайлу —
  * для больших полигонов (например, заповедников) это делает площадь и форму
  * некорректными. Подменяем на полную геометрию из уже загруженного GeoJSON.
  */

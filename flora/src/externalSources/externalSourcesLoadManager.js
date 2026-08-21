@@ -79,7 +79,7 @@ let snapshot = {
   inat: createSourceState()
 };
 
-/** @type {import("mapbox-gl").Map | null} */
+/** @type {import("maplibre-gl").Map | null} */
 let mapRef = null;
 /** @type {(() => void) | null} */
 let onDataChangeRef = null;
@@ -122,7 +122,7 @@ function notifyDataChange(detail) {
 
 /**
  * Карта и колбэк обновления UI живут в App; панель может быть размонтирована.
- * @param {{ map?: import("mapbox-gl").Map | null, onDataChange?: (() => void) | null }} ctx
+ * @param {{ map?: import("maplibre-gl").Map | null, onDataChange?: (() => void) | null }} ctx
  */
 export function setExternalSourcesLoadContext(ctx = {}) {
   if ("map" in ctx) {
