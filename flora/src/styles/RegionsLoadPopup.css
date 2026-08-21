@@ -15,12 +15,12 @@
 
   position: relative;
   box-sizing: border-box;
-  width: max-content;
-  max-width: calc(100vw - 32px);
-  min-width: min(960px, calc(100vw - 32px));
+  width: min(640px, calc(100vw - 32px));
+  max-width: min(640px, calc(100vw - 32px));
+  min-width: 0;
   max-height: min(90vh, 760px);
   overflow: hidden;
-  padding: 16px 20px 20px;
+  padding: 12px 14px 14px;
   border: 1px solid var(--regions-load-accent-border);
   border-radius: 10px;
   background-color: rgba(255, 255, 255, 0.94);
@@ -122,6 +122,42 @@
   gap: 10px;
 }
 
+.load-destination {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: min(180px, 100%);
+  flex: 1 1 180px;
+}
+
+.load-destination-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+}
+
+.load-destination-select {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  padding: 6px 8px;
+  border: 1px solid rgba(13, 148, 136, 0.35);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  color: #333;
+}
+
+.load-destination-select:disabled {
+  opacity: 0.6;
+}
+
+.load-destination-budget {
+  font-size: 11px;
+  line-height: 1.35;
+  color: #666;
+}
+
 .regions-load-source-tabs {
   display: inline-flex;
   flex: 0 0 auto;
@@ -160,8 +196,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  flex: 1 1 220px;
-  min-width: 160px;
+  flex: 1 1 140px;
+  min-width: 120px;
 }
 
 .regions-load-table-batch {
@@ -466,7 +502,7 @@
 
 .regions-load-table th,
 .regions-load-table td {
-  padding: 7px 8px;
+  padding: 5px 6px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   text-align: left;
   vertical-align: middle;
@@ -502,7 +538,9 @@
 .regions-load-table tbody th {
   font-weight: 600;
   color: #222;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 11em;
 }
 
 .regions-load-table-num {
@@ -516,9 +554,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  min-width: 3.2em;
+  min-width: 2.6em;
   margin: 0;
-  padding: 3px 6px;
+  padding: 2px 4px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -553,7 +591,7 @@
 .regions-load-table-actions {
   display: flex;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .regions-load-table-actions .gbif-panel-btn {
@@ -564,8 +602,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   line-height: 0;
 }

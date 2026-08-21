@@ -1,0 +1,126 @@
+.compact-grid-settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.compact-grid-settings-dialog {
+  position: relative;
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(90vh, 640px);
+  overflow: auto;
+  padding: 16px 20px 18px;
+  border: 1px solid rgba(42, 157, 143, 0.35);
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  font-family: Arial, sans-serif;
+}
+
+.compact-grid-settings-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #444;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.compact-grid-settings-title {
+  margin: 0 28px 8px 0;
+  font-size: 15px;
+  color: #333;
+  border-bottom: 2px solid var(--map-tool-accent, #2a9d8f);
+  padding-bottom: 6px;
+}
+
+.compact-grid-settings-lead,
+.compact-grid-settings-hint-block {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #666;
+}
+
+.compact-grid-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #444;
+}
+
+.compact-grid-settings-field--inline {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.compact-grid-settings-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.compact-grid-settings-hint {
+  color: #888;
+  font-weight: 600;
+}
+
+.compact-grid-settings-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888;
+}
+
+.compact-grid-settings-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #333;
+}
+
+.compact-grid-settings-colors--muted {
+  opacity: 0.55;
+}
+
+.compact-grid-settings-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.compact-grid-settings-swatch {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.compact-grid-settings-swatch.is-selected {
+  outline: 2px solid var(--map-tool-accent, #2a9d8f);
+  outline-offset: 1px;
+}
+
+.compact-grid-settings-swatch:disabled {
+  cursor: default;
+}

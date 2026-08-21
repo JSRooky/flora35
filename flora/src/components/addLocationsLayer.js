@@ -18,6 +18,23 @@ import {
 import { getOverlayVersion } from "../names/nameRuCache";
 import { parseFoundYear } from "./yearBounds";
 import {
+  setCompactGbifProcessingFilters,
+  setCompactHiddenPointKeys,
+  setCompactInatProcessingFilters,
+  setCompactLocationFilters
+} from "../map/compactFilterState";
+import {
+  addCompactGridLayers,
+  buildCompactViewportFromGeojson,
+  compactCircleRadiusExpression,
+  compactDensityFalseFilter,
+  compactGridLayerIds,
+  easeToCompactDensityCell,
+  ensureCompactViewportSync,
+  isCompactDensityFeature,
+  isCompactPointDisplayEnabled
+} from "../map/compactPointDisplay";
+import {
   GBIF_SOURCE_ID,
   getGbifInteractiveLayerIds,
   getGbifSourceIds,
@@ -377,6 +394,9 @@ function formatClusterPointsCount(count) {
 
 /** Mapbox Supercluster активен только если включена обычная кластеризация и не режим сверхплотных. */
 function isMapboxClusteringActive() {
+  if (isCompactPointDisplayEnabled()) {
+    return false;
+  }
   return clusteringEnabled && !denseClustersHighlightEnabled;
 }
 
@@ -730,6 +750,32 @@ export function getUnclusteredLayerIds() {
   return [getLayerIds().unclustered];
 }
 
+function getConfiguredLocationSourceIds() {
+  if (!isMapboxClusteringActive()) {
+    return [getSourceId()];
+  }
+  if (clusterByRegnum) {
+    return [...getRegnumValues().map((regnum) => getSourceId(regnum)), getSourceId()];
+  }
+  return [getSourceId()];
+}
+
+function getLocationCompactGridLayerIds() {
+  return getConfiguredLocationSourceIds().flatMap((sourceId) => {
+    const { fillId, lineId } = compactGridLayerIds(sourceId);
+    return [fillId, lineId];
+  });
+}
+
+function getLocationPointClickLayerIds() {
+  return [
+    ...getUnclusteredLayerIds(),
+    ...getConfiguredLocationSourceIds().map(
+      (sourceId) => compactGridLayerIds(sourceId).fillId
+    )
+  ];
+}
+
 function buildPinnedKeyExclusion(key) {
   return [
     "!",
@@ -755,7 +801,7 @@ function buildPinnedKeyExclusion(key) {
 }
 
 function buildUnclusteredLayerFilter() {
-  const parts = [];
+  const parts = [compactDensityFalseFilter()];
 
   if (isMapboxClusteringActive()) {
     parts.push(["!", ["has", "point_count"]]);
@@ -770,10 +816,6 @@ function buildUnclusteredLayerFilter() {
   pinnedFeatureKeys.forEach((key) => {
     parts.push(buildPinnedKeyExclusion(key));
   });
-
-  if (parts.length === 0) {
-    return null;
-  }
 
   if (parts.length === 1) {
     return parts[0];
@@ -848,6 +890,7 @@ function getAllLocationsLayerIds() {
     ...getClusterLayerIds(),
     ...getClusterCountLayerIds(),
     ...getUnclusteredLayerIds(),
+    ...getLocationCompactGridLayerIds(),
     ...getDensePileLayerIds()
   ];
 }
@@ -1222,7 +1265,9 @@ function attachLocationsInteractions(map) {
   const clusterHoverLayerIds = getClusterHoverLayerIds().filter((layerId) =>
     map.getLayer(layerId)
   );
-  const unclusteredLayerIds = getUnclusteredLayerIds();
+  const unclusteredLayerIds = getLocationPointClickLayerIds().filter((layerId) =>
+    map.getLayer(layerId)
+  );
 
   const expandDensePileCluster = (clusterFeature) => {
     const key = clusterFeature.properties?.dense_pile_key;
@@ -1339,11 +1384,14 @@ function attachLocationsInteractions(map) {
 
   const pointClick = (event) => {
     const feature = event.features?.[0];
-    if (feature) {
-      // Оставляем geometry на разведённых координатах (булавка на видимом маркере);
-      // исходные координаты — в properties.coordinates_original.
-      onPointClickCallback?.(feature);
+    if (!feature) {
+      return;
     }
+    if (isCompactDensityFeature(feature)) {
+      easeToCompactDensityCell(map, feature);
+      return;
+    }
+    onPointClickCallback?.(feature);
   };
 
   const pointEnter = (event) => {
@@ -1357,6 +1405,9 @@ function attachLocationsInteractions(map) {
 
     const feature = event.features?.[0];
     if (!feature?.geometry?.coordinates) {
+      return;
+    }
+    if (isCompactDensityFeature(feature)) {
       return;
     }
 
@@ -1462,22 +1513,21 @@ function addUnclusteredLayer(map, sourceId, regnum = null) {
     id: layerIds.unclustered,
     type: "circle",
     source: sourceId,
+    filter: isMapboxClusteringActive()
+      ? ["all", compactDensityFalseFilter(), ["!", ["has", "point_count"]]]
+      : compactDensityFalseFilter(),
     paint: {
       "circle-color": regnum
         ? REGNUM_COLORS[regnum] ?? DEFAULT_POINT_COLOR
         : getPointColorExpression(),
-      "circle-radius": MARKER_RADIUS,
+      "circle-radius": compactCircleRadiusExpression(MARKER_RADIUS),
       "circle-stroke-width": 1,
       "circle-stroke-color": "#ffffff"
     }
   };
 
-  if (isMapboxClusteringActive()) {
-    // Исключаем агрегированные точки кластера — показываем только «листья».
-    layer.filter = ["!", ["has", "point_count"]];
-  }
-
   map.addLayer(layer);
+  addCompactGridLayers(map, sourceId);
 }
 
 function addClusterLayers(map, sourceId, regnum = null) {
@@ -1552,6 +1602,7 @@ export function setHiddenPointKeysForFilter(keys) {
   hiddenPointKeysSet = new Set(
     keys == null ? [] : Array.from(keys, (key) => String(key))
   );
+  setCompactHiddenPointKeys(hiddenPointKeysSet);
   invalidateVisibleGbifCache();
   invalidateVisibleInatCache();
 }
@@ -1743,6 +1794,19 @@ function syncDensePilesLayers(map, denseClusterFeatures) {
 }
 
 function updateLocationsSourceData(map, filteredFeatures) {
+  if (isCompactPointDisplayEnabled()) {
+    ensureCompactViewportSync(map, "locations", () => {
+      updateLocationsSourceData(map, currentFilteredFeatures);
+    });
+    const built = buildCompactViewportFromGeojson(map, filteredFeatures, "locations");
+    map.getSource("locations")?.setData({
+      type: "FeatureCollection",
+      features: built.features
+    });
+    syncDensePilesLayers(map, []);
+    return;
+  }
+
   const { mapFeatures, denseClusterFeatures } = prepareMapFeatures(filteredFeatures);
   const slimFeatures = slimMapFeatures(mapFeatures);
 
@@ -1878,7 +1942,12 @@ function rebuildLocationsLayers(map, { reuseFiltered = false } = {}) {
   if (!reuseFiltered) {
     setCurrentFilteredFeatures(filteredFeatures);
   }
-  const { mapFeatures, denseClusterFeatures } = prepareMapFeatures(filteredFeatures);
+  const compactBuilt = isCompactPointDisplayEnabled()
+    ? buildCompactViewportFromGeojson(map, filteredFeatures, "locations")
+    : null;
+  const { mapFeatures, denseClusterFeatures } = compactBuilt
+    ? { mapFeatures: compactBuilt.features, denseClusterFeatures: [] }
+    : prepareMapFeatures(filteredFeatures);
   const slimFeatures = slimMapFeatures(mapFeatures);
 
   if (!isMapboxClusteringActive()) {
@@ -2554,7 +2623,7 @@ export function getVisibleGbifFeatures(locationFilters = currentFilters) {
 }
 
 function applyGbifTimelineYearChange(map, prevFilters, nextFilters) {
-  if (externalUnifiedClusteringEnabled) {
+  if (isCompactPointDisplayEnabled() || externalUnifiedClusteringEnabled) {
     applyGbifLocationsFilter(map, nextFilters);
     return;
   }
@@ -2617,6 +2686,14 @@ function applyGbifTimelineYearChange(map, prevFilters, nextFilters) {
  */
 export function applyGbifLocationsFilter(map, filters = currentFilters) {
   if (!map) {
+    return;
+  }
+
+  setCompactLocationFilters(filters);
+  setCompactGbifProcessingFilters(gbifProcessingFilters);
+
+  if (isCompactPointDisplayEnabled()) {
+    setGbifData(map, { type: "FeatureCollection", features: [] });
     return;
   }
 
@@ -2782,7 +2859,7 @@ export function getVisibleInatFeatures(locationFilters = currentFilters) {
 }
 
 function applyInatTimelineYearChange(map, prevFilters, nextFilters) {
-  if (externalUnifiedClusteringEnabled) {
+  if (isCompactPointDisplayEnabled() || externalUnifiedClusteringEnabled) {
     applyInatLocationsFilter(map, nextFilters);
     return;
   }
@@ -2844,6 +2921,14 @@ export function applyInatLocationsFilter(map, filters = currentFilters) {
     return;
   }
 
+  setCompactLocationFilters(filters);
+  setCompactInatProcessingFilters(inatProcessingFilters);
+
+  if (isCompactPointDisplayEnabled()) {
+    setInatData(map, { type: "FeatureCollection", features: [] });
+    return;
+  }
+
   if (externalUnifiedClusteringEnabled) {
     refreshExternalUnifiedMapLayers(map, filters, externalLayerIncludeFlags);
     return;
@@ -2873,6 +2958,9 @@ export function getInatProcessingFilters() {
 
 /** Применяет фильтры точек: пересобирает слои, кроме частного случая сдвига года. */
 export function applyLocationsFilter(map, filters = {}) {
+  setCompactLocationFilters(filters);
+  setCompactGbifProcessingFilters(gbifProcessingFilters);
+  setCompactInatProcessingFilters(inatProcessingFilters);
   if (
     map &&
     locationsSourcesExist(map) &&
@@ -2932,19 +3020,33 @@ function applyTempLayersLocationsFilter(map, filters = currentFilters) {
   setTempLayersData(map);
 }
 
-/** Оценка числа точек, попадающих на карту (для порогов производительности). */
-export function getVisibleMapPointCount() {
+/** Число точек в сейчас отображаемых слоях данных (не только кадр карты). */
+export function getDisplayedLayerPointCount() {
   let total = 0;
   if (toolIncludeLocal) {
     total += currentFilteredFeatures.length;
   }
   if (toolIncludeGbif) {
-    total += visibleGbifCache.features?.length ?? getGbifFeatureCount();
+    total += getGbifFeatureCount();
   }
   if (toolIncludeInat) {
-    total += visibleInatCache.features?.length ?? getInatFeatureCount();
+    total += getInatFeatureCount();
+  }
+  if (toolIncludeMerged) {
+    total += getMergedFeatures()?.length ?? 0;
+  }
+  if (toolIncludeRedBook) {
+    total += getRedBookFeatures()?.length ?? 0;
+  }
+  if (isTempLayersVisible()) {
+    total += getVisibleTempLayerFeatures()?.length ?? 0;
   }
   return total;
+}
+
+/** Оценка числа точек, попадающих на карту (для порогов производительности). */
+export function getVisibleMapPointCount() {
+  return getDisplayedLayerPointCount();
 }
 
 /** Сбрасывает все фильтры точек. */

@@ -40,6 +40,7 @@ import {
   getMapFilterSnapshotFeatures,
   listToolDensePiles,
   getVisibleMapPointCount,
+  getDisplayedLayerPointCount,
   getStablePointKey,
   setHiddenPointKeysForFilter,
   setGbifProcessingFilters,
@@ -203,6 +204,7 @@ import SpeciesSearchPanel from "./components/SpeciesSearchPanel";
 import StatusFilterPanel from "./components/StatusFilterPanel";
 import MapDisplayPanel from "./components/MapDisplayPanel";
 import HeatmapSettingsPanel from "./components/HeatmapSettingsPanel";
+import CompactGridSettingsPanel from "./components/CompactGridSettingsPanel";
 import { loadHeatmapSettingsFromStorage, saveHeatmapSettingsToStorage } from "./components/heatmapSettings";
 import {
   createRandomRegionColorMap,
@@ -241,7 +243,7 @@ import MapZoomControl from "./components/MapZoomControl";
 import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
 import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
-import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles } from "./components/addTempLayersLayer";
+import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles, getTempCompactGridLayerColor } from "./components/addTempLayersLayer";
 import { addTempLayerOverlaysLayer, applyTempRegionOverlayPaint } from "./components/addTempLayerOverlaysLayer";
 import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, appendRegionPolygonToTempPlaque, listTempLayerPlaques, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerLabel, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
 import {
@@ -270,9 +272,15 @@ import { loadMergedPointsFromFirestore } from "./firebase/loadMergedPointsFromFi
 import { submitMergedPoint } from "./firebase/submitMergedPoint";
 import { deleteMergedPoint } from "./firebase/deleteMergedPoint";
 import { loadPointAttributionsFromFirestore } from "./firebase/loadPointAttributionsFromFirestore";
-import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
-import { hydrateInatStoreFromPersistence } from "./inaturalist/inatPersistence";
-import { hydrateTempLayersFromPersistence, persistTempLayers } from "./tempLayers/tempLayerPersistence";
+import { persistTempLayers } from "./tempLayers/tempLayerPersistence";
+import { syncDataWorkingSet } from "./map/dataWorkingSet";
+import { applyCompactGridAppearance, setCompactPointDisplayEnabled } from "./map/compactPointDisplay";
+import {
+  getCompactGridPointLimit,
+  getCompactGridSettings,
+  setCompactDisplayedLayerPointCount,
+  setCompactGridSettings
+} from "./map/compactGridSettings";
 import {
   archiveWorkingPlaque,
   deleteArchivedPlaque,
@@ -390,6 +398,7 @@ function isPanelExpandedInState(collapsedState, panelId) {
 export default function MapView() {
   const ref = useRef(null);
   const map = useRef(null);
+  const dataSourceModeRef = useRef(DEFAULT_DATA_SOURCE_MODE);
 
   const [popupData, setPopupData] = useState(null);
   const [propertyFilters, setPropertyFilters] = useState({});
@@ -399,6 +408,12 @@ export default function MapView() {
   const [clusterByTempLayers, setClusterByTempLayersState] = useState(true);
   const [clusterByTempSublayers, setClusterByTempSublayersState] = useState(true);
   const [clusteringEnabled, setClusteringEnabledState] = useState(DEFAULT_CLUSTERING_ENABLED);
+  const [compactPointDisplay, setCompactPointDisplayState] = useState(false);
+  const [compactGridSettings, setCompactGridSettingsState] = useState(
+    getCompactGridSettings
+  );
+  const [displayedLayerPointCount, setDisplayedLayerPointCountState] = useState(0);
+  const compactGridAutoRef = useRef(false);
   const [clusterPieCharts, setClusterPieChartsState] = useState(DEFAULT_CLUSTER_PIE_CHARTS);
   const [denseClustersHighlight, setDenseClustersHighlightState] = useState(
     DEFAULT_DENSE_CLUSTERS_HIGHLIGHT
@@ -427,6 +442,7 @@ export default function MapView() {
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
   const [heatmapSettingsOpen, setHeatmapSettingsOpen] = useState(false);
+  const [compactGridSettingsOpen, setCompactGridSettingsOpen] = useState(false);
   const [heatmapSettings, setHeatmapSettings] = useState(loadHeatmapSettingsFromStorage);
   const [regionBoundsSettings, setRegionBoundsSettings] = useState(
     loadRegionBoundsSettingsFromStorage
@@ -577,14 +593,16 @@ export default function MapView() {
         regionBoundsSettings.fillColor
       )
     );
-  }, [regionCatalog, regionBoundsSettings.fillColor]);
+  }, [regionCatalog, regionBoundsSettings]);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
   const [dataSourceMode, setDataSourceModeState] = useState(DEFAULT_DATA_SOURCE_MODE);
+  dataSourceModeRef.current = dataSourceMode;
   const localDataActive =
     dataSourceMode === DATA_SOURCE_MODES.ALL ||
     dataSourceMode === DATA_SOURCE_MODES.POINTS ||
     dataSourceMode === DATA_SOURCE_MODES.USERPOINTS;
   const externalOnly = dataSourceMode === DATA_SOURCE_MODES.EXTERNAL;
+  const tempOnly = dataSourceMode === DATA_SOURCE_MODES.TEMP;
   const mergedOnly = dataSourceMode === DATA_SOURCE_MODES.MERGED;
   const redbookOnly = dataSourceMode === DATA_SOURCE_MODES.REDBOOK;
   const prevExternalOnlyRef = useRef(externalOnly);
@@ -593,10 +611,10 @@ export default function MapView() {
     [EXTERNAL_LAYER_IDS.INATURALIST]: true
   });
   const [tempLayersRevision, setTempLayersRevision] = useState(0);
-  const overlayRegionEdit = useMemo(
-    () => getVisibleRegionOverlayEditState(),
-    [tempLayersRevision]
-  );
+  const overlayRegionEdit = useMemo(() => {
+    void tempLayersRevision;
+    return getVisibleRegionOverlayEditState();
+  }, [tempLayersRevision]);
   const [externalProcessingActive, setExternalProcessingActive] = useState(false);
   const [nearSpeciesMatchesActive, setNearSpeciesMatchesActive] = useState(false);
   const [unattributedPointsActive, setUnattributedPointsActive] = useState(false);
@@ -729,6 +747,8 @@ export default function MapView() {
       case TASKBAR_PANEL_IDS.GBIF:
         setDataSourcesPanelOpen(true);
         setDataSourceModeState(DATA_SOURCE_MODES.EXTERNAL);
+        dataSourceModeRef.current = DATA_SOURCE_MODES.EXTERNAL;
+        void syncDataWorkingSet({ mode: DATA_SOURCE_MODES.EXTERNAL, map: map.current });
         setActiveModule(null);
         setPanelCollapsed((prev) => ({
           ...prev,
@@ -739,6 +759,8 @@ export default function MapView() {
       case TASKBAR_PANEL_IDS.EXTERNAL_PROCESSING:
       case TASKBAR_PANEL_IDS.GBIF_PROCESSING:
         setDataSourceModeState(DATA_SOURCE_MODES.EXTERNAL);
+        dataSourceModeRef.current = DATA_SOURCE_MODES.EXTERNAL;
+        void syncDataWorkingSet({ mode: DATA_SOURCE_MODES.EXTERNAL, map: map.current });
         setExternalProcessingActive(true);
         setActiveModule(null);
         setPanelCollapsed((prev) => ({
@@ -1359,15 +1381,14 @@ export default function MapView() {
       setDataSourceModeState(mode);
       setMergedPointsVisible(mode === DATA_SOURCE_MODES.MERGED);
       setRedBookPointsVisible(mode === DATA_SOURCE_MODES.REDBOOK);
+      dataSourceModeRef.current = mode;
 
       if (mode === DATA_SOURCE_MODES.EXTERNAL) {
-        // Слой «Внешние источники» сам по себе панель загрузки не открывает —
-        // только отдельная кнопка «Источники данных» в меню.
         setPanelMinimized((prev) => ({
           ...prev,
           [PANEL_IDS.DATA_SOURCES]: true
         }));
-      } else {
+      } else if (mode !== DATA_SOURCE_MODES.TEMP) {
         setDataSourcesPanelOpen(false);
         setExternalProcessingActive(false);
         setPanelMinimized((prev) => ({
@@ -1376,29 +1397,45 @@ export default function MapView() {
           [PANEL_IDS.EXTERNAL_PROCESSING]: true
         }));
       }
+
+      return syncDataWorkingSet({ mode, map: map.current }).then(() => {
+        setTempLayersRevision((value) => value + 1);
+        bumpPointsDataRevision();
+      });
     },
-    []
+    [bumpPointsDataRevision]
   );
 
   const handleTempLayerToggle = useCallback((layerId, visible) => {
-    setTempLayerVisible(layerId, visible);
-    persistTempLayers().catch(() => {});
-    setTempLayersRevision((value) => value + 1);
-    if (map.current) {
-      setTempLayersData(map.current);
-    }
-    bumpPointsDataRevision();
-  }, [bumpPointsDataRevision]);
+    void (async () => {
+      if (visible && dataSourceModeRef.current !== DATA_SOURCE_MODES.TEMP) {
+        await handleDataSourceModeChange(DATA_SOURCE_MODES.TEMP);
+      }
+      setTempLayerVisible(layerId, visible);
+      persistTempLayers().catch(() => {});
+      setTempLayersRevision((value) => value + 1);
+      if (map.current) {
+        setTempLayersData(map.current);
+        setTempLayersVisibility(map.current, dataSourceModeRef.current === DATA_SOURCE_MODES.TEMP);
+      }
+      bumpPointsDataRevision();
+    })();
+  }, [bumpPointsDataRevision, handleDataSourceModeChange]);
 
   const handleTempLayerDelete = useCallback((layerId) => {
-    deleteTempLayer(layerId);
-    persistTempLayers().catch(() => {});
-    setTempLayersRevision((value) => value + 1);
-    if (map.current) {
-      setTempLayersData(map.current);
-    }
-    bumpPointsDataRevision();
-  }, [bumpPointsDataRevision]);
+    void (async () => {
+      if (dataSourceModeRef.current !== DATA_SOURCE_MODES.TEMP) {
+        await handleDataSourceModeChange(DATA_SOURCE_MODES.TEMP);
+      }
+      deleteTempLayer(layerId);
+      persistTempLayers().catch(() => {});
+      setTempLayersRevision((value) => value + 1);
+      if (map.current) {
+        setTempLayersData(map.current);
+      }
+      bumpPointsDataRevision();
+    })();
+  }, [bumpPointsDataRevision, handleDataSourceModeChange]);
 
   const refreshTempLayersUi = useCallback(() => {
     setTempLayersRevision((value) => value + 1);
@@ -1514,6 +1551,9 @@ export default function MapView() {
   const handleTempLayerArchive = useCallback(
     async (layerId) => {
       setTempArchiveStatus("");
+      if (dataSourceModeRef.current !== DATA_SOURCE_MODES.TEMP) {
+        await handleDataSourceModeChange(DATA_SOURCE_MODES.TEMP);
+      }
       const result = await archiveWorkingPlaque(layerId).catch(() => ({
         ok: false,
         reason: "persist"
@@ -1526,11 +1566,12 @@ export default function MapView() {
       }
       handleOpenTempArchive();
     },
-    [handleOpenTempArchive, refreshTempLayersUi]
+    [handleOpenTempArchive, refreshTempLayersUi, handleDataSourceModeChange]
   );
 
   const handleTempArchiveRestore = useCallback(
     async (archiveId) => {
+      await handleDataSourceModeChange(DATA_SOURCE_MODES.TEMP);
       const result = await restoreArchivedPlaque(archiveId).catch(() => ({
         ok: false,
         reason: "persist"
@@ -1548,7 +1589,7 @@ export default function MapView() {
       }
       setTempArchiveStatus("");
     },
-    [refreshTempLayersUi]
+    [refreshTempLayersUi, handleDataSourceModeChange]
   );
 
   const handleTempArchiveExport = useCallback(async (archiveId, format) => {
@@ -1604,12 +1645,15 @@ export default function MapView() {
   }, []);
 
   const handleTempLayersChange = useCallback(() => {
-    setTempLayersRevision((value) => value + 1);
-    if (map.current) {
-      setTempLayersData(map.current);
-    }
-    bumpPointsDataRevision();
-  }, [bumpPointsDataRevision]);
+    void handleDataSourceModeChange(DATA_SOURCE_MODES.TEMP).then(() => {
+      setTempLayersRevision((value) => value + 1);
+      if (map.current) {
+        setTempLayersData(map.current);
+        setTempLayersVisibility(map.current, true);
+      }
+      bumpPointsDataRevision();
+    });
+  }, [bumpPointsDataRevision, handleDataSourceModeChange]);
 
   const handleExternalLayerToggle = useCallback((layerId, enabled) => {
     setExternalLayersEnabled((prev) => {
@@ -1643,7 +1687,7 @@ export default function MapView() {
     includeInat: externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST],
     includeMerged: mergedOnly,
     includeRedBook: redbookOnly,
-    includeTemp: externalOnly
+    includeTemp: tempOnly
   };
 
   const syncYearBounds = useCallback(() => {
@@ -2298,7 +2342,10 @@ export default function MapView() {
   }, [externalSourcesLoadActive, pinPanelsToTaskbar]);
 
   const handleOpenExternalLoadPanel = useCallback(() => {
-    if (dataSourceMode !== DATA_SOURCE_MODES.EXTERNAL) {
+    if (
+      dataSourceMode !== DATA_SOURCE_MODES.EXTERNAL &&
+      dataSourceMode !== DATA_SOURCE_MODES.TEMP
+    ) {
       handleDataSourceModeChange(DATA_SOURCE_MODES.EXTERNAL);
     }
     restorePanel(PANEL_IDS.DATA_SOURCES);
@@ -4067,9 +4114,11 @@ export default function MapView() {
   useEffect(() => {
     setExternalSourcesLoadContext({
       map: mapReady ? map.current : null,
-      onDataChange: handleExternalDataChange
+      onDataChange: handleExternalDataChange,
+      onEnterTempWorkingSet: () => handleDataSourceModeChange(DATA_SOURCE_MODES.TEMP),
+      onEnterExternalWorkingSet: () => handleDataSourceModeChange(DATA_SOURCE_MODES.EXTERNAL)
     });
-  }, [mapReady, handleExternalDataChange]);
+  }, [mapReady, handleExternalDataChange, handleDataSourceModeChange]);
 
   useEffect(() => {
     if (externalOnly === prevExternalOnlyRef.current) {
@@ -4081,11 +4130,11 @@ export default function MapView() {
       const showInat = externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST];
       setGbifVisibility(map.current, showGbif);
       setInatVisibility(map.current, showInat);
-      setTempLayersVisibility(map.current, externalOnly);
+      setTempLayersVisibility(map.current, tempOnly);
     }
 
     prevExternalOnlyRef.current = externalOnly;
-  }, [externalOnly, externalLayersEnabled]);
+  }, [externalOnly, tempOnly, externalLayersEnabled]);
 
   useEffect(() => {
     setToolFeaturesContext({
@@ -4120,6 +4169,7 @@ export default function MapView() {
   }, [
     localDataActive,
     externalOnly,
+    tempOnly,
     mergedOnly,
     redbookOnly,
     externalLayersEnabled,
@@ -4140,7 +4190,8 @@ export default function MapView() {
 
     const includeGbif = Boolean(externalLayersEnabled[EXTERNAL_LAYER_IDS.GBIF]);
     const includeInat = Boolean(externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST]);
-    const unifyExternal = externalOnly && includeGbif && includeInat;
+    const unifyExternal =
+      externalOnly && includeGbif && includeInat && !compactPointDisplay;
 
     setExternalUnifiedClusteringEnabled(unifyExternal, {
       includeGbif: externalOnly ? includeGbif : true,
@@ -4175,7 +4226,7 @@ export default function MapView() {
       }
     }
 
-    setTempLayersVisibility(map.current, externalOnly && mapMarkersVisible);
+    setTempLayersVisibility(map.current, tempOnly && mapMarkersVisible);
 
     setMergedVisibility(
       map.current,
@@ -4189,13 +4240,15 @@ export default function MapView() {
     mapMarkersVisible,
     localDataActive,
     externalOnly,
+    tempOnly,
     mergedOnly,
     redbookOnly,
     externalLayersEnabled,
     mergedPointsVisible,
     redBookPointsVisible,
     locationFilters,
-    mapReady
+    mapReady,
+    compactPointDisplay
   ]);
 
   useEffect(() => {
@@ -4204,10 +4257,10 @@ export default function MapView() {
     }
 
     const grouping = {
-      clusteringEnabled,
+      clusteringEnabled: clusteringEnabled && !compactPointDisplay,
       clusterByRegnum,
-      clusterPieCharts,
-      denseClustersHighlight
+      clusterPieCharts: clusterPieCharts && !compactPointDisplay,
+      denseClustersHighlight: denseClustersHighlight && !compactPointDisplay
     };
     applyLocationsGroupingMode(map.current, grouping);
     applyGbifGroupingMode(map.current, grouping);
@@ -4216,13 +4269,14 @@ export default function MapView() {
     applyTempLayersGroupingMode(map.current, {
       clusterByTempLayers,
       clusterByTempSublayers,
-      clusterPieCharts,
-      clusteringEnabled,
-      denseClustersHighlight
+      clusterPieCharts: grouping.clusterPieCharts,
+      clusteringEnabled: grouping.clusteringEnabled,
+      denseClustersHighlight: grouping.denseClustersHighlight
     });
     refreshClusterPieChartMarkers(map.current);
   }, [
     clusteringEnabled,
+    compactPointDisplay,
     clusterByRegnum,
     clusterByTempLayers,
     clusterByTempSublayers,
@@ -4563,6 +4617,10 @@ export default function MapView() {
   };
 
   const handleClusteringEnabledChange = (enabled) => {
+    if (enabled && compactPointDisplay) {
+      setCompactPointDisplayState(false);
+      setCompactPointDisplayEnabled(false);
+    }
     if (!enabled) {
       setClusterPieChartsState(false);
       const pointCount = getVisibleMapPointCount();
@@ -4608,6 +4666,10 @@ export default function MapView() {
   };
 
   const handleDenseClustersHighlightChange = (enabled) => {
+    if (enabled && compactPointDisplay) {
+      setCompactPointDisplayState(false);
+      setCompactPointDisplayEnabled(false);
+    }
     if (enabled) {
       setMarkersVisibleState(true);
       setDenseGroupsHidden(false);
@@ -4623,6 +4685,95 @@ export default function MapView() {
 
     setDenseClustersHighlightState(enabled);
   };
+
+  const handleCompactPointDisplayChange = (enabled, options = {}) => {
+    const next = Boolean(enabled);
+    if (!next && getDisplayedLayerPointCount() > getCompactGridPointLimit()) {
+      return;
+    }
+    compactGridAutoRef.current = Boolean(options.auto);
+    setCompactPointDisplayState(next);
+    setCompactPointDisplayEnabled(next);
+    if (next) {
+      setDenseClustersHighlightState(false);
+    }
+    if (!map.current) {
+      return;
+    }
+    const grouping = {
+      clusteringEnabled: clusteringEnabled && !next,
+      clusterByRegnum,
+      clusterPieCharts: clusterPieCharts && !next,
+      denseClustersHighlight: false
+    };
+    applyLocationsGroupingMode(map.current, grouping);
+    applyGbifGroupingMode(map.current, grouping);
+    applyInatGroupingMode(map.current, grouping);
+    applyMergedGroupingMode(map.current, grouping);
+    applyTempLayersGroupingMode(map.current, {
+      clusterByTempLayers,
+      clusterByTempSublayers,
+      clusterPieCharts: grouping.clusterPieCharts,
+      clusteringEnabled: grouping.clusteringEnabled,
+      denseClustersHighlight: false
+    });
+    applyLocationsFilter(map.current, locationFilters);
+    applyGbifLocationsFilter(map.current, locationFilters);
+    applyInatLocationsFilter(map.current, locationFilters);
+    setTempLayersData(map.current);
+  };
+
+  const refreshCompactMapLayers = () => {
+    if (!map.current || !compactPointDisplay) {
+      return;
+    }
+    applyLocationsFilter(map.current, locationFilters);
+    applyGbifLocationsFilter(map.current, locationFilters);
+    applyInatLocationsFilter(map.current, locationFilters);
+    setTempLayersData(map.current);
+  };
+
+  const handleCompactGridSettingsChange = (next) => {
+    const prev = compactGridSettings;
+    const saved = setCompactGridSettings(next);
+    setCompactGridSettingsState(saved);
+    if (!map.current) {
+      return;
+    }
+    const geometryChanged =
+      prev.pointLimit !== saved.pointLimit || prev.cellsPerTile !== saved.cellsPerTile;
+    if (geometryChanged && compactPointDisplay) {
+      refreshCompactMapLayers();
+      return;
+    }
+    applyCompactGridAppearance(map.current, getTempCompactGridLayerColor);
+  };
+
+  useEffect(() => {
+    const count = getDisplayedLayerPointCount();
+    setCompactDisplayedLayerPointCount(count);
+    setDisplayedLayerPointCountState(count);
+    const over = count > getCompactGridPointLimit();
+    if (over && !compactPointDisplay) {
+      handleCompactPointDisplayChange(true, { auto: true });
+    } else if (!over && compactGridAutoRef.current && compactPointDisplay) {
+      handleCompactPointDisplayChange(false);
+    }
+    // handleCompactPointDisplayChange замыкается на текущий рендер.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    compactPointDisplay,
+    compactGridSettings.pointLimit,
+    dataSourceMode,
+    pointsDataRevision,
+    tempLayersRevision,
+    externalLayersEnabled,
+    localDataActive,
+    tempOnly,
+    mergedOnly,
+    redbookOnly,
+    mapReady
+  ]);
 
   const handleDenseGroupsHiddenToggle = useCallback(() => {
     if (denseGroupsHidden) {
@@ -4793,11 +4944,7 @@ export default function MapView() {
       handleBufferReset();
       handleSpeciesPolygonResetAll();
       handleAreaReset();
-      handleDataSourceModeChange(DATA_SOURCE_MODES.EXTERNAL);
-      setExternalLayersEnabled({
-        [EXTERNAL_LAYER_IDS.GBIF]: false,
-        [EXTERNAL_LAYER_IDS.INATURALIST]: false
-      });
+      handleDataSourceModeChange(DATA_SOURCE_MODES.TEMP);
       persistTempLayers().catch(() => {});
       setTempLayersRevision((value) => value + 1);
       if (map.current) {
@@ -5863,9 +6010,6 @@ export default function MapView() {
         }
 
         await initLocationsFromFirestore();
-        await hydrateGbifStoreFromPersistence();
-        await hydrateInatStoreFromPersistence();
-        await hydrateTempLayersFromPersistence();
         hydrateRedBookStoreFromPersistence();
 
         // Cleanup (HMR / размонтирование) мог уничтожить карту, пока ждали hydrate.
@@ -6648,6 +6792,14 @@ export default function MapView() {
               onClusterPieChartsChange={handleClusterPieChartsChange}
               denseClustersHighlight={denseClustersHighlight}
               onDenseClustersHighlightChange={handleDenseClustersHighlightChange}
+              compactPointDisplay={compactPointDisplay}
+              compactGridForced={
+                displayedLayerPointCount > compactGridSettings.pointLimit
+              }
+              displayedLayerPointCount={displayedLayerPointCount}
+              compactGridPointLimit={compactGridSettings.pointLimit}
+              onCompactPointDisplayChange={handleCompactPointDisplayChange}
+              onCompactGridSettingsOpen={() => setCompactGridSettingsOpen(true)}
               onDenseProcessingOpen={handleDenseProcessingOpen}
               mergedPointsVisible={mergedPointsVisible}
               onMergedPointsVisibleChange={(visible) => {
@@ -7127,6 +7279,12 @@ export default function MapView() {
         settings={heatmapSettings}
         onSettingsChange={handleHeatmapSettingsChange}
         onClose={() => setHeatmapSettingsOpen(false)}
+      />
+      <CompactGridSettingsPanel
+        open={compactGridSettingsOpen}
+        settings={compactGridSettings}
+        onSettingsChange={handleCompactGridSettingsChange}
+        onClose={() => setCompactGridSettingsOpen(false)}
       />
     </>
   );

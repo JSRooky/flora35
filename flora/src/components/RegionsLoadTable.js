@@ -36,6 +36,21 @@ import {
   fetchRegionKingdomPreviews
 } from "../externalSources/fetchRegionKingdomPreviews";
 import { DownloadIcon, RefreshIcon, TrashIcon } from "../images/buttons";
+import LoadDestinationSelect, {
+  LOAD_LAYER_DEST,
+  finalizeLoadDestination,
+  isExternalLoadDestination
+} from "./LoadDestinationSelect";
+import { getTempLayerLoadBlockMessage } from "../tempLayers/tempLayerStore";
+import { estimateTempGeoJsonBytes, formatTempDataSize } from "../tempLayers/tempLayerMemory";
+import { resolveReusableExternalLoad } from "../externalSources/reuseLoadedFeatures";
+
+const KINGDOM_SHORT_LABELS = {
+  plantae: "Раст.",
+  animalia: "Жив.",
+  fungi: "Грибы",
+  protozoa: "Прост."
+};
 
 function formatCount(value) {
   if (value == null || Number.isNaN(Number(value))) {
@@ -133,7 +148,8 @@ export default function RegionsLoadTable({
   map = null,
   onLoadError,
   regions = null,
-  spatialByRegionId = null
+  spatialByRegionId = null,
+  onTempLayersChange
 }) {
   const regionList = Array.isArray(regions) ? regions : EXTERNAL_REGIONS;
   const previewRegions = useMemo(
@@ -155,6 +171,8 @@ export default function RegionsLoadTable({
   const [busyRegionId, setBusyRegionId] = useState(null);
   const [datasetRevision, setDatasetRevision] = useState(0);
   const [previewStatus, setPreviewStatus] = useState("loading");
+  const [destination, setDestination] = useState(LOAD_LAYER_DEST.EXTERNAL);
+  const createdPlaqueKeyRef = useRef("");
   const abortRef = useRef(null);
 
   useEffect(() => {
@@ -200,12 +218,30 @@ export default function RegionsLoadTable({
   }, [filter, regionList]);
 
   const isInat = source === "inat";
+  const intoTempStaging = !isExternalLoadDestination(destination);
   // Перечитываем store после загрузки/удаления.
   void datasetRevision;
   const loadedQuery = isInat ? getInatLoadedQuery() : getGbifLoadedQuery();
   const loadedRegionIds = isInat ? getInatLoadedRegionIds() : getGbifLoadedRegionIds();
   const loadedKingdomsLabel = formatLoadedKingdoms(loadedQuery);
   const syncedAt = isInat ? getInatSyncedAt() : getGbifSyncedAt();
+
+  useEffect(() => {
+    createdPlaqueKeyRef.current = "";
+  }, [destination, source]);
+
+  const commitLoadedPoints = useCallback(async () => {
+    if (!intoTempStaging) {
+      return;
+    }
+    const layer = await finalizeLoadDestination(destination, onTempLayersChange, {
+      forceNew: true,
+      plaqueKey: createdPlaqueKeyRef.current
+    });
+    if (layer?.groupKey) {
+      createdPlaqueKeyRef.current = layer.groupKey;
+    }
+  }, [destination, intoTempStaging, onTempLayersChange]);
 
   const toggleKingdom = useCallback((regionId, kingdomId) => {
     setKingdomsByRegion((prev) => {
@@ -288,6 +324,24 @@ export default function RegionsLoadTable({
     async (region, { incremental }) => {
       const kingdomIds = kingdomsByRegion[region.id] || [];
       const loadRegion = withLoadSpatialOverride(region, spatialByRegionId);
+      const selectedCount = resolveSelectedCount(previews[region.id], kingdomIds);
+      const query = buildLoadQuery(region.id, kingdomIds);
+      if (intoTempStaging && !incremental) {
+        const reuse = resolveReusableExternalLoad({
+          source: source === "inat" ? "inat" : "gbif",
+          region: loadRegion,
+          kingdomId: query.kingdomId || "",
+          query,
+          extras: {}
+        });
+        if (reuse.mode !== "reuse") {
+          const incoming = typeof selectedCount === "number" ? selectedCount : 0;
+          const blocked = getTempLayerLoadBlockMessage(incoming);
+          if (blocked && incoming > 0) {
+            throw new Error(blocked);
+          }
+        }
+      }
 
       if (source === "inat") {
         const inatRegion = toInatSpatialRegion(loadRegion);
@@ -301,7 +355,6 @@ export default function RegionsLoadTable({
           extras = withInatUpdateSinceExtras(inatExtras, syncedAt);
         }
 
-        const selectedCount = resolveSelectedCount(previews[region.id], kingdomIds);
         let previewCount = incremental ? null : selectedCount;
         if (incremental && selectedCount == null) {
           previewCount = await previewObservationCount(inatRegion, {
@@ -310,18 +363,19 @@ export default function RegionsLoadTable({
           });
         }
 
-        const query = {
-          ...buildLoadQuery(region.id, kingdomIds),
+        const inatQuery = {
+          ...query,
           qualityGrade: INAT_QUALITY_MODES.RESEARCH
         };
 
         await startInatExternalLoad({
           region: inatRegion,
-          kingdomId: query.kingdomId || "",
+          kingdomId: inatQuery.kingdomId || "",
           qualityGrade: INAT_QUALITY_MODES.RESEARCH,
           extras,
-          query,
-          previewCount
+          query: inatQuery,
+          previewCount,
+          intoTempStaging
         });
         return;
       }
@@ -331,8 +385,6 @@ export default function RegionsLoadTable({
         throw new Error(`У региона «${region.label}» нет GADM-идентификатора`);
       }
 
-      const selectedCount = resolveSelectedCount(previews[region.id], kingdomIds);
-      const query = buildLoadQuery(region.id, kingdomIds);
       const loadTargets = kingdomIds.length > 0 ? kingdomIds : [null];
 
       for (let index = 0; index < loadTargets.length; index += 1) {
@@ -362,11 +414,12 @@ export default function RegionsLoadTable({
           kingdomId: kingdomId || "",
           extras,
           query,
-          previewCount
+          previewCount,
+          intoTempStaging
         });
       }
     },
-    [kingdomsByRegion, previews, source, spatialByRegionId, syncedAt]
+    [destination, intoTempStaging, kingdomsByRegion, previews, source, spatialByRegionId, syncedAt]
   );
 
   const runRegionLoad = useCallback(
@@ -380,6 +433,7 @@ export default function RegionsLoadTable({
 
       try {
         await loadOneRegion(region, { incremental });
+        await commitLoadedPoints();
         setDatasetRevision((value) => value + 1);
       } catch (error) {
         onLoadError?.(error?.message || "Не удалось выполнить загрузку");
@@ -387,7 +441,7 @@ export default function RegionsLoadTable({
         setBusyRegionId(null);
       }
     },
-    [busyRegionId, loadOneRegion, map, onLoadError]
+    [busyRegionId, commitLoadedPoints, loadOneRegion, map, onLoadError]
   );
 
   const clearRegionDataset = useCallback(
@@ -446,6 +500,33 @@ export default function RegionsLoadTable({
         return;
       }
 
+      if (intoTempStaging && !incremental) {
+        const incoming = targets.reduce((sum, item) => {
+          const count = resolveSelectedCount(
+            previews[item.id],
+            kingdomsByRegion[item.id] || []
+          );
+          const loadRegion = withLoadSpatialOverride(item, spatialByRegionId);
+          const query = buildLoadQuery(item.id, kingdomsByRegion[item.id] || []);
+          const reuse = resolveReusableExternalLoad({
+            source: source === "inat" ? "inat" : "gbif",
+            region: loadRegion,
+            kingdomId: query.kingdomId || "",
+            query,
+            extras: {}
+          });
+          if (reuse.mode === "reuse") {
+            return sum;
+          }
+          return sum + (typeof count === "number" ? count : 0);
+        }, 0);
+        const blocked = getTempLayerLoadBlockMessage(incoming);
+        if (blocked) {
+          onLoadError?.(blocked);
+          return;
+        }
+      }
+
       onLoadError?.(null);
 
       try {
@@ -453,6 +534,7 @@ export default function RegionsLoadTable({
           setBusyRegionId(region.id);
           await loadOneRegion(region, { incremental });
         }
+        await commitLoadedPoints();
         setDatasetRevision((value) => value + 1);
       } catch (error) {
         onLoadError?.(error?.message || "Не удалось выполнить загрузку");
@@ -464,9 +546,15 @@ export default function RegionsLoadTable({
     [
       availableFilteredRegions,
       busyRegionId,
+      commitLoadedPoints,
+      intoTempStaging,
+      kingdomsByRegion,
       loadOneRegion,
       map,
       onLoadError,
+      previews,
+      source,
+      spatialByRegionId,
       syncedAt
     ]
   );
@@ -478,7 +566,7 @@ export default function RegionsLoadTable({
     !batchBusy &&
     !isExternalSourcesLoadActive() &&
     availableFilteredRegions.length > 0;
-  const canUpdateAll = canLoadAll && Boolean(syncedAt);
+  const canUpdateAll = canLoadAll && Boolean(syncedAt) && !intoTempStaging;
 
   return (
     <div className="regions-load-table-wrap">
@@ -515,6 +603,13 @@ export default function RegionsLoadTable({
             iNaturalist
           </button>
         </div>
+
+        <LoadDestinationSelect
+          value={destination}
+          onChange={setDestination}
+          source={source}
+          disabled={batchBusy || isExternalSourcesLoadActive()}
+        />
 
         <label className="regions-load-table-filter">
           <span className="gbif-panel-label">Поиск</span>
@@ -565,13 +660,20 @@ export default function RegionsLoadTable({
               }`
             : previewStatus === "error"
               ? "Не удалось полностью оценить регионы"
-              : `Регионов: ${formatCount(filteredRegions.length)}. Точек: ${formatCount(
-                  kingdomTotals.plantae
-                )} / ${formatCount(kingdomTotals.animalia)} / ${formatCount(
-                  kingdomTotals.fungi
-                )} / ${formatCount(kingdomTotals.protozoa)}. Суммарный объём: ${formatMegabytes(
+              : `Регионов: ${formatCount(filteredRegions.length)}. Объём: ${formatMegabytes(
                   totalEstimatedBytes
-                )}. Клик по числу — выбрать царство (можно несколько; пусто = все).`}
+                )}${
+                  intoTempStaging && totalEstimatedBytes != null
+                    ? ` · во временном слое ~${formatTempDataSize(
+                        estimateTempGeoJsonBytes(
+                          Object.values(kingdomTotals).reduce(
+                            (sum, value) => sum + (typeof value === "number" ? value : 0),
+                            0
+                          )
+                        )
+                      )}`
+                    : ""
+                }.`}
         </p>
       </div>
 
@@ -581,8 +683,8 @@ export default function RegionsLoadTable({
             <tr>
               <th scope="col">Регион</th>
               {GBIF_KINGDOMS.map((kingdom) => (
-                <th key={kingdom.id} scope="col">
-                  {kingdom.label}
+                <th key={kingdom.id} scope="col" title={kingdom.label}>
+                  {KINGDOM_SHORT_LABELS[kingdom.id] || kingdom.label}
                 </th>
               ))}
               <th scope="col">Объём</th>
@@ -596,7 +698,7 @@ export default function RegionsLoadTable({
               const selectedBytes = resolveSelectedBytes(preview, kingdomIds);
               const isLoaded = loadedRegionIds.has(region.id);
               const rowBusy = busyRegionId === region.id;
-              const canUpdate = isLoaded && Boolean(syncedAt);
+              const canUpdate = isLoaded && Boolean(syncedAt) && !intoTempStaging;
               const hasSpatial = isInat
                 ? Boolean(toInatSpatialRegion(region))
                 : Boolean(toGbifSpatialRegion(region));

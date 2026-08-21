@@ -2,7 +2,8 @@ import {
   replaceTempLayerArchiveIndex,
   replaceTempLayers,
   serializeTempLayers,
-  toArchiveIndexEntry
+  toArchiveIndexEntry,
+  canPersistTempLayersSafely
 } from "./tempLayerStore";
 
 const DB_NAME = "flora35-temp-layers";
@@ -48,6 +49,10 @@ function idbRequest(request) {
 }
 
 export async function persistTempLayers() {
+  if (!canPersistTempLayersSafely()) {
+    return;
+  }
+
   const db = await openDb();
   try {
     const tx = db.transaction(STORE_NAME, "readwrite");

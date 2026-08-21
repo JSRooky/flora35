@@ -1,22 +1,23 @@
 import { stampFeatureRegionIds } from "../externalSources/regionVisibility";
 import { getExternalRegionById } from "../externalSources/regions";
 import { TEMP_LAYER_MARKER_PALETTE } from "./tempLayerPalette";
+import {
+  TEMP_WORKING_SET_POINT_LIMIT,
+  evaluateTempLayerBudget,
+  formatTempBudgetBlockMessage
+} from "./tempLayerMemory";
 
 export { TEMP_LAYER_MARKER_PALETTE } from "./tempLayerPalette";
 
 const listeners = new Set();
 
 function cloneFeature(feature) {
-  try {
-    return JSON.parse(JSON.stringify(feature));
-  } catch {
-    return {
-      type: "Feature",
-      id: feature?.id,
-      geometry: feature?.geometry ?? null,
-      properties: { ...(feature?.properties ?? {}) }
-    };
-  }
+  return {
+    type: feature?.type || "Feature",
+    id: feature?.id,
+    geometry: feature?.geometry ?? null,
+    properties: { ...(feature?.properties ?? {}) }
+  };
 }
 
 function cloneJson(value) {
@@ -214,6 +215,7 @@ export function normalizeTempLayerMarkerColor(color) {
  *   features: object[]
  * }>} */
 let layers = [];
+let tempGeometriesHeld = false;
 
 function emit() {
   listeners.forEach((listener) => {
@@ -223,6 +225,25 @@ function emit() {
       // подписчик не должен ломать остальных
     }
   });
+}
+
+export function areTempLayerGeometriesHeld() {
+  if (layers.some((layer) => layer.unloaded)) {
+    return false;
+  }
+  return tempGeometriesHeld;
+}
+
+/** Снимает GeoJSON точек с RAM, оставляя метаданные табличек. IndexedDB не трогает. */
+export function unloadTempLayerGeometries() {
+  layers = layers.map((layer) => ({
+    ...layer,
+    features: [],
+    overlays: [],
+    unloaded: true
+  }));
+  tempGeometriesHeld = false;
+  emit();
 }
 
 export function isRegionTempLayer(layer) {
@@ -392,6 +413,60 @@ export function getTempLayerStagingCount() {
   return staging.features.length;
 }
 
+/** Все точки во вкладке: staging + все плашки, включая скрытые. */
+export function getTempLayerRamPointCount() {
+  let count = staging.features.length;
+  layers.forEach((layer) => {
+    count += Array.isArray(layer?.features) ? layer.features.length : 0;
+  });
+  return count;
+}
+
+export function getTempLayerBudgetStatus(incomingCount = 0) {
+  return evaluateTempLayerBudget({
+    currentCount: getTempLayerRamPointCount(),
+    incomingCount
+  });
+}
+
+export function getTempLayerLoadBlockMessage(incomingCount = 0) {
+  const status = getTempLayerBudgetStatus(incomingCount);
+  return status.ok ? null : formatTempBudgetBlockMessage(status);
+}
+
+export function collectTempLayerFeaturesForRegion(source, regionId) {
+  const wanted = String(regionId || "");
+  const src = normalizeTempSource(source);
+  if (!wanted) {
+    return [];
+  }
+
+  const seen = new Set();
+  const features = [];
+  const take = (feature) => {
+    if (String(feature?.properties?.region_id || "") !== wanted) {
+      return;
+    }
+    const key = featureStableKey(feature);
+    if (key) {
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+    }
+    features.push(feature);
+  };
+
+  staging.features.forEach(take);
+  layers.forEach((layer) => {
+    if (normalizeTempSource(layer.source) !== src) {
+      return;
+    }
+    (layer.features ?? []).forEach(take);
+  });
+  return features;
+}
+
 export function getTempTaxonGroupKey(input = {}) {
   const taxonKeys = Array.isArray(input.taxonKeys)
     ? [...new Set(input.taxonKeys.map(String).filter(Boolean))].sort()
@@ -461,13 +536,19 @@ export function upsertTempLayerStagingFeatures(features, regionId) {
     if (regionId && !staging.regionIds.includes(regionId)) {
       staging.regionIds = [...staging.regionIds, regionId];
     }
-    return { added: 0 };
+    return { added: 0, overBudget: false };
   }
 
   stampFeatureRegionIds(features, regionId);
   let added = 0;
+  let overBudget = false;
+  let ramCount = getTempLayerRamPointCount();
 
   features.forEach((feature) => {
+    if (ramCount >= TEMP_WORKING_SET_POINT_LIMIT) {
+      overBudget = true;
+      return;
+    }
     const key = featureStableKey(feature);
     if (!key || staging.keys.has(key)) {
       return;
@@ -475,13 +556,14 @@ export function upsertTempLayerStagingFeatures(features, regionId) {
     staging.keys.add(key);
     staging.features.push(feature);
     added += 1;
+    ramCount += 1;
   });
 
   if (regionId && !staging.regionIds.includes(regionId)) {
     staging.regionIds = [...staging.regionIds, regionId];
   }
 
-  return { added };
+  return { added, overBudget };
 }
 
 export function clearTempLayerStaging() {
@@ -647,9 +729,25 @@ function createLayerId() {
   return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function commitTempLayerStaging() {
+export function commitTempLayerStaging(options = {}) {
   if (staging.features.length === 0) {
     return null;
+  }
+
+  const plaqueKey = String(options?.plaqueKey || "").trim();
+  const forceNew = Boolean(options?.forceNew);
+
+  if (plaqueKey) {
+    const plaque = listTempLayerPlaques().find((item) => item.key === plaqueKey);
+    const base = plaque?.layers?.[0];
+    if (base) {
+      const buckets = bucketFeaturesBySource(staging.features);
+      mergeBucketsIntoPlaque(base, buckets, staging.regionIds);
+      staging = createEmptyStaging();
+      tempGeometriesHeld = true;
+      emit();
+      return layers.find((layer) => layerGroupKey(layer) === plaqueKey) || base;
+    }
   }
 
   const source = normalizeTempSource(staging.source);
@@ -665,9 +763,11 @@ export function commitTempLayerStaging() {
   const sibling = layers.find(
     (layer) => layerGroupKey(layer) === groupKey && normalizeTempSource(layer.source) !== source
   );
-  const sameSource = layers.find(
-    (layer) => layerGroupKey(layer) === groupKey && normalizeTempSource(layer.source) === source
-  );
+  const sameSource = forceNew
+    ? null
+    : layers.find(
+        (layer) => layerGroupKey(layer) === groupKey && normalizeTempSource(layer.source) === source
+      );
   const markerColor = sibling?.markerColor ?? sameSource?.markerColor ?? null;
   const taxonFields = {
     taxonName: staging.taxonName || sibling?.taxonName || "",
@@ -733,6 +833,7 @@ export function commitTempLayerStaging() {
   );
   layers = [layer, ...layers];
   staging = createEmptyStaging();
+  tempGeometriesHeld = true;
   emit();
   return layer;
 }
@@ -833,6 +934,7 @@ export function createTempLayerFromFilterSnapshot({ features, filters, overlays 
       createdIds.has(layer.id) ? layer : { ...layer, visible: false }
     )
   ];
+  tempGeometriesHeld = true;
   emit();
   return { ok: true, layers: created };
 }
@@ -1296,6 +1398,7 @@ export function replaceTempLayers(nextLayers) {
   layers = explodeMixedRegionPointLayers(
     Array.isArray(nextLayers) ? nextLayers.map(normalizePersistedLayer) : []
   );
+  tempGeometriesHeld = true;
   emit();
 }
 
@@ -1411,7 +1514,7 @@ export function getAllTempLayerFeatures() {
 }
 
 export function getAllTempLayerFeatureCount() {
-  return getAllTempLayerFeatures().length;
+  return getTempLayerRamPointCount();
 }
 
 /** Группы для кластеризации «по слоям»: одна единица на плашку (GBIF+iNat вместе). */
@@ -1508,6 +1611,10 @@ export function listTempLayerPlaques() {
 
 export function serializeTempLayers() {
   return layers.map((layer) => serializeLayer(layer));
+}
+
+export function canPersistTempLayersSafely() {
+  return tempGeometriesHeld && !layers.some((layer) => layer.unloaded);
 }
 
 /** @type {Array<object>} */

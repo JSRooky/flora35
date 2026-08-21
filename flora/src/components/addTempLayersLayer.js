@@ -1,5 +1,16 @@
 import { DEFAULT_CLUSTER_COLOR, DEFAULT_POINT_COLOR, getPointColorExpression } from "./pointColors";
 import {
+  addCompactGridLayers,
+  buildCompactViewportFromGeojson,
+  compactCircleRadiusExpression,
+  compactDensityFalseFilter,
+  compactGridLayerIds,
+  easeToCompactDensityCell,
+  ensureCompactViewportSync,
+  isCompactDensityFeature,
+  isCompactPointDisplayEnabled
+} from "../map/compactPointDisplay";
+import {
   getTempLayerFeatureGroups,
   getTempLayerPlaqueFeatureGroups,
   getVisibleTempLayerFeatures,
@@ -182,6 +193,9 @@ function sanitizeUnitId(id) {
 }
 
 function isTempMapboxClusteringActive() {
+  if (isCompactPointDisplayEnabled()) {
+    return false;
+  }
   return clusteringEnabled && !denseClustersHighlightEnabled;
 }
 
@@ -288,11 +302,14 @@ function getClusterPaint(markerColor) {
 function applyVisibility(map) {
   const visibility = layerVisible ? "visible" : "none";
   activeUnits.forEach((unit) => {
-    [unit.clusterLayerId, unit.countLayerId, unit.pointLayerId].forEach((layerId) => {
-      if (map?.getLayer?.(layerId)) {
-        map.setLayoutProperty(layerId, "visibility", visibility);
+    const { fillId, lineId } = compactGridLayerIds(unit.sourceId);
+    [unit.clusterLayerId, unit.countLayerId, unit.pointLayerId, fillId, lineId].forEach(
+      (layerId) => {
+        if (map?.getLayer?.(layerId)) {
+          map.setLayoutProperty(layerId, "visibility", visibility);
+        }
       }
-    });
+    );
   });
   [TEMP_DENSE_PILES_CLUSTER_LAYER_ID, TEMP_DENSE_PILES_COUNT_LAYER_ID].forEach((layerId) => {
     if (map?.getLayer?.(layerId)) {
@@ -349,11 +366,14 @@ function detachInteractions(map) {
 function removeTempLayersFromMap(map) {
   detachInteractions(map);
   activeUnits.forEach((unit) => {
-    [unit.clusterLayerId, unit.countLayerId, unit.pointLayerId].forEach((layerId) => {
-      if (map.getLayer(layerId)) {
-        map.removeLayer(layerId);
+    const { fillId, lineId } = compactGridLayerIds(unit.sourceId);
+    [unit.clusterLayerId, unit.countLayerId, unit.pointLayerId, fillId, lineId].forEach(
+      (layerId) => {
+        if (map.getLayer(layerId)) {
+          map.removeLayer(layerId);
+        }
       }
-    });
+    );
     if (map.getSource(unit.sourceId)) {
       map.removeSource(unit.sourceId);
     }
@@ -379,7 +399,10 @@ function attachInteractions(map) {
     TEMP_DENSE_PILES_COUNT_LAYER_ID
   ].filter((layerId) => map.getLayer(layerId));
   const pointLayerIds = activeUnits
-    .map((unit) => unit.pointLayerId)
+    .flatMap((unit) => [
+      unit.pointLayerId,
+      compactGridLayerIds(unit.sourceId).fillId
+    ])
     .filter((layerId) => map.getLayer(layerId));
 
   const clusterClick = (event) => {
@@ -446,6 +469,10 @@ function attachInteractions(map) {
     }
     event.preventDefault?.();
     event.originalEvent?.stopPropagation?.();
+    if (isCompactDensityFeature(feature)) {
+      easeToCompactDensityCell(map, feature);
+      return;
+    }
     onPointClickCallback?.(feature);
   };
 
@@ -500,9 +527,10 @@ function addUnitToMap(map, unit) {
   const ids = unitLayerIds(unit.id);
   const collection = {
     type: "FeatureCollection",
-    features: (unit.features ?? []).filter(
-      (feature) => feature?.geometry?.type === "Point"
-    )
+    features: (unit.features ?? []).filter((feature) => {
+      const type = feature?.geometry?.type;
+      return type === "Point" || type === "Polygon";
+    })
   };
   const useClustering = isTempMapboxClusteringActive();
   const clusterProperties = {
@@ -563,21 +591,28 @@ function addUnitToMap(map, unit) {
     id: ids.pointLayerId,
     type: "circle",
     source: ids.sourceId,
-    ...(useClustering ? { filter: ["!", ["has", "point_count"]] } : {}),
+    filter: useClustering
+      ? ["all", compactDensityFalseFilter(), ["!", ["has", "point_count"]]]
+      : compactDensityFalseFilter(),
     paint: {
       "circle-color": circleColorForUnit(unit.markerColor),
-      "circle-radius": 5,
+      "circle-radius": compactCircleRadiusExpression(5),
       "circle-stroke-width": 1,
       "circle-stroke-color": "#ffffff"
     }
   });
+  addCompactGridLayers(map, ids.sourceId, unit.markerColor);
 
-  activeUnits.push(ids);
+  activeUnits.push({ ...ids, markerColor: unit.markerColor });
 }
 
 export function setTempLayersData(map) {
   if (!map?.getSource || !map.getStyle()) {
     return;
+  }
+
+  if (isCompactPointDisplayEnabled()) {
+    ensureCompactViewportSync(map, "temp", () => setTempLayersData(map));
   }
 
   removeTempLayersFromMap(map);
@@ -587,6 +622,14 @@ export function setTempLayersData(map) {
   buildUnits()
     .filter((unit) => unit.features.length > 0)
     .forEach((unit) => {
+      if (isCompactPointDisplayEnabled()) {
+        const built = buildCompactViewportFromGeojson(map, unit.features, "temp");
+        addUnitToMap(map, {
+          ...unit,
+          features: excludeHiddenPinFeatures(built.features)
+        });
+        return;
+      }
       const prepared = prepareMapTempFeatures(unit.features);
       denseClusterFeatures.push(...prepared.denseClusterFeatures);
       (prepared.densePileMembersById ?? new Map()).forEach((members, key) => {
@@ -675,9 +718,18 @@ export function setTempLayersVisibility(map, visible) {
 
 export function getTempLayersInteractiveLayerIds() {
   return [
-    ...activeUnits.flatMap((unit) => [unit.clusterLayerId, unit.pointLayerId]),
+    ...activeUnits.flatMap((unit) => [
+      unit.clusterLayerId,
+      unit.pointLayerId,
+      compactGridLayerIds(unit.sourceId).fillId
+    ]),
     TEMP_DENSE_PILES_CLUSTER_LAYER_ID
   ];
+}
+
+export function getTempCompactGridLayerColor(sourceId) {
+  const unit = activeUnits.find((entry) => entry.sourceId === sourceId);
+  return unit?.markerColor || null;
 }
 
 export function clearTempLayersLayer(map) {

@@ -1,7 +1,15 @@
+import { findInatFeatureById, getInatSlimMapCollection } from "../inaturalist/inatStore";
+import { buildCompactInatViewportFeatures } from "../map/compactInatViewport";
 import {
-  findInatFeatureById,
-  getInatSlimMapCollection
-} from "../inaturalist/inatStore";
+  addCompactGridLayers,
+  compactCircleRadiusExpression,
+  compactDensityFalseFilter,
+  compactGridLayerIds,
+  easeToCompactDensityCell,
+  ensureCompactViewportSync,
+  isCompactDensityFeature,
+  isCompactPointDisplayEnabled
+} from "../map/compactPointDisplay";
 import {
   DEFAULT_CLUSTER_COLOR,
   REGNUM_COLORS,
@@ -126,6 +134,9 @@ function getInatDensePileMembers(feature) {
 }
 
 function isInatMapboxClusteringActive() {
+  if (isCompactPointDisplayEnabled()) {
+    return false;
+  }
   return inatClusteringEnabled && !inatDenseClustersHighlightEnabled;
 }
 
@@ -191,13 +202,28 @@ function getAllInatUnclusteredLayerIds() {
   return [INAT_UNCLUSTERED_LAYER_ID];
 }
 
+function getAllInatCompactGridLayerIds() {
+  return getInatSourceIds().flatMap((sourceId) => {
+    const { fillId, lineId } = compactGridLayerIds(sourceId);
+    return [fillId, lineId];
+  });
+}
+
+function getInatPointClickLayerIds() {
+  return [
+    ...getAllInatUnclusteredLayerIds(),
+    ...getInatSourceIds().map((sourceId) => compactGridLayerIds(sourceId).fillId)
+  ];
+}
+
 function getAllInatLayerIds() {
   const dense = inatDenseClustersHighlightEnabled
     ? [INAT_DENSE_PILES_CLUSTER_LAYER_ID, INAT_DENSE_PILES_COUNT_LAYER_ID]
     : [];
+  const grid = getAllInatCompactGridLayerIds();
 
   if (!isInatMapboxClusteringActive()) {
-    return [INAT_UNCLUSTERED_LAYER_ID, ...dense];
+    return [INAT_UNCLUSTERED_LAYER_ID, ...grid, ...dense];
   }
 
   if (inatClusterByRegnum) {
@@ -209,18 +235,20 @@ function getAllInatLayerIds() {
       INAT_CLUSTER_LAYER_ID,
       INAT_CLUSTER_COUNT_LAYER_ID,
       INAT_UNCLUSTERED_LAYER_ID,
+      ...grid,
       ...dense
     ];
   }
 
   if (inatClusterPieChartsEnabled) {
-    return [INAT_CLUSTER_LAYER_ID, INAT_UNCLUSTERED_LAYER_ID, ...dense];
+    return [INAT_CLUSTER_LAYER_ID, INAT_UNCLUSTERED_LAYER_ID, ...grid, ...dense];
   }
 
   return [
     INAT_CLUSTER_LAYER_ID,
     INAT_CLUSTER_COUNT_LAYER_ID,
     INAT_UNCLUSTERED_LAYER_ID,
+    ...grid,
     ...dense
   ];
 }
@@ -229,7 +257,7 @@ function getAllInatLayerIds() {
 export function getInatInteractiveLayerIds(map) {
   return [
     ...getAllInatClusterLayerIds(),
-    ...getAllInatUnclusteredLayerIds()
+    ...getInatPointClickLayerIds()
   ].filter((layerId) => map?.getLayer(layerId));
 }
 
@@ -257,7 +285,7 @@ function applyInatUnclusteredFilter(map) {
       return;
     }
 
-    const parts = [];
+    const parts = [compactDensityFalseFilter()];
 
     if (isInatMapboxClusteringActive()) {
       parts.push(["!", ["has", "point_count"]]);
@@ -266,11 +294,6 @@ function applyInatUnclusteredFilter(map) {
     hiddenPointFeatureKeys.forEach((key) => {
       parts.push(buildInatPinnedKeyExclusion(key));
     });
-
-    if (parts.length === 0) {
-      map.setFilter(layerId, null);
-      return;
-    }
 
     map.setFilter(layerId, parts.length === 1 ? parts[0] : ["all", ...parts]);
   });
@@ -370,7 +393,7 @@ function attachInteractions(map) {
   detachInteractions(map);
 
   const clusterLayerIds = getAllInatClusterLayerIds().filter((id) => map.getLayer(id));
-  const unclusteredLayerIds = getAllInatUnclusteredLayerIds().filter((id) =>
+  const unclusteredLayerIds = getInatPointClickLayerIds().filter((id) =>
     map.getLayer(id)
   );
 
@@ -451,6 +474,11 @@ function attachInteractions(map) {
     // Не даём клику «провалиться» в map-background clear (локальный mapClick).
     event.preventDefault?.();
     event.originalEvent?.stopPropagation?.();
+
+    if (isCompactDensityFeature(rawFeature)) {
+      easeToCompactDensityCell(map, rawFeature);
+      return;
+    }
 
     const feature = resolveClickedFeature(rawFeature);
     onPointClickCallback?.(feature);
@@ -561,18 +589,21 @@ function addUnclusteredInatLayer(map, sourceId, layerId, regnum = null) {
     id: layerId,
     type: "circle",
     source: sourceId,
-    ...(isInatMapboxClusteringActive()
-      ? { filter: ["!", ["has", "point_count"]] }
-      : {}),
+    filter: isInatMapboxClusteringActive()
+      ? ["all", compactDensityFalseFilter(), ["!", ["has", "point_count"]]]
+      : compactDensityFalseFilter(),
     paint: {
       "circle-color": regnum
         ? getPointColorForRegnum(regnum)
         : getPointColorExpression(),
-      "circle-radius": MARKER_RADIUS,
+      "circle-radius": compactCircleRadiusExpression(MARKER_RADIUS),
       "circle-stroke-width": 1,
       "circle-stroke-color": "#ffffff"
     }
   });
+  if (map.getSource(sourceId)) {
+    addCompactGridLayers(map, sourceId);
+  }
 }
 
 function addClusterInatLayers(map, sourceId, layerIds, regnum = null) {
@@ -691,18 +722,43 @@ function syncInatDensePilesLayers(map, denseClusterFeatures) {
   );
 }
 
-function rebuildInatLayers(map) {
-  if (!map?.getStyle()) {
-    return;
+function bindInatCompactSync(map) {
+  ensureCompactViewportSync(map, "inat", () => {
+    if (!isCompactPointDisplayEnabled() || inatMapUpdatesPaused) {
+      return;
+    }
+    setInatData(map, lastInatInputCollection);
+  });
+}
+
+function getInatPreparedForMap(map, options = {}) {
+  if (isCompactPointDisplayEnabled() && !options.preview) {
+    bindInatCompactSync(map);
+    return {
+      mapFeatures: buildCompactInatViewportFeatures(map).features,
+      denseClusterFeatures: []
+    };
   }
 
   const collection =
     lastInatInputCollection?.type === "FeatureCollection"
       ? lastInatInputCollection
       : getInatSlimMapCollection();
-  const { mapFeatures, denseClusterFeatures } = prepareMapInatFeatures(
-    collection.features ?? []
-  );
+  if (options.preview) {
+    return {
+      mapFeatures: spreadCoincidentFeatures(collection.features ?? []),
+      denseClusterFeatures: []
+    };
+  }
+  return prepareMapInatFeatures(collection.features ?? []);
+}
+
+function rebuildInatLayers(map) {
+  if (!map?.getStyle()) {
+    return;
+  }
+
+  const { mapFeatures, denseClusterFeatures } = getInatPreparedForMap(map);
   const renderFeatures = slimMapFeatures(excludeInatHiddenPinFeatures(mapFeatures));
   removeInatFromMap(map);
 
@@ -816,13 +872,15 @@ export function setInatData(map, collection, options = {}) {
   }
 
   const data = collection?.type === "FeatureCollection" ? collection : EMPTY_FEATURE_COLLECTION;
-  lastInatInputCollection = data;
+  if (!isCompactPointDisplayEnabled() || options.preview) {
+    lastInatInputCollection = data;
+  }
   const { mapFeatures, denseClusterFeatures } = options.preview
     ? {
         mapFeatures: spreadCoincidentFeatures(data.features ?? []),
         denseClusterFeatures: []
       }
-    : prepareMapInatFeatures(data.features ?? []);
+    : getInatPreparedForMap(map, options);
   const preparedFeatures = options.preview
     ? mapFeatures
     : excludeInatHiddenPinFeatures(mapFeatures);
