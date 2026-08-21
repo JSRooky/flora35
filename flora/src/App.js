@@ -211,6 +211,7 @@ import {
 } from "./components/regionBoundsSettings";
 import DataWorkPanel from "./components/DataWorkPanel";
 import TempLayerArchivePanel from "./components/TempLayerArchivePanel";
+import CompareLayersPopup from "./components/CompareLayersPopup";
 import NearSpeciesMatchesPopup from "./components/NearSpeciesMatchesPopup";
 import UnattributedPointsPopup from "./components/UnattributedPointsPopup";
 import UndoMergedPointsPopup from "./components/UndoMergedPointsPopup";
@@ -603,6 +604,7 @@ export default function MapView() {
   const [dataSourcesFocusRequest, setDataSourcesFocusRequest] = useState(null);
   const [tempArchivePanelOpen, setTempArchivePanelOpen] = useState(false);
   const [tempArchiveStatus, setTempArchiveStatus] = useState("");
+  const [comparePanelOpen, setComparePanelOpen] = useState(false);
   /** Порядок иконок в taskbar (открытая панель остаётся в ряду и подсвечивается). */
   const [panelTaskbarOrder, setPanelTaskbarOrder] = useState([]);
   /** Актуальный stashVisiblePanelsToTaskbar — вызывается из ранних колбэков. */
@@ -1399,6 +1401,14 @@ export default function MapView() {
     tempArchivePanelOpen,
     unpinPanelsFromTaskbar
   ]);
+
+  const handleComparePanelToggle = useCallback(() => {
+    setComparePanelOpen((open) => !open);
+  }, []);
+
+  const handleCloseComparePanel = useCallback(() => {
+    setComparePanelOpen(false);
+  }, []);
 
   const handleTempLayerArchive = useCallback(
     async (layerId) => {
@@ -6270,6 +6280,8 @@ export default function MapView() {
         onDataSourcesPanelToggle={handleDataSourcesPanelToggle}
         tempArchivePanelOpen={tempArchivePanelOpen}
         onTempArchivePanelToggle={handleTempArchivePanelToggle}
+        comparePanelOpen={comparePanelOpen}
+        onComparePanelToggle={handleComparePanelToggle}
       />
       <div
         ref={ref}
@@ -6803,6 +6815,7 @@ export default function MapView() {
         />
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
+      <CompareLayersPopup open={comparePanelOpen} onClose={handleCloseComparePanel} />
       <NearSpeciesMatchesPopup
         open={nearSpeciesMatchesActive}
         onClose={handleCloseNearSpeciesMatches}

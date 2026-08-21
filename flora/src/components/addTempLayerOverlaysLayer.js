@@ -144,7 +144,7 @@ export function addTempLayerOverlaysLayer(map) {
   attachOverlaySelectHandlers(map);
 }
 
-export function setTempLayerOverlaysData(map, { regionSettings = null } = {}) {
+export function setTempLayerOverlaysData(map, { regionSettings = null, visible } = {}) {
   if (!map?.getSource) {
     return;
   }
@@ -168,7 +168,8 @@ export function setTempLayerOverlaysData(map, { regionSettings = null } = {}) {
     features
   });
 
-  const overlayVisibility = features.length > 0 ? "visible" : "none";
+  const overlayOn = visible !== false && features.length > 0;
+  const overlayVisibility = overlayOn ? "visible" : "none";
   [TEMP_OVERLAY_FILL_LAYER_ID, TEMP_OVERLAY_LINE_LAYER_ID].forEach((layerId) => {
     if (map.getLayer(layerId)) {
       map.setLayoutProperty(layerId, "visibility", overlayVisibility);

@@ -500,7 +500,9 @@ function addUnitToMap(map, unit) {
   const ids = unitLayerIds(unit.id);
   const collection = {
     type: "FeatureCollection",
-    features: unit.features
+    features: (unit.features ?? []).filter(
+      (feature) => feature?.geometry?.type === "Point"
+    )
   };
   const useClustering = isTempMapboxClusteringActive();
   const clusterProperties = {
@@ -598,7 +600,7 @@ export function setTempLayersData(map) {
   syncTempDensePilesLayers(map, denseClusterFeatures);
   attachInteractions(map);
   applyVisibility(map);
-  setTempLayerOverlaysData(map);
+  setTempLayerOverlaysData(map, { visible: layerVisible });
 }
 
 export function applyTempLayersGroupingMode(
@@ -663,12 +665,12 @@ export function setTempLayersVisibility(map, visible) {
       setTempLayersData(map);
     } else {
       applyVisibility(map);
-      setTempLayerOverlaysData(map);
+      setTempLayerOverlaysData(map, { visible: layerVisible });
     }
     return;
   }
   applyVisibility(map);
-  setTempLayerOverlaysData(map);
+  setTempLayerOverlaysData(map, { visible: layerVisible });
 }
 
 export function getTempLayersInteractiveLayerIds() {

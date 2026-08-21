@@ -990,7 +990,10 @@ function mergeBucketsIntoPlaque(base, buckets, regionIds) {
     }
     const existing = nextLayers.find(
       (layer) =>
-        layerGroupKey(layer) === groupKey && normalizeTempSource(layer.source) === source
+        !isRegionTempLayer(layer) &&
+        !layerHasRegionOverlays(layer) &&
+        layerGroupKey(layer) === groupKey &&
+        normalizeTempSource(layer.source) === source
     );
     if (existing) {
       const merged = mergeUniqueFeatures(existing.features, incoming);
@@ -1398,7 +1401,6 @@ export function getTempLayerPlaqueFeatureGroups() {
 }
 
 export function listTempLayerPlaques() {
-  layers = explodeMixedRegionPointLayers(layers);
   const plaques = [];
   const indexByKey = new Map();
 

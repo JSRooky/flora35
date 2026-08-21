@@ -35,6 +35,7 @@ export const MODULE_IDS = {
   GBIF_LEGACY: "gbif",
   DATA_SOURCES: "data-sources",
   TEMP_ARCHIVE: "temp-archive",
+  COMPARE: "compare",
   EXTERNAL_PROCESSING: "external-processing",
   /** @deprecated Используйте EXTERNAL_PROCESSING */
   GBIF_PROCESSING: "external-processing",
@@ -94,6 +95,11 @@ const DATA_SOURCES_MODULE_ITEM = {
 const TEMP_ARCHIVE_MODULE_ITEM = {
   id: MODULE_IDS.TEMP_ARCHIVE,
   label: "Архив слоёв"
+};
+
+const COMPARE_MODULE_ITEM = {
+  id: MODULE_IDS.COMPARE,
+  label: "Сравнение"
 };
 
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
@@ -300,6 +306,8 @@ export default function ModuleMenu({
   onDataSourcesPanelToggle,
   tempArchivePanelOpen = false,
   onTempArchivePanelToggle,
+  comparePanelOpen = false,
+  onComparePanelToggle,
   accountUser = null,
   onAccountClick
 }) {
@@ -355,6 +363,15 @@ export default function ModuleMenu({
               pointSelected={pointSelected}
               arealBlocked={arealBlocked}
               bufferBlocked={bufferBlocked}
+            />
+          </li>
+          <li>
+            <ModuleMenuButton
+              id={COMPARE_MODULE_ITEM.id}
+              label={COMPARE_MODULE_ITEM.label}
+              mapToolAccent
+              activeModule={comparePanelOpen ? MODULE_IDS.COMPARE : activeModule}
+              onModuleSelect={onComparePanelToggle}
             />
           </li>
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />
