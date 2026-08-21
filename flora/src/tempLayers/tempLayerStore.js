@@ -844,6 +844,73 @@ function nextUnusedMarkerColor() {
   return TEMP_LAYER_MARKER_PALETTE.find((color) => !used.has(color)) ?? TEMP_LAYER_MARKER_PALETTE[0];
 }
 
+/**
+ * Кладёт полигон субъекта в overlays выбранной рабочей плашки.
+ */
+export function appendRegionPolygonToTempPlaque(plaqueKey, { iso, feature, name } = {}) {
+  const regionIso = iso == null ? "" : String(iso);
+  const geomType = feature?.geometry?.type;
+  if (!plaqueKey || !regionIso || (geomType !== "Polygon" && geomType !== "MultiPolygon")) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  const plaque = listTempLayerPlaques().find((item) => item.key === plaqueKey);
+  const host =
+    plaque?.layers?.find((layer) => layerHasRegionOverlays(layer) || isRegionTempLayer(layer)) ??
+    plaque?.layers?.[0];
+  if (!host) {
+    return { ok: false, reason: "missing" };
+  }
+
+  const markerColor = host.markerColor || plaque.markerColor;
+  const overlayFeature = cloneSnapshotFeature(feature);
+  overlayFeature.properties = {
+    ...(overlayFeature.properties ?? {}),
+    iso: regionIso,
+    name: name || overlayFeature.properties?.name,
+    overlayRole: "region",
+    color: markerColor,
+    fillOpacity:
+      overlayFeature.properties.fillOpacity == null ? 0.18 : overlayFeature.properties.fillOpacity
+  };
+
+  layers = layers.map((layer) => {
+    if (layer.id !== host.id) {
+      return layer;
+    }
+    const overlays = normalizeOverlays(layer.overlays);
+    const regionIndex = overlays.findIndex((item) => item.kind === "regions");
+    if (regionIndex >= 0) {
+      const existing = overlays[regionIndex];
+      const already = (existing.features ?? []).some(
+        (item) => getRegionOverlayFeatureIso(item) === regionIso
+      );
+      const features = already ? existing.features : [...existing.features, overlayFeature];
+      return {
+        ...layer,
+        regionIds: mergeRegionIds(layer.regionIds, [regionIso]),
+        overlays: overlays.map((item, index) =>
+          index === regionIndex ? { ...item, features } : item
+        )
+      };
+    }
+    return {
+      ...layer,
+      regionIds: mergeRegionIds(layer.regionIds, [regionIso]),
+      overlays: [
+        ...overlays,
+        {
+          kind: "regions",
+          label: name || layer.label || "Регионы",
+          features: [overlayFeature]
+        }
+      ]
+    };
+  });
+  emit();
+  return { ok: true };
+}
+
 export function commitRegionSelectionTempLayer({
   label,
   isos = [],

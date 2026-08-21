@@ -666,6 +666,8 @@ let regionHoverPopup = null;
 let regionActionPopup = null;
 let regionActionPopupAddHandler = null;
 let regionActionPopupIsolateHandler = null;
+let regionActionPopupToLayerHandler = null;
+let regionActionPopupLayerPickHandler = null;
 
 function escapeHtml(text) {
   return String(text ?? "")
@@ -712,8 +714,20 @@ export function hideRegionActionPopup() {
       .querySelector("[data-region-action-isolate]")
       ?.removeEventListener("click", regionActionPopupIsolateHandler);
   }
+  if (regionActionPopupToLayerHandler && popupElement) {
+    popupElement
+      .querySelector("[data-region-action-to-layer]")
+      ?.removeEventListener("click", regionActionPopupToLayerHandler);
+  }
+  if (regionActionPopupLayerPickHandler && popupElement) {
+    popupElement
+      .querySelector("[data-region-action-layer-list]")
+      ?.removeEventListener("click", regionActionPopupLayerPickHandler);
+  }
   regionActionPopupAddHandler = null;
   regionActionPopupIsolateHandler = null;
+  regionActionPopupToLayerHandler = null;
+  regionActionPopupLayerPickHandler = null;
   regionActionPopup = null;
   popup?.remove();
 }
@@ -721,7 +735,22 @@ export function hideRegionActionPopup() {
 const REGION_PLUS_ICON = `<svg class="region-action-popup-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.5" d="M12 5v14M5 12h14"/></svg>`;
 const REGION_MINUS_ICON = `<svg class="region-action-popup-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.5" d="M5 12h14"/></svg>`;
 
-export function showRegionActionPopup(map, { title, lngLat, selected = false, onAdd, onRemove, onIsolate }) {
+function renderRegionLayerChoices(choices) {
+  if (!choices.length) {
+    return `<div class="region-action-popup-layers-empty">Нет временных слоёв</div>`;
+  }
+  return choices
+    .map(
+      (choice) =>
+        `<button type="button" class="region-action-popup-layer-btn" data-plaque-key="${escapeHtml(choice.key)}">${escapeHtml(choice.label)}</button>`
+    )
+    .join("");
+}
+
+export function showRegionActionPopup(
+  map,
+  { title, lngLat, selected = false, onAdd, onRemove, onIsolate, getTempLayerChoices, onAddToLayer }
+) {
   if (!map || !lngLat) {
     return;
   }
@@ -748,7 +777,9 @@ export function showRegionActionPopup(map, { title, lngLat, selected = false, on
       <div class="region-action-popup-actions">
         <button type="button" class="region-action-popup-icon-btn" data-region-action-add title="${toggleLabel}" aria-label="${toggleLabel}">${toggleIcon}</button>
         <button type="button" class="feature-popup-action-btn" data-region-action-isolate>Изолировать</button>
-      </div>`
+        <button type="button" class="feature-popup-action-btn" data-region-action-to-layer>В слой</button>
+      </div>
+      <div class="region-action-popup-layers" data-region-action-layer-list hidden></div>`
     );
 
   popup.on("close", () => {
@@ -763,6 +794,8 @@ export function showRegionActionPopup(map, { title, lngLat, selected = false, on
   const popupElement = popup.getElement();
   const addButton = popupElement?.querySelector("[data-region-action-add]");
   const isolateButton = popupElement?.querySelector("[data-region-action-isolate]");
+  const toLayerButton = popupElement?.querySelector("[data-region-action-to-layer]");
+  const layerList = popupElement?.querySelector("[data-region-action-layer-list]");
   const toggleHandler = selected ? onRemove : onAdd;
 
   if (addButton && toggleHandler) {
@@ -781,6 +814,35 @@ export function showRegionActionPopup(map, { title, lngLat, selected = false, on
       onIsolate();
     };
     isolateButton.addEventListener("click", regionActionPopupIsolateHandler);
+  }
+
+  if (toLayerButton && layerList) {
+    regionActionPopupToLayerHandler = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const opening = layerList.hasAttribute("hidden");
+      if (opening) {
+        const choices = typeof getTempLayerChoices === "function" ? getTempLayerChoices() : [];
+        layerList.innerHTML = renderRegionLayerChoices(Array.isArray(choices) ? choices : []);
+        layerList.removeAttribute("hidden");
+      } else {
+        layerList.setAttribute("hidden", "");
+      }
+    };
+    toLayerButton.addEventListener("click", regionActionPopupToLayerHandler);
+  }
+
+  if (layerList && onAddToLayer) {
+    regionActionPopupLayerPickHandler = (event) => {
+      const button = event.target?.closest?.("[data-plaque-key]");
+      if (!button) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      onAddToLayer(button.getAttribute("data-plaque-key"));
+    };
+    layerList.addEventListener("click", regionActionPopupLayerPickHandler);
   }
 }
 

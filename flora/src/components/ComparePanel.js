@@ -191,6 +191,8 @@ export default function ComparePanel({
   onMinimize,
   onClose,
   onOpenDiversity,
+  onOpenSimilarity,
+  onOpenDistribution,
   onCompareSetChange
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
@@ -373,6 +375,32 @@ export default function ComparePanel({
               onClick={() => onOpenDiversity?.(addedPlaques)}
             >
               Разнообразие
+            </button>
+            <button
+              type="button"
+              className="compare-panel-tool"
+              disabled={addedPlaques.length < COMPARE_SET_MIN}
+              title={
+                addedPlaques.length < COMPARE_SET_MIN
+                  ? "Добавьте не меньше двух слоёв"
+                  : "Корреляция слоёв по видам, родам и семействам"
+              }
+              onClick={() => onOpenSimilarity?.(addedPlaques)}
+            >
+              Сходство
+            </button>
+            <button
+              type="button"
+              className="compare-panel-tool"
+              disabled={addedPlaques.length < COMPARE_SET_MIN}
+              title={
+                addedPlaques.length < COMPARE_SET_MIN
+                  ? "Добавьте не меньше двух слоёв"
+                  : "Распределение точек по широте и долготе"
+              }
+              onClick={() => onOpenDistribution?.(addedPlaques)}
+            >
+              Распределение
             </button>
           </div>
 

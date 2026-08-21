@@ -93,6 +93,7 @@ import {
   buildRegionCatalog,
   emitRegionBoundsSelect,
   flyToRegionBoundsFeature,
+  getRegionEntryByIso,
   getRegionFeatureAtClick,
   hideRegionActionPopup,
   getRegionSelectionWithinFeature,
@@ -213,6 +214,8 @@ import DataWorkPanel from "./components/DataWorkPanel";
 import TempLayerArchivePanel from "./components/TempLayerArchivePanel";
 import ComparePanel from "./components/ComparePanel";
 import CompareDiversityPopup from "./components/CompareDiversityPopup";
+import CompareSimilarityPopup from "./components/CompareSimilarityPopup";
+import CompareDistributionPopup from "./components/CompareDistributionPopup";
 import NearSpeciesMatchesPopup from "./components/NearSpeciesMatchesPopup";
 import UnattributedPointsPopup from "./components/UnattributedPointsPopup";
 import UndoMergedPointsPopup from "./components/UndoMergedPointsPopup";
@@ -240,7 +243,7 @@ import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegist
 import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
 import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles } from "./components/addTempLayersLayer";
 import { addTempLayerOverlaysLayer, applyTempRegionOverlayPaint } from "./components/addTempLayerOverlaysLayer";
-import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerLabel, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
+import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, appendRegionPolygonToTempPlaque, listTempLayerPlaques, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerLabel, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
 import {
   collectMapToolOverlays,
   TEMP_OVERLAY_KINDS,
@@ -337,6 +340,8 @@ const PANEL_IDS = {
   TEMP_ARCHIVE: "temp-archive",
   COMPARE: "compare",
   COMPARE_DIVERSITY: "compare-diversity",
+  COMPARE_SIMILARITY: "compare-similarity",
+  COMPARE_DISTRIBUTION: "compare-distribution",
   /** @deprecated алиасы для taskbar */
   GBIF: "data-sources",
   GBIF_PROCESSING: "external-processing"
@@ -372,7 +377,9 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.REDBOOK,
   PANEL_IDS.TEMP_ARCHIVE,
   PANEL_IDS.COMPARE,
-  PANEL_IDS.COMPARE_DIVERSITY
+  PANEL_IDS.COMPARE_DIVERSITY,
+  PANEL_IDS.COMPARE_SIMILARITY,
+  PANEL_IDS.COMPARE_DISTRIBUTION
 ];
 
 function isPanelExpandedInState(collapsedState, panelId) {
@@ -612,6 +619,8 @@ export default function MapView() {
   const [comparePanelOpen, setComparePanelOpen] = useState(false);
   const [compareDiversityOpen, setCompareDiversityOpen] = useState(false);
   const [compareDiversityKeys, setCompareDiversityKeys] = useState([]);
+  const [compareSimilarityOpen, setCompareSimilarityOpen] = useState(false);
+  const [compareDistributionOpen, setCompareDistributionOpen] = useState(false);
   /** Порядок иконок в taskbar (открытая панель остаётся в ряду и подсвечивается). */
   const [panelTaskbarOrder, setPanelTaskbarOrder] = useState([]);
   /** Актуальный stashVisiblePanelsToTaskbar — вызывается из ранних колбэков. */
@@ -762,6 +771,12 @@ export default function MapView() {
         break;
       case TASKBAR_PANEL_IDS.COMPARE_DIVERSITY:
         setCompareDiversityOpen(true);
+        break;
+      case TASKBAR_PANEL_IDS.COMPARE_SIMILARITY:
+        setCompareSimilarityOpen(true);
+        break;
+      case TASKBAR_PANEL_IDS.COMPARE_DISTRIBUTION:
+        setCompareDistributionOpen(true);
         break;
       default: {
         const moduleId = PANEL_TASKBAR_MODULE_ID[panelId];
@@ -1419,7 +1434,14 @@ export default function MapView() {
     if (comparePanelOpen && !isPanelMinimized(PANEL_IDS.COMPARE)) {
       setComparePanelOpen(false);
       setCompareDiversityOpen(false);
-      unpinPanelsFromTaskbar([PANEL_IDS.COMPARE, PANEL_IDS.COMPARE_DIVERSITY]);
+      setCompareSimilarityOpen(false);
+      setCompareDistributionOpen(false);
+      unpinPanelsFromTaskbar([
+        PANEL_IDS.COMPARE,
+        PANEL_IDS.COMPARE_DIVERSITY,
+        PANEL_IDS.COMPARE_SIMILARITY,
+        PANEL_IDS.COMPARE_DISTRIBUTION
+      ]);
       return;
     }
 
@@ -1440,6 +1462,38 @@ export default function MapView() {
       return nextKeys;
     });
   }, []);
+
+  const handleOpenSimilarity = useCallback(
+    (plaques) => {
+      const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
+      setCompareDiversityKeys(nextKeys);
+      setCompareSimilarityOpen(true);
+      setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE_SIMILARITY]: false }));
+      pinPanelsToTaskbar([PANEL_IDS.COMPARE_SIMILARITY]);
+    },
+    [pinPanelsToTaskbar]
+  );
+
+  const handleCloseSimilarity = useCallback(() => {
+    setCompareSimilarityOpen(false);
+    unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_SIMILARITY]);
+  }, [unpinPanelsFromTaskbar]);
+
+  const handleOpenDistribution = useCallback(
+    (plaques) => {
+      const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
+      setCompareDiversityKeys(nextKeys);
+      setCompareDistributionOpen(true);
+      setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE_DISTRIBUTION]: false }));
+      pinPanelsToTaskbar([PANEL_IDS.COMPARE_DISTRIBUTION]);
+    },
+    [pinPanelsToTaskbar]
+  );
+
+  const handleCloseDistribution = useCallback(() => {
+    setCompareDistributionOpen(false);
+    unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_DISTRIBUTION]);
+  }, [unpinPanelsFromTaskbar]);
 
   const handleOpenDiversity = useCallback(
     (plaques) => {
@@ -2140,6 +2194,14 @@ export default function MapView() {
       ids.push(PANEL_IDS.COMPARE_DIVERSITY);
     }
 
+    if (compareSimilarityOpen && !isMin(PANEL_IDS.COMPARE_SIMILARITY)) {
+      ids.push(PANEL_IDS.COMPARE_SIMILARITY);
+    }
+
+    if (compareDistributionOpen && !isMin(PANEL_IDS.COMPARE_DISTRIBUTION)) {
+      ids.push(PANEL_IDS.COMPARE_DISTRIBUTION);
+    }
+
     if (
       dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
       externalProcessingActive &&
@@ -2160,6 +2222,8 @@ export default function MapView() {
     tempArchivePanelOpen,
     comparePanelOpen,
     compareDiversityOpen,
+    compareSimilarityOpen,
+    compareDistributionOpen,
     densePileSpeciesListOpen,
     denseProcessingActive,
     externalProcessingActive,
@@ -3861,6 +3925,24 @@ export default function MapView() {
           regionAddModeRef.current = false;
           setRegionAddMode(false);
           hideRegionActionPopup();
+        },
+        getTempLayerChoices: () =>
+          listTempLayerPlaques().map((plaque) => ({
+            key: plaque.key,
+            label: plaque.label || plaque.taxonName || "Слой"
+          })),
+        onAddToLayer: (plaqueKey) => {
+          const catalogFeature = getRegionEntryByIso(entry.iso)?.feature;
+          const feature = catalogFeature || entry.feature;
+          const result = appendRegionPolygonToTempPlaque(plaqueKey, {
+            iso: entry.iso,
+            feature,
+            name: entry.name
+          });
+          if (result?.ok) {
+            persistTempLayers().catch(() => {});
+          }
+          hideRegionActionPopup();
         }
       });
     });
@@ -5387,6 +5469,14 @@ export default function MapView() {
     setSelectedRegionIsos((current) => current.filter((item) => item !== iso));
   }, []);
 
+  const handleRegionClearSelection = useCallback(() => {
+    setSelectedRegionIsos([]);
+    selectedRegionIsosRef.current = [];
+    setRegionAddMode(false);
+    regionAddModeRef.current = false;
+    hideRegionActionPopup();
+  }, []);
+
   const handleOverlayRegionBufferChange = useCallback((km) => {
     setOverlayRegionBufferKm(km);
     patchVisibleRegionOverlays({ bufferKm: km });
@@ -5598,12 +5688,29 @@ export default function MapView() {
         case PANEL_IDS.COMPARE: {
           setComparePanelOpen(false);
           setCompareDiversityOpen(false);
-          unpinPanelsFromTaskbar([PANEL_IDS.COMPARE, PANEL_IDS.COMPARE_DIVERSITY]);
+          setCompareSimilarityOpen(false);
+          setCompareDistributionOpen(false);
+          unpinPanelsFromTaskbar([
+            PANEL_IDS.COMPARE,
+            PANEL_IDS.COMPARE_DIVERSITY,
+            PANEL_IDS.COMPARE_SIMILARITY,
+            PANEL_IDS.COMPARE_DISTRIBUTION
+          ]);
           break;
         }
         case PANEL_IDS.COMPARE_DIVERSITY: {
           setCompareDiversityOpen(false);
           unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_DIVERSITY]);
+          break;
+        }
+        case PANEL_IDS.COMPARE_SIMILARITY: {
+          setCompareSimilarityOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_SIMILARITY]);
+          break;
+        }
+        case PANEL_IDS.COMPARE_DISTRIBUTION: {
+          setCompareDistributionOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_DISTRIBUTION]);
           break;
         }
         case PANEL_IDS.DATA_WORK: {
@@ -6393,6 +6500,8 @@ export default function MapView() {
               onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE)}
               onClose={handleClosePanel(PANEL_IDS.COMPARE)}
               onOpenDiversity={handleOpenDiversity}
+              onOpenSimilarity={handleOpenSimilarity}
+              onOpenDistribution={handleOpenDistribution}
               onCompareSetChange={handleCompareSetChange}
             />
           )}
@@ -6778,6 +6887,7 @@ export default function MapView() {
               selectedIsos={selectedRegionIsos}
               onSearchSelect={handleRegionSearchSelect}
               onSearchRemove={handleRegionSearchRemove}
+              onClearSelection={handleRegionClearSelection}
               bufferKm={overlayRegionEdit.active ? overlayRegionBufferKm : regionBufferKm}
               onBufferKmChange={
                 overlayRegionEdit.active ? handleOverlayRegionBufferChange : setRegionBufferKm
@@ -6900,6 +7010,22 @@ export default function MapView() {
           plaqueKeys={compareDiversityKeys}
           onClose={handleCloseDiversity}
           onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE_DIVERSITY)}
+        />
+      ) : null}
+      {compareSimilarityOpen && !isPanelMinimized(PANEL_IDS.COMPARE_SIMILARITY) ? (
+        <CompareSimilarityPopup
+          open
+          plaqueKeys={compareDiversityKeys}
+          onClose={handleCloseSimilarity}
+          onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE_SIMILARITY)}
+        />
+      ) : null}
+      {compareDistributionOpen && !isPanelMinimized(PANEL_IDS.COMPARE_DISTRIBUTION) ? (
+        <CompareDistributionPopup
+          open
+          plaqueKeys={compareDiversityKeys}
+          onClose={handleCloseDistribution}
+          onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE_DISTRIBUTION)}
         />
       ) : null}
       <NearSpeciesMatchesPopup

@@ -1,0 +1,115 @@
+.compare-similarity-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.compare-similarity-dialog {
+  box-sizing: border-box;
+  width: min(1100px, calc(100vw - 32px));
+  max-height: min(90vh, 720px);
+  overflow: hidden;
+  padding: 16px 20px 20px;
+  border: 1px solid rgba(47, 111, 78, 0.35);
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.compare-similarity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.compare-similarity-title {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+  border-bottom: 2px solid var(--map-tool-accent, #2f6f4e);
+  padding-bottom: 4px;
+  flex: 1;
+}
+
+.compare-similarity-empty {
+  margin: 0;
+  padding: 24px 8px;
+  text-align: center;
+  font-size: 14px;
+  color: #666;
+}
+
+.compare-similarity-table-wrap {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow: auto;
+}
+
+.compare-similarity-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-size: 13px;
+}
+
+.compare-similarity-table th,
+.compare-similarity-table td {
+  border: 1px solid #e5e7eb;
+  padding: 6px 8px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-similarity-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #e8f2ec;
+  font-weight: 600;
+}
+
+.compare-similarity-table thead tr:nth-child(2) th {
+  top: 28px;
+}
+
+.compare-similarity-table thead tr:first-child th:first-child,
+.compare-similarity-table tbody td:first-child {
+  text-align: left;
+  font-variant-numeric: normal;
+}
+
+.compare-similarity-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.compare-similarity-export {
+  appearance: none;
+  border: 1px solid rgba(47, 111, 78, 0.35);
+  background: rgba(47, 111, 78, 0.16);
+  color: var(--map-tool-accent, #2f6f4e);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.compare-similarity-export:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

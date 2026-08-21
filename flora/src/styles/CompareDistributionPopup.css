@@ -1,0 +1,250 @@
+.compare-distribution-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.compare-distribution-dialog {
+  box-sizing: border-box;
+  width: min(980px, calc(100vw - 32px));
+  max-height: min(90vh, 760px);
+  overflow: auto;
+  padding: 16px 20px 20px;
+  border: 1px solid rgba(47, 111, 78, 0.35);
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.compare-distribution-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.compare-distribution-title {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+  border-bottom: 2px solid var(--map-tool-accent, #2f6f4e);
+  padding-bottom: 4px;
+  flex: 1;
+}
+
+.compare-distribution-empty {
+  margin: 0;
+  padding: 24px 8px;
+  text-align: center;
+  font-size: 14px;
+  color: #666;
+}
+
+.compare-distribution-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.compare-distribution-modes {
+  display: inline-flex;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.compare-distribution-mode {
+  appearance: none;
+  margin: 0;
+  padding: 5px 12px;
+  border: 0;
+  background: transparent;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.compare-distribution-mode + .compare-distribution-mode {
+  box-shadow: inset 1px 0 0 rgba(15, 23, 42, 0.08);
+}
+
+.compare-distribution-mode--on {
+  color: var(--map-tool-accent, #2f6f4e);
+  background: rgba(47, 111, 78, 0.12);
+}
+
+.compare-distribution-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #555;
+}
+
+.compare-distribution-search {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.compare-distribution-search-input {
+  min-width: 220px;
+  max-width: 360px;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.compare-distribution-selected {
+  font-size: 12px;
+  color: #555;
+}
+
+.compare-distribution-search-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 160px;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.compare-distribution-search-list li + li {
+  border-top: 1px solid #f3f4f6;
+}
+
+.compare-distribution-search-option {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  margin: 0;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.compare-distribution-search-option:hover,
+.compare-distribution-search-option:focus {
+  background: rgba(47, 111, 78, 0.1);
+  outline: none;
+}
+
+.compare-distribution-search-option--on {
+  color: var(--map-tool-accent, #2f6f4e);
+  font-weight: 700;
+  background: rgba(47, 111, 78, 0.12);
+}
+
+.compare-distribution-search-empty,
+.compare-distribution-search-more {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.compare-distribution-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: #444;
+}
+
+.compare-distribution-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.compare-distribution-charts {
+  display: grid;
+  grid-template-columns: minmax(240px, 280px) minmax(280px, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.compare-distribution-compass {
+  grid-column: 1 / -1;
+  max-width: 320px;
+  justify-self: center;
+}
+
+.compare-distribution-compass-ring {
+  stroke: #d1d5db;
+  stroke-width: 1.25;
+}
+
+.compare-distribution-compass-label {
+  fill: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.compare-distribution-chart {
+  margin: 0;
+  min-width: 0;
+}
+
+.compare-distribution-chart figcaption {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.compare-distribution-chart svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+}
+
+.compare-distribution-axis {
+  stroke: #d1d5db;
+  stroke-width: 1;
+}
+
+.compare-distribution-tick {
+  fill: #6b7280;
+  font-size: 10px;
+}
+
+@media (max-width: 720px) {
+  .compare-distribution-charts {
+    grid-template-columns: 1fr;
+  }
+}

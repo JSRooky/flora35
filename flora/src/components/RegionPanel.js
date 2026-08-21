@@ -95,6 +95,7 @@ export default function RegionPanel({
   overlayCount = 0,
   onLoadSelectedRegions,
   onSelectiveSearch,
+  onClearSelection,
   collapsed: collapsedProp,
   onCollapsedChange,
   onMinimize,
@@ -253,6 +254,19 @@ export default function RegionPanel({
             <span>Учитывать буфер</span>
           </label>
           <div className="region-panel-load-actions">
+            <button
+              type="button"
+              className="heatmap-settings-reset"
+              disabled={selectedIsos.length === 0}
+              onClick={() => onClearSelection?.()}
+              title={
+                selectedIsos.length === 0
+                  ? "Нет выделенных регионов"
+                  : "Снять выделение со всех субъектов на карте"
+              }
+            >
+              Сбросить выделение
+            </button>
             <button
               type="button"
               className="heatmap-settings-reset"
