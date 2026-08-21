@@ -9,6 +9,7 @@ import {
   REGION_BUFFER_MIN_KM,
   REGION_BUFFER_STEP_KM
 } from "./addRegionBoundsLayer";
+import { FEATURE_FLAGS, FEATURE_UNAVAILABLE_TITLE } from "../config/featureFlags";
 import { TrashIcon } from "../images/buttons";
 import "../styles/HeatmapSettingsPanel.css";
 import "../styles/RegionPanel.css";
@@ -236,17 +237,23 @@ export default function RegionPanel({
 
           <h4 className="region-panel-section-title">Загрузка точек</h4>
           <label
-            className={`region-panel-switch${canIncludeBuffer ? "" : " region-panel-switch--disabled"}`}
+            className={`region-panel-switch${
+              FEATURE_FLAGS.regionPointLoadDisabled || !canIncludeBuffer
+                ? " region-panel-switch--disabled"
+                : ""
+            }`}
             title={
-              canIncludeBuffer
-                ? "GBIF: полигон буфера по координатам. iNaturalist: охватывающий прямоугольник (place_id буфер не включает)."
-                : "Сначала задайте буфер больше 0 км"
+              FEATURE_FLAGS.regionPointLoadDisabled
+                ? FEATURE_UNAVAILABLE_TITLE
+                : canIncludeBuffer
+                  ? "GBIF: полигон буфера по координатам. iNaturalist: охватывающий прямоугольник (place_id буфер не включает)."
+                  : "Сначала задайте буфер больше 0 км"
             }
           >
             <input
               type="checkbox"
-              checked={canIncludeBuffer && includeBuffer}
-              disabled={!canIncludeBuffer}
+              checked={!FEATURE_FLAGS.regionPointLoadDisabled && canIncludeBuffer && includeBuffer}
+              disabled={FEATURE_FLAGS.regionPointLoadDisabled || !canIncludeBuffer}
               onChange={(event) => setIncludeBuffer(event.target.checked)}
             />
             <span className="region-panel-switch-slider" aria-hidden="true" />
@@ -256,18 +263,26 @@ export default function RegionPanel({
             <button
               type="button"
               className="heatmap-settings-reset"
-              disabled={!hasSelection}
+              disabled={FEATURE_FLAGS.regionPointLoadDisabled || !hasSelection}
               onClick={() => onLoadSelectedRegions?.(canIncludeBuffer && includeBuffer)}
-              title="Открыть таблицу загрузки выбранных субъектов"
+              title={
+                FEATURE_FLAGS.regionPointLoadDisabled
+                  ? FEATURE_UNAVAILABLE_TITLE
+                  : "Открыть таблицу загрузки выбранных субъектов"
+              }
             >
               Загрузить выбранные регионы
             </button>
             <button
               type="button"
               className="heatmap-settings-reset"
-              disabled={!hasSelection}
+              disabled={FEATURE_FLAGS.regionPointLoadDisabled || !hasSelection}
               onClick={() => onSelectiveSearch?.(canIncludeBuffer && includeBuffer)}
-              title="Открыть выборочную загрузку с фильтром выбранных субъектов"
+              title={
+                FEATURE_FLAGS.regionPointLoadDisabled
+                  ? FEATURE_UNAVAILABLE_TITLE
+                  : "Открыть выборочную загрузку с фильтром выбранных субъектов"
+              }
             >
               Выборочный поиск
             </button>

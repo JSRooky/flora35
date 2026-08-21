@@ -2181,6 +2181,9 @@ export default function MapView() {
 
   const handleRegionOpenDataLoad = useCallback(
     (kind, includeBuffer = false) => {
+      if (FEATURE_FLAGS.regionPointLoadDisabled) {
+        return;
+      }
       const overlayActive = overlayRegionEdit.active;
       const entries = overlayActive
         ? overlayRegionEdit.isos.map((iso) => {
