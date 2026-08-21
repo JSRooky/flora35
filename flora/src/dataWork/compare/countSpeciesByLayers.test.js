@@ -2,8 +2,12 @@ import {
   COMPARE_SET_MAX,
   UNNAMED_SPECIES_KEY,
   countSpeciesByLayers,
+  formatDiversityCsv,
   listCompareTempLayerOptions,
-  listPresentCompareFields
+  listPresentCompareFields,
+  listSharedSpeciesRows,
+  plaquesToCompareLayerInputs,
+  summarizeDiversity
 } from "./countSpeciesByLayers";
 
 function point(nameLatin, nameRu) {
@@ -55,6 +59,75 @@ describe("countSpeciesByLayers", () => {
   });
 });
 
+describe("plaquesToCompareLayerInputs", () => {
+  it("merges features from all layers on a plaque", () => {
+    const inputs = plaquesToCompareLayerInputs([
+      {
+        key: "p1",
+        taxonName: "Carex",
+        layers: [
+          { source: "gbif", features: [point("Carex acuta")] },
+          { source: "inat", features: [point("Carex nigra")] }
+        ]
+      }
+    ]);
+    expect(inputs).toEqual([
+      {
+        id: "p1",
+        label: "Carex",
+        features: [point("Carex acuta"), point("Carex nigra")]
+      }
+    ]);
+  });
+
+  it("can drop GBIF or iNat layers", () => {
+    const plaques = [
+      {
+        key: "p1",
+        taxonName: "Carex",
+        layers: [
+          { source: "gbif", features: [point("Carex acuta")] },
+          { source: "inat", features: [point("Carex nigra")] },
+          { source: "map", features: [point("Carex rostrata")] }
+        ]
+      }
+    ];
+    expect(plaquesToCompareLayerInputs(plaques, { includeGbif: false })[0].features).toEqual([
+      point("Carex nigra"),
+      point("Carex rostrata")
+    ]);
+    expect(plaquesToCompareLayerInputs(plaques, { includeInat: false })[0].features).toEqual([
+      point("Carex acuta"),
+      point("Carex rostrata")
+    ]);
+  });
+});
+
+describe("summarizeDiversity", () => {
+  it("counts named unique species per layer and intersection", () => {
+    const result = countSpeciesByLayers([
+      {
+        id: "a",
+        label: "A",
+        features: [point("Betula pendula"), point("Betula pendula"), point("Pinus sylvestris"), point("")]
+      },
+      {
+        id: "b",
+        label: "B",
+        features: [point("Betula pendula"), point("Picea abies")]
+      }
+    ]);
+    const summary = summarizeDiversity(result);
+    expect(summary.namedSpeciesTotal).toBe(3);
+    expect(summary.sharedNamedSpecies).toBe(1);
+    expect(summary.layers).toEqual([
+      { id: "a", label: "A", uniqueSpecies: 2, pointCount: 4 },
+      { id: "b", label: "B", uniqueSpecies: 2, pointCount: 2 }
+    ]);
+    expect(listSharedSpeciesRows(result).map((row) => row.nameLatin)).toEqual(["Betula pendula"]);
+  });
+});
+
 describe("listPresentCompareFields", () => {
   it("lists only fields that have values", () => {
     expect(
@@ -87,5 +160,19 @@ describe("listCompareTempLayerOptions", () => {
     expect(options[0].label).toContain("Carex");
     expect(options[0].label).toContain("GBIF");
     expect(options[0].pointCount).toBe(1);
+  });
+});
+
+describe("formatDiversityCsv", () => {
+  it("writes species table with a BOM", () => {
+    const comparison = countSpeciesByLayers([
+      { id: "a", label: "A", features: [point("Rosa canina", "Шиповник")] },
+      { id: "b", label: "B", features: [point("Rosa canina")] }
+    ]);
+    const csv = formatDiversityCsv(comparison, summarizeDiversity(comparison));
+    expect(csv.charCodeAt(0)).toBe(0xfeff);
+    expect(csv).toContain("Латинское название");
+    expect(csv).toContain("Rosa canina");
+    expect(csv).toContain("Шиповник");
   });
 });

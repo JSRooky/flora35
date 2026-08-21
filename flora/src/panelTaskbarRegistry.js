@@ -23,6 +23,8 @@ export const TASKBAR_PANEL_IDS = {
   SEARCH: "search",
   REDBOOK: "redbook",
   TEMP_ARCHIVE: "temp-archive",
+  COMPARE: "compare",
+  COMPARE_DIVERSITY: "compare-diversity",
   OOPT_SPECIES: "oopt-species",
   DENSE_SPECIES: "dense-species"
 };
@@ -58,6 +60,8 @@ export const PANEL_TASKBAR_META = {
   [TASKBAR_PANEL_IDS.SEARCH]: { title: "Поиск", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.REDBOOK]: { title: "Поиск редких видов", icon: "status" },
   [TASKBAR_PANEL_IDS.TEMP_ARCHIVE]: { title: "Архив слоёв", icon: "layersArchive" },
+  [TASKBAR_PANEL_IDS.COMPARE]: { title: "Сравнение", icon: "layers" },
+  [TASKBAR_PANEL_IDS.COMPARE_DIVERSITY]: { title: "Разнообразие", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.OOPT_SPECIES]: { title: "Виды внутри выбранной ООПТ", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.DENSE_SPECIES]: { title: "Виды в плотной группе", icon: "speciesList" }
 };
@@ -90,6 +94,8 @@ export const PANEL_TASKBAR_MODULE_ID = {
   [TASKBAR_PANEL_IDS.SEARCH]: "search",
   [TASKBAR_PANEL_IDS.REDBOOK]: "redbook",
   [TASKBAR_PANEL_IDS.TEMP_ARCHIVE]: null,
+  [TASKBAR_PANEL_IDS.COMPARE]: null,
+  [TASKBAR_PANEL_IDS.COMPARE_DIVERSITY]: null,
   [TASKBAR_PANEL_IDS.OOPT_SPECIES]: null,
   [TASKBAR_PANEL_IDS.DENSE_SPECIES]: null
 };

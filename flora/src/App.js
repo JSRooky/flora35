@@ -211,7 +211,8 @@ import {
 } from "./components/regionBoundsSettings";
 import DataWorkPanel from "./components/DataWorkPanel";
 import TempLayerArchivePanel from "./components/TempLayerArchivePanel";
-import CompareLayersPopup from "./components/CompareLayersPopup";
+import ComparePanel from "./components/ComparePanel";
+import CompareDiversityPopup from "./components/CompareDiversityPopup";
 import NearSpeciesMatchesPopup from "./components/NearSpeciesMatchesPopup";
 import UnattributedPointsPopup from "./components/UnattributedPointsPopup";
 import UndoMergedPointsPopup from "./components/UndoMergedPointsPopup";
@@ -334,6 +335,8 @@ const PANEL_IDS = {
   SEARCH: "search",
   REDBOOK: "redbook",
   TEMP_ARCHIVE: "temp-archive",
+  COMPARE: "compare",
+  COMPARE_DIVERSITY: "compare-diversity",
   /** @deprecated алиасы для taskbar */
   GBIF: "data-sources",
   GBIF_PROCESSING: "external-processing"
@@ -367,7 +370,9 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.DATA_WORK,
   PANEL_IDS.SEARCH,
   PANEL_IDS.REDBOOK,
-  PANEL_IDS.TEMP_ARCHIVE
+  PANEL_IDS.TEMP_ARCHIVE,
+  PANEL_IDS.COMPARE,
+  PANEL_IDS.COMPARE_DIVERSITY
 ];
 
 function isPanelExpandedInState(collapsedState, panelId) {
@@ -605,6 +610,8 @@ export default function MapView() {
   const [tempArchivePanelOpen, setTempArchivePanelOpen] = useState(false);
   const [tempArchiveStatus, setTempArchiveStatus] = useState("");
   const [comparePanelOpen, setComparePanelOpen] = useState(false);
+  const [compareDiversityOpen, setCompareDiversityOpen] = useState(false);
+  const [compareDiversityKeys, setCompareDiversityKeys] = useState([]);
   /** Порядок иконок в taskbar (открытая панель остаётся в ряду и подсвечивается). */
   const [panelTaskbarOrder, setPanelTaskbarOrder] = useState([]);
   /** Актуальный stashVisiblePanelsToTaskbar — вызывается из ранних колбэков. */
@@ -749,6 +756,12 @@ export default function MapView() {
         break;
       case TASKBAR_PANEL_IDS.TEMP_ARCHIVE:
         setTempArchivePanelOpen(true);
+        break;
+      case TASKBAR_PANEL_IDS.COMPARE:
+        setComparePanelOpen(true);
+        break;
+      case TASKBAR_PANEL_IDS.COMPARE_DIVERSITY:
+        setCompareDiversityOpen(true);
         break;
       default: {
         const moduleId = PANEL_TASKBAR_MODULE_ID[panelId];
@@ -1403,12 +1416,46 @@ export default function MapView() {
   ]);
 
   const handleComparePanelToggle = useCallback(() => {
-    setComparePanelOpen((open) => !open);
+    if (comparePanelOpen && !isPanelMinimized(PANEL_IDS.COMPARE)) {
+      setComparePanelOpen(false);
+      setCompareDiversityOpen(false);
+      unpinPanelsFromTaskbar([PANEL_IDS.COMPARE, PANEL_IDS.COMPARE_DIVERSITY]);
+      return;
+    }
+
+    setComparePanelOpen(true);
+    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE]: false }));
+    pinPanelsToTaskbar([PANEL_IDS.COMPARE]);
+  }, [comparePanelOpen, isPanelMinimized, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
+
+  const handleCompareSetChange = useCallback((plaques) => {
+    const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
+    setCompareDiversityKeys((current) => {
+      if (
+        current.length === nextKeys.length &&
+        current.every((key, index) => key === nextKeys[index])
+      ) {
+        return current;
+      }
+      return nextKeys;
+    });
   }, []);
 
-  const handleCloseComparePanel = useCallback(() => {
-    setComparePanelOpen(false);
-  }, []);
+  const handleOpenDiversity = useCallback(
+    (plaques) => {
+      const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
+      setCompareDiversityKeys(nextKeys);
+      setCompareDiversityOpen(true);
+      setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE_DIVERSITY]: false }));
+      pinPanelsToTaskbar([PANEL_IDS.COMPARE_DIVERSITY]);
+    },
+    [pinPanelsToTaskbar]
+  );
+
+  const handleCloseDiversity = useCallback(() => {
+    setCompareDiversityOpen(false);
+    unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_DIVERSITY]);
+  }, [unpinPanelsFromTaskbar]);
 
   const handleTempLayerArchive = useCallback(
     async (layerId) => {
@@ -2085,6 +2132,14 @@ export default function MapView() {
       ids.push(PANEL_IDS.TEMP_ARCHIVE);
     }
 
+    if (comparePanelOpen && !isMin(PANEL_IDS.COMPARE)) {
+      ids.push(PANEL_IDS.COMPARE);
+    }
+
+    if (compareDiversityOpen && !isMin(PANEL_IDS.COMPARE_DIVERSITY)) {
+      ids.push(PANEL_IDS.COMPARE_DIVERSITY);
+    }
+
     if (
       dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
       externalProcessingActive &&
@@ -2103,6 +2158,8 @@ export default function MapView() {
     dataSourceMode,
     dataSourcesPanelOpen,
     tempArchivePanelOpen,
+    comparePanelOpen,
+    compareDiversityOpen,
     densePileSpeciesListOpen,
     denseProcessingActive,
     externalProcessingActive,
@@ -5538,6 +5595,17 @@ export default function MapView() {
           unpinPanelsFromTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
           break;
         }
+        case PANEL_IDS.COMPARE: {
+          setComparePanelOpen(false);
+          setCompareDiversityOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.COMPARE, PANEL_IDS.COMPARE_DIVERSITY]);
+          break;
+        }
+        case PANEL_IDS.COMPARE_DIVERSITY: {
+          setCompareDiversityOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_DIVERSITY]);
+          break;
+        }
         case PANEL_IDS.DATA_WORK: {
           // Сначала восстанавливаем слои (как в handleCloseNearSpeciesMatches),
           // иначе setNearSpeciesMatchesActive(false) опередит cleanup-effect.
@@ -6261,6 +6329,7 @@ export default function MapView() {
     (showOoptFeaturePanel && activeModule !== MODULE_IDS.TIMELINE) ||
     dataSourcesPanelOpen ||
     tempArchivePanelOpen ||
+    comparePanelOpen ||
     dataSourceMode === DATA_SOURCE_MODES.EXTERNAL ||
     denseProcessingActive;
 
@@ -6315,6 +6384,16 @@ export default function MapView() {
               onDelete={handleTempArchiveDelete}
               onRename={handleTempArchiveRename}
               statusMessage={tempArchiveStatus}
+            />
+          )}
+          {comparePanelOpen && !isPanelMinimized(PANEL_IDS.COMPARE) && (
+            <ComparePanel
+              collapsed={isPanelCollapsed(PANEL_IDS.COMPARE)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.COMPARE)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE)}
+              onClose={handleClosePanel(PANEL_IDS.COMPARE)}
+              onOpenDiversity={handleOpenDiversity}
+              onCompareSetChange={handleCompareSetChange}
             />
           )}
           {denseProcessingExclusive ? (
@@ -6815,7 +6894,14 @@ export default function MapView() {
         />
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
-      <CompareLayersPopup open={comparePanelOpen} onClose={handleCloseComparePanel} />
+      {compareDiversityOpen && !isPanelMinimized(PANEL_IDS.COMPARE_DIVERSITY) ? (
+        <CompareDiversityPopup
+          open
+          plaqueKeys={compareDiversityKeys}
+          onClose={handleCloseDiversity}
+          onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE_DIVERSITY)}
+        />
+      ) : null}
       <NearSpeciesMatchesPopup
         open={nearSpeciesMatchesActive}
         onClose={handleCloseNearSpeciesMatches}
