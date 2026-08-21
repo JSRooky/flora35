@@ -1,5 +1,6 @@
 import {
   COMPARE_SET_MAX,
+  DIVERSITY_GROUP_MODES,
   UNNAMED_SPECIES_KEY,
   countSpeciesByLayers,
   formatDiversityCsv,
@@ -57,6 +58,36 @@ describe("countSpeciesByLayers", () => {
     expect(unnamed.unnamed).toBe(true);
     expect(COMPARE_SET_MAX).toBeGreaterThanOrEqual(5);
   });
+
+  it("groups points by genus or family", () => {
+    const familyPoint = (latin, family) => ({
+      type: "Feature",
+      properties: { name_latin: latin, family },
+      geometry: { type: "Point", coordinates: [0, 0] }
+    });
+    const genera = countSpeciesByLayers(
+      [
+        {
+          id: "a",
+          features: [familyPoint("Betula pendula", "Betulaceae"), familyPoint("Betula pubescens", "Betulaceae")]
+        },
+        { id: "b", features: [familyPoint("Pinus sylvestris", "Pinaceae")] }
+      ],
+      DIVERSITY_GROUP_MODES.GENUS
+    );
+    expect(genera.rows.find((row) => row.key === "betula").counts).toEqual({ a: 2, b: 0 });
+    const families = countSpeciesByLayers(
+      [
+        {
+          id: "a",
+          features: [familyPoint("Betula pendula", "Betulaceae"), familyPoint("Alnus glutinosa", "Betulaceae")]
+        },
+        { id: "b", features: [familyPoint("Pinus sylvestris", "Pinaceae")] }
+      ],
+      DIVERSITY_GROUP_MODES.FAMILY
+    );
+    expect(families.rows.find((row) => row.key === "betulaceae").counts).toEqual({ a: 2, b: 0 });
+  });
 });
 
 describe("plaquesToCompareLayerInputs", () => {
@@ -100,6 +131,29 @@ describe("plaquesToCompareLayerInputs", () => {
       point("Carex acuta"),
       point("Carex rostrata")
     ]);
+  });
+
+  it("filters features by kingdom", () => {
+    const plant = {
+      type: "Feature",
+      properties: { name_latin: "Betula pendula", regnum: "plantae" },
+      geometry: { type: "Point", coordinates: [0, 0] }
+    };
+    const fungus = {
+      type: "Feature",
+      properties: { name_latin: "Amanita muscaria", regnum: "fungi" },
+      geometry: { type: "Point", coordinates: [0, 0] }
+    };
+    const plaques = [
+      {
+        key: "p1",
+        taxonName: "Mix",
+        layers: [{ source: "gbif", features: [plant, fungus] }]
+      }
+    ];
+    expect(
+      plaquesToCompareLayerInputs(plaques, { allowedRegnums: new Set(["plantae"]) })[0].features
+    ).toEqual([plant]);
   });
 });
 

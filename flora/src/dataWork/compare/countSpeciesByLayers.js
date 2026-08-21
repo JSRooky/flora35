@@ -1,4 +1,4 @@
-import { PROPERTY_LABELS } from "../../components/featurePropertyLabels";
+import { PROPERTY_LABELS, REGNUM_ORDER } from "../../components/featurePropertyLabels";
 import { normalizeLatinName } from "../normalizeLatinName";
 import {
   formatTempSourceLabel,
@@ -11,6 +11,14 @@ import {
 export const UNNAMED_SPECIES_KEY = "__unnamed__";
 export const COMPARE_SET_MIN = 2;
 export const COMPARE_SET_MAX = 8;
+
+export const DIVERSITY_GROUP_MODES = {
+  SPECIES: "species",
+  GENUS: "genus",
+  FAMILY: "family"
+};
+
+export const DIVERSITY_REGNUM_NONE = "__none__";
 
 /** Поля точек, которые можно включить в сравнение (галочки в строке слоя). */
 export const COMPARE_DATA_FIELDS = [
@@ -77,12 +85,102 @@ function emptyCounts(layerIds) {
   return Object.fromEntries(layerIds.map((id) => [id, 0]));
 }
 
+export function normalizeCompareRegnum(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  return raw || DIVERSITY_REGNUM_NONE;
+}
+
+/**
+ * Царства, встречающиеся на плашках, в порядке REGNUM_ORDER.
+ * @param {object[]} plaques
+ * @returns {string[]}
+ */
+export function listDiversityRegnumKeys(plaques) {
+  const present = new Set();
+  (Array.isArray(plaques) ? plaques : []).forEach((plaque) => {
+    (Array.isArray(plaque?.layers) ? plaque.layers : []).forEach((layer) => {
+      (Array.isArray(layer?.features) ? layer.features : []).forEach((feature) => {
+        present.add(normalizeCompareRegnum(feature?.properties?.regnum));
+      });
+    });
+  });
+  const ordered = [];
+  REGNUM_ORDER.forEach((code) => {
+    if (present.has(code)) {
+      ordered.push(code);
+    }
+  });
+  if (present.has(DIVERSITY_REGNUM_NONE)) {
+    ordered.push(DIVERSITY_REGNUM_NONE);
+  }
+  [...present]
+    .sort((left, right) => left.localeCompare(right, "en"))
+    .forEach((key) => {
+      if (!ordered.includes(key)) {
+        ordered.push(key);
+      }
+    });
+  return ordered;
+}
+
 function displayLatin(rawLatin, key) {
   if (key === UNNAMED_SPECIES_KEY) {
     return "Без названия";
   }
   const trimmed = String(rawLatin ?? "").trim();
   return trimmed || key;
+}
+
+function extractGenusKey(nameLatin) {
+  const normalized = normalizeLatinName(nameLatin);
+  if (!normalized) {
+    return null;
+  }
+  const first = normalized.split(" ")[0];
+  if (!first || first === "x" || first === "×") {
+    return null;
+  }
+  return first;
+}
+
+function resolveFeatureGroup(properties, mode) {
+  if (mode === DIVERSITY_GROUP_MODES.FAMILY) {
+    const raw = String(properties.family ?? "").trim();
+    const key = normalizeLatinName(raw) || UNNAMED_SPECIES_KEY;
+    return {
+      key,
+      nameLatin: raw || "Без семейства",
+      nameRu: "",
+      unnamed: key === UNNAMED_SPECIES_KEY
+    };
+  }
+  if (mode === DIVERSITY_GROUP_MODES.GENUS) {
+    const key = extractGenusKey(properties.name_latin);
+    if (!key) {
+      return {
+        key: UNNAMED_SPECIES_KEY,
+        nameLatin: "Без рода",
+        nameRu: "",
+        unnamed: true
+      };
+    }
+    const rawFirst = String(properties.name_latin ?? "")
+      .trim()
+      .split(/\s+/)[0];
+    const display = rawFirst
+      ? rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1)
+      : key.charAt(0).toUpperCase() + key.slice(1);
+    return { key, nameLatin: display, nameRu: "", unnamed: false };
+  }
+
+  const rawLatin = properties.name_latin;
+  const key = normalizeLatinName(rawLatin) || UNNAMED_SPECIES_KEY;
+  return {
+    key,
+    nameLatin: displayLatin(rawLatin, key),
+    nameRu: String(properties.name_ru ?? "").trim(),
+    unnamed: key === UNNAMED_SPECIES_KEY
+  };
 }
 
 /**
@@ -111,12 +209,13 @@ export function listCompareTempLayerOptions(layers = getTempLayers()) {
  * Плашка сравнения → вход countSpeciesByLayers: все точки слоёв плашки склеены.
  * GBIF и iNat можно отключить; прочие источники (карта, регионы) всегда входят.
  * @param {object[]} plaques
- * @param {{ includeGbif?: boolean, includeInat?: boolean }} [options]
+ * @param {{ includeGbif?: boolean, includeInat?: boolean, allowedRegnums?: Set<string>|null }} [options]
  * @returns {{ id: string, label: string, features: object[] }[]}
  */
 export function plaquesToCompareLayerInputs(plaques, options = {}) {
   const includeGbif = options.includeGbif !== false;
   const includeInat = options.includeInat !== false;
+  const allowedRegnums = options.allowedRegnums ?? null;
   return (Array.isArray(plaques) ? plaques : [])
     .filter((plaque) => plaque?.key)
     .map((plaque) => {
@@ -128,7 +227,13 @@ export function plaquesToCompareLayerInputs(plaques, options = {}) {
         if (source === TEMP_SOURCE_IDS.INAT && !includeInat) {
           return [];
         }
-        return Array.isArray(layer?.features) ? layer.features : [];
+        const layerFeatures = Array.isArray(layer?.features) ? layer.features : [];
+        if (!allowedRegnums) {
+          return layerFeatures;
+        }
+        return layerFeatures.filter((feature) =>
+          allowedRegnums.has(normalizeCompareRegnum(feature?.properties?.regnum))
+        );
       });
       const label = String(plaque.taxonName || plaque.label || plaque.key).trim() || "Слой";
       return { id: String(plaque.key), label, features };
@@ -185,23 +290,15 @@ export function listSharedSpeciesRows(comparison) {
 }
 
 /**
- * Считает точки каждого вида в каждом наборе.
- * Число колонок не ограничено двумя — подходит для 3–8 слоёв.
+ * Считает точки каждой группы (вид / род / семейство) в каждом наборе.
  *
  * @param {{ id: string, label?: string, features?: object[] }[]} layerInputs
- * @returns {{
- *   layers: { id: string, label: string }[],
- *   rows: {
- *     key: string,
- *     nameLatin: string,
- *     nameRu: string,
- *     unnamed: boolean,
- *     counts: Record<string, number>,
- *     total: number
- *   }[]
- * }}
+ * @param {string} [groupMode]
  */
-export function countSpeciesByLayers(layerInputs) {
+export function countSpeciesByLayers(layerInputs, groupMode = DIVERSITY_GROUP_MODES.SPECIES) {
+  const mode = Object.values(DIVERSITY_GROUP_MODES).includes(groupMode)
+    ? groupMode
+    : DIVERSITY_GROUP_MODES.SPECIES;
   const layers = (Array.isArray(layerInputs) ? layerInputs : [])
     .filter((layer) => layer?.id != null && layer.id !== "")
     .map((layer) => ({
@@ -216,29 +313,28 @@ export function countSpeciesByLayers(layerInputs) {
   layers.forEach((layer) => {
     layer.features.forEach((feature) => {
       const properties = feature?.properties ?? {};
-      const rawLatin = properties.name_latin;
-      const key = normalizeLatinName(rawLatin) || UNNAMED_SPECIES_KEY;
-      let row = byKey.get(key);
+      const group = resolveFeatureGroup(properties, mode);
+      let row = byKey.get(group.key);
       if (!row) {
         row = {
-          key,
-          nameLatin: displayLatin(rawLatin, key),
-          nameRu: String(properties.name_ru ?? "").trim(),
-          unnamed: key === UNNAMED_SPECIES_KEY,
+          key: group.key,
+          nameLatin: group.nameLatin,
+          nameRu: group.nameRu,
+          unnamed: group.unnamed,
           counts: emptyCounts(layerIds)
         };
-        byKey.set(key, row);
+        byKey.set(group.key, row);
       } else {
-        if (!row.nameRu && properties.name_ru) {
-          row.nameRu = String(properties.name_ru).trim();
+        if (!row.nameRu && group.nameRu) {
+          row.nameRu = group.nameRu;
         }
         if (
           !row.unnamed &&
-          row.nameLatin === key &&
-          typeof rawLatin === "string" &&
-          rawLatin.trim()
+          row.nameLatin === row.key &&
+          group.nameLatin &&
+          group.nameLatin !== row.key
         ) {
-          row.nameLatin = rawLatin.trim();
+          row.nameLatin = group.nameLatin;
         }
       }
       row.counts[layer.id] += 1;
@@ -280,46 +376,57 @@ function csvCell(value) {
  * @param {{ layers?: { label: string, uniqueSpecies: number, pointCount: number }[], namedSpeciesTotal?: number, sharedNamedSpecies?: number }|null} [summary]
  * @returns {string}
  */
-export function formatDiversityCsv(comparison, summary = null) {
+export function formatDiversityCsv(comparison, summary = null, groupMode = DIVERSITY_GROUP_MODES.SPECIES) {
   const layers = Array.isArray(comparison?.layers) ? comparison.layers : [];
   const rows = Array.isArray(comparison?.rows) ? comparison.rows : [];
   const lines = [];
+  const nameHeader =
+    groupMode === DIVERSITY_GROUP_MODES.GENUS
+      ? "Род"
+      : groupMode === DIVERSITY_GROUP_MODES.FAMILY
+        ? "Семейство"
+        : "Латинское название";
+  const showRu = groupMode === DIVERSITY_GROUP_MODES.SPECIES;
+  const groupNoun =
+    groupMode === DIVERSITY_GROUP_MODES.GENUS
+      ? "Родов"
+      : groupMode === DIVERSITY_GROUP_MODES.FAMILY
+        ? "Семейств"
+        : "Именованных видов";
 
   if (summary) {
-    lines.push(["Именованных видов", summary.namedSpeciesTotal ?? 0].map(csvCell).join(","));
+    lines.push([groupNoun, summary.namedSpeciesTotal ?? 0].map(csvCell).join(","));
     lines.push(["Общих для всех слоёв", summary.sharedNamedSpecies ?? 0].map(csvCell).join(","));
     lines.push("");
-    lines.push(["Слой", "Видов", "Точек"].map(csvCell).join(","));
+    lines.push(["Слой", groupNoun, "Точек"].map(csvCell).join(","));
     (summary.layers ?? []).forEach((layer) => {
       lines.push([layer.label, layer.uniqueSpecies, layer.pointCount].map(csvCell).join(","));
     });
     lines.push("");
   }
 
-  lines.push(
-    ["Латинское название", "Русское название", ...layers.map((layer) => layer.label), "Всего"]
-      .map(csvCell)
-      .join(",")
-  );
+  const headers = showRu
+    ? [nameHeader, "Русское название", ...layers.map((layer) => layer.label), "Всего"]
+    : [nameHeader, ...layers.map((layer) => layer.label), "Всего"];
+  lines.push(headers.map(csvCell).join(","));
   rows.forEach((row) => {
-    lines.push(
-      [
-        row.nameLatin,
-        row.nameRu || "",
-        ...layers.map((layer) => row.counts?.[layer.id] || 0),
-        row.total
-      ]
-        .map(csvCell)
-        .join(",")
-    );
+    const cells = showRu
+      ? [
+          row.nameLatin,
+          row.nameRu || "",
+          ...layers.map((layer) => row.counts?.[layer.id] || 0),
+          row.total
+        ]
+      : [row.nameLatin, ...layers.map((layer) => row.counts?.[layer.id] || 0), row.total];
+    lines.push(cells.map(csvCell).join(","));
   });
 
   return `\uFEFF${lines.join("\r\n")}\r\n`;
 }
 
 /** Скачивает CSV разнообразия. */
-export function downloadDiversityCsv(comparison, summary) {
-  const blob = new Blob([formatDiversityCsv(comparison, summary)], {
+export function downloadDiversityCsv(comparison, summary, groupMode) {
+  const blob = new Blob([formatDiversityCsv(comparison, summary, groupMode)], {
     type: "text/csv;charset=utf-8"
   });
   const url = URL.createObjectURL(blob);

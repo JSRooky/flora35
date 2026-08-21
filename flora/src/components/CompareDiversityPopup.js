@@ -3,12 +3,17 @@ import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import {
   COMPARE_SET_MIN,
+  DIVERSITY_GROUP_MODES,
+  DIVERSITY_REGNUM_NONE,
   countSpeciesByLayers,
   downloadDiversityCsv,
+  listDiversityRegnumKeys,
   listSharedSpeciesRows,
   plaquesToCompareLayerInputs,
   summarizeDiversity
 } from "../dataWork/compare/countSpeciesByLayers";
+import { getRegnumLabel } from "./featurePropertyLabels";
+import { getPointColorForRegnum } from "./pointColors";
 import { listTempLayerPlaques, subscribeTempLayers } from "../tempLayers/tempLayerStore";
 import "../styles/CompareDiversityPopup.css";
 
@@ -16,6 +21,31 @@ function resolvePlaques(plaqueKeys) {
   const plaques = listTempLayerPlaques();
   const byKey = new Map(plaques.map((plaque) => [plaque.key, plaque]));
   return (plaqueKeys ?? []).map((key) => byKey.get(key)).filter(Boolean);
+}
+
+function groupCopy(groupMode) {
+  if (groupMode === DIVERSITY_GROUP_MODES.GENUS) {
+    return {
+      nameHeader: "Род",
+      summaryHeader: "Родов",
+      leadTotal: "Родов всего",
+      emptyMatches: "Нет родов, общих для всех слоёв."
+    };
+  }
+  if (groupMode === DIVERSITY_GROUP_MODES.FAMILY) {
+    return {
+      nameHeader: "Семейство",
+      summaryHeader: "Семейств",
+      leadTotal: "Семейств всего",
+      emptyMatches: "Нет семейств, общих для всех слоёв."
+    };
+  }
+  return {
+    nameHeader: "Латинское название",
+    summaryHeader: "Видов",
+    leadTotal: "Именованных видов всего",
+    emptyMatches: "Нет видов, общих для всех слоёв."
+  };
 }
 
 /**
@@ -31,6 +61,8 @@ export default function CompareDiversityPopup({
   const [includeGbif, setIncludeGbif] = useState(true);
   const [includeInat, setIncludeInat] = useState(true);
   const [matchesOnly, setMatchesOnly] = useState(false);
+  const [groupMode, setGroupMode] = useState(DIVERSITY_GROUP_MODES.SPECIES);
+  const [regnumOff, setRegnumOff] = useState({});
 
   const keysSignature = plaqueKeys.join("\u0001");
 
@@ -46,12 +78,22 @@ export default function CompareDiversityPopup({
   }, [open, keysSignature]);
 
   const bothSources = includeGbif && includeInat;
+  const presentRegnums = useMemo(() => listDiversityRegnumKeys(plaques), [plaques]);
+  const allRegnumsOn =
+    presentRegnums.length > 0 && presentRegnums.every((key) => regnumOff[key] !== true);
+  const allowedRegnums = useMemo(() => {
+    if (presentRegnums.length === 0 || allRegnumsOn) {
+      return null;
+    }
+    return new Set(presentRegnums.filter((key) => regnumOff[key] !== true));
+  }, [allRegnumsOn, presentRegnums, regnumOff]);
 
   const comparison = useMemo(() => {
     return countSpeciesByLayers(
-      plaquesToCompareLayerInputs(plaques, { includeGbif, includeInat })
+      plaquesToCompareLayerInputs(plaques, { includeGbif, includeInat, allowedRegnums }),
+      groupMode
     );
-  }, [plaques, includeGbif, includeInat]);
+  }, [plaques, includeGbif, includeInat, allowedRegnums, groupMode]);
 
   const summary = useMemo(() => summarizeDiversity(comparison), [comparison]);
   const tableRows = useMemo(() => {
@@ -71,12 +113,33 @@ export default function CompareDiversityPopup({
     setIncludeInat(next);
   }, [bothSources]);
 
+  const handleToggleAllRegnums = useCallback(() => {
+    const nextOff = !allRegnumsOn;
+    setRegnumOff(
+      Object.fromEntries(presentRegnums.map((key) => [key, nextOff]))
+    );
+  }, [allRegnumsOn, presentRegnums]);
+
+  const handleToggleRegnum = useCallback((key) => {
+    setRegnumOff((current) => ({ ...current, [key]: current[key] !== true }));
+  }, []);
+
   const handleExport = useCallback(() => {
     if (!canExport) {
       return;
     }
-    downloadDiversityCsv(tableComparison, summary);
-  }, [canExport, tableComparison, summary]);
+    downloadDiversityCsv(tableComparison, summary, groupMode);
+  }, [canExport, tableComparison, summary, groupMode]);
+
+  const copy = groupCopy(groupMode);
+  const showRuColumn = groupMode === DIVERSITY_GROUP_MODES.SPECIES;
+  const emptyColSpan = comparison.layers.length + (showRuColumn ? 3 : 2);
+
+  const handleGroupMode = useCallback((nextMode) => {
+    setGroupMode((current) =>
+      current === nextMode ? DIVERSITY_GROUP_MODES.SPECIES : nextMode
+    );
+  }, []);
 
   if (!open) {
     return null;
@@ -105,9 +168,9 @@ export default function CompareDiversityPopup({
           </p>
         ) : (
           <>
-            <div className="compare-diversity-sources" role="group" aria-label="Точки">
+            <div className="compare-diversity-sources" role="toolbar" aria-label="Фильтры таблицы">
               <span className="compare-diversity-sources-label">Точки</span>
-              <div className="compare-diversity-source-group">
+              <div className="compare-diversity-source-group" role="group" aria-label="Точки">
                 <button
                   type="button"
                   className={`compare-diversity-source${
@@ -139,6 +202,43 @@ export default function CompareDiversityPopup({
                   iNat
                 </button>
               </div>
+              {presentRegnums.length > 0 ? (
+                <>
+                  <span className="compare-diversity-sources-label">Царства</span>
+                  <div className="compare-diversity-source-group" role="group" aria-label="Царства">
+                    <button
+                      type="button"
+                      className={`compare-diversity-source${
+                        allRegnumsOn ? " compare-diversity-source--on" : ""
+                      }`}
+                      aria-pressed={allRegnumsOn}
+                      onClick={handleToggleAllRegnums}
+                    >
+                      Все
+                    </button>
+                    {presentRegnums.map((key) => {
+                      const isOn = regnumOff[key] !== true;
+                      const color = getPointColorForRegnum(
+                        key === DIVERSITY_REGNUM_NONE ? null : key
+                      );
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          className={`compare-diversity-source compare-diversity-source--regnum${
+                            isOn ? " compare-diversity-source--on" : ""
+                          }`}
+                          style={isOn ? { color, background: `${color}22` } : undefined}
+                          aria-pressed={isOn}
+                          onClick={() => handleToggleRegnum(key)}
+                        >
+                          {getRegnumLabel(key === DIVERSITY_REGNUM_NONE ? null : key)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : null}
               <button
                 type="button"
                 className={`compare-diversity-filter${
@@ -150,6 +250,28 @@ export default function CompareDiversityPopup({
               >
                 Только совпадения
               </button>
+              <button
+                type="button"
+                className={`compare-diversity-filter${
+                  groupMode === DIVERSITY_GROUP_MODES.GENUS ? " compare-diversity-filter--on" : ""
+                }`}
+                aria-pressed={groupMode === DIVERSITY_GROUP_MODES.GENUS}
+                title="Сравнить количество родов"
+                onClick={() => handleGroupMode(DIVERSITY_GROUP_MODES.GENUS)}
+              >
+                По родам
+              </button>
+              <button
+                type="button"
+                className={`compare-diversity-filter${
+                  groupMode === DIVERSITY_GROUP_MODES.FAMILY ? " compare-diversity-filter--on" : ""
+                }`}
+                aria-pressed={groupMode === DIVERSITY_GROUP_MODES.FAMILY}
+                title="Сравнить количество семейств"
+                onClick={() => handleGroupMode(DIVERSITY_GROUP_MODES.FAMILY)}
+              >
+                По семействам
+              </button>
             </div>
 
             {noPoints ? (
@@ -157,14 +279,14 @@ export default function CompareDiversityPopup({
             ) : (
               <>
                 <p className="compare-diversity-lead">
-                  Именованных видов всего: {summary.namedSpeciesTotal}. Общих для всех слоёв:{" "}
+                  {copy.leadTotal}: {summary.namedSpeciesTotal}. Общих для всех слоёв:{" "}
                   {summary.sharedNamedSpecies}.
                 </p>
                 <table className="compare-diversity-summary">
                   <thead>
                     <tr>
                       <th>Слой</th>
-                      <th>Видов</th>
+                      <th>{copy.summaryHeader}</th>
                       <th>Точек</th>
                     </tr>
                   </thead>
@@ -183,8 +305,8 @@ export default function CompareDiversityPopup({
                   <table className="compare-diversity-table">
                     <thead>
                       <tr>
-                        <th>Латинское название</th>
-                        <th>Русское название</th>
+                        <th>{copy.nameHeader}</th>
+                        {showRuColumn ? <th>Русское название</th> : null}
                         {comparison.layers.map((layer) => (
                           <th key={layer.id}>{layer.label}</th>
                         ))}
@@ -194,9 +316,7 @@ export default function CompareDiversityPopup({
                     <tbody>
                       {tableRows.length === 0 ? (
                         <tr>
-                          <td colSpan={comparison.layers.length + 3}>
-                            Нет видов, общих для всех слоёв.
-                          </td>
+                          <td colSpan={emptyColSpan}>{copy.emptyMatches}</td>
                         </tr>
                       ) : (
                         tableRows.map((row) => (
@@ -204,7 +324,7 @@ export default function CompareDiversityPopup({
                             <td>
                               <em>{row.nameLatin}</em>
                             </td>
-                            <td>{row.nameRu || "—"}</td>
+                            {showRuColumn ? <td>{row.nameRu || "—"}</td> : null}
                             {comparison.layers.map((layer) => (
                               <td key={layer.id}>{row.counts[layer.id] || 0}</td>
                             ))}
