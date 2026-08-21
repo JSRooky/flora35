@@ -8,8 +8,6 @@
 # testing
 /coverage
 
-# generated MapLibre CSP worker (copied on prestart/prebuild)
-/public/maplibre-gl-csp-worker.js
 /release
 /dist
 

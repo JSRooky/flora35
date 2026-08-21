@@ -1,10 +1,10 @@
 import maplibregl from "maplibre-gl/dist/maplibre-gl-csp";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-// CRA ломает worker-loader на ESM-обёртке. MapLibre CSP ждёт абсолютный URL воркера.
+// CRA ломает worker-loader на ESM-обёртке MapLibre. CSP-сборка грузит воркер по URL из public/.
 function getMapLibreWorkerUrl() {
-  const publicUrl = process.env.PUBLIC_URL || "";
-  const workerPath = `${publicUrl}/maplibre-gl-csp-worker.js`.replace(/([^:]\/)\/+/g, "$1");
+  const publicUrl = (process.env.PUBLIC_URL || "").replace(/\/$/, "");
+  const workerPath = `${publicUrl}/maplibre-gl-csp-worker.js`;
   if (typeof window === "undefined") {
     return workerPath;
   }
@@ -12,10 +12,11 @@ function getMapLibreWorkerUrl() {
 }
 
 const workerUrl = getMapLibreWorkerUrl();
+if (maplibregl.config) {
+  maplibregl.config.WORKER_URL = workerUrl;
+}
 if (typeof maplibregl.setWorkerUrl === "function") {
   maplibregl.setWorkerUrl(workerUrl);
-} else if (maplibregl.config) {
-  maplibregl.config.WORKER_URL = workerUrl;
 }
 
 export default maplibregl;

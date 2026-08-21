@@ -12,10 +12,13 @@ function copyMapLibreWorker() {
     throw new Error(`MapLibre worker not found: ${source}`);
   }
 
+  fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(source, target);
   console.log(`Copied MapLibre worker to ${target}`);
 }
 
-copyMapLibreWorker();
+if (require.main === module) {
+  copyMapLibreWorker();
+}
 
 module.exports = { copyMapLibreWorker };
