@@ -564,7 +564,7 @@ export default function MapView() {
         regionBoundsSettings.fillColor
       )
     );
-  }, [regionCatalog, regionBoundsSettings.fillColor]);
+  }, [regionBoundsSettings, regionCatalog]);
   const [basemapMode, setBasemapMode] = useState(BASEMAP_MODES.MAPBOX);
   const [dataSourceMode, setDataSourceModeState] = useState(DEFAULT_DATA_SOURCE_MODE);
   const localDataActive =
@@ -581,7 +581,7 @@ export default function MapView() {
   });
   const [tempLayersRevision, setTempLayersRevision] = useState(0);
   const overlayRegionEdit = useMemo(
-    () => getVisibleRegionOverlayEditState(),
+    () => getVisibleRegionOverlayEditState(tempLayersRevision),
     [tempLayersRevision]
   );
   const [externalProcessingActive, setExternalProcessingActive] = useState(false);
