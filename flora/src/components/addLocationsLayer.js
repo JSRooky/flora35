@@ -70,6 +70,10 @@ import {
   featureMatchesSpeciesSearch
 } from "../locations/speciesSearchFilter";
 import {
+  REGION_SPECIES_ALLOWLIST_KEY,
+  featureMatchesRegionSpeciesAllowlist
+} from "../locations/regionSpeciesAllowlist";
+import {
   applyRedBookLocationsFilter,
   getRedBookFeatures,
   getRedBookInteractiveLayerIds,
@@ -2014,6 +2018,7 @@ export function filterFeatures(features, filters = {}) {
     [WITHIN_FEATURE_FILTER_KEY]: withinFeature,
     [HIDDEN_FEATURE_KEYS_FILTER_KEY]: _hiddenFeatureKeys,
     [SPECIES_SEARCH_FILTER_KEY]: speciesSearch,
+    [REGION_SPECIES_ALLOWLIST_KEY]: regionSpeciesAllowlist,
     [REQUIRE_FOUND_YEAR_FILTER_KEY]: requireFoundYear,
     ...propertyFilters
   } = filters;
@@ -2036,6 +2041,12 @@ export function filterFeatures(features, filters = {}) {
   if (speciesSearch) {
     result = result.filter((feature) =>
       featureMatchesSpeciesSearch(feature, speciesSearch)
+    );
+  }
+
+  if (regionSpeciesAllowlist) {
+    result = result.filter((feature) =>
+      featureMatchesRegionSpeciesAllowlist(feature, regionSpeciesAllowlist)
     );
   }
 

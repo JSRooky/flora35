@@ -3,6 +3,10 @@ import {
   featureMatchesSpeciesSearch,
   SPECIES_SEARCH_FILTER_KEY
 } from "../locations/speciesSearchFilter";
+import {
+  REGION_SPECIES_ALLOWLIST_KEY,
+  featureMatchesRegionSpeciesAllowlist
+} from "../locations/regionSpeciesAllowlist";
 import { booleanPointInPolygon, point } from "@turf/turf";
 
 const WITHIN_KEY = "__withinFeature";
@@ -51,6 +55,7 @@ export function locationFiltersNeedProperties(filters = locationFilters) {
   return Boolean(
     f[REQUIRE_YEAR_KEY] ||
       f[SPECIES_SEARCH_FILTER_KEY] ||
+      f[REGION_SPECIES_ALLOWLIST_KEY] ||
       f.found_year ||
       Object.prototype.hasOwnProperty.call(f, "regnum") ||
       f[WITHIN_KEY] ||
@@ -98,6 +103,14 @@ export function compactPropertiesMatchFilters(properties, lng, lat, filters = lo
 
   const speciesSearch = filters[SPECIES_SEARCH_FILTER_KEY];
   if (speciesSearch && !featureMatchesSpeciesSearch({ properties: props }, speciesSearch)) {
+    return false;
+  }
+
+  const regionSpeciesAllowlist = filters[REGION_SPECIES_ALLOWLIST_KEY];
+  if (
+    regionSpeciesAllowlist &&
+    !featureMatchesRegionSpeciesAllowlist({ properties: props }, regionSpeciesAllowlist)
+  ) {
     return false;
   }
 

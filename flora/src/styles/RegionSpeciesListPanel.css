@@ -1,0 +1,145 @@
+.region-species-list-panel-stack {
+  z-index: 1102;
+}
+
+.region-species-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.region-species-section-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.region-species-empty,
+.region-species-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.region-species-regnum-list,
+.region-species-family-groups,
+.region-species-family-list,
+.region-species-search-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.region-species-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #1f2937;
+}
+
+.region-species-check input {
+  margin: 0;
+}
+
+.region-species-muted {
+  margin-left: auto;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.region-species-family-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.region-species-family-regnum {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.region-species-list-btn,
+.region-species-add-btn {
+  margin-left: auto;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 8px;
+  background: #fff;
+  color: #1f2937;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.region-species-list-btn:hover,
+.region-species-add-btn:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.region-species-add-btn {
+  margin-left: 8px;
+  min-width: 28px;
+  flex: 0 0 auto;
+}
+
+.region-species-add-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.region-species-add-btn--remove {
+  color: #9f1239;
+}
+
+.region-species-family-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 8px 12px;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.region-species-family-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #334155;
+}
+
+.region-species-search {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.region-species-search-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.region-species-search-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.region-species-search-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 13px;
+  color: #1f2937;
+}

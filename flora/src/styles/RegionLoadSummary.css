@@ -16,7 +16,7 @@
   transform: translate(-50%, -50%);
   display: inline-flex;
   width: max-content;
-  max-width: min(168px, 72vw);
+  max-width: min(220px, 78vw);
   align-items: center;
   gap: 4px;
   min-height: 0;
@@ -160,8 +160,34 @@
   cursor: pointer;
 }
 
+.region-load-plaque-list {
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8e8e93;
+  cursor: pointer;
+}
+
+.region-load-plaque-list-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
 .region-load-plaque-display:hover,
-.region-load-plaque-display--off {
+.region-load-plaque-display--off,
+.region-load-plaque-list:hover {
   background: rgba(0, 0, 0, 0.06);
   color: #4b5563;
 }
@@ -200,9 +226,15 @@
   font-size: 10px;
 }
 
-.region-load-plaque--compact .region-load-plaque-display {
+.region-load-plaque--compact .region-load-plaque-display,
+.region-load-plaque--compact .region-load-plaque-list {
   width: 18px;
   height: 18px;
+  padding: 0;
+}
+
+.region-load-plaque--compact .region-load-plaque-list-label {
+  display: none;
 }
 
 .region-load-plaque--compact .region-load-plaque-display-icon {

@@ -26,11 +26,19 @@ const EYE_ON_SVG = `<svg class="region-load-plaque-display-icon" viewBox="0 0 24
 
 const EYE_OFF_SVG = `<svg class="region-load-plaque-display-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M17.49,17.49c-1.58,1.2-3.5,1.87-5.49,1.9-6.47,0-10.16-7.39-10.16-7.39,1.15-2.14,2.74-4.01,4.67-5.49"/><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M10.06,4.83c.64-.15,1.29-.22,1.94-.22,6.47,0,10.16,7.39,10.16,7.39-.56,1.05-1.23,2.04-2,2.95"/><line stroke="currentColor" stroke-width="2.2" stroke-linecap="round" x1="1.84" y1="1.84" x2="22.16" y2="22.16"/></svg>`;
 
+const LIST_SVG = `<svg class="region-load-plaque-display-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M8 6h13M8 12h13M8 18h13"/><circle fill="currentColor" cx="4" cy="6" r="1.4"/><circle fill="currentColor" cx="4" cy="12" r="1.4"/><circle fill="currentColor" cx="4" cy="18" r="1.4"/></svg>`;
+
 /** @type {((summary: object, visible: boolean) => void) | null} */
 let displayHandler = null;
+/** @type {((summary: object) => void) | null} */
+let listHandler = null;
 
 export function setRegionLoadSummaryDisplayHandler(handler) {
   displayHandler = typeof handler === "function" ? handler : null;
+}
+
+export function setRegionLoadSummaryListHandler(handler) {
+  listHandler = typeof handler === "function" ? handler : null;
 }
 
 /** @type {Map<string, import("mapbox-gl").Marker>} */
@@ -218,8 +226,24 @@ function createPlaqueElement(summary, map) {
   });
   element.appendChild(displayBtn);
 
+  const listBtn = document.createElement("button");
+  listBtn.type = "button";
+  listBtn.className = "region-load-plaque-list";
+  listBtn.setAttribute("aria-label", "Список видов региона");
+  listBtn.title = "Список";
+  listBtn.innerHTML = `<span class="region-load-plaque-list-label">Список</span>${LIST_SVG}`;
+  listBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    listHandler?.(summary);
+  });
+  element.appendChild(listBtn);
+
   element.addEventListener("click", (event) => {
-    if (event.target.closest(".region-load-plaque-display")) {
+    if (
+      event.target.closest(".region-load-plaque-display") ||
+      event.target.closest(".region-load-plaque-list")
+    ) {
       return;
     }
     event.preventDefault();

@@ -56,6 +56,11 @@ import {
   SPECIES_SEARCH_MIN_QUERY_LENGTH
 } from "./locations/speciesSearchFilter";
 import {
+  REGION_SPECIES_ALLOWLIST_KEY,
+  speciesDisplayKey
+} from "./locations/regionSpeciesAllowlist";
+import { buildRegionSpeciesInventory } from "./map/regionSpeciesInventory";
+import {
   isLargePointCount
 } from "./components/mapPerformance";
 import {
@@ -109,6 +114,7 @@ import OoptPanel from "./components/OoptPanel";
 import RegionPanel from "./components/RegionPanel";
 import OoptFeaturePanel from "./components/OoptFeaturePanel";
 import BoundsSpeciesListPopup from "./components/BoundsSpeciesListPopup";
+import RegionSpeciesListPanel from "./components/RegionSpeciesListPanel";
 import { getBoundsFeatureHeadingParts } from "./components/boundsPropertyLabels";
 import { isFirebaseConfigured } from "./firebase/config";
 import {
@@ -247,6 +253,7 @@ import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDens
 import {
   clearRegionLoadSummary,
   setRegionLoadSummaryDisplayHandler,
+  setRegionLoadSummaryListHandler,
   refreshRegionLoadSummary,
   setLoadedPointMarkersRequested,
   setRegionLoadSummaryActive,
@@ -360,6 +367,7 @@ const PANEL_IDS = {
   COMPARE_SIMILARITY: "compare-similarity",
   COMPARE_DISTRIBUTION: "compare-distribution",
   COMPARE_STATS: "compare-stats",
+  REGION_SPECIES: "region-species",
   /** @deprecated алиасы для taskbar */
   GBIF: "data-sources",
   GBIF_PROCESSING: "external-processing"
@@ -398,7 +406,8 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.COMPARE_DIVERSITY,
   PANEL_IDS.COMPARE_SIMILARITY,
   PANEL_IDS.COMPARE_DISTRIBUTION,
-  PANEL_IDS.COMPARE_STATS
+  PANEL_IDS.COMPARE_STATS,
+  PANEL_IDS.REGION_SPECIES
 ];
 
 function isPanelExpandedInState(collapsedState, panelId) {
@@ -435,6 +444,10 @@ export default function MapView() {
   const [hiddenDensePileKeys, setHiddenDensePileKeysState] = useState([]);
   const [selectedDensePileKey, setSelectedDensePileKey] = useState(null);
   const [densePileSpeciesListOpen, setDensePileSpeciesListOpen] = useState(false);
+  const [regionSpeciesPanelOpen, setRegionSpeciesPanelOpen] = useState(false);
+  const [regionSpeciesContext, setRegionSpeciesContext] = useState(null);
+  const [regionSpeciesAllowlist, setRegionSpeciesAllowlist] = useState(null);
+  const [regionSpeciesRegnumFilter, setRegionSpeciesRegnumFilter] = useState(null);
   // Инвалидация списка плотных групп при смене данных в module-store (локальные/GBIF).
   const [pointsDataRevision, setPointsDataRevision] = useState(0);
   const [speciesSearchInput, setSpeciesSearchInput] = useState("");
@@ -789,6 +802,9 @@ export default function MapView() {
         setDenseProcessingActive(true);
         setDensePileSpeciesListOpen(true);
         setActiveModule(MODULE_IDS.MAP);
+        break;
+      case TASKBAR_PANEL_IDS.REGION_SPECIES:
+        setRegionSpeciesPanelOpen(true);
         break;
       case TASKBAR_PANEL_IDS.FEATURE:
         setActiveModule(MODULE_IDS.FEATURE);
@@ -1456,6 +1472,9 @@ export default function MapView() {
 
   useEffect(() => {
     setRegionLoadSummaryDisplayHandler((summary, visible) => {
+      if (visible) {
+        setRegionSpeciesAllowlist(null);
+      }
       if (Array.isArray(summary?.layerIds) && summary.layerIds.length > 0) {
         summary.layerIds.forEach((layerId) => {
           setTempLayerVisible(layerId, visible);
@@ -1473,6 +1492,124 @@ export default function MapView() {
     });
     return () => setRegionLoadSummaryDisplayHandler(null);
   }, [bumpPointsDataRevision]);
+
+  useEffect(() => {
+    setRegionLoadSummaryListHandler((summary) => {
+      if (!summary) {
+        return;
+      }
+      const nextContext = {
+        regionId: summary.regionId,
+        layerIds: Array.isArray(summary.layerIds) ? summary.layerIds : [],
+        mode: Array.isArray(summary.layerIds) && summary.layerIds.length > 0 ? "temp" : "external",
+        title: summary.layerName
+          ? `${summary.layerName} · ${summary.label}`
+          : summary.label || "Список видов региона"
+      };
+      setRegionSpeciesContext((current) => {
+        const same =
+          current?.regionId === nextContext.regionId &&
+          current?.mode === nextContext.mode &&
+          JSON.stringify(current?.layerIds || []) === JSON.stringify(nextContext.layerIds);
+        if (!same) {
+          setRegionSpeciesAllowlist(null);
+          setRegionSpeciesRegnumFilter(null);
+        }
+        return nextContext;
+      });
+      setPanelMinimized((prev) => ({
+        ...prev,
+        [PANEL_IDS.REGION_SPECIES]: false
+      }));
+      pinPanelsToTaskbar([PANEL_IDS.REGION_SPECIES]);
+      setRegionSpeciesPanelOpen(true);
+    });
+    return () => setRegionLoadSummaryListHandler(null);
+  }, [pinPanelsToTaskbar]);
+
+  const regionSpeciesInventory = useMemo(() => {
+    if (!regionSpeciesContext?.regionId) {
+      return [];
+    }
+    void pointsDataRevision;
+    void tempLayersRevision;
+    return buildRegionSpeciesInventory(regionSpeciesContext);
+  }, [pointsDataRevision, regionSpeciesContext, tempLayersRevision]);
+
+  const showRegionSpeciesPoints = useCallback(
+    (context) => {
+      if (!context) {
+        return;
+      }
+      if (context.mode === "temp" && context.layerIds.length > 0) {
+        context.layerIds.forEach((layerId) => {
+          setTempLayerVisible(layerId, true);
+        });
+        persistTempLayers().catch(() => {});
+        setTempLayersRevision((value) => value + 1);
+        if (map.current) {
+          setTempLayersData(map.current);
+          refreshRegionLoadSummary(map.current);
+        }
+        bumpPointsDataRevision();
+        return;
+      }
+      setMarkersVisibleState(true);
+    },
+    [bumpPointsDataRevision]
+  );
+
+  const handleAddRegionSpecies = useCallback(
+    (entry) => {
+      if (!entry) {
+        return;
+      }
+      const key = speciesDisplayKey(entry);
+      setRegionSpeciesAllowlist((current) => {
+        const list = Array.isArray(current) ? current : [];
+        if (list.some((item) => speciesDisplayKey(item) === key)) {
+          return current;
+        }
+        return [...list, entry];
+      });
+      showRegionSpeciesPoints(regionSpeciesContext);
+    },
+    [regionSpeciesContext, showRegionSpeciesPoints]
+  );
+
+  const handleRemoveRegionSpecies = useCallback((entry) => {
+    const key = speciesDisplayKey(entry);
+    setRegionSpeciesAllowlist((current) => {
+      if (!Array.isArray(current)) {
+        return current;
+      }
+      return current.filter((item) => speciesDisplayKey(item) !== key);
+    });
+  }, []);
+
+  const handleRegionSpeciesRegnumChange = useCallback(
+    (regnum, enabled) => {
+      const allRegnums = [
+        ...new Set(regionSpeciesInventory.map((item) => item.regnum))
+      ];
+      setRegionSpeciesRegnumFilter((current) => {
+        const base = current ?? allRegnums;
+        const next = enabled
+          ? [...new Set([...base, regnum])]
+          : base.filter((item) => item !== regnum);
+        if (next.length === allRegnums.length && allRegnums.every((item) => next.includes(item))) {
+          return null;
+        }
+        return next;
+      });
+    },
+    [regionSpeciesInventory]
+  );
+
+  const handleCloseRegionSpeciesPanel = useCallback(() => {
+    setRegionSpeciesPanelOpen(false);
+    unpinPanelsFromTaskbar([PANEL_IDS.REGION_SPECIES]);
+  }, [unpinPanelsFromTaskbar]);
 
   const handleTempLayerDelete = useCallback((layerId) => {
     void (async () => {
@@ -2293,6 +2430,10 @@ export default function MapView() {
       ids.push(TASKBAR_PANEL_IDS.OOPT_SPECIES);
     }
 
+    if (regionSpeciesPanelOpen && !isMin(PANEL_IDS.REGION_SPECIES)) {
+      ids.push(PANEL_IDS.REGION_SPECIES);
+    }
+
     if (dataSourcesPanelOpen) {
       ids.push(PANEL_IDS.DATA_SOURCES);
     }
@@ -2349,6 +2490,7 @@ export default function MapView() {
     externalProcessingActive,
     ooptPointsFilterActive,
     panelMinimized,
+    regionSpeciesPanelOpen,
     selectedBoundsFeature
   ]);
 
@@ -2558,6 +2700,26 @@ export default function MapView() {
       }
     }
 
+    if (regionSpeciesRegnumFilter !== null) {
+      const enabledRegnums = regionSpeciesRegnumFilter;
+      if (enabledRegnums.length === 0) {
+        filters.regnum = ["__none__"];
+      } else if (filters.regnum != null) {
+        const existing = Array.isArray(filters.regnum) ? filters.regnum : [filters.regnum];
+        const existingNormalized = existing.map((value) =>
+          value == null || value === "" ? "" : String(value).toLowerCase()
+        );
+        const intersected = enabledRegnums.filter((regnum) =>
+          existingNormalized.includes(
+            regnum == null || regnum === "" ? "" : String(regnum).toLowerCase()
+          )
+        );
+        filters.regnum = intersected.length > 0 ? intersected : ["__none__"];
+      } else {
+        filters.regnum = enabledRegnums;
+      }
+    }
+
     if (effectiveHiddenPointKeys.length > 0) {
       filters[HIDDEN_FEATURE_KEYS_FILTER_KEY] = effectiveHiddenPointKeys;
     }
@@ -2574,10 +2736,16 @@ export default function MapView() {
       filters[SPECIES_SEARCH_FILTER_KEY] = speciesSearch;
     }
 
+    if (regionSpeciesAllowlist) {
+      filters[REGION_SPECIES_ALLOWLIST_KEY] = regionSpeciesAllowlist;
+    }
+
     return filters;
   }, [
     baseLocationFilters,
     boundsSpeciesRegnumFilter,
+    regionSpeciesRegnumFilter,
+    regionSpeciesAllowlist,
     effectiveWithinFeature,
     effectiveHiddenPointKeys,
     hideMissingFoundYear,
@@ -5980,6 +6148,11 @@ export default function MapView() {
           handleDensePileSpeciesListClose();
           break;
         }
+        case PANEL_IDS.REGION_SPECIES:
+        case TASKBAR_PANEL_IDS.REGION_SPECIES: {
+          handleCloseRegionSpeciesPanel();
+          break;
+        }
         default: {
           const moduleId = PANEL_TASKBAR_MODULE_ID[panelId];
           unpinPanelsFromTaskbar([panelId]);
@@ -6001,6 +6174,7 @@ export default function MapView() {
       handleCloseUndoMergedPoints,
       handleDensePileSpeciesListClose,
       handleDenseProcessingClose,
+      handleCloseRegionSpeciesPanel,
       minimizePanel,
       unpinPanelsFromTaskbar
     ]
@@ -7312,6 +7486,20 @@ export default function MapView() {
         onClose={handleCloseUndoMergedPoints}
         onShowPoint={handleShowUndoMergedPoint}
         onUndoMerge={handleUndoMergedPoint}
+      />
+      <RegionSpeciesListPanel
+        open={regionSpeciesPanelOpen && !isPanelMinimized(PANEL_IDS.REGION_SPECIES)}
+        title={regionSpeciesContext?.title || "Список видов региона"}
+        species={regionSpeciesInventory}
+        displayedSpecies={regionSpeciesAllowlist || []}
+        enabledRegnums={regionSpeciesRegnumFilter}
+        onRegnumEnabledChange={handleRegionSpeciesRegnumChange}
+        onAddSpecies={handleAddRegionSpecies}
+        onRemoveSpecies={handleRemoveRegionSpecies}
+        collapsed={isPanelCollapsed(PANEL_IDS.REGION_SPECIES)}
+        onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.REGION_SPECIES)}
+        onMinimize={handleMinimizePanel(PANEL_IDS.REGION_SPECIES)}
+        onClose={handleClosePanel(PANEL_IDS.REGION_SPECIES)}
       />
       <BoundsSpeciesListPopup
         open={
