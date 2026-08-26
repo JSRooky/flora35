@@ -374,7 +374,7 @@ export function ensureCompactViewportSync(map, key, syncFn) {
   }
   let entry = syncByMap.get(map);
   if (!entry) {
-    entry = { fns: new Map(), timer: null };
+    entry = { fns: new Map(), timer: null, run: null };
     const run = () => {
       if (!compactEnabled) {
         return;
@@ -393,9 +393,30 @@ export function ensureCompactViewportSync(map, key, syncFn) {
         });
       }, 80);
     };
+    entry.run = run;
     map.on("moveend", run);
     map.on("zoomend", run);
     syncByMap.set(map, entry);
   }
   entry.fns.set(key, syncFn);
+}
+
+/**
+ * Просит пересобрать компактную сетку тем же дебаунсом, что пан/зум (80мс).
+ * Нужно для смены фильтров (например, слайдер "Год находки") — иначе каждое
+ * промежуточное значение слайдера вызывало бы полную пересборку сетки.
+ *
+ * Если синхронизация для этой карты ещё не зарегистрирована (первое
+ * включение компактного режима) — вызывает fallbackFn немедленно, как раньше,
+ * чтобы не остаться без отрисовки до следующего пана/зума.
+ */
+export function requestCompactViewportSync(map, fallbackFn) {
+  const entry = syncByMap.get(map);
+  if (entry?.run) {
+    entry.run();
+    return;
+  }
+  if (typeof fallbackFn === "function") {
+    fallbackFn();
+  }
 }

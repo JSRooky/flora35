@@ -32,7 +32,8 @@ import {
   easeToCompactDensityCell,
   ensureCompactViewportSync,
   isCompactDensityFeature,
-  isCompactPointDisplayEnabled
+  isCompactPointDisplayEnabled,
+  requestCompactViewportSync
 } from "../map/compactPointDisplay";
 import {
   GBIF_SOURCE_ID,
@@ -2693,7 +2694,12 @@ export function applyGbifLocationsFilter(map, filters = currentFilters) {
   setCompactGbifProcessingFilters(gbifProcessingFilters);
 
   if (isCompactPointDisplayEnabled()) {
-    setGbifData(map, { type: "FeatureCollection", features: [] });
+    // Сетка перечитывает фильтры сама при пересборке — не гоним полную
+    // пересборку сразу на каждое изменение (например, тик слайдера года),
+    // а планируем её с тем же дебаунсом, что и пан/зум.
+    requestCompactViewportSync(map, () =>
+      setGbifData(map, { type: "FeatureCollection", features: [] })
+    );
     return;
   }
 
@@ -2925,7 +2931,11 @@ export function applyInatLocationsFilter(map, filters = currentFilters) {
   setCompactInatProcessingFilters(inatProcessingFilters);
 
   if (isCompactPointDisplayEnabled()) {
-    setInatData(map, { type: "FeatureCollection", features: [] });
+    // См. комментарий в applyGbifLocationsFilter — избегаем немедленной
+    // полной пересборки сетки на каждый промежуточный тик фильтра.
+    requestCompactViewportSync(map, () =>
+      setInatData(map, { type: "FeatureCollection", features: [] })
+    );
     return;
   }
 
@@ -3017,6 +3027,13 @@ function applyTempLayersLocationsFilter(map, filters = currentFilters) {
   }
 
   setTempLayersLocationFeatureFilter((features) => filterFeatures(features, filters));
+
+  if (isCompactPointDisplayEnabled()) {
+    // См. комментарий в applyGbifLocationsFilter.
+    requestCompactViewportSync(map, () => setTempLayersData(map));
+    return;
+  }
+
   setTempLayersData(map);
 }
 
