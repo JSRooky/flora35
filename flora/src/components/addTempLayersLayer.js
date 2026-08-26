@@ -1,6 +1,7 @@
 import { DEFAULT_CLUSTER_COLOR, DEFAULT_POINT_COLOR, getPointColorExpression } from "./pointColors";
 import {
   addCompactGridLayers,
+  buildCompactViewportFeatures,
   buildCompactViewportFromGeojson,
   compactCircleRadiusExpression,
   compactDensityFalseFilter,
@@ -10,7 +11,9 @@ import {
   isCompactDensityFeature,
   isCompactPointDisplayEnabled
 } from "../map/compactPointDisplay";
+import { shouldUseCompactDensityGrid } from "../map/compactGridSettings";
 import {
+  forEachVisibleTempLayerPoint,
   getTempLayerFeatureGroups,
   getTempLayerPlaqueFeatureGroups,
   getVisibleTempLayerFeatures,
@@ -619,27 +622,43 @@ export function setTempLayersData(map) {
   pieLayerKeys = [];
   tempDensePileMembers = new Map();
   const denseClusterFeatures = [];
-  buildUnits()
-    .filter((unit) => unit.features.length > 0)
-    .forEach((unit) => {
-      if (isCompactPointDisplayEnabled()) {
-        const built = buildCompactViewportFromGeojson(map, unit.features, "temp");
+
+  if (isCompactPointDisplayEnabled() && shouldUseCompactDensityGrid() && !isSplitByLayer()) {
+    // Плотностной сетке не нужны ни свойства точек, ни разбиение по слоям —
+    // считаем прямо по координатам, не клонируя сотни тысяч GeoJSON-фич
+    // временных слоёв на каждый pan/zoom (иначе это делал getVisibleTempLayerFeatures
+    // через buildUnits(), и именно это было основной причиной подвисаний/OOM
+    // при большом количестве точек).
+    const built = buildCompactViewportFeatures({
+      map,
+      source: "temp",
+      forEachPoint: (visit) => forEachVisibleTempLayerPoint((lng, lat) => visit(lng, lat))
+    });
+    addUnitToMap(map, { id: "all", markerColor: null, features: built.features });
+  } else {
+    buildUnits()
+      .filter((unit) => unit.features.length > 0)
+      .forEach((unit) => {
+        if (isCompactPointDisplayEnabled()) {
+          const built = buildCompactViewportFromGeojson(map, unit.features, "temp");
+          addUnitToMap(map, {
+            ...unit,
+            features: excludeHiddenPinFeatures(built.features)
+          });
+          return;
+        }
+        const prepared = prepareMapTempFeatures(unit.features);
+        denseClusterFeatures.push(...prepared.denseClusterFeatures);
+        (prepared.densePileMembersById ?? new Map()).forEach((members, key) => {
+          tempDensePileMembers.set(key, members);
+        });
         addUnitToMap(map, {
           ...unit,
-          features: excludeHiddenPinFeatures(built.features)
+          features: excludeHiddenPinFeatures(prepared.mapFeatures)
         });
-        return;
-      }
-      const prepared = prepareMapTempFeatures(unit.features);
-      denseClusterFeatures.push(...prepared.denseClusterFeatures);
-      (prepared.densePileMembersById ?? new Map()).forEach((members, key) => {
-        tempDensePileMembers.set(key, members);
       });
-      addUnitToMap(map, {
-        ...unit,
-        features: excludeHiddenPinFeatures(prepared.mapFeatures)
-      });
-    });
+  }
+
   syncTempDensePilesLayers(map, denseClusterFeatures);
   attachInteractions(map);
   applyVisibility(map);
@@ -716,13 +735,16 @@ export function setTempLayersVisibility(map, visible) {
   setTempLayerOverlaysData(map, { visible: layerVisible });
 }
 
+/**
+ * Слои, по которым клик считается попаданием в точку/кластер данных.
+ * Плотностную сетку (compact grid) сюда не включаем: это грубый агрегат,
+ * покрывающий большие площади карты, и если считать клик по нему «попаданием
+ * в данные», это полностью блокирует клики по фоновым слоям карты — например,
+ * выбор региона по контуру, если он оказался под ячейкой сетки.
+ */
 export function getTempLayersInteractiveLayerIds() {
   return [
-    ...activeUnits.flatMap((unit) => [
-      unit.clusterLayerId,
-      unit.pointLayerId,
-      compactGridLayerIds(unit.sourceId).fillId
-    ]),
+    ...activeUnits.flatMap((unit) => [unit.clusterLayerId, unit.pointLayerId]),
     TEMP_DENSE_PILES_CLUSTER_LAYER_ID
   ];
 }

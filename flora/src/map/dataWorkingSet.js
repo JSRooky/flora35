@@ -9,6 +9,11 @@ import { clearInatStore, getInatFeatureCount, getInatSlimMapCollection } from ".
 import { hydrateInatStoreFromPersistence } from "../inaturalist/inatPersistence";
 import { clearGbifLayer, setGbifData } from "../components/addGbifLayer";
 import { clearInatLayer, setInatData } from "../components/addInatLayer";
+import { getCompactGridPointLimit } from "./compactGridSettings";
+import {
+  isCompactPointDisplayEnabled,
+  setCompactPointDisplayEnabled
+} from "./compactPointDisplay";
 import {
   hydrateTempLayersFromPersistence,
   persistTempLayers
@@ -49,6 +54,24 @@ async function unloadExternalWorkingSet(map) {
   }
 }
 
+/**
+ * Если после гидратации точек больше безопасного лимита — включаем
+ * компактный режим ДО построения полной коллекции фич, чтобы не
+ * материализовать сотни тысяч точек и не строить по ним Supercluster-индекс
+ * (именно это раньше приводило к Out of Memory).
+ */
+function forceCompactModeIfOverLimit() {
+  if (isCompactPointDisplayEnabled()) {
+    return true;
+  }
+  const total = getGbifFeatureCount() + getInatFeatureCount();
+  if (total > getCompactGridPointLimit()) {
+    setCompactPointDisplayEnabled(true);
+    return true;
+  }
+  return false;
+}
+
 async function loadExternalWorkingSet(map) {
   if (getGbifFeatureCount() === 0) {
     await hydrateGbifStoreFromPersistence();
@@ -56,9 +79,12 @@ async function loadExternalWorkingSet(map) {
   if (getInatFeatureCount() === 0) {
     await hydrateInatStoreFromPersistence();
   }
+
+  const compact = forceCompactModeIfOverLimit();
+
   if (map) {
-    setGbifData(map, getGbifSlimMapCollection());
-    setInatData(map, getInatSlimMapCollection());
+    setGbifData(map, compact ? undefined : getGbifSlimMapCollection());
+    setInatData(map, compact ? undefined : getInatSlimMapCollection());
   }
 }
 

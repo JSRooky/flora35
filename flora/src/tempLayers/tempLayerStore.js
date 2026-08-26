@@ -217,7 +217,10 @@ export function normalizeTempLayerMarkerColor(color) {
 let layers = [];
 let tempGeometriesHeld = false;
 
+let dataRevision = 0;
+
 function emit() {
+  dataRevision += 1;
   listeners.forEach((listener) => {
     try {
       listener();
@@ -1438,7 +1441,14 @@ function inferFeatureTempSource(feature) {
   return null;
 }
 
+let cachedFeatureGroupsRevision = -1;
+let cachedFeatureGroups = null;
+
 export function getTempLayerFeatureGroups() {
+  if (cachedFeatureGroups && cachedFeatureGroupsRevision === dataRevision) {
+    return cachedFeatureGroups;
+  }
+
   const groups = [];
 
   if (staging.features.length > 0) {
@@ -1469,11 +1479,45 @@ export function getTempLayerFeatureGroups() {
     });
   });
 
+  cachedFeatureGroups = groups;
+  cachedFeatureGroupsRevision = dataRevision;
   return groups;
 }
 
 export function getVisibleTempLayerFeatures() {
   return getTempLayerFeatureGroups().flatMap((group) => group.features);
+}
+
+/**
+ * Проходит по координатам видимых точек временных слоёв без клонирования
+ * фич и без сборки объектов properties (в отличие от getVisibleTempLayerFeatures).
+ * Предназначено для режима плотностной сетки, где нужны только координаты —
+ * иначе на каждый pan/zoom при сотнях тысяч точек пришлось бы пересобирать
+ * полный набор GeoJSON-объектов.
+ */
+export function forEachVisibleTempLayerPoint(visitPoint) {
+  if (typeof visitPoint !== "function") {
+    return;
+  }
+
+  const visitList = (features) => {
+    if (!Array.isArray(features)) {
+      return;
+    }
+    for (let i = 0; i < features.length; i += 1) {
+      const coordinates = features[i]?.geometry?.coordinates;
+      if (Array.isArray(coordinates) && coordinates.length >= 2) {
+        visitPoint(coordinates[0], coordinates[1]);
+      }
+    }
+  };
+
+  visitList(staging.features);
+  layers.forEach((layer) => {
+    if (layer.visible) {
+      visitList(layer.features);
+    }
+  });
 }
 
 export function getVisibleTempLayerOverlays() {
@@ -1517,8 +1561,15 @@ export function getAllTempLayerFeatureCount() {
   return getTempLayerRamPointCount();
 }
 
+let cachedPlaqueGroupsRevision = -1;
+let cachedPlaqueGroups = null;
+
 /** Группы для кластеризации «по слоям»: одна единица на плашку (GBIF+iNat вместе). */
 export function getTempLayerPlaqueFeatureGroups() {
+  if (cachedPlaqueGroups && cachedPlaqueGroupsRevision === dataRevision) {
+    return cachedPlaqueGroups;
+  }
+
   const groups = [];
 
   if (staging.features.length > 0) {
@@ -1567,6 +1618,8 @@ export function getTempLayerPlaqueFeatureGroups() {
     });
   });
 
+  cachedPlaqueGroups = groups;
+  cachedPlaqueGroupsRevision = dataRevision;
   return groups;
 }
 

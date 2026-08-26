@@ -224,10 +224,7 @@ function getAllGbifCompactGridLayerIds() {
 }
 
 function getGbifPointClickLayerIds() {
-  return [
-    ...getAllGbifUnclusteredLayerIds(),
-    ...getGbifSourceIds().map((sourceId) => compactGridLayerIds(sourceId).fillId)
-  ];
+  return getAllGbifUnclusteredLayerIds();
 }
 
 function getAllGbifLayerIds() {

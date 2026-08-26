@@ -14,9 +14,15 @@ import { getOverlayEntry } from "../names/nameRuCache";
 import {
   compactPropertiesMatchFilters,
   getCompactInatProcessingFilters,
-  getCompactLocationFilters
+  getCompactLocationFilters,
+  locationFiltersNeedProperties
 } from "./compactFilterState";
-import { buildCompactViewportFeatures } from "./compactPointDisplay";
+import {
+  buildCompactViewportFeatures,
+  paddedBoundsFromMap,
+  pointInCompactBounds
+} from "./compactPointDisplay";
+import { shouldUseCompactDensityGrid } from "./compactGridSettings";
 
 export function buildCompactInatViewportFeatures(map) {
   const table = getInatColumnarTable();
@@ -26,6 +32,9 @@ export function buildCompactInatViewportFeatures(map) {
     ? filterInatTableIndices(table, processingFilters)
     : null;
   const rowCount = table?.rowCount ?? 0;
+  const bounds = paddedBoundsFromMap(map);
+  const needProperties =
+    !shouldUseCompactDensityGrid() || locationFiltersNeedProperties(locationFilters);
 
   return buildCompactViewportFeatures({
     map,
@@ -36,6 +45,17 @@ export function buildCompactInatViewportFeatures(map) {
         const rowIndex = indices ? indices[i] : i;
         const lng = table.lng[rowIndex];
         const lat = table.lat[rowIndex];
+        if (bounds && !pointInCompactBounds(lng, lat, bounds)) {
+          continue;
+        }
+
+        if (!needProperties) {
+          // Ни один активный фильтр не требует свойств точки — можно
+          // отдать координаты в сетку плотности без чтения строк из таблицы.
+          visit(lng, lat, rowIndex);
+          continue;
+        }
+
         const nameLatin = readInatNameLatin(table, rowIndex);
         const overlayEntry = nameLatin ? getOverlayEntry(nameLatin) : undefined;
         const id = readInatId(table, rowIndex);

@@ -244,11 +244,14 @@ export function buildCompactViewportFeatures({
     inBoundsCount += 1;
     if (wantPoints) {
       pointFeatures.push(toPointFeature(extra, lng, lat));
+      return;
     }
     const [wx, wy] = lngLatToWorld(lng, lat, worldSize);
     const ix = Math.floor(wrapWorldX(wx, worldSize));
     const iy = Math.min(worldSize - 1, Math.max(0, Math.floor(wy)));
-    const key = `${ix}:${iy}`;
+    // Числовой ключ вместо строкового — на сотнях тысяч точек это заметно
+    // дешевле, чем конкатенация строк и Map<string>.
+    const key = iy * worldSize + ix;
     let cell = cells.get(key);
     if (!cell) {
       const [centerLng, centerLat] = worldToLngLat(ix + 0.5, iy + 0.5, worldSize);

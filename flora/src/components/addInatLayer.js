@@ -210,10 +210,7 @@ function getAllInatCompactGridLayerIds() {
 }
 
 function getInatPointClickLayerIds() {
-  return [
-    ...getAllInatUnclusteredLayerIds(),
-    ...getInatSourceIds().map((sourceId) => compactGridLayerIds(sourceId).fillId)
-  ];
+  return getAllInatUnclusteredLayerIds();
 }
 
 function getAllInatLayerIds() {

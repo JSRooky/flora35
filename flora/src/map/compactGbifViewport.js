@@ -14,9 +14,15 @@ import { getOverlayEntry } from "../names/nameRuCache";
 import {
   compactPropertiesMatchFilters,
   getCompactGbifProcessingFilters,
-  getCompactLocationFilters
+  getCompactLocationFilters,
+  locationFiltersNeedProperties
 } from "./compactFilterState";
-import { buildCompactViewportFeatures } from "./compactPointDisplay";
+import {
+  buildCompactViewportFeatures,
+  paddedBoundsFromMap,
+  pointInCompactBounds
+} from "./compactPointDisplay";
+import { shouldUseCompactDensityGrid } from "./compactGridSettings";
 
 export function buildCompactGbifViewportFeatures(map) {
   const table = getGbifColumnarTable();
@@ -26,6 +32,12 @@ export function buildCompactGbifViewportFeatures(map) {
     ? filterGbifTableIndices(table, processingFilters)
     : null;
   const rowCount = table?.rowCount ?? 0;
+  const bounds = paddedBoundsFromMap(map);
+  // В режиме плотностной сетки свойства точек (название, царство, год, ключ)
+  // не попадают в итоговые фичи — считать их для каждой строки на сотнях
+  // тысяч точек при каждом pan/zoom бессмысленно, если фильтры их не требуют.
+  const needProperties =
+    !shouldUseCompactDensityGrid() || locationFiltersNeedProperties(locationFilters);
 
   return buildCompactViewportFeatures({
     map,
@@ -36,6 +48,17 @@ export function buildCompactGbifViewportFeatures(map) {
         const rowIndex = indices ? indices[i] : i;
         const lng = table.lng[rowIndex];
         const lat = table.lat[rowIndex];
+        if (bounds && !pointInCompactBounds(lng, lat, bounds)) {
+          continue;
+        }
+
+        if (!needProperties) {
+          // Ни один активный фильтр не требует свойств точки — можно
+          // отдать координаты в сетку плотности без чтения строк из таблицы.
+          visit(lng, lat, rowIndex);
+          continue;
+        }
+
         const nameLatin = readGbifNameLatin(table, rowIndex);
         const overlayEntry = nameLatin ? getOverlayEntry(nameLatin) : undefined;
         const key = readGbifKey(table, rowIndex);

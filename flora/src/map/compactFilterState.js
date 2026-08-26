@@ -41,6 +41,23 @@ export function setCompactHiddenPointKeys(keys) {
   hiddenPointKeys = new Set(keys == null ? [] : Array.from(keys, (key) => String(key)));
 }
 
+export function hasCompactHiddenPointKeys() {
+  return hiddenPointKeys.size > 0;
+}
+
+/** Есть ли активные фильтры, для проверки которых нужны свойства точки (не только координаты). */
+export function locationFiltersNeedProperties(filters = locationFilters) {
+  const f = filters || {};
+  return Boolean(
+    f[REQUIRE_YEAR_KEY] ||
+      f[SPECIES_SEARCH_FILTER_KEY] ||
+      f.found_year ||
+      Object.prototype.hasOwnProperty.call(f, "regnum") ||
+      f[WITHIN_KEY] ||
+      hasCompactHiddenPointKeys()
+  );
+}
+
 function matchesRegnum(regnum, value) {
   const normalized =
     regnum == null || String(regnum).trim() === ""
