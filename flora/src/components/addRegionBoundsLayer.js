@@ -1,6 +1,7 @@
 import mapboxgl from "mapbox-gl";
-import { bbox, booleanPointInPolygon, buffer, difference, featureCollection, polygon, simplify, union } from "@turf/turf";
+import { bbox, booleanPointInPolygon, buffer, difference, featureCollection, point, polygon, simplify, union } from "@turf/turf";
 import { applyMapCursor, getFirstLocationsLayerId } from "./addLocationsLayer";
+import { shouldSuppressLoadedPointLayers } from "../map/regionLoadSummary";
 import {
   createDefaultRegionBoundsSettings,
   normalizeRegionBoundsSettings
@@ -609,20 +610,14 @@ export function emitRegionBoundsSelect(entry, lngLat) {
   regionSelectListener?.(entry, lngLat);
 }
 
-export function getRegionFeatureAtClick(map, event) {
-  if (!map || !event?.point) {
-    return null;
-  }
-
-  const hits = safeQueryRenderedFeatures(map, event.point).filter(
-    (hit) => hit.layer?.id === REGION_BOUNDS_FILL_LAYER_ID
-  );
-  const feature = hits[0];
+function regionEntryFromFeature(feature) {
   if (!feature) {
     return null;
   }
-
   const iso = getRegionFeatureId(feature);
+  if (!iso) {
+    return null;
+  }
   return getRegionEntryByIso(iso) ?? {
     iso,
     name: getRegionFeatureTitle(feature),
@@ -630,6 +625,48 @@ export function getRegionFeatureAtClick(map, event) {
     fo: feature.properties?.fo || "Прочие",
     feature
   };
+}
+
+function getRegionEntryAtLngLat(lngLat) {
+  if (lngLat?.lng == null || lngLat?.lat == null) {
+    return null;
+  }
+  const pt = [lngLat.lng, lngLat.lat];
+  const catalog = getCachedRegionCatalog();
+  for (let index = 0; index < catalog.length; index += 1) {
+    const entry = catalog[index];
+    if (!entry?.feature?.geometry) {
+      continue;
+    }
+    try {
+      if (booleanPointInPolygon(point(pt), entry.feature)) {
+        return entry;
+      }
+    } catch {
+      // некорректная геометрия субъекта — пропускаем
+    }
+  }
+  return null;
+}
+
+export function getRegionFeatureAtClick(map, event) {
+  if (!map || !event?.point) {
+    return null;
+  }
+
+  const hits = safeQueryRenderedFeatures(map, event.point).filter((hit) => {
+    const layerId = hit.layer?.id;
+    return (
+      layerId === REGION_BOUNDS_FILL_LAYER_ID ||
+      layerId === "temp-layer-overlays-fill"
+    );
+  });
+  const fromFill = regionEntryFromFeature(hits[0]);
+  if (fromFill) {
+    return fromFill;
+  }
+
+  return getRegionEntryAtLngLat(event.lngLat);
 }
 
 function setRegionBufferVisibility(map, visible) {
@@ -881,11 +918,40 @@ function clearRegionHover(map) {
   hideRegionHoverPopup();
 }
 
+function isBasemapLabelLayer(hit) {
+  const source = String(hit.layer?.source || "");
+  return !source || source === "composite" || source.startsWith("mapbox");
+}
+
+function isTransparentCircleHit(hit) {
+  if (hit.layer?.type !== "circle") {
+    return false;
+  }
+  const opacity = hit.layer?.paint?.["circle-opacity"];
+  const strokeOpacity = hit.layer?.paint?.["circle-stroke-opacity"];
+  return opacity === 0 && (strokeOpacity === 0 || strokeOpacity == null);
+}
+
 function hasPointLayerUnderCursor(map, point) {
+  if (shouldSuppressLoadedPointLayers()) {
+    return false;
+  }
   const hits = safeQueryRenderedFeatures(map, point);
   return hits.some((hit) => {
     const type = hit.layer?.type;
-    return type === "circle" || type === "symbol";
+    if (type !== "circle" && type !== "symbol") {
+      return false;
+    }
+    if (isBasemapLabelLayer(hit)) {
+      return false;
+    }
+    if (hit.layer?.layout?.visibility === "none") {
+      return false;
+    }
+    if (isTransparentCircleHit(hit)) {
+      return false;
+    }
+    return true;
   });
 }
 
@@ -941,18 +1007,11 @@ function attachRegionHoverHandlers(map) {
       return;
     }
     const feature = event.features?.[0];
-    if (!feature) {
+    const entry = regionEntryFromFeature(feature);
+    if (!entry) {
       return;
     }
     event.preventDefault?.();
-    const iso = getRegionFeatureId(feature);
-    const entry = getRegionEntryByIso(iso) ?? {
-      iso,
-      name: getRegionFeatureTitle(feature),
-      nameEn: feature.properties?.name_en || "",
-      fo: feature.properties?.fo || "Прочие",
-      feature
-    };
     regionSelectListener?.(entry, event.lngLat);
   });
 }

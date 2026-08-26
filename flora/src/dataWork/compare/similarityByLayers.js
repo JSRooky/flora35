@@ -212,6 +212,30 @@ export function computeLayerSimilarity(layerInputs) {
   };
 }
 
+export const SIMILARITY_TABLE_LEVELS = [
+  { key: "species", label: "Виды" },
+  { key: "genus", label: "Роды" },
+  { key: "family", label: "Семейства" },
+  { key: "overall", label: "Общее" }
+];
+
+export const SIMILARITY_TABLE_METRICS = [
+  { key: "n", label: "n" },
+  { key: "r", label: "R" },
+  { key: "r2", label: "R²" }
+];
+
+function pairMetricValue(pair, levelKey, metricKey) {
+  const cell = pair?.[levelKey];
+  if (!cell) {
+    return metricKey === "n" ? 0 : null;
+  }
+  if (metricKey === "n") {
+    return cell.n;
+  }
+  return metricKey === "r" ? cell.r : cell.r2;
+}
+
 function csvCell(value) {
   const text = String(value ?? "");
   if (/[",\n\r]/.test(text)) {
@@ -221,45 +245,24 @@ function csvCell(value) {
 }
 
 export function formatSimilarityCsv(result) {
-  const lines = [
-    [
-      "Слой 1",
-      "Слой 2",
-      "Виды n",
-      "Виды R",
-      "Виды R²",
-      "Роды n",
-      "Роды R",
-      "Роды R²",
-      "Семейства n",
-      "Семейства R",
-      "Семейства R²",
-      "Общее n",
-      "Общее R",
-      "Общее R²"
-    ].map(csvCell).join(",")
-  ];
-  (result?.pairs ?? []).forEach((pair) => {
-    lines.push(
-      [
-        pair.leftLabel,
-        pair.rightLabel,
-        pair.species.n,
-        formatSimilarityCoef(pair.species.r),
-        formatSimilarityCoef(pair.species.r2),
-        pair.genus.n,
-        formatSimilarityCoef(pair.genus.r),
-        formatSimilarityCoef(pair.genus.r2),
-        pair.family.n,
-        formatSimilarityCoef(pair.family.r),
-        formatSimilarityCoef(pair.family.r2),
-        pair.overall.n,
-        formatSimilarityCoef(pair.overall.r),
-        formatSimilarityCoef(pair.overall.r2)
-      ]
-        .map(csvCell)
-        .join(",")
-    );
+  const pairs = result?.pairs ?? [];
+  const header = ["Уровень", "Показатель", ...pairs.map((pair) => `${pair.leftLabel} · ${pair.rightLabel}`)];
+  const lines = [header.map(csvCell).join(",")];
+  SIMILARITY_TABLE_LEVELS.forEach((level) => {
+    SIMILARITY_TABLE_METRICS.forEach((metric) => {
+      lines.push(
+        [
+          level.label,
+          metric.label,
+          ...pairs.map((pair) => {
+            const value = pairMetricValue(pair, level.key, metric.key);
+            return metric.key === "n" ? value : formatSimilarityCoef(value);
+          })
+        ]
+          .map(csvCell)
+          .join(",")
+      );
+    });
   });
   return `\uFEFF${lines.join("\r\n")}\r\n`;
 }

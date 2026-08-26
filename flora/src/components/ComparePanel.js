@@ -3,6 +3,7 @@ import PanelCloseButton from "./PanelCloseButton";
 import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import { COMPARE_SET_MAX, COMPARE_SET_MIN } from "../dataWork/compare/countSpeciesByLayers";
+import { COMPARE_STATS_TOOLS } from "../dataWork/compare/compareExtraStats";
 import {
   isRegionTempLayer,
   listTempLayerOriginItems,
@@ -193,6 +194,7 @@ export default function ComparePanel({
   onOpenDiversity,
   onOpenSimilarity,
   onOpenDistribution,
+  onOpenStats,
   onCompareSetChange
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(false);
@@ -352,56 +354,75 @@ export default function ComparePanel({
             )}
           </div>
 
-          <button
-            type="button"
-            className="compare-panel-add"
-            onClick={() => setPickerOpen((open) => !open)}
-            disabled={!canOpenPicker && !pickerOpen}
-            aria-expanded={pickerOpen}
-          >
-            Добавить
-          </button>
-
-          <div className="compare-panel-tools">
+          <div className="compare-panel-actions">
             <button
               type="button"
-              className="compare-panel-tool"
-              disabled={addedPlaques.length < COMPARE_SET_MIN}
-              title={
-                addedPlaques.length < COMPARE_SET_MIN
-                  ? "Добавьте не меньше двух слоёв"
-                  : "Сравнение биологического разнообразия"
-              }
-              onClick={() => onOpenDiversity?.(addedPlaques)}
+              className="compare-panel-add"
+              onClick={() => setPickerOpen((open) => !open)}
+              disabled={!canOpenPicker && !pickerOpen}
+              aria-expanded={pickerOpen}
             >
-              Разнообразие
+              Добавить
             </button>
-            <button
-              type="button"
-              className="compare-panel-tool"
-              disabled={addedPlaques.length < COMPARE_SET_MIN}
-              title={
-                addedPlaques.length < COMPARE_SET_MIN
-                  ? "Добавьте не меньше двух слоёв"
-                  : "Корреляция слоёв по видам, родам и семействам"
-              }
-              onClick={() => onOpenSimilarity?.(addedPlaques)}
-            >
-              Сходство
-            </button>
-            <button
-              type="button"
-              className="compare-panel-tool"
-              disabled={addedPlaques.length < COMPARE_SET_MIN}
-              title={
-                addedPlaques.length < COMPARE_SET_MIN
-                  ? "Добавьте не меньше двух слоёв"
-                  : "Распределение точек по широте и долготе"
-              }
-              onClick={() => onOpenDistribution?.(addedPlaques)}
-            >
-              Распределение
-            </button>
+            <div className="compare-panel-tools">
+              <button
+                type="button"
+                className="compare-panel-tool"
+                disabled={addedPlaques.length < COMPARE_SET_MIN}
+                title={
+                  addedPlaques.length < COMPARE_SET_MIN
+                    ? "Добавьте не меньше двух слоёв"
+                    : "Сравнение биологического разнообразия"
+                }
+                onClick={() => onOpenDiversity?.(addedPlaques)}
+              >
+                Разнообразие
+              </button>
+              <button
+                type="button"
+                className="compare-panel-tool"
+                disabled={addedPlaques.length < COMPARE_SET_MIN}
+                title={
+                  addedPlaques.length < COMPARE_SET_MIN
+                    ? "Добавьте не меньше двух слоёв"
+                    : "Корреляция слоёв по видам, родам и семействам"
+                }
+                onClick={() => onOpenSimilarity?.(addedPlaques)}
+              >
+                Сходство
+              </button>
+              <button
+                type="button"
+                className="compare-panel-tool"
+                disabled={addedPlaques.length < COMPARE_SET_MIN}
+                title={
+                  addedPlaques.length < COMPARE_SET_MIN
+                    ? "Добавьте не меньше двух слоёв"
+                    : "Распределение точек по широте и долготе"
+                }
+                onClick={() => onOpenDistribution?.(addedPlaques)}
+              >
+                Распределение
+              </button>
+            </div>
+            <div className="compare-panel-tools compare-panel-tools--extra">
+              {COMPARE_STATS_TOOLS.map((tool) => (
+                <button
+                  key={tool.id}
+                  type="button"
+                  className="compare-panel-tool"
+                  disabled={addedPlaques.length < COMPARE_SET_MIN}
+                  title={
+                    addedPlaques.length < COMPARE_SET_MIN
+                      ? "Добавьте не меньше двух слоёв"
+                      : tool.title
+                  }
+                  onClick={() => onOpenStats?.(tool.id, addedPlaques)}
+                >
+                  {tool.title}
+                </button>
+              ))}
+            </div>
           </div>
 
           {pickerOpen ? (

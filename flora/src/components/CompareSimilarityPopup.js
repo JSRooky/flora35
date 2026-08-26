@@ -6,7 +6,9 @@ import { COMPARE_SET_MIN, plaquesToCompareLayerInputs } from "../dataWork/compar
 import {
   computeLayerSimilarity,
   formatSimilarityCoef,
-  downloadSimilarityCsv
+  downloadSimilarityCsv,
+  SIMILARITY_TABLE_LEVELS,
+  SIMILARITY_TABLE_METRICS
 } from "../dataWork/compare/similarityByLayers";
 import { listTempLayerPlaques, subscribeTempLayers } from "../tempLayers/tempLayerStore";
 import "../styles/CompareSimilarityPopup.css";
@@ -90,49 +92,75 @@ export default function CompareSimilarityPopup({
 
             <div className="compare-similarity-table-wrap">
               <table className="compare-similarity-table">
+                <colgroup>
+                  <col className="compare-similarity-col-level" />
+                  <col className="compare-similarity-col-metric" />
+                  {result.pairs.map((pair) => (
+                    <col
+                      key={`${pair.leftId}:${pair.rightId}`}
+                      className="compare-similarity-col-pair"
+                      style={{
+                        width: `${60 / Math.max(result.pairs.length, 1)}%`
+                      }}
+                    />
+                  ))}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th rowSpan={2}>Пара</th>
-                    <th colSpan={3}>Виды</th>
-                    <th colSpan={3}>Роды</th>
-                    <th colSpan={3}>Семейства</th>
-                    <th colSpan={3}>Общее</th>
-                  </tr>
-                  <tr>
-                    <th>n</th>
-                    <th>R</th>
-                    <th>R²</th>
-                    <th>n</th>
-                    <th>R</th>
-                    <th>R²</th>
-                    <th>n</th>
-                    <th>R</th>
-                    <th>R²</th>
-                    <th>n</th>
-                    <th>R</th>
-                    <th>R²</th>
+                    <th className="compare-similarity-level" scope="col">
+                      Уровень
+                    </th>
+                    <th className="compare-similarity-metric" scope="col">
+                      Показ.
+                    </th>
+                    {result.pairs.map((pair) => (
+                      <th
+                        key={`${pair.leftId}:${pair.rightId}`}
+                        className="compare-similarity-pair"
+                        scope="col"
+                        title={`${pair.leftLabel} · ${pair.rightLabel}`}
+                      >
+                        <span className="compare-similarity-pair-name">{pair.leftLabel}</span>
+                        <span className="compare-similarity-pair-sep" aria-hidden="true">
+                          ·
+                        </span>
+                        <span className="compare-similarity-pair-name">{pair.rightLabel}</span>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {result.pairs.map((pair) => (
-                    <tr key={`${pair.leftId}:${pair.rightId}`}>
-                      <td>
-                        {pair.leftLabel} · {pair.rightLabel}
-                      </td>
-                      <td>{pair.species.n}</td>
-                      <td>{formatSimilarityCoef(pair.species.r)}</td>
-                      <td>{formatSimilarityCoef(pair.species.r2)}</td>
-                      <td>{pair.genus.n}</td>
-                      <td>{formatSimilarityCoef(pair.genus.r)}</td>
-                      <td>{formatSimilarityCoef(pair.genus.r2)}</td>
-                      <td>{pair.family.n}</td>
-                      <td>{formatSimilarityCoef(pair.family.r)}</td>
-                      <td>{formatSimilarityCoef(pair.family.r2)}</td>
-                      <td>{pair.overall.n}</td>
-                      <td>{formatSimilarityCoef(pair.overall.r)}</td>
-                      <td>{formatSimilarityCoef(pair.overall.r2)}</td>
-                    </tr>
-                  ))}
+                  {SIMILARITY_TABLE_LEVELS.map((level) =>
+                    SIMILARITY_TABLE_METRICS.map((metric, metricIndex) => (
+                      <tr
+                        key={`${level.key}:${metric.key}`}
+                        className={
+                          metricIndex === 0 ? "compare-similarity-level-start" : undefined
+                        }
+                      >
+                        {metricIndex === 0 ? (
+                          <th className="compare-similarity-level" rowSpan={3} scope="row">
+                            {level.label}
+                          </th>
+                        ) : null}
+                        <th className="compare-similarity-metric" scope="row">
+                          {metric.label}
+                        </th>
+                        {result.pairs.map((pair) => {
+                          const cell = pair[level.key];
+                          const value =
+                            metric.key === "n"
+                              ? cell?.n ?? "—"
+                              : formatSimilarityCoef(cell?.[metric.key]);
+                          return (
+                            <td key={`${pair.leftId}:${pair.rightId}:${level.key}:${metric.key}`}>
+                              {value}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

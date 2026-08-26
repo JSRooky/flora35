@@ -27,6 +27,7 @@ export const TASKBAR_PANEL_IDS = {
   COMPARE_DIVERSITY: "compare-diversity",
   COMPARE_SIMILARITY: "compare-similarity",
   COMPARE_DISTRIBUTION: "compare-distribution",
+  COMPARE_STATS: "compare-stats",
   OOPT_SPECIES: "oopt-species",
   DENSE_SPECIES: "dense-species"
 };
@@ -66,6 +67,7 @@ export const PANEL_TASKBAR_META = {
   [TASKBAR_PANEL_IDS.COMPARE_DIVERSITY]: { title: "Разнообразие", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.COMPARE_SIMILARITY]: { title: "Сходство", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.COMPARE_DISTRIBUTION]: { title: "Распределение", icon: "year" },
+  [TASKBAR_PANEL_IDS.COMPARE_STATS]: { title: "Статистика", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.OOPT_SPECIES]: { title: "Виды внутри выбранной ООПТ", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.DENSE_SPECIES]: { title: "Виды в плотной группе", icon: "speciesList" }
 };
@@ -102,6 +104,7 @@ export const PANEL_TASKBAR_MODULE_ID = {
   [TASKBAR_PANEL_IDS.COMPARE_DIVERSITY]: null,
   [TASKBAR_PANEL_IDS.COMPARE_SIMILARITY]: null,
   [TASKBAR_PANEL_IDS.COMPARE_DISTRIBUTION]: null,
+  [TASKBAR_PANEL_IDS.COMPARE_STATS]: null,
   [TASKBAR_PANEL_IDS.OOPT_SPECIES]: null,
   [TASKBAR_PANEL_IDS.DENSE_SPECIES]: null
 };

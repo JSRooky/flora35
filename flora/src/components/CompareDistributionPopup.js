@@ -119,8 +119,8 @@ function formatCoord(value) {
 }
 
 function MeanDirectionPlot({ layers, bounds, ariaLabel }) {
-  const size = 280;
-  const pad = 28;
+  const size = 260;
+  const pad = 26;
   const radius = (size - pad * 2) / 2;
   const cx = size / 2;
   const cy = size / 2;
@@ -156,10 +156,10 @@ function MeanDirectionPlot({ layers, bounds, ariaLabel }) {
         preserveAspectRatio="xMidYMid meet"
       >
         <circle
-          className="compare-distribution-compass-ring"
+          className="compare-distribution-compass-ring compare-distribution-compass-ring--inner"
           cx={cx}
           cy={cy}
-          r={radius}
+          r={radius / 2}
           fill="none"
         />
         <line
@@ -209,21 +209,20 @@ function MeanDirectionPlot({ layers, bounds, ariaLabel }) {
 }
 
 function DensityChart({ title, series, axis, ariaLabel }) {
-  const width = axis === "lat" ? 280 : 560;
-  const height = axis === "lat" ? 340 : 200;
-  const pad = { top: 16, right: 16, bottom: 32, left: 44 };
+  const width = axis === "lat" ? 260 : 420;
+  const height = 276;
+  const pad = { top: 12, right: 12, bottom: 28, left: 40 };
   const plotWidth = width - pad.left - pad.right;
   const plotHeight = height - pad.top - pad.bottom;
   const maxShare = Math.max(0, ...series.flatMap((item) => item.shares));
   const minValue = series[0]?.centers[0] ?? 0;
   const maxValue = series[0]?.centers[(series[0]?.centers.length || 1) - 1] ?? 1;
+  const valueSpan = maxValue - minValue || 1;
 
   const toXShare = (share) =>
     pad.left + (maxShare > 0 ? (share / maxShare) * plotWidth : 0);
-  const toYLat = (lat) =>
-    pad.top + ((maxValue - lat) / (maxValue - minValue || 1)) * plotHeight;
-  const toXLon = (lon) =>
-    pad.left + ((lon - minValue) / (maxValue - minValue || 1)) * plotWidth;
+  const toYLat = (lat) => pad.top + ((maxValue - lat) / valueSpan) * plotHeight;
+  const toXLon = (lon) => pad.left + ((lon - minValue) / valueSpan) * plotWidth;
   const toYShare = (share) =>
     pad.top + plotHeight - (maxShare > 0 ? (share / maxShare) * plotHeight : 0);
 
@@ -241,7 +240,9 @@ function DensityChart({ title, series, axis, ariaLabel }) {
     });
 
   const startLabel = formatCoord(axis === "lat" ? maxValue : minValue);
+  const midLabel = formatCoord((minValue + maxValue) / 2);
   const endLabel = formatCoord(axis === "lat" ? minValue : maxValue);
+  const gridFractions = [0.25, 0.5, 0.75];
 
   return (
     <figure className="compare-distribution-chart">
@@ -252,6 +253,27 @@ function DensityChart({ title, series, axis, ariaLabel }) {
         aria-label={ariaLabel}
         preserveAspectRatio="xMidYMid meet"
       >
+        {gridFractions.map((fraction) =>
+          axis === "lat" ? (
+            <line
+              key={fraction}
+              className="compare-distribution-grid"
+              x1={pad.left + plotWidth * fraction}
+              y1={pad.top}
+              x2={pad.left + plotWidth * fraction}
+              y2={pad.top + plotHeight}
+            />
+          ) : (
+            <line
+              key={fraction}
+              className="compare-distribution-grid"
+              x1={pad.left}
+              y1={pad.top + plotHeight * (1 - fraction)}
+              x2={pad.left + plotWidth}
+              y2={pad.top + plotHeight * (1 - fraction)}
+            />
+          )
+        )}
         <line
           className="compare-distribution-axis"
           x1={pad.left}
@@ -273,6 +295,8 @@ function DensityChart({ title, series, axis, ariaLabel }) {
             fill="none"
             stroke={item.color}
             strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
             <title>{item.label}</title>
           </path>
@@ -281,6 +305,13 @@ function DensityChart({ title, series, axis, ariaLabel }) {
           <>
             <text className="compare-distribution-tick" x={8} y={pad.top + 4}>
               {startLabel}
+            </text>
+            <text
+              className="compare-distribution-tick"
+              x={8}
+              y={pad.top + plotHeight / 2 + 3}
+            >
+              {midLabel}
             </text>
             <text className="compare-distribution-tick" x={8} y={pad.top + plotHeight}>
               {endLabel}
@@ -295,6 +326,14 @@ function DensityChart({ title, series, axis, ariaLabel }) {
               textAnchor="start"
             >
               {startLabel}
+            </text>
+            <text
+              className="compare-distribution-tick"
+              x={pad.left + plotWidth / 2}
+              y={height - 8}
+              textAnchor="middle"
+            >
+              {midLabel}
             </text>
             <text
               className="compare-distribution-tick"

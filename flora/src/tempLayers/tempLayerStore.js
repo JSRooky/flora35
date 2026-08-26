@@ -824,7 +824,7 @@ export function commitTempLayerStaging(options = {}) {
     ...taxonFields,
     regionIds,
     createdAt: new Date().toISOString(),
-    visible: true,
+    visible: false,
     heatmapEnabled: sibling ? Boolean(sibling.heatmapEnabled) : false,
     markerColor,
     archiveId: sameSource?.archiveId ?? sibling?.archiveId ?? null,

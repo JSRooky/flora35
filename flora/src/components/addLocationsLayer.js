@@ -35,6 +35,7 @@ import {
   isCompactPointDisplayEnabled,
   requestCompactViewportSync
 } from "../map/compactPointDisplay";
+import { shouldSuppressLoadedPointLayers } from "../map/regionLoadSummary";
 import {
   GBIF_SOURCE_ID,
   getGbifInteractiveLayerIds,
@@ -2684,6 +2685,7 @@ function applyGbifTimelineYearChange(map, prevFilters, nextFilters) {
 /**
  * То же применение фильтров к слою GBIF: store остаётся полным,
  * на карту уходит отфильтрованная выборка (как у локальных точек).
+ * Пока сводки регионов без маркеров — слой точек не заполняем.
  */
 export function applyGbifLocationsFilter(map, filters = currentFilters) {
   if (!map) {
@@ -2692,6 +2694,11 @@ export function applyGbifLocationsFilter(map, filters = currentFilters) {
 
   setCompactLocationFilters(filters);
   setCompactGbifProcessingFilters(gbifProcessingFilters);
+
+  if (shouldSuppressLoadedPointLayers()) {
+    setGbifData(map, { type: "FeatureCollection", features: [] });
+    return;
+  }
 
   if (isCompactPointDisplayEnabled()) {
     // Сетка перечитывает фильтры сама при пересборке — не гоним полную
@@ -2740,6 +2747,12 @@ export function refreshExternalUnifiedMapLayers(
   { includeGbif = true, includeInat = true } = {}
 ) {
   if (!map) {
+    return;
+  }
+
+  if (shouldSuppressLoadedPointLayers()) {
+    setGbifData(map, { type: "FeatureCollection", features: [] });
+    setInatData(map, { type: "FeatureCollection", features: [] });
     return;
   }
 
@@ -2930,6 +2943,11 @@ export function applyInatLocationsFilter(map, filters = currentFilters) {
   setCompactLocationFilters(filters);
   setCompactInatProcessingFilters(inatProcessingFilters);
 
+  if (shouldSuppressLoadedPointLayers()) {
+    setInatData(map, { type: "FeatureCollection", features: [] });
+    return;
+  }
+
   if (isCompactPointDisplayEnabled()) {
     // См. комментарий в applyGbifLocationsFilter — избегаем немедленной
     // полной пересборки сетки на каждый промежуточный тик фильтра.
@@ -3039,6 +3057,9 @@ function applyTempLayersLocationsFilter(map, filters = currentFilters) {
 
 /** Число точек в сейчас отображаемых слоях данных (не только кадр карты). */
 export function getDisplayedLayerPointCount() {
+  if (shouldSuppressLoadedPointLayers()) {
+    return 0;
+  }
   let total = 0;
   if (toolIncludeLocal) {
     total += currentFilteredFeatures.length;

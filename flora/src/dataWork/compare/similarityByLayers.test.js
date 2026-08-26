@@ -1,5 +1,6 @@
 import {
   computeLayerSimilarity,
+  formatSimilarityCsv,
   overallSimilarityVectors,
   pearsonR
 } from "./similarityByLayers";
@@ -58,6 +59,27 @@ describe("computeLayerSimilarity", () => {
     expect(pair.overall.n).toBeGreaterThan(pair.family.n);
     expect(pair.species.r).not.toBeNull();
     expect(pair.species.r2).toBeCloseTo(pair.species.r * pair.species.r);
+  });
+});
+
+describe("formatSimilarityCsv", () => {
+  it("writes levels as rows and pairs as columns", () => {
+    const csv = formatSimilarityCsv({
+      pairs: [
+        {
+          leftLabel: "A",
+          rightLabel: "B",
+          species: { n: 3, r: 1, r2: 1 },
+          genus: { n: 2, r: 0.5, r2: 0.25 },
+          family: { n: 1, r: null, r2: null },
+          overall: { n: 4, r: 0.25, r2: 0.0625 }
+        }
+      ]
+    });
+    expect(csv).toContain("Уровень,Показатель,A · B");
+    expect(csv).toContain("Виды,n,3");
+    expect(csv).toContain("Виды,R,1");
+    expect(csv).toContain("Семейства,R,—");
   });
 });
 

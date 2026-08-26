@@ -218,6 +218,7 @@ import ComparePanel from "./components/ComparePanel";
 import CompareDiversityPopup from "./components/CompareDiversityPopup";
 import CompareSimilarityPopup from "./components/CompareSimilarityPopup";
 import CompareDistributionPopup from "./components/CompareDistributionPopup";
+import CompareStatsPopup from "./components/CompareStatsPopup";
 import NearSpeciesMatchesPopup from "./components/NearSpeciesMatchesPopup";
 import UnattributedPointsPopup from "./components/UnattributedPointsPopup";
 import UndoMergedPointsPopup from "./components/UndoMergedPointsPopup";
@@ -243,6 +244,14 @@ import MapZoomControl from "./components/MapZoomControl";
 import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
 import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
+import {
+  clearRegionLoadSummary,
+  setRegionLoadSummaryDisplayHandler,
+  refreshRegionLoadSummary,
+  setLoadedPointMarkersRequested,
+  setRegionLoadSummaryActive,
+  setRegionLoadSummaryOptions
+} from "./components/addRegionLoadSummaryLayer";
 import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles, getTempCompactGridLayerColor } from "./components/addTempLayersLayer";
 import { addTempLayerOverlaysLayer, applyTempRegionOverlayPaint } from "./components/addTempLayerOverlaysLayer";
 import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, appendRegionPolygonToTempPlaque, listTempLayerPlaques, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerLabel, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
@@ -350,6 +359,7 @@ const PANEL_IDS = {
   COMPARE_DIVERSITY: "compare-diversity",
   COMPARE_SIMILARITY: "compare-similarity",
   COMPARE_DISTRIBUTION: "compare-distribution",
+  COMPARE_STATS: "compare-stats",
   /** @deprecated алиасы для taskbar */
   GBIF: "data-sources",
   GBIF_PROCESSING: "external-processing"
@@ -387,7 +397,8 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.COMPARE,
   PANEL_IDS.COMPARE_DIVERSITY,
   PANEL_IDS.COMPARE_SIMILARITY,
-  PANEL_IDS.COMPARE_DISTRIBUTION
+  PANEL_IDS.COMPARE_DISTRIBUTION,
+  PANEL_IDS.COMPARE_STATS
 ];
 
 function isPanelExpandedInState(collapsedState, panelId) {
@@ -639,6 +650,7 @@ export default function MapView() {
   const [compareDiversityKeys, setCompareDiversityKeys] = useState([]);
   const [compareSimilarityOpen, setCompareSimilarityOpen] = useState(false);
   const [compareDistributionOpen, setCompareDistributionOpen] = useState(false);
+  const [compareStatsKind, setCompareStatsKind] = useState(null);
   /** Порядок иконок в taskbar (открытая панель остаётся в ряду и подсвечивается). */
   const [panelTaskbarOrder, setPanelTaskbarOrder] = useState([]);
   /** Актуальный stashVisiblePanelsToTaskbar — вызывается из ранних колбэков. */
@@ -799,6 +811,8 @@ export default function MapView() {
         break;
       case TASKBAR_PANEL_IDS.COMPARE_DISTRIBUTION:
         setCompareDistributionOpen(true);
+        break;
+      case TASKBAR_PANEL_IDS.COMPARE_STATS:
         break;
       default: {
         const moduleId = PANEL_TASKBAR_MODULE_ID[panelId];
@@ -1383,6 +1397,17 @@ export default function MapView() {
       setRedBookPointsVisible(mode === DATA_SOURCE_MODES.REDBOOK);
       dataSourceModeRef.current = mode;
 
+      const useRegionSummary =
+        mode === DATA_SOURCE_MODES.EXTERNAL || mode === DATA_SOURCE_MODES.TEMP;
+      setRegionLoadSummaryActive(useRegionSummary);
+      setLoadedPointMarkersRequested(false);
+      if (useRegionSummary) {
+        setMarkersVisibleState(false);
+      }
+      if (!useRegionSummary) {
+        clearRegionLoadSummary();
+      }
+
       if (mode === DATA_SOURCE_MODES.EXTERNAL) {
         setPanelMinimized((prev) => ({
           ...prev,
@@ -1401,6 +1426,9 @@ export default function MapView() {
       return syncDataWorkingSet({ mode, map: map.current }).then(() => {
         setTempLayersRevision((value) => value + 1);
         bumpPointsDataRevision();
+        if (useRegionSummary && map.current) {
+          refreshRegionLoadSummary(map.current);
+        }
       });
     },
     [bumpPointsDataRevision]
@@ -1416,11 +1444,35 @@ export default function MapView() {
       setTempLayersRevision((value) => value + 1);
       if (map.current) {
         setTempLayersData(map.current);
-        setTempLayersVisibility(map.current, dataSourceModeRef.current === DATA_SOURCE_MODES.TEMP);
+        setTempLayersVisibility(
+          map.current,
+          dataSourceModeRef.current === DATA_SOURCE_MODES.TEMP
+        );
+        refreshRegionLoadSummary(map.current);
       }
       bumpPointsDataRevision();
     })();
   }, [bumpPointsDataRevision, handleDataSourceModeChange]);
+
+  useEffect(() => {
+    setRegionLoadSummaryDisplayHandler((summary, visible) => {
+      if (Array.isArray(summary?.layerIds) && summary.layerIds.length > 0) {
+        summary.layerIds.forEach((layerId) => {
+          setTempLayerVisible(layerId, visible);
+        });
+        persistTempLayers().catch(() => {});
+        setTempLayersRevision((value) => value + 1);
+        if (map.current) {
+          setTempLayersData(map.current);
+          refreshRegionLoadSummary(map.current);
+        }
+        bumpPointsDataRevision();
+        return;
+      }
+      setMarkersVisibleState(Boolean(visible));
+    });
+    return () => setRegionLoadSummaryDisplayHandler(null);
+  }, [bumpPointsDataRevision]);
 
   const handleTempLayerDelete = useCallback((layerId) => {
     void (async () => {
@@ -1473,11 +1525,13 @@ export default function MapView() {
       setCompareDiversityOpen(false);
       setCompareSimilarityOpen(false);
       setCompareDistributionOpen(false);
+      setCompareStatsKind(null);
       unpinPanelsFromTaskbar([
         PANEL_IDS.COMPARE,
         PANEL_IDS.COMPARE_DIVERSITY,
         PANEL_IDS.COMPARE_SIMILARITY,
-        PANEL_IDS.COMPARE_DISTRIBUTION
+        PANEL_IDS.COMPARE_DISTRIBUTION,
+        PANEL_IDS.COMPARE_STATS
       ]);
       return;
     }
@@ -1530,6 +1584,22 @@ export default function MapView() {
   const handleCloseDistribution = useCallback(() => {
     setCompareDistributionOpen(false);
     unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_DISTRIBUTION]);
+  }, [unpinPanelsFromTaskbar]);
+
+  const handleOpenStats = useCallback(
+    (kind, plaques) => {
+      const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
+      setCompareDiversityKeys(nextKeys);
+      setCompareStatsKind(kind);
+      setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE_STATS]: false }));
+      pinPanelsToTaskbar([PANEL_IDS.COMPARE_STATS]);
+    },
+    [pinPanelsToTaskbar]
+  );
+
+  const handleCloseStats = useCallback(() => {
+    setCompareStatsKind(null);
+    unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_STATS]);
   }, [unpinPanelsFromTaskbar]);
 
   const handleOpenDiversity = useCallback(
@@ -1629,6 +1699,7 @@ export default function MapView() {
     setTempLayersRevision((value) => value + 1);
     if (map.current) {
       setTempLayersData(map.current);
+      refreshRegionLoadSummary(map.current);
     }
   }, []);
 
@@ -1649,7 +1720,7 @@ export default function MapView() {
       setTempLayersRevision((value) => value + 1);
       if (map.current) {
         setTempLayersData(map.current);
-        setTempLayersVisibility(map.current, true);
+        setTempLayersVisibility(map.current, false);
       }
       bumpPointsDataRevision();
     });
@@ -2246,6 +2317,10 @@ export default function MapView() {
       ids.push(PANEL_IDS.COMPARE_DISTRIBUTION);
     }
 
+    if (compareStatsKind && !isMin(PANEL_IDS.COMPARE_STATS)) {
+      ids.push(PANEL_IDS.COMPARE_STATS);
+    }
+
     if (
       dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
       externalProcessingActive &&
@@ -2268,6 +2343,7 @@ export default function MapView() {
     compareDiversityOpen,
     compareSimilarityOpen,
     compareDistributionOpen,
+    compareStatsKind,
     densePileSpeciesListOpen,
     denseProcessingActive,
     externalProcessingActive,
@@ -4107,6 +4183,7 @@ export default function MapView() {
     if (source === "temp") {
       setTempLayersData(map.current);
     }
+    refreshRegionLoadSummary(map.current);
     updateHeatmapData(map.current, locationFilters);
     refreshAreal();
   }, [mapReady, locationFilters, refreshAreal, syncYearBounds, bumpPointsDataRevision]);
@@ -4126,10 +4203,8 @@ export default function MapView() {
     }
 
     if (map.current) {
-      const showGbif = externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.GBIF];
-      const showInat = externalOnly && externalLayersEnabled[EXTERNAL_LAYER_IDS.INATURALIST];
-      setGbifVisibility(map.current, showGbif);
-      setInatVisibility(map.current, showInat);
+      setGbifVisibility(map.current, false);
+      setInatVisibility(map.current, false);
       setTempLayersVisibility(map.current, tempOnly);
     }
 
@@ -4201,32 +4276,48 @@ export default function MapView() {
     // Виден только выбранный слой данных; «Скрыть точки» действует внутри него.
     setMarkersVisible(map.current, localDataActive ? mapMarkersVisible : false);
 
-    if (externalOnly && unifyExternal) {
-      // Оба внешних источника — один clustered-слой (GBIF) с объединёнными точками.
-      setGbifVisibility(map.current, mapMarkersVisible);
-      setInatVisibility(map.current, false);
-      refreshExternalUnifiedMapLayers(map.current, locationFilters, {
-        includeGbif: true,
-        includeInat: true
-      });
-    } else {
-      setGbifVisibility(
-        map.current,
-        externalOnly && includeGbif ? mapMarkersVisible : false
-      );
+    setRegionLoadSummaryActive(externalOnly || tempOnly);
+    setLoadedPointMarkersRequested(externalOnly && mapMarkersVisible);
+    setRegionLoadSummaryOptions({
+      mode: tempOnly ? "temp" : "external",
+      includeGbif,
+      includeInat,
+      hiddenRegionIds: externalProcessingFilters.hiddenRegionIds ?? []
+    });
+
+    if (externalOnly) {
+      setGbifVisibility(map.current, mapMarkersVisible && includeGbif);
       setInatVisibility(
         map.current,
-        externalOnly && includeInat ? mapMarkersVisible : false
+        mapMarkersVisible && includeInat && !unifyExternal
       );
-      if (externalOnly) {
+      refreshExternalUnifiedMapLayers(map.current, locationFilters, {
+        includeGbif,
+        includeInat
+      });
+      refreshRegionLoadSummary(map.current);
+    } else if (tempOnly) {
+      setGbifVisibility(map.current, false);
+      setInatVisibility(map.current, false);
+      setTempLayersVisibility(map.current, true);
+      setTempLayersData(map.current);
+      refreshRegionLoadSummary(map.current);
+    } else {
+      clearRegionLoadSummary();
+      if (unifyExternal) {
+        setGbifVisibility(map.current, mapMarkersVisible);
+        setInatVisibility(map.current, false);
         refreshExternalUnifiedMapLayers(map.current, locationFilters, {
-          includeGbif,
-          includeInat
+          includeGbif: true,
+          includeInat: true
         });
+      } else {
+        setGbifVisibility(map.current, false);
+        setInatVisibility(map.current, false);
       }
     }
 
-    setTempLayersVisibility(map.current, tempOnly && mapMarkersVisible);
+    setTempLayersVisibility(map.current, tempOnly);
 
     setMergedVisibility(
       map.current,
@@ -4248,7 +4339,9 @@ export default function MapView() {
     redBookPointsVisible,
     locationFilters,
     mapReady,
-    compactPointDisplay
+    compactPointDisplay,
+    externalProcessingFilters,
+    tempLayersRevision
   ]);
 
   useEffect(() => {
@@ -4949,7 +5042,7 @@ export default function MapView() {
       setTempLayersRevision((value) => value + 1);
       if (map.current) {
         setTempLayersData(map.current);
-        setTempLayersVisibility(map.current, true);
+        setTempLayersVisibility(map.current, false);
       }
       bumpPointsDataRevision();
       return true;
@@ -5837,11 +5930,13 @@ export default function MapView() {
           setCompareDiversityOpen(false);
           setCompareSimilarityOpen(false);
           setCompareDistributionOpen(false);
+          setCompareStatsKind(null);
           unpinPanelsFromTaskbar([
             PANEL_IDS.COMPARE,
             PANEL_IDS.COMPARE_DIVERSITY,
             PANEL_IDS.COMPARE_SIMILARITY,
-            PANEL_IDS.COMPARE_DISTRIBUTION
+            PANEL_IDS.COMPARE_DISTRIBUTION,
+            PANEL_IDS.COMPARE_STATS
           ]);
           break;
         }
@@ -5858,6 +5953,11 @@ export default function MapView() {
         case PANEL_IDS.COMPARE_DISTRIBUTION: {
           setCompareDistributionOpen(false);
           unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_DISTRIBUTION]);
+          break;
+        }
+        case PANEL_IDS.COMPARE_STATS: {
+          setCompareStatsKind(null);
+          unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_STATS]);
           break;
         }
         case PANEL_IDS.DATA_WORK: {
@@ -6646,6 +6746,7 @@ export default function MapView() {
               onOpenDiversity={handleOpenDiversity}
               onOpenSimilarity={handleOpenSimilarity}
               onOpenDistribution={handleOpenDistribution}
+              onOpenStats={handleOpenStats}
               onCompareSetChange={handleCompareSetChange}
             />
           )}
@@ -7178,6 +7279,15 @@ export default function MapView() {
           plaqueKeys={compareDiversityKeys}
           onClose={handleCloseDistribution}
           onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE_DISTRIBUTION)}
+        />
+      ) : null}
+      {compareStatsKind && !isPanelMinimized(PANEL_IDS.COMPARE_STATS) ? (
+        <CompareStatsPopup
+          open
+          kind={compareStatsKind}
+          plaqueKeys={compareDiversityKeys}
+          onClose={handleCloseStats}
+          onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE_STATS)}
         />
       ) : null}
       <NearSpeciesMatchesPopup

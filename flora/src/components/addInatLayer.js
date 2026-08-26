@@ -1,4 +1,5 @@
 import { findInatFeatureById, getInatSlimMapCollection } from "../inaturalist/inatStore";
+import { shouldSuppressLoadedPointLayers } from "../map/regionLoadSummary";
 import { buildCompactInatViewportFeatures } from "../map/compactInatViewport";
 import {
   addCompactGridLayers,
@@ -721,7 +722,7 @@ function syncInatDensePilesLayers(map, denseClusterFeatures) {
 
 function bindInatCompactSync(map) {
   ensureCompactViewportSync(map, "inat", () => {
-    if (!isCompactPointDisplayEnabled() || inatMapUpdatesPaused) {
+    if (!isCompactPointDisplayEnabled() || inatMapUpdatesPaused || shouldSuppressLoadedPointLayers()) {
       return;
     }
     setInatData(map, lastInatInputCollection);
@@ -729,6 +730,13 @@ function bindInatCompactSync(map) {
 }
 
 function getInatPreparedForMap(map, options = {}) {
+  if (shouldSuppressLoadedPointLayers() && !options.preview) {
+    return {
+      mapFeatures: [],
+      denseClusterFeatures: []
+    };
+  }
+
   if (isCompactPointDisplayEnabled() && !options.preview) {
     bindInatCompactSync(map);
     return {

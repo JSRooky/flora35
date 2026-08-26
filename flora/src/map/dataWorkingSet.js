@@ -9,6 +9,8 @@ import { clearInatStore, getInatFeatureCount, getInatSlimMapCollection } from ".
 import { hydrateInatStoreFromPersistence } from "../inaturalist/inatPersistence";
 import { clearGbifLayer, setGbifData } from "../components/addGbifLayer";
 import { clearInatLayer, setInatData } from "../components/addInatLayer";
+import { setRegionLoadSummaryActive, setRegionLoadSummaryMode, shouldSuppressLoadedPointLayers } from "./regionLoadSummary";
+import { clearRegionLoadSummary, refreshRegionLoadSummary } from "../components/addRegionLoadSummaryLayer";
 import { getCompactGridPointLimit } from "./compactGridSettings";
 import {
   isCompactPointDisplayEnabled,
@@ -39,6 +41,7 @@ export function isTempDataSourceMode(mode) {
 }
 
 async function unloadExternalWorkingSet(map) {
+  clearRegionLoadSummary();
   if (getGbifFeatureCount() === 0 && getInatFeatureCount() === 0) {
     if (map) {
       clearGbifLayer(map);
@@ -83,8 +86,14 @@ async function loadExternalWorkingSet(map) {
   const compact = forceCompactModeIfOverLimit();
 
   if (map) {
-    setGbifData(map, compact ? undefined : getGbifSlimMapCollection());
-    setInatData(map, compact ? undefined : getInatSlimMapCollection());
+    if (shouldSuppressLoadedPointLayers()) {
+      setGbifData(map, { type: "FeatureCollection", features: [] });
+      setInatData(map, { type: "FeatureCollection", features: [] });
+      refreshRegionLoadSummary(map);
+    } else {
+      setGbifData(map, compact ? undefined : getGbifSlimMapCollection());
+      setInatData(map, compact ? undefined : getInatSlimMapCollection());
+    }
   }
 }
 
@@ -105,6 +114,7 @@ async function loadTempWorkingSet(map) {
   if (map) {
     setTempLayersData(map);
     setTempLayersVisibility(map, true);
+    refreshRegionLoadSummary(map);
   }
 }
 
@@ -116,6 +126,7 @@ export async function syncDataWorkingSet({ mode, map } = {}) {
   const seq = ++activationSeq;
 
   if (!isExternalDataSourceMode(mode)) {
+    setRegionLoadSummaryActive(false);
     await unloadExternalWorkingSet(map);
   }
   if (!isTempDataSourceMode(mode)) {
@@ -127,6 +138,8 @@ export async function syncDataWorkingSet({ mode, map } = {}) {
   }
 
   if (isExternalDataSourceMode(mode)) {
+    setRegionLoadSummaryActive(true);
+    setRegionLoadSummaryMode("external");
     await loadExternalWorkingSet(map);
   }
 
@@ -135,6 +148,8 @@ export async function syncDataWorkingSet({ mode, map } = {}) {
   }
 
   if (isTempDataSourceMode(mode)) {
+    setRegionLoadSummaryActive(true);
+    setRegionLoadSummaryMode("temp");
     await loadTempWorkingSet(map);
   }
 

@@ -304,6 +304,20 @@ export function getInatFeatureCount() {
   return table.rowCount;
 }
 
+/** Число загруженных точек iNaturalist по region_id. */
+export function countInatFeaturesByRegionId() {
+  const counts = new Map();
+  for (let i = 0; i < table.rowCount; i += 1) {
+    const regionId = readInatRegionId(table, i);
+    if (!regionId) {
+      continue;
+    }
+    const key = String(regionId);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return counts;
+}
+
 export function hasInatDataset() {
   return table.rowCount > 0;
 }

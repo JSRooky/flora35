@@ -2,6 +2,7 @@ import {
   findGbifFeatureByKey,
   getGbifSlimMapCollection
 } from "../gbif/gbifStore";
+import { shouldSuppressLoadedPointLayers } from "../map/regionLoadSummary";
 import { buildCompactGbifViewportFeatures } from "../map/compactGbifViewport";
 import {
   addCompactGridLayers,
@@ -767,7 +768,7 @@ function syncGbifDensePilesLayers(map, denseClusterFeatures) {
 
 function bindGbifCompactSync(map) {
   ensureCompactViewportSync(map, "gbif", () => {
-    if (!isCompactPointDisplayEnabled() || gbifMapUpdatesPaused) {
+    if (!isCompactPointDisplayEnabled() || gbifMapUpdatesPaused || shouldSuppressLoadedPointLayers()) {
       return;
     }
     setGbifData(map, lastGbifInputCollection);
@@ -775,6 +776,13 @@ function bindGbifCompactSync(map) {
 }
 
 function getGbifPreparedForMap(map, options = {}) {
+  if (shouldSuppressLoadedPointLayers() && !options.preview) {
+    return {
+      mapFeatures: [],
+      denseClusterFeatures: []
+    };
+  }
+
   if (isCompactPointDisplayEnabled() && !options.preview) {
     bindGbifCompactSync(map);
     return {
