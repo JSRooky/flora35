@@ -137,6 +137,25 @@ export function isLargePointCount(count) {
   return typeof count === "number" && count >= LARGE_POINT_COUNT_THRESHOLD;
 }
 
+/** Порог включения авто-растрового режима (маркеры → тепловая карта, как у iNat). */
+export const RASTER_MODE_ENTER_THRESHOLD = 60000;
+/** Порог выключения — заметно ниже, чтобы не мигать режимом у границы при фильтрации. */
+export const RASTER_MODE_EXIT_THRESHOLD = 40000;
+
+/**
+ * Гистерезис для авто-переключения в растровый режим при огромном числе точек:
+ * рисовать сотни тысяч маркеров/кластеров — верный путь к Out of Memory,
+ * поэтому при превышении порога прячем маркеры и показываем только тепловую карту.
+ */
+export function resolveAutoRasterMode(count, currentlyActive) {
+  if (typeof count !== "number" || Number.isNaN(count)) {
+    return Boolean(currentlyActive);
+  }
+  return currentlyActive
+    ? count > RASTER_MODE_EXIT_THRESHOLD
+    : count >= RASTER_MODE_ENTER_THRESHOLD;
+}
+
 /**
  * Стабильный хэш фильтров локаций (для кэша видимых features).
  * Не зависит от identity объекта.

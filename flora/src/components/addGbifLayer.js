@@ -47,6 +47,8 @@ const CLUSTER_OPTIONS = {
 };
 
 const MARKER_RADIUS = 5;
+/** Максимум точек, вытаскиваемых из кластера по клику (не весь кластер целиком). */
+const CLUSTER_CLICK_LEAVES_LIMIT = 20000;
 const REGNUM_KEYS = ["plantae", "animalia", "fungi", "protozoa"];
 
 /** Агрегаты царств для «Кластеры-диаграммы» (тот же инструмент, что у локальных точек). */
@@ -446,7 +448,9 @@ function attachInteractions(map) {
       return;
     }
 
-    source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
+    // Infinity вытаскивал ВЕСЬ кластер (при клике на низком зуме — весь регион,
+    // сотни тысяч точек) только чтобы найти совпадающие координаты — вешало вкладку.
+    source.getClusterLeaves(clusterId, CLUSTER_CLICK_LEAVES_LIMIT, 0, (leavesErr, leaves) => {
       if (leavesErr) {
         return;
       }
@@ -741,8 +745,11 @@ function rebuildGbifLayers(map) {
     return;
   }
 
-  const collection =
-    lastGbifInputCollection?.type === "FeatureCollection"
+  // При активной паузе (авто-растровый режим/загрузка) не тянем весь store в Supercluster —
+  // именно первый rebuild после hydrate из IndexedDB с сотнями тысяч точек валит вкладку в OOM.
+  const collection = gbifMapUpdatesPaused
+    ? EMPTY_FEATURE_COLLECTION
+    : lastGbifInputCollection?.type === "FeatureCollection"
       ? lastGbifInputCollection
       : getGbifSlimMapCollection();
   const { mapFeatures, denseClusterFeatures } = prepareMapGbifFeatures(

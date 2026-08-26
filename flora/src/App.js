@@ -55,7 +55,8 @@ import {
   SPECIES_SEARCH_MIN_QUERY_LENGTH
 } from "./locations/speciesSearchFilter";
 import {
-  isLargePointCount
+  isLargePointCount,
+  resolveAutoRasterMode
 } from "./components/mapPerformance";
 import {
   buildSpeciesSummaryFromDensePile,
@@ -91,6 +92,7 @@ import {
   applyRegionBoundsIsoFilter,
   applyRegionBoundsPaintSettings,
   buildRegionCatalog,
+  buildRegionSelectionBufferFeature,
   emitRegionBoundsSelect,
   flyToRegionBoundsFeature,
   getRegionFeatureAtClick,
@@ -235,7 +237,7 @@ import MapCornerControls from "./components/MapCornerControls";
 import MapZoomControl from "./components/MapZoomControl";
 import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
-import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
+import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler, setGbifMapUpdatesPaused, clearGbifLayer } from "./components/addGbifLayer";
 import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles } from "./components/addTempLayersLayer";
 import { addTempLayerOverlaysLayer, applyTempRegionOverlayPaint } from "./components/addTempLayerOverlaysLayer";
 import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerLabel, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
@@ -244,7 +246,7 @@ import {
   TEMP_OVERLAY_KINDS,
   TEMP_OVERLAY_LABELS
 } from "./tempLayers/collectMapToolOverlays";
-import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatDensePiles, expandInatDensePileByKey, collapseInatExpandedDensePiles, setInatDensePileExpandedHandler } from "./components/addInatLayer";
+import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatDensePiles, expandInatDensePileByKey, collapseInatExpandedDensePiles, setInatDensePileExpandedHandler, setInatMapUpdatesPaused, clearInatLayer } from "./components/addInatLayer";
 import {
   addMergedLayer,
   setMergedData,
@@ -265,9 +267,13 @@ import { loadMergedPointsFromFirestore } from "./firebase/loadMergedPointsFromFi
 import { submitMergedPoint } from "./firebase/submitMergedPoint";
 import { deleteMergedPoint } from "./firebase/deleteMergedPoint";
 import { loadPointAttributionsFromFirestore } from "./firebase/loadPointAttributionsFromFirestore";
-import { hydrateGbifStoreFromPersistence } from "./gbif/gbifPersistence";
-import { hydrateInatStoreFromPersistence } from "./inaturalist/inatPersistence";
-import { hydrateTempLayersFromPersistence, persistTempLayers } from "./tempLayers/tempLayerPersistence";
+import { hydrateGbifStoreFromPersistence, clearGbifStoreAndPersistence } from "./gbif/gbifPersistence";
+import { hydrateInatStoreFromPersistence, clearInatStoreAndPersistence } from "./inaturalist/inatPersistence";
+import {
+  hydrateTempLayersFromPersistence,
+  persistTempLayers,
+  clearAllTempLayersAndPersistence
+} from "./tempLayers/tempLayerPersistence";
 import {
   archiveWorkingPlaque,
   deleteArchivedPlaque,
@@ -275,8 +281,8 @@ import {
   renameArchivedPlaque,
   restoreArchivedPlaque
 } from "./tempLayers/tempLayerArchive";
-import { findGbifFeatureByKey, getGbifFeaturesForRegionIds } from "./gbif/gbifStore";
-import { findInatFeatureById, getInatFeaturesForRegionIds } from "./inaturalist/inatStore";
+import { findGbifFeatureByKey, getGbifFeaturesForRegionIds, getGbifFeatureCount } from "./gbif/gbifStore";
+import { findInatFeatureById, getInatFeaturesForRegionIds, getInatFeatureCount } from "./inaturalist/inatStore";
 import {
   createDefaultExternalProcessingFilters,
   toGbifProcessingFiltersFromExternal,
@@ -413,6 +419,9 @@ export default function MapView() {
   const [markersVisible, setMarkersVisibleState] = useState(DEFAULT_MARKERS_VISIBLE);
   const [mapReady, setMapReady] = useState(false);
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
+  // Авто-режим при огромном числе точек: маркеры/кластеры прячем, показываем только heatmap (как у iNat).
+  const [autoRasterMode, setAutoRasterMode] = useState(false);
+  const autoRasterModeRef = useRef(false);
   const [heatmapSettingsOpen, setHeatmapSettingsOpen] = useState(false);
   const [heatmapSettings, setHeatmapSettings] = useState(loadHeatmapSettingsFromStorage);
   const [regionBoundsSettings, setRegionBoundsSettings] = useState(
@@ -1871,28 +1880,53 @@ export default function MapView() {
     regionCatalogRef.current = regionCatalog;
   }, [regionCatalog]);
 
-  const selectedRegionNames = useMemo(
-    () =>
-      selectedRegionIsos
-        .map((iso) => regionCatalog.find((entry) => entry.iso === iso)?.name)
-        .filter(Boolean),
-    [regionCatalog, selectedRegionIsos]
-  );
+  // Пока открыт временный слой-оверлей с регионами, фильтр точек и подпись
+  // должны следовать за его набором субъектов, а не за выделением на карте —
+  // иначе они расходятся с тем, что фактически показано/загружается.
+  const selectedRegionNames = useMemo(() => {
+    if (overlayRegionEdit.active) {
+      return overlayRegionEdit.isos
+        .map(
+          (iso) =>
+            regionCatalog.find((entry) => entry.iso === iso)?.name ||
+            overlayRegionEdit.features.find((feature) => feature.properties?.iso === iso)
+              ?.properties?.name
+        )
+        .filter(Boolean);
+    }
+    return selectedRegionIsos
+      .map((iso) => regionCatalog.find((entry) => entry.iso === iso)?.name)
+      .filter(Boolean);
+  }, [overlayRegionEdit, regionCatalog, selectedRegionIsos]);
 
-  const selectedRegionFeatures = useMemo(
-    () =>
-      selectedRegionIsos
-        .map((iso) => regionCatalog.find((entry) => entry.iso === iso)?.feature)
-        .filter(Boolean),
-    [regionCatalog, selectedRegionIsos]
-  );
+  const selectedRegionFeatures = useMemo(() => {
+    if (overlayRegionEdit.active) {
+      return overlayRegionEdit.isos
+        .map(
+          (iso) =>
+            regionCatalog.find((entry) => entry.iso === iso)?.feature ||
+            overlayRegionEdit.features.find((feature) => feature.properties?.iso === iso)
+        )
+        .filter(Boolean);
+    }
+    return selectedRegionIsos
+      .map((iso) => regionCatalog.find((entry) => entry.iso === iso)?.feature)
+      .filter(Boolean);
+  }, [overlayRegionEdit, regionCatalog, selectedRegionIsos]);
+
+  const activeRegionBufferKm = overlayRegionEdit.active
+    ? overlayRegionBufferKm
+    : regionBufferKm;
 
   const regionWithinFeature = useMemo(
-    () => getRegionSelectionWithinFeature(selectedRegionFeatures, regionBufferKm),
-    [regionBufferKm, selectedRegionFeatures]
+    () => getRegionSelectionWithinFeature(selectedRegionFeatures, activeRegionBufferKm),
+    [activeRegionBufferKm, selectedRegionFeatures]
   );
 
-  const regionPointsFilterActive = selectedRegionFeatures.length > 0;
+  const regionPointsFilterActive = Boolean(
+    (overlayRegionEdit.active || toolPointsFilterEnabled[MODULE_IDS.REGIONS]) &&
+      selectedRegionFeatures.length > 0
+  );
 
   const activeToolWithinFeature = useMemo(() => {
     const mapInstance = mapReady ? map.current : null;
@@ -1914,7 +1948,7 @@ export default function MapView() {
       areaGeometry,
       selectedBoundsFeature,
       selectedRegionFeatures,
-      regionBufferKm
+      regionBufferKm: activeRegionBufferKm
     });
   }, [
     activeToolFilterModule,
@@ -1932,7 +1966,7 @@ export default function MapView() {
     areaGeometry,
     selectedBoundsFeature,
     selectedRegionFeatures,
-    regionBufferKm,
+    activeRegionBufferKm,
     mapReady
   ]);
 
@@ -2200,17 +2234,19 @@ export default function MapView() {
       const spatialByRegionId = {};
       if (includeBuffer && activeBufferKm > 0) {
         matched.forEach(({ region, feature }) => {
-          spatialByRegionId[region.id] = applyBufferToExternalRegion(
-            region,
-            feature,
-            activeBufferKm
-          );
+          const buffered = applyBufferToExternalRegion(region, feature, activeBufferKm);
+          if (buffered) {
+            spatialByRegionId[region.id] = buffered;
+          }
         });
       }
 
       setDataSourcesFocusRequest({
         kind,
-        regions: matched.map((item) => item.region),
+        // Пустой список совпадений означает "не удалось сопоставить регион",
+        // а не "нужно показать пустую таблицу" — в этом случае показываем
+        // полный список регионов, как без выделения.
+        regions: matched.length > 0 ? matched.map((item) => item.region) : null,
         spatialByRegionId:
           Object.keys(spatialByRegionId).length > 0 ? spatialByRegionId : null,
         unmatchedLabels: unmatched
@@ -3651,7 +3687,12 @@ export default function MapView() {
           .map((entry) => entry.iso)
           .filter((iso) => !hiddenRegionIsoSet.has(iso));
     applyRegionBoundsIsoFilter(map.current, visibleIsos);
-    setRegionBoundsSelectedIsos(map.current, selectedRegionIsos);
+    // В режиме оверлея выделение на базовом слое регионов не должно
+    // показываться — иначе оно расходится с составом временного слоя.
+    setRegionBoundsSelectedIsos(
+      map.current,
+      overlayRegionEdit.active ? [] : selectedRegionIsos
+    );
   }, [
     mapReady,
     regionBoundsEnabled,
@@ -4126,6 +4167,48 @@ export default function MapView() {
     };
   }, [locationFilters]);
 
+  // Огромное число точек (сотни тысяч GBIF/iNat) в маркерах/кластерах — прямой путь
+  // к Out of Memory: при превышении порога прячем маркеры (пауза + очистка их
+  // Mapbox-источников) и переключаемся на тепловую карту, как в мобильном iNaturalist.
+  // Гистерезис (resolveAutoRasterMode) не даёт миганию режима у границы порога.
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
+      if (!map.current) {
+        return;
+      }
+
+      const pointCount = getVisibleMapPointCount();
+      const nextRaster = resolveAutoRasterMode(pointCount, autoRasterModeRef.current);
+      if (nextRaster === autoRasterModeRef.current) {
+        return;
+      }
+
+      autoRasterModeRef.current = nextRaster;
+      setAutoRasterMode(nextRaster);
+
+      if (nextRaster) {
+        setGbifMapUpdatesPaused(true);
+        clearGbifLayer(map.current);
+        setInatMapUpdatesPaused(true);
+        clearInatLayer(map.current);
+      } else {
+        setGbifMapUpdatesPaused(false);
+        setInatMapUpdatesPaused(false);
+        applyGbifLocationsFilter(map.current, locationFilters);
+        applyInatLocationsFilter(map.current, locationFilters);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- пересчитываем сразу после debounce
+    }, LOCATION_FILTERS_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [locationFilters, externalOnly, tempLayersRevision, pointsDataRevision, mapReady]);
+
   useEffect(() => {
     if (!map.current) {
       return;
@@ -4136,8 +4219,9 @@ export default function MapView() {
         return;
       }
       refreshHeatmapSourceOptions(externalOnly);
-      // Общая тепловая карта: в режиме временных слоёв — только они.
-      setHeatmapEnabled(map.current, heatmapEnabled, locationFilters);
+      // Общая тепловая карта: в режиме временных слоёв — только они;
+      // при авто-растровом режиме включаем её независимо от ручного тумблера пользователя.
+      setHeatmapEnabled(map.current, heatmapEnabled || autoRasterMode, locationFilters);
       syncTempLayerHeatmaps(map.current, {
         active: externalOnly,
         filters: locationFilters,
@@ -4149,7 +4233,7 @@ export default function MapView() {
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [heatmapEnabled, locationFilters, externalOnly, tempLayersRevision, heatmapSettings]);
+  }, [heatmapEnabled, autoRasterMode, locationFilters, externalOnly, tempLayersRevision, heatmapSettings]);
 
   useEffect(() => {
     if (!mapReady || !map.current || !isFirebaseConfigured()) {
@@ -5322,7 +5406,7 @@ export default function MapView() {
 
   const handleOverlayRegionBufferChange = useCallback((km) => {
     setOverlayRegionBufferKm(km);
-    patchVisibleRegionOverlays({ bufferKm: km });
+    patchVisibleRegionOverlays({ bufferKm: km, buildBufferFeature: buildRegionSelectionBufferFeature });
     persistTempLayers().catch(() => {});
   }, []);
 
@@ -5678,6 +5762,20 @@ export default function MapView() {
         }
 
         await initLocationsFromFirestore();
+
+        // Экстренный сброс: ?wipeExternalData=1 в адресе — чистит GBIF/iNat/временные
+        // слои (в памяти и в IndexedDB) ДО hydrate, если гигантский сохранённый
+        // датасет валит вкладку в Out of Memory ещё до готовности интерфейса.
+        // Слои «Проверенные»/«Пользовательские» (Firestore) это не затрагивает.
+        if (new URLSearchParams(window.location.search).get("wipeExternalData") === "1") {
+          await clearGbifStoreAndPersistence();
+          await clearInatStoreAndPersistence();
+          await clearAllTempLayersAndPersistence();
+          const url = new URL(window.location.href);
+          url.searchParams.delete("wipeExternalData");
+          window.history.replaceState({}, "", url.toString());
+        }
+
         await hydrateGbifStoreFromPersistence();
         await hydrateInatStoreFromPersistence();
         await hydrateTempLayersFromPersistence();
@@ -5690,6 +5788,18 @@ export default function MapView() {
 
         syncYearBounds();
         setPointsDataRevision((value) => value + 1);
+
+        // Если из IndexedDB восстановилось огромное число точек (GBIF/iNat),
+        // не даём addGbifLayer/addInatLayer сразу построить полный Supercluster —
+        // это и роняет вкладку в Out of Memory прямо при открытии страницы.
+        const hydratedPointCount = getGbifFeatureCount() + getInatFeatureCount();
+        const initialRasterMode = resolveAutoRasterMode(hydratedPointCount, false);
+        autoRasterModeRef.current = initialRasterMode;
+        if (initialRasterMode) {
+          setAutoRasterMode(true);
+          setGbifMapUpdatesPaused(true);
+          setInatMapUpdatesPaused(true);
+        }
 
         addOsmBasemapLayer(mapInstance);
         addYandexBasemapLayer(mapInstance);

@@ -38,6 +38,8 @@ const CLUSTER_OPTIONS = {
   clusterMaxZoom: 14,
   clusterRadius: 50
 };
+/** Максимум точек, вытаскиваемых из кластера по клику (не весь кластер целиком). */
+const CLUSTER_CLICK_LEAVES_LIMIT = 20000;
 
 const TEMP_LAYER_CIRCLE_COLOR = [
   "case",
@@ -412,7 +414,8 @@ function attachInteractions(map) {
     event.preventDefault?.();
     event.originalEvent?.stopPropagation?.();
 
-    source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
+    // Infinity вытаскивал ВЕСЬ кластер только чтобы найти совпадающие координаты — вешало вкладку.
+    source.getClusterLeaves(clusterId, CLUSTER_CLICK_LEAVES_LIMIT, 0, (leavesErr, leaves) => {
       if (leavesErr) {
         return;
       }

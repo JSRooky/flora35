@@ -53,17 +53,17 @@ export function applyTempRegionOverlayPaint(map, { settings, featureColors } = {
   });
 }
 
-let overlaySelectAttached = false;
+const overlaySelectAttachedMaps = new WeakSet();
 
 function overlayBeforeId(map) {
   return map.getLayer(REGION_BOUNDS_FILL_LAYER_ID) ? REGION_BOUNDS_FILL_LAYER_ID : undefined;
 }
 
 function attachOverlaySelectHandlers(map) {
-  if (overlaySelectAttached || !map?.getLayer?.(TEMP_OVERLAY_FILL_LAYER_ID)) {
+  if (overlaySelectAttachedMaps.has(map) || !map?.getLayer?.(TEMP_OVERLAY_FILL_LAYER_ID)) {
     return;
   }
-  overlaySelectAttached = true;
+  overlaySelectAttachedMaps.add(map);
   map.on("click", TEMP_OVERLAY_FILL_LAYER_ID, (event) => {
     const feature = event.features?.[0];
     const iso = feature?.properties?.iso || feature?.properties?.ISO_1;

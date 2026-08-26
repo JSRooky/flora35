@@ -129,6 +129,30 @@ export async function refreshTempLayerArchiveIndex() {
   }
 }
 
+/** Полностью очищает временные слои (в т.ч. архив) в памяти и в IndexedDB. */
+export async function clearAllTempLayersAndPersistence() {
+  replaceTempLayers([]);
+  replaceTempLayerArchiveIndex([]);
+
+  if (typeof indexedDB === "undefined") {
+    return;
+  }
+
+  try {
+    const db = await openDb();
+    try {
+      await idbRequest(db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).clear());
+      if (db.objectStoreNames.contains(ARCHIVE_STORE)) {
+        await idbRequest(db.transaction(ARCHIVE_STORE, "readwrite").objectStore(ARCHIVE_STORE).clear());
+      }
+    } finally {
+      db.close();
+    }
+  } catch (error) {
+    console.warn("Failed to clear temp layers IndexedDB:", error);
+  }
+}
+
 export async function hydrateTempLayersFromPersistence() {
   if (typeof indexedDB === "undefined") {
     replaceTempLayers([]);

@@ -329,7 +329,12 @@ const SPECIES_POLYGON_OUTLINE_PAINT = {
   "line-color": ["get", "outlineColor"],
   "line-width": POLYGON_OUTLINE_WIDTH,
   "line-opacity": POLYGON_OUTLINE_OPACITY,
-  "line-dasharray": POLYGON_OUTLINE_DASHARRAY,
+  "line-dasharray": POLYGON_OUTLINE_DASHARRAY
+};
+
+// line-join/line-cap — свойства layout, а не paint (Mapbox иначе пишет
+// "unknown property" в консоль и игнорирует их).
+const SPECIES_POLYGON_OUTLINE_LAYOUT = {
   "line-join": "round",
   "line-cap": "round"
 };
@@ -351,7 +356,12 @@ const INTERSECTION_OUTLINE_PAINT = {
   "line-color": INTERSECTION_OUTLINE_COLOR,
   "line-width": INTERSECTION_OUTLINE_WIDTH,
   "line-opacity": INTERSECTION_OUTLINE_OPACITY,
-  "line-dasharray": INTERSECTION_OUTLINE_DASHARRAY,
+  "line-dasharray": INTERSECTION_OUTLINE_DASHARRAY
+};
+
+// line-join/line-cap — свойства layout, а не paint (Mapbox иначе пишет
+// "unknown property" в консоль и игнорирует их).
+const INTERSECTION_OUTLINE_LAYOUT = {
   "line-join": "round",
   "line-cap": "round"
 };
@@ -459,6 +469,7 @@ function ensureSpeciesPolygonIntersectionLayers(map) {
       id: "species-polygon-intersection-outline",
       type: "line",
       source: INTERSECTION_SOURCE_ID,
+      layout: INTERSECTION_OUTLINE_LAYOUT,
       paint: INTERSECTION_OUTLINE_PAINT
     });
 
@@ -499,6 +510,7 @@ export function addSpeciesPolygonLayer(map) {
     id: "species-polygon-outline",
     type: "line",
     source: SOURCE_ID,
+    layout: SPECIES_POLYGON_OUTLINE_LAYOUT,
     paint: SPECIES_POLYGON_OUTLINE_PAINT
   });
 

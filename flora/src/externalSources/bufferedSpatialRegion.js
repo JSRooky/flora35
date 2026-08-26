@@ -6,9 +6,16 @@ function roundCoord(value) {
 }
 
 function ringToWkt(ring) {
-  return `(${(ring ?? [])
-    .map((position) => `${roundCoord(position[0])} ${roundCoord(position[1])}`)
-    .join(",")})`;
+  const positions = Array.isArray(ring) ? ring : [];
+  // WKT-полигоны обязаны быть замкнуты (первая точка = последней),
+  // иначе GBIF может отклонить или неверно интерпретировать геометрию.
+  const first = positions[0];
+  const last = positions[positions.length - 1];
+  const closed =
+    first && last && (first[0] !== last[0] || first[1] !== last[1])
+      ? [...positions, first]
+      : positions;
+  return `(${closed.map((position) => `${roundCoord(position[0])} ${roundCoord(position[1])}`).join(",")})`;
 }
 
 function polygonToWkt(rings) {
@@ -50,19 +57,22 @@ const MAX_WKT_CHARS = 7000;
 export function applyBufferToExternalRegion(region, feature, bufferKm) {
   const radius = Number(bufferKm);
   if (!region || !feature?.geometry || !Number.isFinite(radius) || radius <= 0) {
-    return region;
+    // Буфер не запрошен или не может быть построен — явно сообщаем об этом
+    // вызывающему коду, а не молча возвращаем region как есть (чтобы UI не
+    // считал загрузку буферизованной, когда это не так).
+    return null;
   }
 
   const expanded = getRegionSelectionWithinFeature([feature], radius);
   if (!expanded?.geometry) {
-    return region;
+    return null;
   }
 
   const compact = compactGeometry(expanded);
   let geometry = geojsonToWkt(compact);
   const bounds = turfBbox(compact);
   if (!Array.isArray(bounds) || bounds.length < 4) {
-    return region;
+    return null;
   }
 
   if (!geometry || geometry.length > MAX_WKT_CHARS) {

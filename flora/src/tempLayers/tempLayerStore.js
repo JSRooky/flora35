@@ -332,8 +332,14 @@ export function getVisibleRegionOverlayEditState() {
   };
 }
 
-/** Заливка, обводка и буфер — сразу на все видимые временные слои с регионами. */
-export function patchVisibleRegionOverlays({ style, featureColors, bufferKm } = {}) {
+/**
+ * Заливка, обводка и буфер — сразу на все видимые временные слои с регионами.
+ * `buildBufferFeature(regionFeatures, bufferKm)` — опциональный колбэк
+ * (внедряется вызывающим кодом, у которого есть доступ к turf/картe),
+ * который пересчитывает кольцо буфера, когда радиус меняется. Без него
+ * буфер просто убирается вместе со старыми (уже неверными) фичами.
+ */
+export function patchVisibleRegionOverlays({ style, featureColors, bufferKm, buildBufferFeature } = {}) {
   const nextStyle = style && typeof style === "object" ? style : undefined;
   const nextColors = featureColors;
   const nextBuffer = bufferKm === undefined ? undefined : Number(bufferKm) || 0;
@@ -356,6 +362,25 @@ export function patchVisibleRegionOverlays({ style, featureColors, bufferKm } = 
             featureColors: nextColors === undefined ? layer.regionFeatureColors : nextColors
           })
         );
+      }
+      const effectiveBufferKm = nextBuffer === undefined ? layer.bufferKm : nextBuffer;
+      if (effectiveBufferKm > 0 && typeof buildBufferFeature === "function") {
+        const halo = buildBufferFeature(features, effectiveBufferKm);
+        if (halo?.geometry) {
+          features = [
+            ...features,
+            {
+              type: "Feature",
+              geometry: halo.geometry,
+              properties: {
+                ...(halo.properties ?? {}),
+                overlayRole: "buffer",
+                color: "#0284c7",
+                fillOpacity: 0.16
+              }
+            }
+          ];
+        }
       }
       return { ...overlay, features };
     });
@@ -1051,6 +1076,41 @@ function explodeMixedRegionPointLayers(list) {
   return extra.length > 0 ? [...extra, ...next] : list;
 }
 
+function overlayFeatureKey(feature) {
+  const props = feature?.properties ?? {};
+  return String(props.iso || props.ISO_1 || props.region_id || feature?.id || "");
+}
+
+/** Добавляет новые overlay-полигоны регионов к уже существующим, без дублей. */
+function mergeRegionOverlaySnapshots(existingOverlays, incomingOverlays) {
+  const existing = normalizeOverlays(existingOverlays);
+  const incoming = normalizeOverlays(incomingOverlays);
+  if (incoming.length === 0) {
+    return existing;
+  }
+
+  const merged = existing.map((entry) => ({ ...entry, features: [...entry.features] }));
+  incoming.forEach((incomingEntry) => {
+    let target = merged.find((entry) => entry.kind === incomingEntry.kind);
+    if (!target) {
+      target = { ...incomingEntry, features: [] };
+      merged.push(target);
+    }
+    const seen = new Set(target.features.map((feature) => overlayFeatureKey(feature)));
+    incomingEntry.features.forEach((feature) => {
+      const key = overlayFeatureKey(feature);
+      if (key && seen.has(key)) {
+        return;
+      }
+      if (key) {
+        seen.add(key);
+      }
+      target.features.push(feature);
+    });
+  });
+  return merged;
+}
+
 /**
  * Кладёт точки в видимый временный слой с контурами регионов.
  * Если такого слоя нет, создаёт его из переданных overlays.
@@ -1070,6 +1130,13 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
   const buckets = bucketFeaturesBySource(incoming);
   const target = layers.find((layer) => layer.visible && layerHasRegionOverlays(layer));
   if (target) {
+    const incomingOverlaySnapshot = normalizeOverlays(overlays);
+    if (incomingOverlaySnapshot.length > 0) {
+      const mergedOverlays = mergeRegionOverlaySnapshots(target.overlays, incomingOverlaySnapshot);
+      layers = layers.map((layer) =>
+        layer.id === target.id ? { ...layer, overlays: mergedOverlays } : layer
+      );
+    }
     const added = mergeBucketsIntoPlaque(target, buckets, regionIds);
     emit();
     return { ok: true, appended: true, added, layer: target };
@@ -1239,9 +1306,12 @@ function stampGroupFeatures(rawFeatures, layerId, markerColor, source) {
     if (markerColor) {
       properties.temp_marker_color = markerColor;
     }
-    const inferred = inferFeatureTempSource(feature) || tempSource;
-    if (inferred) {
-      properties.temp_source = inferred;
+    // Слой уже корректно рассортирован по источнику (bucketFeaturesBySource /
+    // explodeMixedRegionPointLayers) — его source приоритетнее, чем догадка
+    // по возможно устаревшим properties отдельной точки.
+    const resolvedSource = tempSource || inferFeatureTempSource(feature);
+    if (resolvedSource) {
+      properties.temp_source = resolvedSource;
     }
     return {
       ...feature,
@@ -1398,11 +1468,12 @@ export function getTempLayerPlaqueFeatureGroups() {
 }
 
 export function listTempLayerPlaques() {
-  layers = explodeMixedRegionPointLayers(layers);
+  // Только для отображения: не мутируем общий store из "read-only" листинга,
+  // иначе подписчики не узнают об изменении структуры (нет emit()).
   const plaques = [];
   const indexByKey = new Map();
 
-  layers.forEach((layer) => {
+  explodeMixedRegionPointLayers(layers).forEach((layer) => {
     const key = layerGroupKey(layer);
     let plaque = indexByKey.get(key);
     if (!plaque) {

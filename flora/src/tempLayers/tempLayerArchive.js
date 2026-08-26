@@ -61,7 +61,11 @@ export async function renameArchivedPlaque(archiveId, nextTitle) {
     layers: (Array.isArray(record.layers) ? record.layers : []).map((layer) => ({
       ...layer,
       label: title,
-      taxonName: title
+      taxonName: title,
+      overlays: (Array.isArray(layer.overlays) ? layer.overlays : []).map((overlay) => ({
+        ...overlay,
+        label: title
+      }))
     }))
   };
   await putTempLayerArchiveRecord(next);

@@ -19,8 +19,12 @@ function regionKeys(region) {
     .filter(Boolean);
 }
 
-function namesMatch(left, right) {
-  return left === right || (left.length >= 5 && right.includes(left)) || (right.length >= 5 && left.includes(right));
+function exactMatch(left, right) {
+  return left === right;
+}
+
+function fuzzyMatch(left, right) {
+  return (left.length >= 5 && right.includes(left)) || (right.length >= 5 && left.includes(right));
 }
 
 /** Сопоставляет субъект с карты с регионом загрузки GBIF/iNat. */
@@ -29,10 +33,22 @@ export function matchMapRegionToExternal(entry) {
   if (!keys.length) {
     return null;
   }
+
+  // Точное совпадение по нормализованному имени/ISO проверяем первым, чтобы
+  // не подобрать похожий по подстроке чужой регион (например, «Алтай» →
+  // «Алтайский край» вместо «Республика Алтай»).
+  const exact = EXTERNAL_REGIONS.find((region) => {
+    const targets = regionKeys(region);
+    return keys.some((key) => targets.some((target) => exactMatch(key, target)));
+  });
+  if (exact) {
+    return exact;
+  }
+
   return (
     EXTERNAL_REGIONS.find((region) => {
       const targets = regionKeys(region);
-      return keys.some((key) => targets.some((target) => namesMatch(key, target)));
+      return keys.some((key) => targets.some((target) => fuzzyMatch(key, target)));
     }) ?? null
   );
 }
@@ -40,7 +56,7 @@ export function matchMapRegionToExternal(entry) {
 export function matchMapRegionsToExternal(entries = []) {
   const matched = [];
   const unmatched = [];
-  const seen = new Set();
+  const byRegionId = new Map();
 
   (Array.isArray(entries) ? entries : []).forEach((entry) => {
     const region = matchMapRegionToExternal(entry);
@@ -48,11 +64,24 @@ export function matchMapRegionsToExternal(entries = []) {
       unmatched.push(entry?.name || entry?.iso || "Регион");
       return;
     }
-    if (seen.has(region.id)) {
+    const existing = byRegionId.get(region.id);
+    if (existing) {
+      // Несколько субъектов карты сопоставились с одним внешним регионом
+      // (например, составной регион из нескольких частей) — не теряем
+      // геометрию остальных частей, а объединяем их.
+      if (entry?.feature) {
+        existing.features.push(entry.feature);
+      }
       return;
     }
-    seen.add(region.id);
-    matched.push({ region, feature: entry?.feature ?? null, entry });
+    const record = {
+      region,
+      feature: entry?.feature ?? null,
+      features: entry?.feature ? [entry.feature] : [],
+      entry
+    };
+    byRegionId.set(region.id, record);
+    matched.push(record);
   });
 
   return { matched, unmatched };

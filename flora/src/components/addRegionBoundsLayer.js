@@ -984,7 +984,7 @@ export function collectRegionSelectionOverlayFeatures(features = [], bufferKm = 
   return list;
 }
 
-function buildRegionSelectionBufferFeature(features, radiusKm) {
+export function buildRegionSelectionBufferFeature(features, radiusKm) {
   const radius = Number(radiusKm);
   if (!Number.isFinite(radius) || radius <= 0) {
     return null;
