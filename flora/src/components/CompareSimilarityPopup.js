@@ -3,6 +3,7 @@ import PanelCloseButton from "./PanelCloseButton";
 import PanelHint from "./PanelHint";
 import PanelMinimizeButton from "./PanelMinimizeButton";
 import { COMPARE_SET_MIN, plaquesToCompareLayerInputs } from "../dataWork/compare/countSpeciesByLayers";
+import CompareRegnumFilter, { useCompareRegnumFilter } from "./CompareRegnumFilter";
 import {
   computeLayerSimilarity,
   formatSimilarityCoef,
@@ -42,9 +43,20 @@ export default function CompareSimilarityPopup({
     });
   }, [open, keysSignature]);
 
+  const {
+    presentRegnums,
+    allRegnumsOn,
+    noneRegnumsOn,
+    allowedRegnums,
+    handleSelectAllRegnums,
+    handleResetRegnums,
+    handleToggleRegnum,
+    isRegnumOn
+  } = useCompareRegnumFilter(plaques);
+
   const result = useMemo(
-    () => computeLayerSimilarity(plaquesToCompareLayerInputs(plaques)),
-    [plaques]
+    () => computeLayerSimilarity(plaquesToCompareLayerInputs(plaques, { allowedRegnums })),
+    [plaques, allowedRegnums]
   );
   const tooFew = plaques.length < COMPARE_SET_MIN;
   const canExport = !tooFew && result.pairs.length > 0;
@@ -83,6 +95,15 @@ export default function CompareSimilarityPopup({
           </p>
         ) : (
           <>
+            <CompareRegnumFilter
+              presentRegnums={presentRegnums}
+              isRegnumOn={isRegnumOn}
+              allRegnumsOn={allRegnumsOn}
+              noneRegnumsOn={noneRegnumsOn}
+              onSelectAll={handleSelectAllRegnums}
+              onReset={handleResetRegnums}
+              onToggleRegnum={handleToggleRegnum}
+            />
             <PanelHint>
               Попарно считаются корреляция Пирсона R и коэффициент детерминации R². Виды — по числу
               точек каждого вида (нет в слое = 0). Роды и семейства — так же по точкам группы.

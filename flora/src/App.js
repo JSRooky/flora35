@@ -99,12 +99,14 @@ import {
   buildRegionCatalog,
   emitRegionBoundsSelect,
   flyToRegionBoundsFeature,
+  getFeaturePopupLngLat,
   getRegionEntryByIso,
   getRegionFeatureAtClick,
   hideRegionActionPopup,
   getRegionSelectionWithinFeature,
   loadRegionBoundsGeoJSON,
   setRegionBoundsEnabled,
+  setRegionBoundsLoadedIsos,
   setRegionBoundsSelectHandler,
   setRegionBoundsSelectedIsos,
   showRegionActionPopup,
@@ -112,6 +114,8 @@ import {
 } from "./components/addRegionBoundsLayer";
 import OoptPanel from "./components/OoptPanel";
 import RegionPanel from "./components/RegionPanel";
+import RegionLayersPanel from "./components/RegionLayersPanel";
+import OsmAdminLoadPopup from "./components/OsmAdminLoadPopup";
 import OoptFeaturePanel from "./components/OoptFeaturePanel";
 import BoundsSpeciesListPopup from "./components/BoundsSpeciesListPopup";
 import RegionSpeciesListPanel from "./components/RegionSpeciesListPanel";
@@ -259,9 +263,17 @@ import {
   setRegionLoadSummaryActive,
   setRegionLoadSummaryOptions
 } from "./components/addRegionLoadSummaryLayer";
+import { listLoadedRegionCatalogIsos } from "./map/regionLoadSummary";
+import {
+  OSM_ADMIN_LOAD_MODES,
+  downloadGeoJson,
+  loadOsmAdminFeatureCollection,
+  suggestedOsmAdminFilename,
+  toOsmIso3166_2
+} from "./osm/osmAdminBoundaries";
 import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles, getTempCompactGridLayerColor } from "./components/addTempLayersLayer";
-import { addTempLayerOverlaysLayer, applyTempRegionOverlayPaint } from "./components/addTempLayerOverlaysLayer";
-import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, appendRegionPolygonToTempPlaque, listTempLayerPlaques, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerLabel, setTempLayerMarkerColor, setTempLayerVisible } from "./tempLayers/tempLayerStore";
+import { addTempLayerOverlaysLayer, applyTempRegionOverlayPaint, setTempLayerOverlaysData, setTempOverlaySelectedIsos } from "./components/addTempLayerOverlaysLayer";
+import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, appendRegionPolygonToTempPlaque, listTempLayerPlaques, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerLabel, setTempLayerMarkerColor, setTempLayerVisible, applyTempLayerSettingsMeta, ensureMapRegionBoundary, ingestOsmAdminOverlays, getRegionOverlayByKey, listRegionLayerTree, removeRegionOverlay, removeRegionsRootLayer, setRegionBoundsDisplaySource, hydrateRegionBoundsDisplaySource, getRegionBoundsDisplaySource, setRegionBoundsContoursEnabled, REGION_BOUNDS_DISPLAY_SOURCES, findOsmOverlayFeatureByIso, listOsmOverlaySelectableIsos } from "./tempLayers/tempLayerStore";
 import {
   collectMapToolOverlays,
   TEMP_OVERLAY_KINDS,
@@ -288,9 +300,16 @@ import { loadMergedPointsFromFirestore } from "./firebase/loadMergedPointsFromFi
 import { submitMergedPoint } from "./firebase/submitMergedPoint";
 import { deleteMergedPoint } from "./firebase/deleteMergedPoint";
 import { loadPointAttributionsFromFirestore } from "./firebase/loadPointAttributionsFromFirestore";
-import { persistTempLayers } from "./tempLayers/tempLayerPersistence";
+import { persistTempLayers, hydrateRegionOverlaysFromPersistence, snapshotTempSettings, applyArchiveSettingsMeta, refreshTempLayerArchiveIndex } from "./tempLayers/tempLayerPersistence";
 import { syncDataWorkingSet } from "./map/dataWorkingSet";
 import { applyCompactGridAppearance, setCompactPointDisplayEnabled } from "./map/compactPointDisplay";
+import {
+  applyMapView,
+  buildMapConfigDocument,
+  downloadMapConfigFile,
+  readMapConfigFile,
+  readMapView
+} from "./mapConfig/mapConfigDocument";
 import {
   getCompactGridPointLimit,
   getCompactGridSettings,
@@ -556,6 +575,17 @@ export default function MapView() {
   const [regionCatalog, setRegionCatalog] = useState([]);
   const [hiddenRegionIsos, setHiddenRegionIsos] = useState([]);
   const [selectedRegionIsos, setSelectedRegionIsos] = useState([]);
+  const [osmAdminLoading, setOsmAdminLoading] = useState(false);
+  const [osmAdminStatus, setOsmAdminStatus] = useState("");
+  const [osmAdminError, setOsmAdminError] = useState("");
+  const [osmAdminLoadingKey, setOsmAdminLoadingKey] = useState("");
+  const [osmAdminPopupOpen, setOsmAdminPopupOpen] = useState(false);
+  const [regionBoundsDisplaySource, setRegionBoundsDisplaySourceState] = useState(
+    () => hydrateRegionBoundsDisplaySource()
+  );
+  const [regionOverlaysHydrated, setRegionOverlaysHydrated] = useState(false);
+  const [selectedOsmRegionKey, setSelectedOsmRegionKey] = useState(null);
+  const [regionLayersPanelOpen, setRegionLayersPanelOpen] = useState(true);
   const [regionAddMode, setRegionAddMode] = useState(false);
   const [regionBufferKm, setRegionBufferKm] = useState(0);
   const [overlayRegionBufferKm, setOverlayRegionBufferKm] = useState(0);
@@ -638,6 +668,17 @@ export default function MapView() {
   const overlayRegionEdit = useMemo(() => {
     void tempLayersRevision;
     return getVisibleRegionOverlayEditState();
+  }, [tempLayersRevision]);
+  const osmLayerTargetLabel = useMemo(() => {
+    void tempLayersRevision;
+    if (!selectedOsmRegionKey) {
+      return "";
+    }
+    return getRegionOverlayByKey(selectedOsmRegionKey)?.label || "";
+  }, [selectedOsmRegionKey, tempLayersRevision]);
+  const osmDataAvailable = useMemo(() => {
+    void tempLayersRevision;
+    return !listRegionLayerTree().empty;
   }, [tempLayersRevision]);
   const [externalProcessingActive, setExternalProcessingActive] = useState(false);
   const [nearSpeciesMatchesActive, setNearSpeciesMatchesActive] = useState(false);
@@ -1863,6 +1904,174 @@ export default function MapView() {
     });
   }, [bumpPointsDataRevision, handleDataSourceModeChange]);
 
+  const handleRegionLayersTreeChange = useCallback(() => {
+    persistTempLayers().catch(() => {});
+    setTempLayersRevision((value) => value + 1);
+    if (map.current) {
+      setTempLayerOverlaysData(map.current);
+    }
+  }, []);
+
+  const handleRegionBoundsDisplaySourceChange = useCallback((source) => {
+    const next =
+      source === REGION_BOUNDS_DISPLAY_SOURCES.OSM
+        ? REGION_BOUNDS_DISPLAY_SOURCES.OSM
+        : REGION_BOUNDS_DISPLAY_SOURCES.DEFAULT;
+    setRegionBoundsDisplaySource(next);
+    setRegionBoundsDisplaySourceState(next);
+    if (next === REGION_BOUNDS_DISPLAY_SOURCES.OSM) {
+      setRegionBoundsVisible(true);
+    }
+    if (map.current) {
+      setTempLayerOverlaysData(map.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (
+      regionOverlaysHydrated &&
+      !osmDataAvailable &&
+      regionBoundsDisplaySource === REGION_BOUNDS_DISPLAY_SOURCES.OSM
+    ) {
+      handleRegionBoundsDisplaySourceChange(REGION_BOUNDS_DISPLAY_SOURCES.DEFAULT);
+    }
+  }, [
+    handleRegionBoundsDisplaySourceChange,
+    osmDataAvailable,
+    regionBoundsDisplaySource,
+    regionOverlaysHydrated
+  ]);
+
+  const handleOsmAdminLoad = useCallback(
+    async ({ mode, downloadJson, regionKey, regionIso } = {}) => {
+      setOsmAdminError("");
+      setOsmAdminStatus("Запрос к OpenStreetMap…");
+      setOsmAdminLoading(true);
+      setOsmAdminLoadingKey(
+        regionKey ||
+          selectedOsmRegionKey ||
+          (regionIso ? `iso:${regionIso}` : "") ||
+          (mode === OSM_ADMIN_LOAD_MODES.COUNTRY ? "country:RU" : mode) ||
+          ""
+      );
+      setRegionLayersPanelOpen(true);
+      try {
+        const selectedEntries = selectedRegionIsos
+          .map((iso) => regionCatalog.find((entry) => entry.iso === iso))
+          .filter(Boolean);
+        const pickedEntry = regionIso
+          ? regionCatalog.find((entry) => entry.iso === regionIso)
+          : null;
+        if (pickedEntry && !selectedEntries.some((entry) => entry.iso === pickedEntry.iso)) {
+          selectedEntries.unshift(pickedEntry);
+        }
+        const treeKey = regionKey || selectedOsmRegionKey;
+        const treeTarget = treeKey ? getRegionOverlayByKey(treeKey) : null;
+
+        if (mode === OSM_ADMIN_LOAD_MODES.DISTRICTS) {
+          const parents = [];
+          const addParent = (item) => {
+            if (
+              !item?.regionKey ||
+              parents.some(
+                (existing) =>
+                  existing.regionKey === item.regionKey || existing.label === item.label
+              )
+            ) {
+              return;
+            }
+            parents.push(item);
+          };
+          if (treeTarget?.regionKey && treeTarget.role !== "country") {
+            addParent({
+              regionKey: treeTarget.regionKey,
+              label: treeTarget.label,
+              sourceKind: treeTarget.sourceKind || "osm",
+              iso3166: treeTarget.feature?.properties?.ISO3166_2 || ""
+            });
+          }
+          selectedEntries.forEach((entry) => {
+            const ensured = ensureMapRegionBoundary({
+              iso: entry.iso,
+              name: entry.name,
+              feature: entry.feature
+            });
+            addParent({
+              regionKey: ensured?.regionKey,
+              label: entry.name,
+              sourceKind: "map",
+              iso3166: toOsmIso3166_2(entry.iso)
+            });
+          });
+          if (parents.length === 0) {
+            throw new Error("Укажите регион в строке поиска");
+          }
+
+          const merged = { type: "FeatureCollection", name: "osm-region-districts", features: [] };
+          for (const parent of parents) {
+            setOsmAdminLoadingKey(parent.regionKey || "");
+            setOsmAdminStatus(`OSM: ${parent.label}…`);
+            const collection = await loadOsmAdminFeatureCollection({
+              mode: OSM_ADMIN_LOAD_MODES.DISTRICTS,
+              regionNames: [parent.label],
+              iso3166: parent.iso3166 || ""
+            });
+            if (!collection.features.length) {
+              throw new Error(`Overpass не вернул полигоны для «${parent.label}»`);
+            }
+            ingestOsmAdminOverlays({
+              mode: OSM_ADMIN_LOAD_MODES.DISTRICTS,
+              collection,
+              parent
+            });
+            merged.features.push(...collection.features);
+          }
+
+          persistTempLayers().catch(() => {});
+          handleTempLayersChange();
+          if (map.current) {
+            setTempLayerOverlaysData(map.current);
+          }
+          setRegionLayersPanelOpen(true);
+          handleRegionBoundsDisplaySourceChange(REGION_BOUNDS_DISPLAY_SOURCES.OSM);
+          if (downloadJson) {
+            downloadGeoJson(
+              merged,
+              suggestedOsmAdminFilename(mode, parents[0]?.label)
+            );
+          }
+          setOsmAdminStatus(`Загружено объектов: ${merged.features.length}`);
+          return;
+        }
+
+        const collection = await loadOsmAdminFeatureCollection({ mode });
+        if (!collection.features.length) {
+          throw new Error("Overpass не вернул полигоны");
+        }
+        ingestOsmAdminOverlays({ mode, collection });
+
+        persistTempLayers().catch(() => {});
+        handleTempLayersChange();
+        handleRegionBoundsDisplaySourceChange(REGION_BOUNDS_DISPLAY_SOURCES.OSM);
+        if (map.current) {
+          setTempLayerOverlaysData(map.current);
+        }
+        setRegionLayersPanelOpen(true);
+        if (downloadJson) {
+          downloadGeoJson(collection, suggestedOsmAdminFilename(mode));
+        }
+        setOsmAdminStatus(`Загружено объектов: ${collection.features.length}`);
+      } catch (error) {
+        setOsmAdminError(error?.message || String(error));
+        setOsmAdminStatus("");
+      } finally {
+        setOsmAdminLoading(false);
+        setOsmAdminLoadingKey("");
+      }
+    },
+    [handleRegionBoundsDisplaySourceChange, handleTempLayersChange, regionCatalog, selectedOsmRegionKey, selectedRegionIsos]
+  );
+
   const handleExternalLayerToggle = useCallback((layerId, enabled) => {
     setExternalLayersEnabled((prev) => {
       if (prev[layerId] === enabled) {
@@ -2234,21 +2443,33 @@ export default function MapView() {
     regionCatalogRef.current = regionCatalog;
   }, [regionCatalog]);
 
-  const selectedRegionNames = useMemo(
-    () =>
-      selectedRegionIsos
-        .map((iso) => regionCatalog.find((entry) => entry.iso === iso)?.name)
-        .filter(Boolean),
-    [regionCatalog, selectedRegionIsos]
-  );
+  const selectedRegionNames = useMemo(() => {
+    void tempLayersRevision;
+    return selectedRegionIsos
+      .map((iso) => {
+        const catalogName = regionCatalog.find((entry) => entry.iso === iso)?.name;
+        if (catalogName) {
+          return catalogName;
+        }
+        const overlay = findOsmOverlayFeatureByIso(iso);
+        const properties = overlay?.properties ?? {};
+        return properties.title || properties.name || properties.name_en || "";
+      })
+      .filter(Boolean);
+  }, [regionCatalog, selectedRegionIsos, tempLayersRevision]);
 
-  const selectedRegionFeatures = useMemo(
-    () =>
-      selectedRegionIsos
-        .map((iso) => regionCatalog.find((entry) => entry.iso === iso)?.feature)
-        .filter(Boolean),
-    [regionCatalog, selectedRegionIsos]
-  );
+  const selectedRegionFeatures = useMemo(() => {
+    void tempLayersRevision;
+    return selectedRegionIsos
+      .map((iso) => {
+        const catalogFeature = regionCatalog.find((entry) => entry.iso === iso)?.feature;
+        if (catalogFeature) {
+          return catalogFeature;
+        }
+        return findOsmOverlayFeatureByIso(iso);
+      })
+      .filter(Boolean);
+  }, [regionCatalog, selectedRegionIsos, tempLayersRevision]);
 
   const regionWithinFeature = useMemo(
     () => getRegionSelectionWithinFeature(selectedRegionFeatures, regionBufferKm),
@@ -4052,10 +4273,41 @@ export default function MapView() {
   }, [hoverTooltipsDisabled]);
 
   useEffect(() => {
+    if (!mapReady) {
+      return undefined;
+    }
+    let cancelled = false;
+    void hydrateRegionOverlaysFromPersistence().then(() => {
+      if (cancelled) {
+        return;
+      }
+      setRegionBoundsDisplaySourceState(getRegionBoundsDisplaySource());
+      setTempLayersRevision((value) => value + 1);
+      setRegionOverlaysHydrated(true);
+      if (map.current) {
+        setTempLayerOverlaysData(map.current);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mapReady]);
+
+  useEffect(() => {
     if (!map.current || !mapReady) {
       return;
     }
-    setRegionBoundsEnabled(map.current, regionBoundsEnabled);
+    const loadedIsos =
+      overlayRegionEdit.active || dataSourceMode === DATA_SOURCE_MODES.NONE
+        ? []
+        : listLoadedRegionCatalogIsos(regionCatalog).filter((iso) => !hiddenRegionIsoSet.has(iso));
+    const useOsmContours =
+      regionBoundsDisplaySource === REGION_BOUNDS_DISPLAY_SOURCES.OSM;
+    setRegionBoundsDisplaySource(regionBoundsDisplaySource);
+    setRegionBoundsContoursEnabled(regionBoundsEnabled);
+    const showRegionBounds =
+      !useOsmContours && (regionBoundsEnabled || loadedIsos.length > 0);
+    setRegionBoundsEnabled(map.current, showRegionBounds);
     if (!overlayRegionEdit.active) {
       applyRegionBoundsPaintSettings(map.current, regionBoundsSettings, regionFeatureColors);
     } else {
@@ -4067,23 +4319,32 @@ export default function MapView() {
     }
 
     const allVisible = hiddenRegionIsos.length === 0;
-    const visibleIsos = allVisible
+    const catalogVisibleIsos = allVisible
       ? null
       : regionCatalog
           .map((entry) => entry.iso)
           .filter((iso) => !hiddenRegionIsoSet.has(iso));
+    const visibleIsos =
+      !regionBoundsEnabled && loadedIsos.length > 0 ? loadedIsos : catalogVisibleIsos;
     applyRegionBoundsIsoFilter(map.current, visibleIsos);
     setRegionBoundsSelectedIsos(map.current, selectedRegionIsos);
+    setRegionBoundsLoadedIsos(map.current, loadedIsos);
+    setTempLayerOverlaysData(map.current, { hiddenIsos: hiddenRegionIsos });
+    setTempOverlaySelectedIsos(map.current, selectedRegionIsos);
   }, [
     mapReady,
     regionBoundsEnabled,
+    regionBoundsDisplaySource,
     regionBoundsSettings,
     regionFeatureColors,
     hiddenRegionIsos,
     hiddenRegionIsoSet,
     regionCatalog,
     selectedRegionIsos,
-    overlayRegionEdit
+    overlayRegionEdit,
+    pointsDataRevision,
+    tempLayersRevision,
+    dataSourceMode
   ]);
 
   useEffect(() => {
@@ -4208,9 +4469,10 @@ export default function MapView() {
         },
         onIsolate: () => {
           const keep = new Set(selectedRegionIsosRef.current);
-          const hidden = regionCatalogRef.current
-            .map((item) => item.iso)
-            .filter((iso) => !keep.has(iso));
+          const hidden = [
+            ...regionCatalogRef.current.map((item) => item.iso).filter((iso) => !keep.has(iso)),
+            ...listOsmOverlaySelectableIsos().filter((iso) => !keep.has(iso))
+          ];
           hiddenRegionIsosRef.current = hidden;
           setHiddenRegionIsos(hidden);
           regionAddModeRef.current = false;
@@ -5009,6 +5271,184 @@ export default function MapView() {
     }
     applyCompactGridAppearance(map.current, getTempCompactGridLayerColor);
   };
+
+  const handleSaveMapConfig = useCallback(async () => {
+    const workspace = await snapshotTempSettings();
+    downloadMapConfigFile(
+      buildMapConfigDocument({
+        mapView: readMapView(map.current),
+        layers: {
+          dataSourceMode,
+          markersVisible,
+          heatmapEnabled,
+          clusteringEnabled,
+          clusterByRegnum,
+          clusterByTempLayers,
+          clusterByTempSublayers,
+          clusterPieCharts,
+          denseClustersHighlight,
+          densePileMinSize,
+          compactPointDisplay,
+          mergedPointsVisible,
+          redBookPointsVisible,
+          regionBoundsEnabled,
+          externalLayersEnabled,
+          boundsFeatureVisibility,
+          basemapMode
+        },
+        filters: {
+          propertyFilters,
+          statusFilters,
+          regnumFilters,
+          yearFilterEnabled,
+          hideMissingFoundYear,
+          yearRange,
+          speciesSearchQuery,
+          speciesSearchSelectedLatin,
+          externalProcessing: externalProcessingFilters,
+          regionSpeciesAllowlist,
+          regionSpeciesRegnumFilter,
+          selectedRegionIsos,
+          hiddenRegionIsos,
+          regionBufferKm,
+          toolPointsFilter: toolPointsFilterEnabled
+        },
+        colors: {
+          heatmap: heatmapSettings,
+          compactGrid: compactGridSettings,
+          regionBounds: regionBoundsSettings,
+          regionFeatureColors
+        },
+        tempLayers: workspace.layers,
+        tempArchive: workspace.archive
+      })
+    );
+  }, [
+    basemapMode,
+    boundsFeatureVisibility,
+    clusterByRegnum,
+    clusterByTempLayers,
+    clusterByTempSublayers,
+    clusterPieCharts,
+    clusteringEnabled,
+    compactGridSettings,
+    compactPointDisplay,
+    dataSourceMode,
+    denseClustersHighlight,
+    densePileMinSize,
+    externalLayersEnabled,
+    externalProcessingFilters,
+    heatmapEnabled,
+    heatmapSettings,
+    hiddenRegionIsos,
+    hideMissingFoundYear,
+    markersVisible,
+    mergedPointsVisible,
+    propertyFilters,
+    redBookPointsVisible,
+    regionBoundsEnabled,
+    regionBoundsSettings,
+    regionBufferKm,
+    regionFeatureColors,
+    regionSpeciesAllowlist,
+    regionSpeciesRegnumFilter,
+    regnumFilters,
+    selectedRegionIsos,
+    speciesSearchQuery,
+    speciesSearchSelectedLatin,
+    statusFilters,
+    toolPointsFilterEnabled,
+    yearFilterEnabled,
+    yearRange
+  ]);
+
+  const handleLoadMapConfig = useCallback(
+    async (file) => {
+      const parsed = await readMapConfigFile(file);
+      const confirmed = window.confirm(
+        "Загрузить настройки пользователя? Фильтры и цвета применятся к текущей карте. Временные слои не заменяются — обновятся только имя, цвет и видимость совпадающих слоёв."
+      );
+      if (!confirmed) {
+        return false;
+      }
+
+      applyTempLayerSettingsMeta(parsed.tempLayers);
+      await applyArchiveSettingsMeta(parsed.tempArchive);
+      setTempLayersRevision((value) => value + 1);
+
+      await handleDataSourceModeChange(parsed.layers.dataSourceMode);
+      setExternalLayersEnabled(parsed.layers.externalLayersEnabled);
+      setMarkersVisibleState(parsed.layers.markersVisible);
+      setHeatmapEnabledState(parsed.layers.heatmapEnabled);
+      setClusteringEnabledState(parsed.layers.clusteringEnabled);
+      setClusterByRegnumState(parsed.layers.clusterByRegnum);
+      setClusterByTempLayersState(parsed.layers.clusterByTempLayers);
+      setClusterByTempSublayersState(parsed.layers.clusterByTempSublayers);
+      setClusterPieChartsState(parsed.layers.clusterPieCharts);
+      setDenseClustersHighlightState(parsed.layers.denseClustersHighlight);
+      if (parsed.layers.densePileMinSize) {
+        setDensePileMinSizeState(parsed.layers.densePileMinSize);
+        setDensePileMinSize(parsed.layers.densePileMinSize);
+      }
+      setCompactPointDisplayState(parsed.layers.compactPointDisplay);
+      setCompactPointDisplayEnabled(parsed.layers.compactPointDisplay);
+      setMergedPointsVisible(parsed.layers.mergedPointsVisible);
+      setRedBookPointsVisible(parsed.layers.redBookPointsVisible);
+      setRegionBoundsVisible(parsed.layers.regionBoundsEnabled);
+      setBoundsFeatureVisibility(parsed.layers.boundsFeatureVisibility);
+      if (parsed.layers.basemapMode) {
+        setBasemapMode(parsed.layers.basemapMode);
+      }
+
+      setPropertyFilters(parsed.filters.propertyFilters);
+      setStatusFilters(parsed.filters.statusFilters);
+      setRegnumFilters(parsed.filters.regnumFilters);
+      setYearFilterEnabled(parsed.filters.yearFilterEnabled);
+      setHideMissingFoundYear(parsed.filters.hideMissingFoundYear);
+      if (parsed.filters.yearRange) {
+        setYearRange(parsed.filters.yearRange);
+      }
+      setSpeciesSearchInput(parsed.filters.speciesSearchQuery);
+      setSpeciesSearchQuery(parsed.filters.speciesSearchQuery);
+      setSpeciesSearchSelectedLatin(parsed.filters.speciesSearchSelectedLatin);
+      setExternalProcessingFiltersState(parsed.filters.externalProcessing);
+      setRegionSpeciesAllowlist(parsed.filters.regionSpeciesAllowlist);
+      setRegionSpeciesRegnumFilter(parsed.filters.regionSpeciesRegnumFilter);
+      selectedRegionIsosRef.current = parsed.filters.selectedRegionIsos;
+      setSelectedRegionIsos(parsed.filters.selectedRegionIsos);
+      hiddenRegionIsosRef.current = parsed.filters.hiddenRegionIsos;
+      setHiddenRegionIsos(parsed.filters.hiddenRegionIsos);
+      setRegionBufferKm(parsed.filters.regionBufferKm);
+      setToolPointsFilterEnabled(parsed.filters.toolPointsFilter);
+
+      if (parsed.colors.heatmap) {
+        setHeatmapSettings(parsed.colors.heatmap);
+        saveHeatmapSettingsToStorage(parsed.colors.heatmap);
+      }
+      if (parsed.colors.compactGrid) {
+        const saved = setCompactGridSettings(parsed.colors.compactGrid);
+        setCompactGridSettingsState(saved);
+      }
+      if (parsed.colors.regionBounds) {
+        setRegionBoundsSettings(parsed.colors.regionBounds);
+        saveRegionBoundsSettingsToStorage(parsed.colors.regionBounds);
+      }
+      setRegionFeatureColors(parsed.colors.regionFeatureColors);
+
+      if (map.current) {
+        applyMapView(map.current, parsed.mapView);
+        setTempLayersData(map.current);
+        setTempLayersVisibility(
+          map.current,
+          parsed.layers.dataSourceMode === DATA_SOURCE_MODES.TEMP
+        );
+      }
+      persistTempLayers().catch(() => {});
+      bumpPointsDataRevision();
+      return true;
+    },
+    [bumpPointsDataRevision, handleDataSourceModeChange]
+  );
 
   useEffect(() => {
     const count = getDisplayedLayerPointCount();
@@ -6442,6 +6882,11 @@ export default function MapView() {
         addBufferLayer(mapInstance);
         addAreaSelectionLayer(mapInstance);
         addTempLayerOverlaysLayer(mapInstance);
+        void refreshTempLayerArchiveIndex().then(() => {
+          if (map.current) {
+            setTempLayerOverlaysData(map.current);
+          }
+        });
         addHeatmapLayer(mapInstance);
         addGbifLayer(mapInstance, {
           onPointClick: (feature) => {
@@ -6876,6 +7321,8 @@ export default function MapView() {
         onTempArchivePanelToggle={handleTempArchivePanelToggle}
         comparePanelOpen={comparePanelOpen}
         onComparePanelToggle={handleComparePanelToggle}
+        onSaveUserSettings={handleSaveMapConfig}
+        onLoadUserSettings={handleLoadMapConfig}
       />
       <div
         ref={ref}
@@ -7327,6 +7774,11 @@ export default function MapView() {
               onSelectiveSearch={(includeBuffer) =>
                 handleRegionOpenDataLoad("selective", includeBuffer)
               }
+              displaySource={regionBoundsDisplaySource}
+              onDisplaySourceChange={handleRegionBoundsDisplaySourceChange}
+              osmDataAvailable={osmDataAvailable}
+              onOpenOsmAdminLoad={() => setOsmAdminPopupOpen(true)}
+              osmAdminLoading={osmAdminLoading}
               collapsed={isPanelCollapsed(PANEL_IDS.REGIONS)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.REGIONS)}
               onMinimize={handleMinimizePanel(PANEL_IDS.REGIONS)}
@@ -7486,6 +7938,71 @@ export default function MapView() {
         onClose={handleCloseUndoMergedPoints}
         onShowPoint={handleShowUndoMergedPoint}
         onUndoMerge={handleUndoMergedPoint}
+      />
+      <OsmAdminLoadPopup
+        open={osmAdminPopupOpen}
+        loading={osmAdminLoading}
+        status={osmAdminStatus}
+        error={osmAdminError}
+        catalog={regionCatalog}
+        hasDistrictTarget={selectedRegionIsos.length > 0 || Boolean(selectedOsmRegionKey)}
+        osmLayerTargetLabel={osmLayerTargetLabel}
+        onLoad={handleOsmAdminLoad}
+        onClose={() => !osmAdminLoading && setOsmAdminPopupOpen(false)}
+      />
+      <RegionLayersPanel
+        open={regionLayersPanelOpen}
+        selectedRegionKey={selectedOsmRegionKey}
+        selectedPlaceIso={selectedRegionIso}
+        loading={osmAdminLoading}
+        loadingKey={osmAdminLoadingKey}
+        loadingStatus={osmAdminStatus}
+        onSelectRegion={(item) => {
+          if (item?.role === "boundary" || item?.role === "country") {
+            setSelectedOsmRegionKey(item.regionKey);
+          }
+        }}
+        onSelectPlace={(place) => {
+          const iso = String(place.iso || place.id || "").trim();
+          if (!iso || !map.current) {
+            return;
+          }
+          const feature = findOsmOverlayFeatureByIso(iso);
+          const entry = {
+            iso,
+            name: place.name,
+            nameEn: "",
+            fo: "OSM",
+            feature
+          };
+          emitRegionBoundsSelect(entry, getFeaturePopupLngLat(feature) || map.current.getCenter());
+          if (feature) {
+            flyToRegionBoundsFeature(map.current, feature, { maxZoom: 10 });
+          }
+        }}
+        onLoadDistricts={(item) => {
+          setSelectedOsmRegionKey(item.regionKey);
+          void handleOsmAdminLoad({
+            mode: OSM_ADMIN_LOAD_MODES.DISTRICTS,
+            downloadJson: false,
+            regionKey: item.regionKey
+          });
+        }}
+        onRemove={(item) => {
+          removeRegionOverlay(item.id);
+          if (selectedOsmRegionKey && item.regionKey === selectedOsmRegionKey) {
+            const remaining = listRegionLayerTree().items;
+            setSelectedOsmRegionKey(remaining[0]?.regionKey || null);
+          }
+          handleRegionLayersTreeChange();
+        }}
+        onRemoveAll={() => {
+          removeRegionsRootLayer();
+          setSelectedOsmRegionKey(null);
+          handleRegionLayersTreeChange();
+        }}
+        onTreeChange={handleRegionLayersTreeChange}
+        onClose={() => setRegionLayersPanelOpen(false)}
       />
       <RegionSpeciesListPanel
         open={regionSpeciesPanelOpen && !isPanelMinimized(PANEL_IDS.REGION_SPECIES)}

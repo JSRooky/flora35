@@ -2,7 +2,8 @@ import mapboxgl from "mapbox-gl";
 import {
   getCachedRegionCatalog,
   loadRegionBoundsGeoJSON,
-  emitRegionBoundsSelect
+  emitRegionBoundsSelect,
+  setRegionBoundsLoadedIsos
 } from "./addRegionBoundsLayer";
 import {
   buildExternalIdToCatalogEntry,
@@ -11,6 +12,7 @@ import {
   formatCompactPointCount,
   isRegionLoadSummaryActive,
   isRegionPlaqueCompact,
+  listLoadedRegionCatalogIsos,
   regionPlaqueColorVars,
   setRegionLoadSummaryMode
 } from "../map/regionLoadSummary";
@@ -312,12 +314,13 @@ function syncMarkers(map, summaries) {
 
 function applySummaries(map) {
   attachPlaqueMapEvents(map);
+  const catalog = getCachedRegionCatalog();
+  setRegionBoundsLoadedIsos(map, listLoadedRegionCatalogIsos(catalog));
   if (!isRegionLoadSummaryActive()) {
     clearMarkers();
     return;
   }
 
-  const catalog = getCachedRegionCatalog();
   const summaries =
     lastOptions.mode === "temp"
       ? buildTempLayerRegionSummaries({ catalog })

@@ -336,6 +336,22 @@ export function isCompactDensityFeature(feature) {
   return Boolean(feature?.properties?.[COMPACT_DENSITY_PROP]);
 }
 
+/** Контуры субъектов видны — клик по сетке должен выделять регион, а не зумить ячейку. */
+export function isRegionContourPickActive(map) {
+  if (!map?.getLayer || !map.getLayoutProperty) {
+    return false;
+  }
+  const layerId = map.getLayer("region-bounds-hit")
+    ? "region-bounds-hit"
+    : map.getLayer("region-bounds-fill")
+      ? "region-bounds-fill"
+      : null;
+  if (!layerId) {
+    return false;
+  }
+  return map.getLayoutProperty(layerId, "visibility") !== "none";
+}
+
 function densityCellCenter(feature) {
   const lng = Number(feature?.properties?.center_lng);
   const lat = Number(feature?.properties?.center_lat);

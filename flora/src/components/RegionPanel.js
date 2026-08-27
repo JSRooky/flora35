@@ -10,6 +10,7 @@ import {
   REGION_BUFFER_STEP_KM
 } from "./addRegionBoundsLayer";
 import { TrashIcon } from "../images/buttons";
+import { REGION_BOUNDS_DISPLAY_SOURCES } from "../tempLayers/tempLayerStore";
 import "../styles/HeatmapSettingsPanel.css";
 import "../styles/RegionPanel.css";
 
@@ -20,7 +21,8 @@ function getCollapsedSummary({
   selectedCount,
   bufferKm,
   overlayMode,
-  overlayCount
+  overlayCount,
+  displaySource
 }) {
   if (overlayMode) {
     const parts = [`Временные слои: ${overlayCount}`];
@@ -45,6 +47,10 @@ function getCollapsedSummary({
     parts.push(`Показано: ${visible} из ${total}`);
   } else {
     parts.push(`Субъектов: ${total}`);
+  }
+
+  if (displaySource === REGION_BOUNDS_DISPLAY_SOURCES.OSM) {
+    parts.unshift("OSM");
   }
 
   if (selectedCount) {
@@ -96,6 +102,11 @@ export default function RegionPanel({
   onLoadSelectedRegions,
   onSelectiveSearch,
   onClearSelection,
+  displaySource = REGION_BOUNDS_DISPLAY_SOURCES.DEFAULT,
+  onDisplaySourceChange,
+  osmDataAvailable = false,
+  onOpenOsmAdminLoad,
+  osmAdminLoading = false,
   collapsed: collapsedProp,
   onCollapsedChange,
   onMinimize,
@@ -177,7 +188,8 @@ export default function RegionPanel({
             selectedCount: selectedNames.length,
             bufferKm,
             overlayMode,
-            overlayCount
+            overlayCount,
+            displaySource
           })}
         </p>
       ) : (
@@ -233,6 +245,43 @@ export default function RegionPanel({
                 }
               />
             </span>
+          </div>
+
+          <h4 className="region-panel-section-title">Источник контуров</h4>
+          <fieldset className="region-panel-osm">
+            <legend className="region-panel-osm-legend">Источник контуров</legend>
+            <label className="region-panel-osm-option">
+              <input
+                type="radio"
+                name="region-bounds-source"
+                checked={displaySource === REGION_BOUNDS_DISPLAY_SOURCES.DEFAULT}
+                onChange={() => onDisplaySourceChange?.(REGION_BOUNDS_DISPLAY_SOURCES.DEFAULT)}
+              />
+              <span>Базовые контуры</span>
+            </label>
+            <label
+              className={`region-panel-osm-option${osmDataAvailable ? "" : " region-panel-osm-option--disabled"}`}
+              title={osmDataAvailable ? "Показать границы, загруженные из OSM" : "Сначала загрузите данные OSM"}
+            >
+              <input
+                type="radio"
+                name="region-bounds-source"
+                checked={displaySource === REGION_BOUNDS_DISPLAY_SOURCES.OSM}
+                disabled={!osmDataAvailable}
+                onChange={() => onDisplaySourceChange?.(REGION_BOUNDS_DISPLAY_SOURCES.OSM)}
+              />
+              <span>Загруженные из OSM</span>
+            </label>
+          </fieldset>
+          <div className="region-panel-load-actions">
+            <button
+              type="button"
+              className="heatmap-settings-reset"
+              onClick={() => onOpenOsmAdminLoad?.()}
+              title="Открыть окно загрузки границ из OpenStreetMap"
+            >
+              {osmAdminLoading ? "Загрузка OSM…" : "Загрузить из OSM…"}
+            </button>
           </div>
 
           <h4 className="region-panel-section-title">Загрузка точек</h4>

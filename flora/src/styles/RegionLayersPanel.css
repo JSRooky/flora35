@@ -1,0 +1,249 @@
+.region-layers-panel {
+  position: fixed;
+  top: calc(10px + var(--module-menu-dock-height, 44px) + 70px);
+  right: 16px;
+  z-index: 1000;
+  box-sizing: border-box;
+  width: 280px;
+  max-height: min(52vh, calc(100vh - 220px));
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.14);
+  font-family: Arial, sans-serif;
+}
+
+.region-layers-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 6px 10px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.region-layers-header-icon {
+  width: 16px;
+  height: 16px;
+  color: #4b5563;
+}
+
+.region-layers-title {
+  margin: 0;
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #4b5563;
+}
+
+.region-layers-close {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.region-layers-close:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: #111827;
+}
+
+.region-layers-tree {
+  overflow-y: auto;
+  padding: 4px 0 6px;
+}
+
+.region-layers-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 2px 8px 2px 8px;
+  cursor: pointer;
+}
+
+.region-layers-row:hover {
+  background: rgba(42, 157, 143, 0.1);
+}
+
+.region-layers-row--selected {
+  background: rgba(42, 157, 143, 0.18);
+}
+
+.region-layers-row--root {
+  cursor: default;
+  font-weight: 700;
+}
+
+.region-layers-row--hidden .region-layers-row-name {
+  color: #9ca3af;
+}
+
+.region-layers-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #1f2937;
+}
+
+.region-layers-row-count {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.region-layers-eye,
+.region-layers-add,
+.region-layers-list,
+.region-layers-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.region-layers-eye:hover,
+.region-layers-add:hover,
+.region-layers-list:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: #111827;
+}
+
+.region-layers-eye--off {
+  color: #d1d5db;
+}
+
+.region-layers-eye-icon,
+.region-layers-add-icon,
+.region-layers-list-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.region-layers-list--on {
+  background: rgba(42, 157, 143, 0.18);
+  color: #0f766e;
+}
+
+.region-layers-places {
+  margin: 0 8px 6px 0;
+  padding-right: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.region-layers-place {
+  padding: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #374151;
+  list-style: none;
+}
+
+.region-layers-place-btn {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 3px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.region-layers-place-btn:hover {
+  background: rgba(42, 157, 143, 0.12);
+}
+
+.region-layers-place-btn--selected {
+  background: rgba(42, 157, 143, 0.22);
+  font-weight: 600;
+}
+
+.region-layers-place--empty {
+  color: #9ca3af;
+}
+
+.region-layers-eye:disabled,
+.region-layers-add:disabled,
+.region-layers-list:disabled,
+.region-layers-remove:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.region-layers-remove {
+  color: #9ca3af;
+}
+
+.region-layers-remove:hover:not(:disabled) {
+  background: rgba(185, 28, 28, 0.1);
+  color: #b91c1c;
+}
+
+.region-layers-remove-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.region-layers-progress {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(42, 157, 143, 0.08);
+}
+
+.region-layers-progress-text {
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #0f766e;
+}
+
+.region-layers-spinner {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  margin-top: 2px;
+  border: 2px solid rgba(13, 148, 136, 0.25);
+  border-top-color: #0d9488;
+  border-radius: 50%;
+  animation: regionLayersSpin 0.7s linear infinite;
+}
+
+.region-layers-row .region-layers-spinner {
+  margin-top: 0;
+}
+
+@keyframes regionLayersSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,67 @@
+.compare-regnum-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.compare-regnum-filter-label {
+  font-size: 13px;
+  color: #555;
+}
+
+.compare-regnum-filter-group {
+  display: inline-flex;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.compare-regnum-filter-btn {
+  appearance: none;
+  margin: 0;
+  padding: 5px 12px;
+  border: 0;
+  background: transparent;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.compare-regnum-filter-btn + .compare-regnum-filter-btn {
+  box-shadow: inset 1px 0 0 rgba(15, 23, 42, 0.08);
+}
+
+.compare-regnum-filter-btn--on {
+  color: var(--map-tool-accent, #2f6f4e);
+  background: rgba(47, 111, 78, 0.12);
+}
+
+.compare-regnum-filter-reset {
+  appearance: none;
+  margin: 0;
+  padding: 5px 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 8px;
+  background: #fff;
+  color: #4b5563;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.compare-regnum-filter-reset:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.compare-regnum-filter-reset:disabled {
+  color: #c4c9d1;
+  cursor: default;
+}

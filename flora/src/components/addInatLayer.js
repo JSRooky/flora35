@@ -9,7 +9,8 @@ import {
   easeToCompactDensityCell,
   ensureCompactViewportSync,
   isCompactDensityFeature,
-  isCompactPointDisplayEnabled
+  isCompactPointDisplayEnabled,
+  isRegionContourPickActive
 } from "../map/compactPointDisplay";
 import {
   DEFAULT_CLUSTER_COLOR,
@@ -469,14 +470,19 @@ function attachInteractions(map) {
       return;
     }
 
-    // Не даём клику «провалиться» в map-background clear (локальный mapClick).
-    event.preventDefault?.();
-    event.originalEvent?.stopPropagation?.();
-
     if (isCompactDensityFeature(rawFeature)) {
+      if (isRegionContourPickActive(map)) {
+        return;
+      }
+      event.preventDefault?.();
+      event.originalEvent?.stopPropagation?.();
       easeToCompactDensityCell(map, rawFeature);
       return;
     }
+
+    // Не даём клику «провалиться» в map-background clear (локальный mapClick).
+    event.preventDefault?.();
+    event.originalEvent?.stopPropagation?.();
 
     const feature = resolveClickedFeature(rawFeature);
     onPointClickCallback?.(feature);

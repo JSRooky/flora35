@@ -2,6 +2,7 @@ import mapboxgl from "mapbox-gl";
 import { bbox, booleanPointInPolygon, buffer, difference, featureCollection, point, polygon, simplify, union } from "@turf/turf";
 import { applyMapCursor, getFirstLocationsLayerId } from "./addLocationsLayer";
 import { shouldSuppressLoadedPointLayers } from "../map/regionLoadSummary";
+import { isCompactDensityFeature } from "../map/compactPointDisplay";
 import {
   createDefaultRegionBoundsSettings,
   normalizeRegionBoundsSettings
@@ -10,6 +11,7 @@ import { safeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
 
 export const REGION_BOUNDS_SOURCE_ID = "region-bounds";
 export const REGION_BOUNDS_FILL_LAYER_ID = "region-bounds-fill";
+export const REGION_BOUNDS_HIT_LAYER_ID = "region-bounds-hit";
 export const REGION_BOUNDS_OUTLINE_LAYER_ID = "region-bounds-outline";
 export const REGION_BUFFER_SOURCE_ID = "region-selection-buffer";
 export const REGION_BUFFER_FILL_LAYER_ID = "region-selection-buffer-fill";
@@ -25,8 +27,10 @@ const EMPTY_COLLECTION = {
 
 const HOVER_FILL_OPACITY_BOOST = 0.23;
 const SELECTED_FILL_OPACITY_BOOST = 0.32;
+const HAS_DATA_FILL_OPACITY_BOOST = 0.1;
 const HOVER_LINE_WIDTH_BOOST = 1.1;
 const SELECTED_LINE_WIDTH_BOOST = 1.6;
+const HAS_DATA_LINE_WIDTH_BOOST = 0.55;
 
 let regionSelectListener = null;
 let cachedRegionCollection = null;
@@ -53,6 +57,8 @@ function buildFillPaint(settings = regionBoundsPaintSettings, colorsByIso = regi
       Math.min(1, fillOpacity + SELECTED_FILL_OPACITY_BOOST),
       ["boolean", ["feature-state", "hover"], false],
       hoverOpacity,
+      ["boolean", ["feature-state", "hasData"], false],
+      Math.min(1, fillOpacity + HAS_DATA_FILL_OPACITY_BOOST),
       fillOpacity
     ],
     "fill-antialias": true
@@ -69,9 +75,16 @@ function buildOutlinePaint(settings = regionBoundsPaintSettings, colorsByIso = r
       lineWidth + SELECTED_LINE_WIDTH_BOOST,
       ["boolean", ["feature-state", "hover"], false],
       lineWidth + HOVER_LINE_WIDTH_BOOST,
+      ["boolean", ["feature-state", "hasData"], false],
+      lineWidth + HAS_DATA_LINE_WIDTH_BOOST,
       lineWidth
     ],
-    "line-opacity": 0.9
+    "line-opacity": [
+      "case",
+      ["boolean", ["feature-state", "hasData"], false],
+      1,
+      0.9
+    ]
   };
 }
 
@@ -539,7 +552,7 @@ export function applyRegionBoundsIsoFilter(map, visibleIsos) {
         ? ["==", ["get", "iso"], "__none__"]
         : ["match", ["get", "iso"], visibleIsos, true, false];
 
-  [REGION_BOUNDS_FILL_LAYER_ID, REGION_BOUNDS_OUTLINE_LAYER_ID].forEach((layerId) => {
+  [REGION_BOUNDS_FILL_LAYER_ID, REGION_BOUNDS_HIT_LAYER_ID, REGION_BOUNDS_OUTLINE_LAYER_ID].forEach((layerId) => {
     if (map.getLayer(layerId)) {
       map.setFilter(layerId, filter);
     }
@@ -582,6 +595,48 @@ export function setRegionBoundsSelectedIsos(map, isos = []) {
 
 export function setRegionBoundsSelectedIso(map, iso) {
   setRegionBoundsSelectedIsos(map, iso == null ? [] : [iso]);
+}
+
+/** Подсвечивает субъекты, для которых уже загружены точки. */
+export function setRegionBoundsLoadedIsos(map, isos = []) {
+  if (!map?.getSource || !map.getSource(REGION_BOUNDS_SOURCE_ID)) {
+    return;
+  }
+
+  const nextIds = [...new Set((isos ?? []).filter(Boolean).map(String))];
+  const state = mapsWithRegionHover.get(map) ?? {
+    hoveredId: null,
+    selectedId: null,
+    selectedIds: [],
+    loadedIds: [],
+    attached: false
+  };
+  mapsWithRegionHover.set(map, state);
+
+  const previousIds = Array.isArray(state.loadedIds) ? state.loadedIds : [];
+
+  previousIds.forEach((id) => {
+    if (!nextIds.includes(id)) {
+      map.setFeatureState({ source: REGION_BOUNDS_SOURCE_ID, id }, { hasData: false });
+    }
+  });
+
+  nextIds.forEach((id) => {
+    map.setFeatureState({ source: REGION_BOUNDS_SOURCE_ID, id }, { hasData: true });
+  });
+
+  state.loadedIds = nextIds;
+}
+
+export function getFeaturePopupLngLat(feature) {
+  if (!feature?.geometry) {
+    return null;
+  }
+  const bounds = bbox(feature);
+  return {
+    lng: (bounds[0] + bounds[2]) / 2,
+    lat: (bounds[1] + bounds[3]) / 2
+  };
 }
 
 export function flyToRegionBoundsFeature(map, feature, { padding = 48, maxZoom = 6, duration = 800 } = {}) {
@@ -658,10 +713,20 @@ export function getRegionFeatureAtClick(map, event) {
     const layerId = hit.layer?.id;
     return (
       layerId === REGION_BOUNDS_FILL_LAYER_ID ||
-      layerId === "temp-layer-overlays-fill"
+      layerId === REGION_BOUNDS_HIT_LAYER_ID ||
+      layerId === REGION_BOUNDS_OUTLINE_LAYER_ID ||
+      layerId === "temp-layer-overlays-fill" ||
+      layerId === "temp-layer-overlays-archive-hatch"
     );
   });
-  const fromFill = regionEntryFromFeature(hits[0]);
+  const overlayHits = hits.filter(
+    (hit) =>
+      hit.layer?.id === "temp-layer-overlays-fill" ||
+      hit.layer?.id === "temp-layer-overlays-archive-hatch"
+  );
+  const preferredOverlay =
+    overlayHits.find((hit) => hit.properties?.overlayRole === "districts") || overlayHits[0];
+  const fromFill = regionEntryFromFeature(preferredOverlay || hits[0]);
   if (fromFill) {
     return fromFill;
   }
@@ -680,7 +745,7 @@ function setRegionBufferVisibility(map, visible) {
 
 function setRegionBoundsVisibility(map, visible) {
   const visibility = visible ? "visible" : "none";
-  [REGION_BOUNDS_FILL_LAYER_ID, REGION_BOUNDS_OUTLINE_LAYER_ID].forEach((layerId) => {
+  [REGION_BOUNDS_FILL_LAYER_ID, REGION_BOUNDS_HIT_LAYER_ID, REGION_BOUNDS_OUTLINE_LAYER_ID].forEach((layerId) => {
     if (map.getLayer(layerId)) {
       map.setLayoutProperty(layerId, "visibility", visibility);
     }
@@ -691,10 +756,23 @@ function setRegionBoundsVisibility(map, visible) {
   }
 }
 
+const appliedRegionBoundsData = new WeakMap();
+
 function applyRegionBoundsData(map, data) {
   const source = map.getSource(REGION_BOUNDS_SOURCE_ID);
-  if (source && typeof source.setData === "function" && data) {
-    source.setData(data);
+  if (!source || typeof source.setData !== "function" || !data) {
+    return;
+  }
+  if (appliedRegionBoundsData.get(map) === data) {
+    return;
+  }
+  source.setData(data);
+  appliedRegionBoundsData.set(map, data);
+  const loadedIds = mapsWithRegionHover.get(map)?.loadedIds;
+  if (Array.isArray(loadedIds) && loadedIds.length > 0) {
+    loadedIds.forEach((id) => {
+      map.setFeatureState({ source: REGION_BOUNDS_SOURCE_ID, id }, { hasData: true });
+    });
   }
 }
 
@@ -728,14 +806,18 @@ function getRegionFeatureId(feature) {
 
 function getRegionFeatureTitle(feature) {
   const properties = feature?.properties ?? {};
-  return properties.name || properties.name_en || properties.iso || "Регион";
+  return properties.title || properties.name || properties.name_en || properties.iso || "Регион";
 }
 
-function hideRegionHoverPopup() {
+export function hideRegionHoverPopup() {
   if (regionHoverPopup) {
     regionHoverPopup.remove();
     regionHoverPopup = null;
   }
+}
+
+export function isRegionActionPopupOpen() {
+  return Boolean(regionActionPopup);
 }
 
 export function hideRegionActionPopup() {
@@ -883,7 +965,7 @@ export function showRegionActionPopup(
   }
 }
 
-function showRegionHoverPopup(map, lngLat, title) {
+export function showRegionHoverPopup(map, lngLat, title) {
   if (!regionHoverPopup) {
     regionHoverPopup = new mapboxgl.Popup({
       closeButton: false,
@@ -948,7 +1030,7 @@ function hasPointLayerUnderCursor(map, point) {
     if (hit.layer?.layout?.visibility === "none") {
       return false;
     }
-    if (isTransparentCircleHit(hit)) {
+    if (isTransparentCircleHit(hit) || isCompactDensityFeature(hit)) {
       return false;
     }
     return true;
@@ -980,6 +1062,17 @@ function setRegionHover(map, feature, lngLat, point) {
   showRegionHoverPopup(map, lngLat, getRegionFeatureTitle(feature));
 }
 
+function selectRegionAtEvent(map, event) {
+  const feature = event.features?.[0];
+  const entry = regionEntryFromFeature(feature) || getRegionFeatureAtClick(map, event);
+  if (!entry) {
+    return false;
+  }
+  event.preventDefault?.();
+  regionSelectListener?.(entry, event.lngLat);
+  return true;
+}
+
 function attachRegionHoverHandlers(map) {
   const state = mapsWithRegionHover.get(map) ?? { hoveredId: null, selectedId: null, attached: false };
   mapsWithRegionHover.set(map, state);
@@ -988,31 +1081,33 @@ function attachRegionHoverHandlers(map) {
   }
   state.attached = true;
 
-  map.on("mousemove", REGION_BOUNDS_FILL_LAYER_ID, (event) => {
-    const feature = event.features?.[0];
-    if (!feature) {
-      return;
-    }
-    applyMapCursor(map, "pointer");
-    setRegionHover(map, feature, event.lngLat, event.point);
-  });
+  const interactiveLayerIds = [
+    REGION_BOUNDS_HIT_LAYER_ID,
+    REGION_BOUNDS_FILL_LAYER_ID,
+    REGION_BOUNDS_OUTLINE_LAYER_ID
+  ];
 
-  map.on("mouseleave", REGION_BOUNDS_FILL_LAYER_ID, () => {
-    applyMapCursor(map, "");
-    clearRegionHover(map);
-  });
+  interactiveLayerIds.forEach((layerId) => {
+    map.on("mousemove", layerId, (event) => {
+      const feature = event.features?.[0];
+      if (!feature) {
+        return;
+      }
+      applyMapCursor(map, "pointer");
+      setRegionHover(map, feature, event.lngLat, event.point);
+    });
 
-  map.on("click", REGION_BOUNDS_FILL_LAYER_ID, (event) => {
-    if (hasPointLayerUnderCursor(map, event.point)) {
-      return;
-    }
-    const feature = event.features?.[0];
-    const entry = regionEntryFromFeature(feature);
-    if (!entry) {
-      return;
-    }
-    event.preventDefault?.();
-    regionSelectListener?.(entry, event.lngLat);
+    map.on("mouseleave", layerId, () => {
+      applyMapCursor(map, "");
+      clearRegionHover(map);
+    });
+
+    map.on("click", layerId, (event) => {
+      if (hasPointLayerUnderCursor(map, event.point)) {
+        return;
+      }
+      selectRegionAtEvent(map, event);
+    });
   });
 }
 
@@ -1259,6 +1354,25 @@ export function addRegionBoundsLayer(map, { loadData = false } = {}) {
           visibility: "none"
         },
         paint: buildFillPaint()
+      },
+      beforeId
+    );
+  }
+
+  if (!map.getLayer(REGION_BOUNDS_HIT_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: REGION_BOUNDS_HIT_LAYER_ID,
+        type: "fill",
+        source: REGION_BOUNDS_SOURCE_ID,
+        layout: {
+          visibility: "none"
+        },
+        paint: {
+          "fill-color": "#000000",
+          "fill-opacity": 0.01,
+          "fill-antialias": false
+        }
       },
       beforeId
     );

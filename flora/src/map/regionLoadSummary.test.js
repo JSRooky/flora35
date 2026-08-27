@@ -1,8 +1,10 @@
 import {
   buildExternalIdToCatalogEntry,
+  buildRegionLoadSummaries,
   buildTempLayerRegionSummaries,
   formatCompactPointCount,
   isRegionPlaqueCompact,
+  listLoadedRegionCatalogIsos,
   regionLabelCoordinates,
   regionPlaqueColorVars,
   setRegionLoadSummaryActive,
@@ -10,6 +12,12 @@ import {
   shouldSuppressLoadedPointLayers
 } from "./regionLoadSummary";
 import { resolveTempSourceMarkerColor, TEMP_SOURCE_IDS } from "../tempLayers/tempLayerStore";
+import { clearGbifStore, setGbifFeatureCollection } from "../gbif/gbifStore";
+import {
+  markExternalWorkingSetLoaded,
+  markExternalWorkingSetUnloaded,
+  resetLoadedRegionIndicationForTests
+} from "./loadedRegionIndication";
 
 function squareFeature(west, south, east, north) {
   return {
@@ -31,6 +39,13 @@ function squareFeature(west, south, east, north) {
 }
 
 describe("regionLoadSummary", () => {
+  afterEach(() => {
+    clearGbifStore();
+    resetLoadedRegionIndicationForTests();
+    setRegionLoadSummaryActive(false);
+    setRegionLoadSummaryMode("external");
+  });
+
   test("places the label at the polygon centroid", () => {
     const [lng, lat] = regionLabelCoordinates(squareFeature(30, 50, 40, 60));
     expect(lng).toBeCloseTo(35, 5);
@@ -117,6 +132,10 @@ describe("regionLoadSummary", () => {
     expect(map.get("vologda")?.iso).toBe("RU-VLG");
   });
 
+  test("returns no catalog isos when there is no loaded data", () => {
+    expect(listLoadedRegionCatalogIsos([])).toEqual([]);
+  });
+
   test("builds a temp-layer plaque per loaded region", () => {
     const catalog = [
       {
@@ -155,6 +174,35 @@ describe("regionLoadSummary", () => {
     expect(summaries[0].markerColor).toBe("#c45c26");
   });
 
+  test("hides region info plaques when the temp layer is visible", () => {
+    const catalog = [
+      {
+        iso: "RU-VLG",
+        name: "Вологодская область",
+        nameEn: "Vologda",
+        feature: squareFeature(35, 58, 45, 62)
+      }
+    ];
+    const plaques = [
+      {
+        key: "pinus",
+        taxonName: "Pinus sylvestris",
+        layers: [
+          {
+            id: "layer-1",
+            source: "gbif",
+            regionIds: ["vologda"],
+            visible: true,
+            features: [{ properties: { region_id: "vologda" } }]
+          }
+        ]
+      }
+    ];
+    expect(buildTempLayerRegionSummaries({ catalog, plaques })).toEqual([]);
+    plaques[0].layers[0].visible = false;
+    expect(buildTempLayerRegionSummaries({ catalog, plaques })).toHaveLength(1);
+  });
+
   test("uses the temp-layer marker color for GBIF and iNat tints", () => {
     const vars = regionPlaqueColorVars({ markerColor: "#c45c26" });
     expect(vars["--temp-layer-color"]).toBe("#c45c26");
@@ -173,5 +221,71 @@ describe("regionLoadSummary", () => {
     setRegionLoadSummaryMode("external");
     setRegionLoadSummaryActive(false);
     expect(shouldSuppressLoadedPointLayers()).toBe(false);
+  });
+
+  test("keeps temp-layer plaques when geometries are unloaded", () => {
+    const catalog = [
+      {
+        iso: "RU-VLG",
+        name: "Вологодская область",
+        nameEn: "Vologda",
+        feature: squareFeature(35, 58, 45, 62)
+      }
+    ];
+    const summaries = buildTempLayerRegionSummaries({
+      catalog,
+      plaques: [
+        {
+          key: "pinus",
+          taxonName: "Pinus sylvestris",
+          layers: [
+            {
+              id: "layer-1",
+              source: "gbif",
+              regionIds: ["vologda"],
+              visible: false,
+              unloaded: true,
+              pointCount: 12,
+              features: []
+            }
+          ]
+        }
+      ]
+    });
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0].pointCount).toBe(12);
+  });
+
+  test("keeps external plaques after the working set leaves RAM", () => {
+    const catalog = [
+      {
+        iso: "RU-VLG",
+        name: "Вологодская область",
+        nameEn: "Vologda",
+        feature: squareFeature(35, 58, 45, 62)
+      }
+    ];
+    setGbifFeatureCollection(
+      {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [40, 59] },
+            properties: { gbif_key: 1, region_id: "vologda" }
+          }
+        ]
+      },
+      "vologda"
+    );
+    markExternalWorkingSetLoaded();
+    markExternalWorkingSetUnloaded();
+    clearGbifStore();
+
+    expect(listLoadedRegionCatalogIsos(catalog)).toEqual(["RU-VLG"]);
+    const summaries = buildRegionLoadSummaries({ catalog });
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0].pointCount).toBe(1);
+    expect(summaries[0].sources.gbif).toBe(true);
   });
 });

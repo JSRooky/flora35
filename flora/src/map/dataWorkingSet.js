@@ -10,6 +10,10 @@ import { hydrateInatStoreFromPersistence } from "../inaturalist/inatPersistence"
 import { clearGbifLayer, setGbifData } from "../components/addGbifLayer";
 import { clearInatLayer, setInatData } from "../components/addInatLayer";
 import { setRegionLoadSummaryActive, setRegionLoadSummaryMode, shouldSuppressLoadedPointLayers } from "./regionLoadSummary";
+import {
+  markExternalWorkingSetLoaded,
+  markExternalWorkingSetUnloaded
+} from "./loadedRegionIndication";
 import { clearRegionLoadSummary, refreshRegionLoadSummary } from "../components/addRegionLoadSummaryLayer";
 import { getCompactGridPointLimit } from "./compactGridSettings";
 import {
@@ -41,6 +45,7 @@ export function isTempDataSourceMode(mode) {
 }
 
 async function unloadExternalWorkingSet(map) {
+  markExternalWorkingSetUnloaded();
   clearRegionLoadSummary();
   if (getGbifFeatureCount() === 0 && getInatFeatureCount() === 0) {
     if (map) {
@@ -82,6 +87,8 @@ async function loadExternalWorkingSet(map) {
   if (getInatFeatureCount() === 0) {
     await hydrateInatStoreFromPersistence();
   }
+
+  markExternalWorkingSetLoaded();
 
   const compact = forceCompactModeIfOverLimit();
 

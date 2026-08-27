@@ -1,7 +1,8 @@
 /** Общая очередь запросов к api.gbif.org: лимит параллелизма и пауза после 429/503. */
 
-const MAX_CONCURRENT = 3;
-const MIN_INTERVAL_MS = 150;
+/** GBIF анонимно режет параллельные occurrence/search (429). Одна очередь на всё приложение. */
+const MAX_CONCURRENT = 1;
+const MIN_INTERVAL_MS = 400;
 const FETCH_TIMEOUT_MS = 20000;
 
 let active = 0;
@@ -50,8 +51,8 @@ export function parseGbifRetryAfterMs(response) {
   return null;
 }
 
-export function notifyGbifRateLimit(retryAfterMs = 2000) {
-  const wait = Math.max(500, Number(retryAfterMs) || 2000);
+export function notifyGbifRateLimit(retryAfterMs = 5000) {
+  const wait = Math.max(2000, Number(retryAfterMs) || 5000);
   pauseUntil = Math.max(pauseUntil, Date.now() + wait);
 }
 
@@ -104,10 +105,14 @@ async function acquire(signal) {
   });
 
   try {
-    const now = Date.now();
-    const until = Math.max(pauseUntil, lastStartedAt + MIN_INTERVAL_MS);
-    const delay = until - now;
-    if (delay > 0) {
+    // Пересчитываем паузу после sleep: иначе несколько waiter'ов стартуют в один тик.
+    while (true) {
+      const now = Date.now();
+      const until = Math.max(pauseUntil, lastStartedAt + MIN_INTERVAL_MS);
+      const delay = until - now;
+      if (delay <= 0) {
+        break;
+      }
       await waitMs(delay, signal);
     }
     lastStartedAt = Date.now();
@@ -152,7 +157,7 @@ export async function gbifFetch(url, { signal, ...init } = {}) {
       credentials: "omit"
     });
     if (response.status === 429 || response.status === 503) {
-      notifyGbifRateLimit(parseGbifRetryAfterMs(response) ?? 2500);
+      notifyGbifRateLimit(parseGbifRetryAfterMs(response) ?? 5000);
     }
     return response;
   } catch (error) {

@@ -309,7 +309,8 @@ export default function ModuleMenu({
   comparePanelOpen = false,
   onComparePanelToggle,
   accountUser = null,
-  onAccountClick
+  onSaveUserSettings,
+  onLoadUserSettings
 }) {
   const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => {
     const pointRequired = isPointRequiredModule(id) && !pointSelected;
@@ -452,7 +453,11 @@ export default function ModuleMenu({
           </li>
           <li className="module-menu-separator" aria-hidden="true" />
           <li className="module-menu-account-item">
-            <UserAccountControl user={accountUser} onAccountClick={onAccountClick} />
+            <UserAccountControl
+              user={accountUser}
+              onSaveUserSettings={onSaveUserSettings}
+              onLoadUserSettings={onLoadUserSettings}
+            />
           </li>
         </ul>
       </div>

@@ -4,16 +4,13 @@ import PanelMinimizeButton from "./PanelMinimizeButton";
 import {
   COMPARE_SET_MIN,
   DIVERSITY_GROUP_MODES,
-  DIVERSITY_REGNUM_NONE,
   countSpeciesByLayers,
   downloadDiversityCsv,
-  listDiversityRegnumKeys,
   listSharedSpeciesRows,
   plaquesToCompareLayerInputs,
   summarizeDiversity
 } from "../dataWork/compare/countSpeciesByLayers";
-import { getRegnumLabel } from "./featurePropertyLabels";
-import { getPointColorForRegnum } from "./pointColors";
+import CompareRegnumFilter, { useCompareRegnumFilter } from "./CompareRegnumFilter";
 import { listTempLayerPlaques, subscribeTempLayers } from "../tempLayers/tempLayerStore";
 import "../styles/CompareDiversityPopup.css";
 
@@ -62,7 +59,6 @@ export default function CompareDiversityPopup({
   const [includeInat, setIncludeInat] = useState(true);
   const [matchesOnly, setMatchesOnly] = useState(false);
   const [groupMode, setGroupMode] = useState(DIVERSITY_GROUP_MODES.SPECIES);
-  const [regnumOff, setRegnumOff] = useState({});
 
   const keysSignature = plaqueKeys.join("\u0001");
 
@@ -78,15 +74,16 @@ export default function CompareDiversityPopup({
   }, [open, keysSignature]);
 
   const bothSources = includeGbif && includeInat;
-  const presentRegnums = useMemo(() => listDiversityRegnumKeys(plaques), [plaques]);
-  const allRegnumsOn =
-    presentRegnums.length > 0 && presentRegnums.every((key) => regnumOff[key] !== true);
-  const allowedRegnums = useMemo(() => {
-    if (presentRegnums.length === 0 || allRegnumsOn) {
-      return null;
-    }
-    return new Set(presentRegnums.filter((key) => regnumOff[key] !== true));
-  }, [allRegnumsOn, presentRegnums, regnumOff]);
+  const {
+    presentRegnums,
+    allRegnumsOn,
+    noneRegnumsOn,
+    allowedRegnums,
+    handleSelectAllRegnums,
+    handleResetRegnums,
+    handleToggleRegnum,
+    isRegnumOn
+  } = useCompareRegnumFilter(plaques);
 
   const comparison = useMemo(() => {
     return countSpeciesByLayers(
@@ -112,17 +109,6 @@ export default function CompareDiversityPopup({
     setIncludeGbif(next);
     setIncludeInat(next);
   }, [bothSources]);
-
-  const handleToggleAllRegnums = useCallback(() => {
-    const nextOff = !allRegnumsOn;
-    setRegnumOff(
-      Object.fromEntries(presentRegnums.map((key) => [key, nextOff]))
-    );
-  }, [allRegnumsOn, presentRegnums]);
-
-  const handleToggleRegnum = useCallback((key) => {
-    setRegnumOff((current) => ({ ...current, [key]: current[key] !== true }));
-  }, []);
 
   const handleExport = useCallback(() => {
     if (!canExport) {
@@ -203,41 +189,15 @@ export default function CompareDiversityPopup({
                 </button>
               </div>
               {presentRegnums.length > 0 ? (
-                <>
-                  <span className="compare-diversity-sources-label">Царства</span>
-                  <div className="compare-diversity-source-group" role="group" aria-label="Царства">
-                    <button
-                      type="button"
-                      className={`compare-diversity-source${
-                        allRegnumsOn ? " compare-diversity-source--on" : ""
-                      }`}
-                      aria-pressed={allRegnumsOn}
-                      onClick={handleToggleAllRegnums}
-                    >
-                      Все
-                    </button>
-                    {presentRegnums.map((key) => {
-                      const isOn = regnumOff[key] !== true;
-                      const color = getPointColorForRegnum(
-                        key === DIVERSITY_REGNUM_NONE ? null : key
-                      );
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          className={`compare-diversity-source compare-diversity-source--regnum${
-                            isOn ? " compare-diversity-source--on" : ""
-                          }`}
-                          style={isOn ? { color, background: `${color}22` } : undefined}
-                          aria-pressed={isOn}
-                          onClick={() => handleToggleRegnum(key)}
-                        >
-                          {getRegnumLabel(key === DIVERSITY_REGNUM_NONE ? null : key)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
+                <CompareRegnumFilter
+                  presentRegnums={presentRegnums}
+                  isRegnumOn={isRegnumOn}
+                  allRegnumsOn={allRegnumsOn}
+                  noneRegnumsOn={noneRegnumsOn}
+                  onSelectAll={handleSelectAllRegnums}
+                  onReset={handleResetRegnums}
+                  onToggleRegnum={handleToggleRegnum}
+                />
               ) : null}
               <button
                 type="button"

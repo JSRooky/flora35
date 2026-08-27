@@ -9,9 +9,15 @@ import {
   easeToCompactDensityCell,
   ensureCompactViewportSync,
   isCompactDensityFeature,
-  isCompactPointDisplayEnabled
+  isCompactPointDisplayEnabled,
+  isRegionContourPickActive
 } from "../map/compactPointDisplay";
 import { shouldUseCompactDensityGrid } from "../map/compactGridSettings";
+import {
+  compactPropertiesMatchFilters,
+  getCompactLocationFilters,
+  locationFiltersNeedProperties
+} from "../map/compactFilterState";
 import {
   forEachVisibleTempLayerPoint,
   getTempLayerFeatureGroups,
@@ -97,6 +103,14 @@ let locationFeatureFilter = (features) => features;
 
 export function setTempLayersLocationFeatureFilter(filterFn) {
   locationFeatureFilter = typeof filterFn === "function" ? filterFn : (features) => features;
+}
+
+function tempPointMatchesCompactFilters(lng, lat, feature) {
+  const locationFilters = getCompactLocationFilters();
+  if (!locationFiltersNeedProperties(locationFilters)) {
+    return true;
+  }
+  return compactPropertiesMatchFilters(feature?.properties, lng, lat, locationFilters);
 }
 
 function getTempDensePileMembers(feature) {
@@ -470,12 +484,17 @@ function attachInteractions(map) {
     if (!feature) {
       return;
     }
-    event.preventDefault?.();
-    event.originalEvent?.stopPropagation?.();
     if (isCompactDensityFeature(feature)) {
+      if (isRegionContourPickActive(map)) {
+        return;
+      }
+      event.preventDefault?.();
+      event.originalEvent?.stopPropagation?.();
       easeToCompactDensityCell(map, feature);
       return;
     }
+    event.preventDefault?.();
+    event.originalEvent?.stopPropagation?.();
     onPointClickCallback?.(feature);
   };
 
@@ -624,15 +643,16 @@ export function setTempLayersData(map) {
   const denseClusterFeatures = [];
 
   if (isCompactPointDisplayEnabled() && shouldUseCompactDensityGrid() && !isSplitByLayer()) {
-    // Плотностной сетке не нужны ни свойства точек, ни разбиение по слоям —
-    // считаем прямо по координатам, не клонируя сотни тысяч GeoJSON-фич
-    // временных слоёв на каждый pan/zoom (иначе это делал getVisibleTempLayerFeatures
-    // через buildUnits(), и именно это было основной причиной подвисаний/OOM
-    // при большом количестве точек).
     const built = buildCompactViewportFeatures({
       map,
       source: "temp",
-      forEachPoint: (visit) => forEachVisibleTempLayerPoint((lng, lat) => visit(lng, lat))
+      forEachPoint: (visit) =>
+        forEachVisibleTempLayerPoint((lng, lat, feature) => {
+          if (!tempPointMatchesCompactFilters(lng, lat, feature)) {
+            return;
+          }
+          visit(lng, lat);
+        })
     });
     addUnitToMap(map, { id: "all", markerColor: null, features: built.features });
   } else {

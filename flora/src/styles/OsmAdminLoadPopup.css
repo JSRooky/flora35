@@ -1,0 +1,129 @@
+.osm-admin-load-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-width: min(440px, calc(100vw - 32px));
+}
+
+.osm-admin-load-modes {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.osm-admin-load-legend {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.osm-admin-load-option,
+.osm-admin-load-download {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.osm-admin-load-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.osm-admin-load-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.osm-admin-load-search-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.osm-admin-load-search-label input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: #111827;
+}
+
+.osm-admin-load-picked {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(42, 157, 143, 0.12);
+  font-size: 13px;
+  color: #1f2937;
+}
+
+.osm-admin-load-picked-clear {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.osm-admin-load-picked-clear:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: #111827;
+}
+
+.osm-admin-load-results {
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.osm-admin-load-result {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.osm-admin-load-result:hover {
+  background: rgba(42, 157, 143, 0.12);
+}
+
+.osm-admin-load-result-name {
+  display: block;
+  font-size: 13px;
+  color: #111827;
+}
+
+.osm-admin-load-result-meta {
+  display: block;
+  font-size: 11px;
+  color: #6b7280;
+}

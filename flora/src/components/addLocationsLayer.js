@@ -32,6 +32,7 @@ import {
   easeToCompactDensityCell,
   ensureCompactViewportSync,
   isCompactDensityFeature,
+  isRegionContourPickActive,
   isCompactPointDisplayEnabled,
   requestCompactViewportSync
 } from "../map/compactPointDisplay";
@@ -1394,6 +1395,9 @@ function attachLocationsInteractions(map) {
       return;
     }
     if (isCompactDensityFeature(feature)) {
+      if (isRegionContourPickActive(map)) {
+        return;
+      }
       easeToCompactDensityCell(map, feature);
       return;
     }
@@ -1488,7 +1492,8 @@ function attachLocationsInteractions(map) {
         layers: hitLayerIds
       });
 
-      if (features.length > 0) {
+      const blockingHits = features.filter((feature) => !isCompactDensityFeature(feature));
+      if (blockingHits.length > 0) {
         return;
       }
     }
@@ -3055,6 +3060,7 @@ function applyTempLayersLocationsFilter(map, filters = currentFilters) {
     return;
   }
 
+  setCompactLocationFilters(filters);
   setTempLayersLocationFeatureFilter((features) => filterFeatures(features, filters));
 
   if (isCompactPointDisplayEnabled()) {

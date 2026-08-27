@@ -10,12 +10,12 @@ const GBIF_OCCURRENCE_SEARCH_URL = "https://api.gbif.org/v1/occurrence/search";
 export const GBIF_PAGE_SIZE = 300;
 /** Сколько страниц копить перед обновлением слоя карты (~24k точек при page=300). */
 export const GBIF_MAP_UPDATE_PAGES = 80;
-/** Одновременных page-запросов внутри одной серии (осторожный параллелизм). */
-export const GBIF_PAGE_CONCURRENCY = 3;
+/** Страницы серии строго по очереди: параллельные offset=0/300/600 дают пачку 429. */
+export const GBIF_PAGE_CONCURRENCY = 1;
 const FETCH_RETRY_COUNT = 2;
 const FETCH_RATE_LIMIT_RETRY_COUNT = 5;
 const FETCH_RETRY_DELAY_MS = 700;
-const FETCH_RETRY_429_DELAY_MS = 2000;
+const FETCH_RETRY_429_DELAY_MS = 4000;
 const PAGE_SURVIVE_ROUNDS = 3;
 const PAGE_SURVIVE_DELAY_MS = 5000;
 
@@ -290,7 +290,7 @@ function throwIfAborted(signal) {
  * softLimit — мягкая отсечка по offset (для серийной загрузки): дальше пагинация GBIF
  * сильно замедляется, серию лучше дробить (годы → месяцы).
  *
- * Страницы запрашиваются пулом (по умолчанию 2); в store/UI отдаются строго по возрастанию offset.
+ * Страницы по умолчанию по одной; в store/UI отдаются строго по возрастанию offset.
  * При 429/503 concurrency временно падает до 1; страница повторяется с паузой, без abort всей загрузки.
  */
 export async function loadOccurrencesForRegion(

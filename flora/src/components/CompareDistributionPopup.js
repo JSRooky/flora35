@@ -6,6 +6,7 @@ import {
   COMPARE_SET_MIN,
   plaquesToCompareLayerInputs
 } from "../dataWork/compare/countSpeciesByLayers";
+import CompareRegnumFilter, { useCompareRegnumFilter } from "./CompareRegnumFilter";
 import {
   DISTRIBUTION_TAXON_MODES,
   buildCoordinateDistributions,
@@ -373,7 +374,21 @@ export default function CompareDistributionPopup({
     });
   }, [open, keysSignature]);
 
-  const layerInputs = useMemo(() => plaquesToCompareLayerInputs(plaques), [plaques]);
+  const {
+    presentRegnums,
+    allRegnumsOn,
+    noneRegnumsOn,
+    allowedRegnums,
+    handleSelectAllRegnums,
+    handleResetRegnums,
+    handleToggleRegnum,
+    isRegnumOn
+  } = useCompareRegnumFilter(plaques);
+
+  const layerInputs = useMemo(
+    () => plaquesToCompareLayerInputs(plaques, { allowedRegnums }),
+    [plaques, allowedRegnums]
+  );
   const taxa = useMemo(
     () => listDistributionTaxa(layerInputs, taxonMode),
     [layerInputs, taxonMode]
@@ -474,6 +489,15 @@ export default function CompareDistributionPopup({
             </PanelHint>
 
             <div className="compare-distribution-toolbar">
+              <CompareRegnumFilter
+                presentRegnums={presentRegnums}
+                isRegnumOn={isRegnumOn}
+                allRegnumsOn={allRegnumsOn}
+                noneRegnumsOn={noneRegnumsOn}
+                onSelectAll={handleSelectAllRegnums}
+                onReset={handleResetRegnums}
+                onToggleRegnum={handleToggleRegnum}
+              />
               <div className="compare-distribution-modes" role="group" aria-label="Группа точек">
                 {[
                   { id: DISTRIBUTION_TAXON_MODES.ALL, label: "Все точки" },

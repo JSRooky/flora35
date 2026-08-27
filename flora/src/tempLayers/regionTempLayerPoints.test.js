@@ -1,4 +1,5 @@
 import {
+  collectArchivedRegionOverlayFeatures,
   getTempLayers,
   getVisibleTempLayerFeatures,
   replaceTempLayers,
@@ -62,5 +63,56 @@ describe("saveFeaturesIntoRegionOverlayTempLayer", () => {
     expect(points).toHaveLength(1);
     expect(points[0].features).toHaveLength(2);
     expect(getVisibleTempLayerFeatures()).toHaveLength(2);
+  });
+
+  it("collects archived region polygons only when the layer still has points", () => {
+    const polygon = {
+      type: "Feature",
+      properties: { iso: "RU-VLG" },
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [0, 0],
+            [1, 0],
+            [1, 1],
+            [0, 1],
+            [0, 0]
+          ]
+        ]
+      }
+    };
+    const withData = collectArchivedRegionOverlayFeatures([
+      {
+        archiveId: "a1",
+        markerColor: "#c45c26",
+        layers: [
+          {
+            kind: "points",
+            source: "gbif",
+            features: [gbifPoint(1, "Betula pendula")],
+            overlays: [{ kind: "regions", features: [polygon] }]
+          }
+        ]
+      }
+    ]);
+    expect(withData).toHaveLength(1);
+    expect(withData[0].properties.overlayRole).toBe("archived-region");
+    expect(withData[0].properties.color).toBe("#c45c26");
+
+    const empty = collectArchivedRegionOverlayFeatures([
+      {
+        archiveId: "a2",
+        layers: [
+          {
+            kind: "regions",
+            source: "regions",
+            features: [],
+            overlays: [{ kind: "regions", features: [polygon] }]
+          }
+        ]
+      }
+    ]);
+    expect(empty).toEqual([]);
   });
 });

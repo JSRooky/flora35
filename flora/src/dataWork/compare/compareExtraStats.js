@@ -1,6 +1,8 @@
 import { getFoundMonth } from "../../geo/foundDate";
 import { getFeatureLonLat } from "../buildSeasonalityStats";
 import { normalizeLatinName } from "../normalizeLatinName";
+import { getRegnumLabel, REGNUM_ORDER } from "../../components/featurePropertyLabels";
+import { resolveFeatureRegnum } from "../../gbif/taxonFilters";
 import { getRedBookList } from "../../redbook/redBookStore";
 import { normalizeTempSource, TEMP_SOURCE_IDS } from "../../tempLayers/tempLayerStore";
 
@@ -31,6 +33,18 @@ function formatNum(value, digits = 3) {
     return String(value);
   }
   return String(Number(value.toFixed(digits)));
+}
+
+function formatCountShare(count, total) {
+  const n = Number(count) || 0;
+  const all = Number(total) || 0;
+  if (all <= 0) {
+    return `${n} (—)`;
+  }
+  const pct = (100 * n) / all;
+  const text =
+    Math.abs(pct - Math.round(pct)) < 0.05 ? String(Math.round(pct)) : pct.toFixed(1);
+  return `${n} (${text}%)`;
 }
 
 function speciesKey(feature) {
@@ -103,6 +117,159 @@ function sharedAll(sets) {
   return [...first]
     .filter((key) => rest.every((set) => set.has(key)))
     .sort((a, b) => a.localeCompare(b, "en"));
+}
+
+function bumpCount(map, key) {
+  map.set(key, (map.get(key) || 0) + 1);
+}
+
+function voteWinner(countMap, order = []) {
+  let bestKey = null;
+  let bestCount = -1;
+  countMap.forEach((count, key) => {
+    if (count > bestCount) {
+      bestKey = key;
+      bestCount = count;
+      return;
+    }
+    if (count !== bestCount || bestKey == null) {
+      return;
+    }
+    const leftRank = order.indexOf(key);
+    const rightRank = order.indexOf(bestKey);
+    const leftOrder = leftRank === -1 ? order.length + 1 : leftRank;
+    const rightOrder = rightRank === -1 ? order.length + 1 : rightRank;
+    if (leftOrder !== rightOrder) {
+      if (leftOrder < rightOrder) {
+        bestKey = key;
+      }
+      return;
+    }
+    if (String(key).localeCompare(String(bestKey), "en") < 0) {
+      bestKey = key;
+    }
+  });
+  return bestKey;
+}
+
+function collectSpeciesMeta(layers) {
+  const meta = new Map();
+  (layers ?? []).forEach((layer) => {
+    (layer.features ?? []).forEach((feature) => {
+      const key = speciesKey(feature);
+      if (!key) {
+        return;
+      }
+      let entry = meta.get(key);
+      if (!entry) {
+        entry = {
+          names: new Map(),
+          regnums: new Map(),
+          families: new Map(),
+          familyLabels: new Map()
+        };
+        meta.set(key, entry);
+      }
+      const rawName = String(feature?.properties?.name_latin ?? "").trim();
+      if (rawName) {
+        bumpCount(entry.names, rawName);
+      }
+      bumpCount(entry.regnums, resolveFeatureRegnum(feature?.properties) || "");
+      const familyNorm = familyKey(feature);
+      const familyLabel = String(feature?.properties?.family ?? "").trim();
+      bumpCount(entry.families, familyNorm);
+      if (familyNorm && familyLabel) {
+        const labels = entry.familyLabels.get(familyNorm) || new Map();
+        bumpCount(labels, familyLabel);
+        entry.familyLabels.set(familyNorm, labels);
+      }
+    });
+  });
+  return meta;
+}
+
+function resolveSharedSpecies(key, entry) {
+  const name = voteWinner(entry.names) || key;
+  const regnum = voteWinner(entry.regnums, REGNUM_ORDER) || "";
+  const familyNorm = voteWinner(entry.families) || "";
+  const familyLabelMap = entry.familyLabels.get(familyNorm);
+  const familyLabel = familyNorm
+    ? voteWinner(familyLabelMap || new Map()) || familyNorm
+    : "Без семейства";
+  return {
+    key,
+    name,
+    regnum,
+    familyKey: familyNorm,
+    familyLabel
+  };
+}
+
+function orderRegnumKeys(keys) {
+  const unique = [...new Set(keys)];
+  const ordered = [];
+  REGNUM_ORDER.forEach((code) => {
+    if (unique.includes(code)) {
+      ordered.push(code);
+    }
+  });
+  unique
+    .filter((key) => key && !ordered.includes(key))
+    .sort((left, right) => getRegnumLabel(left).localeCompare(getRegnumLabel(right), "ru"))
+    .forEach((key) => ordered.push(key));
+  if (unique.includes("")) {
+    ordered.push("");
+  }
+  return ordered;
+}
+
+export function buildOverlapKingdoms(sharedKeys, layers) {
+  const meta = collectSpeciesMeta(layers);
+  const byRegnum = new Map();
+  sharedKeys.forEach((key) => {
+    const entry = meta.get(key);
+    const species = resolveSharedSpecies(key, entry || { names: new Map(), regnums: new Map(), families: new Map(), familyLabels: new Map() });
+    const bucket = byRegnum.get(species.regnum) || [];
+    bucket.push(species);
+    byRegnum.set(species.regnum, bucket);
+  });
+
+  const kingdoms = {};
+  orderRegnumKeys([...byRegnum.keys()]).forEach((regnum) => {
+    const speciesList = byRegnum.get(regnum) || [];
+    const byFamily = new Map();
+    speciesList.forEach((species) => {
+      const familyId = species.familyKey || "";
+      const group = byFamily.get(familyId) || {
+        key: familyId,
+        label: species.familyLabel,
+        species: []
+      };
+      group.species.push({ key: species.key, name: species.name });
+      byFamily.set(familyId, group);
+    });
+    const families = [...byFamily.values()]
+      .map((family) => ({
+        ...family,
+        species: family.species.sort((left, right) => left.name.localeCompare(right.name, "en"))
+      }))
+      .sort((left, right) => {
+        if (!left.key && right.key) {
+          return 1;
+        }
+        if (left.key && !right.key) {
+          return -1;
+        }
+        return left.label.localeCompare(right.label, "en");
+      });
+    kingdoms[regnum] = {
+      key: regnum,
+      label: getRegnumLabel(regnum),
+      count: speciesList.length,
+      families
+    };
+  });
+  return kingdoms;
 }
 
 function shannon(counts) {
@@ -222,8 +389,11 @@ export function computeOverlapStats(layers) {
     }
   }
   const allShared = sharedAll(sets);
+  const overlapKingdoms = buildOverlapKingdoms(allShared, layers);
+  const kingdomOrder = orderRegnumKeys(Object.keys(overlapKingdoms));
   return {
-    hint: "Жаккар и Сёренсен по присутствию видов. «Только здесь» — виды, которых нет в остальных слоях.",
+    hint: "Жаккар и Сёренсен по присутствию видов. «Только здесь» — виды, которых нет в остальных слоях. Клик по царству открывает списки общих видов по семействам.",
+    overlapKingdoms,
     sections: [
       {
         title: "Слои",
@@ -243,9 +413,14 @@ export function computeOverlapStats(layers) {
         rows: pairRows
       },
       {
+        id: "overlap-kingdoms",
         title: "Общие для всех слоёв",
-        columns: ["Виды"],
-        rows: allShared.length ? allShared.slice(0, 80).map((name) => [name]) : [["—"]]
+        columns: ["Царство", "Общих видов"],
+        selectable: true,
+        rowIds: kingdomOrder,
+        rows: kingdomOrder.length
+          ? kingdomOrder.map((key) => [overlapKingdoms[key].label, overlapKingdoms[key].count])
+          : [["—", "—"]]
       }
     ]
   };
@@ -548,7 +723,15 @@ export function computeQualityStats(layers) {
           }).length;
           const withMonth = features.filter((feature) => getFoundMonth(feature) != null).length;
           const withCoords = features.filter((feature) => getFeatureLonLat(feature)).length;
-          return [layer.label, n, withSpecies, withFamily, withYear, withMonth, withCoords];
+          return [
+            layer.label,
+            n,
+            formatCountShare(withSpecies, n),
+            formatCountShare(withFamily, n),
+            formatCountShare(withYear, n),
+            formatCountShare(withMonth, n),
+            formatCountShare(withCoords, n)
+          ];
         })
       },
       {
@@ -558,7 +741,8 @@ export function computeQualityStats(layers) {
           let gbif = 0;
           let inat = 0;
           let other = 0;
-          (layer.features ?? []).forEach((feature) => {
+          const features = layer.features ?? [];
+          features.forEach((feature) => {
             const source = normalizeTempSource(
               feature?.properties?.temp_source || feature?.properties?.source
             );
@@ -570,7 +754,13 @@ export function computeQualityStats(layers) {
               other += 1;
             }
           });
-          return [layer.label, gbif, inat, other];
+          const total = features.length;
+          return [
+            layer.label,
+            formatCountShare(gbif, total),
+            formatCountShare(inat, total),
+            formatCountShare(other, total)
+          ];
         })
       }
     ]

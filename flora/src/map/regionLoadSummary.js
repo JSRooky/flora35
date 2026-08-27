@@ -1,7 +1,9 @@
 import { matchMapRegionToExternal } from "../externalSources/matchMapRegionToExternal";
 import { getExternalRegionById } from "../externalSources/regions";
-import { countGbifFeaturesByRegionId, getGbifLoadedRegionIds } from "../gbif/gbifStore";
-import { countInatFeaturesByRegionId, getInatLoadedRegionIds } from "../inaturalist/inatStore";
+import {
+  getIndicatedExternalRegionStats,
+  listIndicatedExternalRegionIds
+} from "./loadedRegionIndication";
 import {
   isRegionTempLayer,
   listTempLayerPlaques,
@@ -331,6 +333,32 @@ export function buildExternalIdToCatalogEntry(catalog = []) {
   return map;
 }
 
+/** ISO субъектов карты, по которым уже есть загруженные точки. */
+export function listLoadedRegionCatalogIsos(catalog = []) {
+  const catalogByExternalId = buildExternalIdToCatalogEntry(catalog);
+  const isos = new Set();
+
+  const addExternalId = (regionId) => {
+    const entry = catalogByExternalId.get(String(regionId));
+    if (entry?.iso) {
+      isos.add(String(entry.iso));
+    }
+  };
+
+  listIndicatedExternalRegionIds().forEach(addExternalId);
+
+  listTempLayerPlaques().forEach((plaque) => {
+    (plaque.layers || []).forEach((layer) => {
+      if (isRegionTempLayer(layer)) {
+        return;
+      }
+      collectLayerRegionIds(layer).forEach(addExternalId);
+    });
+  });
+
+  return [...isos];
+}
+
 function formatPointCount(value) {
   return new Intl.NumberFormat("ru-RU").format(Number(value) || 0);
 }
@@ -357,6 +385,12 @@ function countLayerPointsForRegion(layer, regionId) {
   if (!ids.includes(regionId)) {
     return 0;
   }
+  if (features.length === 0) {
+    if (ids.length <= 1) {
+      return Number(layer?.pointCount) || 0;
+    }
+    return 0;
+  }
   if (ids.length <= 1) {
     return features.length;
   }
@@ -364,6 +398,16 @@ function countLayerPointsForRegion(layer, regionId) {
     (feature) => String(feature?.properties?.region_id || "") === regionId
   ).length;
   return tagged > 0 ? tagged : 0;
+}
+
+function isTempPointPreviewLayer(layer) {
+  if (!layer || isRegionTempLayer(layer)) {
+    return false;
+  }
+  if ((layer.features?.length || 0) > 0) {
+    return true;
+  }
+  return (layer.regionIds || []).length > 0 && Number(layer.pointCount) > 0;
 }
 
 /**
@@ -375,10 +419,11 @@ export function buildTempLayerRegionSummaries({ catalog = [], plaques } = {}) {
   const summaries = [];
 
   list.forEach((plaque) => {
-    const pointLayers = (plaque.layers || []).filter(
-      (layer) => !isRegionTempLayer(layer) && (layer.features?.length || 0) > 0
-    );
+    const pointLayers = (plaque.layers || []).filter((layer) => isTempPointPreviewLayer(layer));
     if (pointLayers.length === 0) {
+      return;
+    }
+    if ((plaque.layers || []).some((layer) => layer.visible)) {
       return;
     }
 
@@ -462,18 +507,14 @@ export function buildRegionLoadSummaries({
 } = {}) {
   const hidden = new Set((hiddenRegionIds ?? []).map((id) => String(id)).filter(Boolean));
   const catalogByExternalId = buildExternalIdToCatalogEntry(catalog);
-  const gbifCounts = includeGbif ? countGbifFeaturesByRegionId() : new Map();
-  const inatCounts = includeInat ? countInatFeaturesByRegionId() : new Map();
+  const stats = getIndicatedExternalRegionStats();
   const regionIds = new Set();
 
-  if (includeGbif) {
-    getGbifLoadedRegionIds().forEach((id) => regionIds.add(String(id)));
-    gbifCounts.forEach((_, id) => regionIds.add(id));
-  }
-  if (includeInat) {
-    getInatLoadedRegionIds().forEach((id) => regionIds.add(String(id)));
-    inatCounts.forEach((_, id) => regionIds.add(id));
-  }
+  listIndicatedExternalRegionIds().forEach((id) => regionIds.add(String(id)));
+  stats.forEach((_, id) => regionIds.add(String(id)));
+
+  const gbifCountOf = (regionId) => (includeGbif ? stats.get(regionId)?.gbif || 0 : 0);
+  const inatCountOf = (regionId) => (includeInat ? stats.get(regionId)?.inat || 0 : 0);
 
   const summaries = [];
 
@@ -482,8 +523,8 @@ export function buildRegionLoadSummaries({
       return;
     }
 
-    const gbifCount = gbifCounts.get(regionId) || 0;
-    const inatCount = inatCounts.get(regionId) || 0;
+    const gbifCount = gbifCountOf(regionId);
+    const inatCount = inatCountOf(regionId);
     const pointCount = gbifCount + inatCount;
     if (pointCount <= 0) {
       return;
