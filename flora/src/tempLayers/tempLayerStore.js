@@ -1818,6 +1818,12 @@ function bucketFeaturesBySource(features) {
   return buckets;
 }
 
+function hidePlaqueByGroupKey(groupKey) {
+  layers = layers.map((item) =>
+    layerGroupKey(item) === groupKey ? { ...item, visible: false } : item
+  );
+}
+
 function createPointSourceLayer(base, source, features) {
   return {
     id: createLayerId(),
@@ -1833,7 +1839,7 @@ function createPointSourceLayer(base, source, features) {
     regionIds: [...(base.regionIds || [])],
     bufferKm: base.bufferKm ?? 0,
     createdAt: base.createdAt,
-    visible: base.visible,
+    visible: false,
     heatmapEnabled: Boolean(base.heatmapEnabled),
     markerColor: base.markerColor ?? null,
     archiveId: base.archiveId ?? null,
@@ -1971,7 +1977,12 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
 
   layers = explodeMixedRegionPointLayers(layers);
   const buckets = bucketFeaturesBySource(incoming);
-  const target = layers.find((layer) => layer.visible && layerHasRegionOverlays(layer));
+  const target =
+    layers.find(
+      (layer) =>
+        !isRegionsRootLayer(layer) && layer.visible && layerHasRegionOverlays(layer)
+    ) ||
+    layers.find((layer) => !isRegionsRootLayer(layer) && layerHasRegionOverlays(layer));
   if (target) {
     const incomingOverlaySnapshot = normalizeOverlays(overlays);
     if (incomingOverlaySnapshot.length > 0) {
@@ -1981,6 +1992,7 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
       );
     }
     const added = mergeBucketsIntoPlaque(target, buckets, regionIds);
+    hidePlaqueByGroupKey(layerGroupKey(target));
     emit();
     return { ok: true, appended: true, added, layer: target };
   }
@@ -2008,7 +2020,7 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
     regionIds: mergeRegionIds([], regionIds),
     bufferKm: 0,
     createdAt,
-    visible: true,
+    visible: false,
     heatmapEnabled: false,
     markerColor,
     archiveId: null,
@@ -2020,6 +2032,7 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
     ...layers.map((item) => ({ ...item, visible: false }))
   ];
   const added = mergeBucketsIntoPlaque(layer, buckets, regionIds);
+  hidePlaqueByGroupKey(layerGroupKey(layer));
   emit();
   return { ok: true, appended: false, added, layer };
 }

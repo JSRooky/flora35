@@ -60,9 +60,11 @@ describe("saveFeaturesIntoRegionOverlayTempLayer", () => {
     const points = stored.filter((layer) => layer.source === TEMP_SOURCE_IDS.GBIF);
 
     expect(overlay?.features).toEqual([]);
+    expect(overlay?.visible).toBe(false);
     expect(points).toHaveLength(1);
     expect(points[0].features).toHaveLength(2);
-    expect(getVisibleTempLayerFeatures()).toHaveLength(2);
+    expect(points[0].visible).toBe(false);
+    expect(getVisibleTempLayerFeatures()).toHaveLength(0);
   });
 
   it("collects archived region polygons only when the layer still has points", () => {

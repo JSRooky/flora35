@@ -13,6 +13,7 @@ import {
   isRegionContourPickActive
 } from "../map/compactPointDisplay";
 import { shouldUseCompactDensityGrid } from "../map/compactGridSettings";
+import { shouldSuppressLoadedPointLayers } from "../map/regionLoadSummary";
 import {
   compactPropertiesMatchFilters,
   getCompactLocationFilters,
@@ -633,6 +634,12 @@ function addUnitToMap(map, unit) {
 
 export function setTempLayersData(map) {
   if (!map?.getSource || !map.getStyle()) {
+    return;
+  }
+
+  if (shouldSuppressLoadedPointLayers()) {
+    removeTempLayersFromMap(map);
+    setTempLayerOverlaysData(map, { visible: layerVisible });
     return;
   }
 

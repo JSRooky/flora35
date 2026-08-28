@@ -265,7 +265,7 @@ import {
   setRegionLoadSummaryActive,
   setRegionLoadSummaryOptions
 } from "./components/addRegionLoadSummaryLayer";
-import { listLoadedRegionCatalogIsos } from "./map/regionLoadSummary";
+import { listLoadedRegionCatalogIsos, shouldSuppressLoadedPointLayers } from "./map/regionLoadSummary";
 import {
   OSM_ADMIN_LOAD_MODES,
   downloadGeoJson,
@@ -4774,6 +4774,9 @@ export default function MapView() {
       });
       refreshRegionLoadSummary(map.current);
     } else if (tempOnly) {
+      if (!compactPointDisplay) {
+        setCompactPointDisplayEnabled(false);
+      }
       setGbifVisibility(map.current, false);
       setInatVisibility(map.current, false);
       setTempLayersVisibility(map.current, true);
@@ -4913,6 +4916,14 @@ export default function MapView() {
         return;
       }
 
+      if (shouldSuppressLoadedPointLayers()) {
+        if (autoRasterModeRef.current) {
+          autoRasterModeRef.current = false;
+          setAutoRasterMode(false);
+        }
+        return;
+      }
+
       const pointCount = getVisibleMapPointCount();
       const nextRaster = resolveAutoRasterMode(pointCount, autoRasterModeRef.current);
       if (nextRaster === autoRasterModeRef.current) {
@@ -4951,9 +4962,9 @@ export default function MapView() {
         return;
       }
       refreshHeatmapSourceOptions(externalOnly);
-      // Общая тепловая карта: в режиме временных слоёв — только они;
-      // при авто-растровом режиме включаем её независимо от ручного тумблера пользователя.
-      setHeatmapEnabled(map.current, heatmapEnabled || autoRasterMode, locationFilters);
+      const showHeatmap =
+        (heatmapEnabled || autoRasterMode) && !shouldSuppressLoadedPointLayers();
+      setHeatmapEnabled(map.current, showHeatmap, locationFilters);
       syncTempLayerHeatmaps(map.current, {
         active: externalOnly,
         filters: locationFilters,
@@ -5544,6 +5555,12 @@ export default function MapView() {
     const count = getDisplayedLayerPointCount();
     setCompactDisplayedLayerPointCount(count);
     setDisplayedLayerPointCountState(count);
+    if (shouldSuppressLoadedPointLayers()) {
+      if (compactGridAutoRef.current && compactPointDisplay) {
+        handleCompactPointDisplayChange(false);
+      }
+      return;
+    }
     const over = count > getCompactGridPointLimit();
     if (over && !compactPointDisplay) {
       handleCompactPointDisplayChange(true, { auto: true });
