@@ -383,6 +383,8 @@ export default function ModuleMenu({
               mapToolAccent
               activeModule={comparePanelOpen ? MODULE_IDS.COMPARE : activeModule}
               onModuleSelect={onComparePanelToggle}
+              disabled={FEATURE_FLAGS.compareModuleDisabled}
+              disabledTitle={FEATURE_UNAVAILABLE_TITLE}
             />
           </li>
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />

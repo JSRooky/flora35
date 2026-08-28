@@ -796,6 +796,17 @@ export default function MapView() {
   );
 
   const restorePanel = useCallback((panelId) => {
+    if (
+      FEATURE_FLAGS.compareModuleDisabled &&
+      (panelId === TASKBAR_PANEL_IDS.COMPARE ||
+        panelId === TASKBAR_PANEL_IDS.COMPARE_DIVERSITY ||
+        panelId === TASKBAR_PANEL_IDS.COMPARE_SIMILARITY ||
+        panelId === TASKBAR_PANEL_IDS.COMPARE_DISTRIBUTION ||
+        panelId === TASKBAR_PANEL_IDS.COMPARE_STATS)
+    ) {
+      return;
+    }
+
     // Текущие видимые панели уводим в taskbar, затем поднимаем выбранную.
     stashVisiblePanelsToTaskbarRef.current(panelId);
 
@@ -1709,6 +1720,10 @@ export default function MapView() {
   ]);
 
   const handleComparePanelToggle = useCallback(() => {
+    if (FEATURE_FLAGS.compareModuleDisabled) {
+      return;
+    }
+
     if (comparePanelOpen && !isPanelMinimized(PANEL_IDS.COMPARE)) {
       setComparePanelOpen(false);
       setCompareDiversityOpen(false);
@@ -1745,6 +1760,9 @@ export default function MapView() {
 
   const handleOpenSimilarity = useCallback(
     (plaques) => {
+      if (FEATURE_FLAGS.compareModuleDisabled) {
+        return;
+      }
       const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
       setCompareDiversityKeys(nextKeys);
       setCompareSimilarityOpen(true);
@@ -1761,6 +1779,9 @@ export default function MapView() {
 
   const handleOpenDistribution = useCallback(
     (plaques) => {
+      if (FEATURE_FLAGS.compareModuleDisabled) {
+        return;
+      }
       const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
       setCompareDiversityKeys(nextKeys);
       setCompareDistributionOpen(true);
@@ -1777,6 +1798,9 @@ export default function MapView() {
 
   const handleOpenStats = useCallback(
     (kind, plaques) => {
+      if (FEATURE_FLAGS.compareModuleDisabled) {
+        return;
+      }
       const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
       setCompareDiversityKeys(nextKeys);
       setCompareStatsKind(kind);
@@ -1793,6 +1817,9 @@ export default function MapView() {
 
   const handleOpenDiversity = useCallback(
     (plaques) => {
+      if (FEATURE_FLAGS.compareModuleDisabled) {
+        return;
+      }
       const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
       setCompareDiversityKeys(nextKeys);
       setCompareDiversityOpen(true);
@@ -7464,7 +7491,9 @@ export default function MapView() {
               statusMessage={tempArchiveStatus}
             />
           )}
-          {comparePanelOpen && !isPanelMinimized(PANEL_IDS.COMPARE) && (
+          {comparePanelOpen &&
+            !FEATURE_FLAGS.compareModuleDisabled &&
+            !isPanelMinimized(PANEL_IDS.COMPARE) && (
             <ComparePanel
               collapsed={isPanelCollapsed(PANEL_IDS.COMPARE)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.COMPARE)}
@@ -7989,7 +8018,9 @@ export default function MapView() {
         />
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
-      {compareDiversityOpen && !isPanelMinimized(PANEL_IDS.COMPARE_DIVERSITY) ? (
+      {compareDiversityOpen &&
+      !FEATURE_FLAGS.compareModuleDisabled &&
+      !isPanelMinimized(PANEL_IDS.COMPARE_DIVERSITY) ? (
         <CompareDiversityPopup
           open
           plaqueKeys={compareDiversityKeys}
@@ -7997,7 +8028,9 @@ export default function MapView() {
           onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE_DIVERSITY)}
         />
       ) : null}
-      {compareSimilarityOpen && !isPanelMinimized(PANEL_IDS.COMPARE_SIMILARITY) ? (
+      {compareSimilarityOpen &&
+      !FEATURE_FLAGS.compareModuleDisabled &&
+      !isPanelMinimized(PANEL_IDS.COMPARE_SIMILARITY) ? (
         <CompareSimilarityPopup
           open
           plaqueKeys={compareDiversityKeys}
@@ -8005,7 +8038,9 @@ export default function MapView() {
           onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE_SIMILARITY)}
         />
       ) : null}
-      {compareDistributionOpen && !isPanelMinimized(PANEL_IDS.COMPARE_DISTRIBUTION) ? (
+      {compareDistributionOpen &&
+      !FEATURE_FLAGS.compareModuleDisabled &&
+      !isPanelMinimized(PANEL_IDS.COMPARE_DISTRIBUTION) ? (
         <CompareDistributionPopup
           open
           plaqueKeys={compareDiversityKeys}
@@ -8013,7 +8048,9 @@ export default function MapView() {
           onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE_DISTRIBUTION)}
         />
       ) : null}
-      {compareStatsKind && !isPanelMinimized(PANEL_IDS.COMPARE_STATS) ? (
+      {compareStatsKind &&
+      !FEATURE_FLAGS.compareModuleDisabled &&
+      !isPanelMinimized(PANEL_IDS.COMPARE_STATS) ? (
         <CompareStatsPopup
           open
           kind={compareStatsKind}
