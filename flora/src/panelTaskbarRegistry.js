@@ -23,8 +23,14 @@ export const TASKBAR_PANEL_IDS = {
   SEARCH: "search",
   REDBOOK: "redbook",
   TEMP_ARCHIVE: "temp-archive",
+  COMPARE: "compare",
+  COMPARE_DIVERSITY: "compare-diversity",
+  COMPARE_SIMILARITY: "compare-similarity",
+  COMPARE_DISTRIBUTION: "compare-distribution",
+  COMPARE_STATS: "compare-stats",
   OOPT_SPECIES: "oopt-species",
-  DENSE_SPECIES: "dense-species"
+  DENSE_SPECIES: "dense-species",
+  REGION_SPECIES: "region-species"
 };
 
 /** Подписи и ключи иконок для панели задач. */
@@ -58,8 +64,14 @@ export const PANEL_TASKBAR_META = {
   [TASKBAR_PANEL_IDS.SEARCH]: { title: "Поиск", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.REDBOOK]: { title: "Поиск редких видов", icon: "status" },
   [TASKBAR_PANEL_IDS.TEMP_ARCHIVE]: { title: "Архив слоёв", icon: "layersArchive" },
+  [TASKBAR_PANEL_IDS.COMPARE]: { title: "Сравнение", icon: "layers" },
+  [TASKBAR_PANEL_IDS.COMPARE_DIVERSITY]: { title: "Разнообразие", icon: "speciesList" },
+  [TASKBAR_PANEL_IDS.COMPARE_SIMILARITY]: { title: "Сходство", icon: "speciesList" },
+  [TASKBAR_PANEL_IDS.COMPARE_DISTRIBUTION]: { title: "Распределение", icon: "year" },
+  [TASKBAR_PANEL_IDS.COMPARE_STATS]: { title: "Статистика", icon: "speciesList" },
   [TASKBAR_PANEL_IDS.OOPT_SPECIES]: { title: "Виды внутри выбранной ООПТ", icon: "speciesList" },
-  [TASKBAR_PANEL_IDS.DENSE_SPECIES]: { title: "Виды в плотной группе", icon: "speciesList" }
+  [TASKBAR_PANEL_IDS.DENSE_SPECIES]: { title: "Виды в плотной группе", icon: "speciesList" },
+  [TASKBAR_PANEL_IDS.REGION_SPECIES]: { title: "Список видов региона", icon: "speciesList" }
 };
 
 /**
@@ -90,8 +102,14 @@ export const PANEL_TASKBAR_MODULE_ID = {
   [TASKBAR_PANEL_IDS.SEARCH]: "search",
   [TASKBAR_PANEL_IDS.REDBOOK]: "redbook",
   [TASKBAR_PANEL_IDS.TEMP_ARCHIVE]: null,
+  [TASKBAR_PANEL_IDS.COMPARE]: null,
+  [TASKBAR_PANEL_IDS.COMPARE_DIVERSITY]: null,
+  [TASKBAR_PANEL_IDS.COMPARE_SIMILARITY]: null,
+  [TASKBAR_PANEL_IDS.COMPARE_DISTRIBUTION]: null,
+  [TASKBAR_PANEL_IDS.COMPARE_STATS]: null,
   [TASKBAR_PANEL_IDS.OOPT_SPECIES]: null,
-  [TASKBAR_PANEL_IDS.DENSE_SPECIES]: null
+  [TASKBAR_PANEL_IDS.DENSE_SPECIES]: null,
+  [TASKBAR_PANEL_IDS.REGION_SPECIES]: null
 };
 
 export function getPanelTaskbarMeta(panelId) {

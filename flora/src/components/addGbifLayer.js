@@ -2,6 +2,19 @@ import {
   findGbifFeatureByKey,
   getGbifSlimMapCollection
 } from "../gbif/gbifStore";
+import { shouldSuppressLoadedPointLayers } from "../map/regionLoadSummary";
+import { buildCompactGbifViewportFeatures } from "../map/compactGbifViewport";
+import {
+  addCompactGridLayers,
+  compactCircleRadiusExpression,
+  compactDensityFalseFilter,
+  compactGridLayerIds,
+  easeToCompactDensityCell,
+  ensureCompactViewportSync,
+  isCompactDensityFeature,
+  isCompactPointDisplayEnabled,
+  isRegionContourPickActive
+} from "../map/compactPointDisplay";
 import { findInatFeatureById } from "../inaturalist/inatStore";
 import {
   DEFAULT_CLUSTER_COLOR,
@@ -139,6 +152,9 @@ function getGbifDensePileMembers(feature) {
 }
 
 function isGbifMapboxClusteringActive() {
+  if (isCompactPointDisplayEnabled()) {
+    return false;
+  }
   return gbifClusteringEnabled && !gbifDenseClustersHighlightEnabled;
 }
 
@@ -204,13 +220,25 @@ function getAllGbifUnclusteredLayerIds() {
   return [GBIF_UNCLUSTERED_LAYER_ID];
 }
 
+function getAllGbifCompactGridLayerIds() {
+  return getGbifSourceIds().flatMap((sourceId) => {
+    const { fillId, lineId } = compactGridLayerIds(sourceId);
+    return [fillId, lineId];
+  });
+}
+
+function getGbifPointClickLayerIds() {
+  return getAllGbifUnclusteredLayerIds();
+}
+
 function getAllGbifLayerIds() {
   const dense = gbifDenseClustersHighlightEnabled
     ? [GBIF_DENSE_PILES_CLUSTER_LAYER_ID, GBIF_DENSE_PILES_COUNT_LAYER_ID]
     : [];
+  const grid = getAllGbifCompactGridLayerIds();
 
   if (!isGbifMapboxClusteringActive()) {
-    return [GBIF_UNCLUSTERED_LAYER_ID, ...dense];
+    return [GBIF_UNCLUSTERED_LAYER_ID, ...grid, ...dense];
   }
 
   if (gbifClusterByRegnum) {
@@ -222,18 +250,20 @@ function getAllGbifLayerIds() {
       GBIF_CLUSTER_LAYER_ID,
       GBIF_CLUSTER_COUNT_LAYER_ID,
       GBIF_UNCLUSTERED_LAYER_ID,
+      ...grid,
       ...dense
     ];
   }
 
   if (gbifClusterPieChartsEnabled) {
-    return [GBIF_CLUSTER_LAYER_ID, GBIF_UNCLUSTERED_LAYER_ID, ...dense];
+    return [GBIF_CLUSTER_LAYER_ID, GBIF_UNCLUSTERED_LAYER_ID, ...grid, ...dense];
   }
 
   return [
     GBIF_CLUSTER_LAYER_ID,
     GBIF_CLUSTER_COUNT_LAYER_ID,
     GBIF_UNCLUSTERED_LAYER_ID,
+    ...grid,
     ...dense
   ];
 }
@@ -242,7 +272,7 @@ function getAllGbifLayerIds() {
 export function getGbifInteractiveLayerIds(map) {
   return [
     ...getAllGbifClusterLayerIds(),
-    ...getAllGbifUnclusteredLayerIds()
+    ...getGbifPointClickLayerIds()
   ].filter((layerId) => map?.getLayer(layerId));
 }
 
@@ -270,7 +300,7 @@ function applyGbifUnclusteredFilter(map) {
       return;
     }
 
-    const parts = [];
+    const parts = [compactDensityFalseFilter()];
 
     if (isGbifMapboxClusteringActive()) {
       parts.push(["!", ["has", "point_count"]]);
@@ -279,11 +309,6 @@ function applyGbifUnclusteredFilter(map) {
     hiddenPointFeatureKeys.forEach((key) => {
       parts.push(buildPinnedKeyExclusion(key));
     });
-
-    if (parts.length === 0) {
-      map.setFilter(layerId, null);
-      return;
-    }
 
     map.setFilter(layerId, parts.length === 1 ? parts[0] : ["all", ...parts]);
   });
@@ -417,7 +442,7 @@ function attachInteractions(map) {
   detachInteractions(map);
 
   const clusterLayerIds = getAllGbifClusterLayerIds().filter((id) => map.getLayer(id));
-  const unclusteredLayerIds = getAllGbifUnclusteredLayerIds().filter((id) =>
+  const unclusteredLayerIds = getGbifPointClickLayerIds().filter((id) =>
     map.getLayer(id)
   );
 
@@ -494,6 +519,16 @@ function attachInteractions(map) {
   const pointClick = (event) => {
     const rawFeature = event.features?.[0];
     if (!rawFeature) {
+      return;
+    }
+
+    if (isCompactDensityFeature(rawFeature)) {
+      if (isRegionContourPickActive(map)) {
+        return;
+      }
+      event.preventDefault?.();
+      event.originalEvent?.stopPropagation?.();
+      easeToCompactDensityCell(map, rawFeature);
       return;
     }
 
@@ -610,18 +645,19 @@ function addUnclusteredGbifLayer(map, sourceId, layerId, regnum = null) {
     id: layerId,
     type: "circle",
     source: sourceId,
-    ...(isGbifMapboxClusteringActive()
-      ? { filter: ["!", ["has", "point_count"]] }
-      : {}),
+    filter: isGbifMapboxClusteringActive()
+      ? ["all", compactDensityFalseFilter(), ["!", ["has", "point_count"]]]
+      : compactDensityFalseFilter(),
     paint: {
       "circle-color": regnum
         ? getPointColorForRegnum(regnum)
         : getPointColorExpression(),
-      "circle-radius": MARKER_RADIUS,
+      "circle-radius": compactCircleRadiusExpression(MARKER_RADIUS),
       "circle-stroke-width": 1,
       "circle-stroke-color": "#ffffff"
     }
   });
+  addCompactGridLayers(map, sourceId);
 }
 
 function addClusterGbifLayers(map, sourceId, layerIds, regnum = null) {
@@ -740,9 +776,29 @@ function syncGbifDensePilesLayers(map, denseClusterFeatures) {
   );
 }
 
-function rebuildGbifLayers(map) {
-  if (!map?.getStyle()) {
-    return;
+function bindGbifCompactSync(map) {
+  ensureCompactViewportSync(map, "gbif", () => {
+    if (!isCompactPointDisplayEnabled() || gbifMapUpdatesPaused || shouldSuppressLoadedPointLayers()) {
+      return;
+    }
+    setGbifData(map, lastGbifInputCollection);
+  });
+}
+
+function getGbifPreparedForMap(map, options = {}) {
+  if (shouldSuppressLoadedPointLayers() && !options.preview) {
+    return {
+      mapFeatures: [],
+      denseClusterFeatures: []
+    };
+  }
+
+  if (isCompactPointDisplayEnabled() && !options.preview) {
+    bindGbifCompactSync(map);
+    return {
+      mapFeatures: buildCompactGbifViewportFeatures(map).features,
+      denseClusterFeatures: []
+    };
   }
 
   // При активной паузе (авто-растровый режим/загрузка) не тянем весь store в Supercluster —
@@ -752,9 +808,21 @@ function rebuildGbifLayers(map) {
     : lastGbifInputCollection?.type === "FeatureCollection"
       ? lastGbifInputCollection
       : getGbifSlimMapCollection();
-  const { mapFeatures, denseClusterFeatures } = prepareMapGbifFeatures(
-    collection.features ?? []
-  );
+  if (options.preview) {
+    return {
+      mapFeatures: spreadCoincidentFeatures(collection.features ?? []),
+      denseClusterFeatures: []
+    };
+  }
+  return prepareMapGbifFeatures(collection.features ?? []);
+}
+
+function rebuildGbifLayers(map) {
+  if (!map?.getStyle()) {
+    return;
+  }
+
+  const { mapFeatures, denseClusterFeatures } = getGbifPreparedForMap(map);
   const renderFeatures = slimMapFeatures(excludeGbifHiddenPinFeatures(mapFeatures));
   removeGbifFromMap(map);
 
@@ -868,13 +936,15 @@ export function setGbifData(map, collection, options = {}) {
   }
 
   const data = collection?.type === "FeatureCollection" ? collection : EMPTY_FEATURE_COLLECTION;
-  lastGbifInputCollection = data;
+  if (!isCompactPointDisplayEnabled() || options.preview) {
+    lastGbifInputCollection = data;
+  }
   const { mapFeatures, denseClusterFeatures } = options.preview
     ? {
         mapFeatures: spreadCoincidentFeatures(data.features ?? []),
         denseClusterFeatures: []
       }
-    : prepareMapGbifFeatures(data.features ?? []);
+    : getGbifPreparedForMap(map, options);
   const preparedFeatures = options.preview
     ? mapFeatures
     : excludeGbifHiddenPinFeatures(mapFeatures);

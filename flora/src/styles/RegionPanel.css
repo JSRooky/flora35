@@ -234,6 +234,44 @@
   opacity: 0.5;
 }
 
+.region-panel-osm {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.region-panel-osm-legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.region-panel-osm-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.region-panel-osm-option--disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.region-panel-error {
+  margin: 0;
+  font-size: 13px;
+  color: #b91c1c;
+  line-height: 1.4;
+}
+
 .region-panel-load-actions {
   display: flex;
   flex-direction: column;

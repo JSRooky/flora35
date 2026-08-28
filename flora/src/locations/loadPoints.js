@@ -15,6 +15,7 @@ export const DATA_SOURCE_MODES = {
   POINTS: "points",
   USERPOINTS: "userpoints",
   EXTERNAL: "external",
+  TEMP: "temp",
   MERGED: "merged",
   REDBOOK: "redbook",
   /** @deprecated Используйте EXTERNAL */
@@ -41,6 +42,11 @@ export const DATA_SOURCE_OPTIONS = [
     value: DATA_SOURCE_MODES.EXTERNAL,
     label: "Внешние источники",
     title: "Данные GBIF и iNaturalist"
+  },
+  {
+    value: DATA_SOURCE_MODES.TEMP,
+    label: "Временные слои",
+    title: "Точки временных слоёв (в памяти только этот слой данных)"
   },
   {
     value: DATA_SOURCE_MODES.MERGED,
@@ -213,6 +219,7 @@ export function getSpeciesCollection() {
       return userpointsCollection;
     case DATA_SOURCE_MODES.NONE:
     case DATA_SOURCE_MODES.EXTERNAL:
+    case DATA_SOURCE_MODES.TEMP:
     case DATA_SOURCE_MODES.MERGED:
     case DATA_SOURCE_MODES.REDBOOK:
     case DATA_SOURCE_MODES.GBIF:

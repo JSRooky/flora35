@@ -332,8 +332,7 @@ const SPECIES_POLYGON_OUTLINE_PAINT = {
   "line-dasharray": POLYGON_OUTLINE_DASHARRAY
 };
 
-// line-join/line-cap — свойства layout, а не paint (Mapbox иначе пишет
-// "unknown property" в консоль и игнорирует их).
+// line-join/line-cap — свойства layout, не paint; в paint Mapbox их не признаёт.
 const SPECIES_POLYGON_OUTLINE_LAYOUT = {
   "line-join": "round",
   "line-cap": "round"
@@ -359,8 +358,6 @@ const INTERSECTION_OUTLINE_PAINT = {
   "line-dasharray": INTERSECTION_OUTLINE_DASHARRAY
 };
 
-// line-join/line-cap — свойства layout, а не paint (Mapbox иначе пишет
-// "unknown property" в консоль и игнорирует их).
 const INTERSECTION_OUTLINE_LAYOUT = {
   "line-join": "round",
   "line-cap": "round"

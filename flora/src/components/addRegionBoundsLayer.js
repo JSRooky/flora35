@@ -1,6 +1,8 @@
 import mapboxgl from "mapbox-gl";
-import { bbox, booleanPointInPolygon, buffer, difference, featureCollection, polygon, simplify, union } from "@turf/turf";
+import { bbox, booleanPointInPolygon, buffer, difference, featureCollection, point, polygon, simplify, union } from "@turf/turf";
 import { applyMapCursor, getFirstLocationsLayerId } from "./addLocationsLayer";
+import { shouldSuppressLoadedPointLayers } from "../map/regionLoadSummary";
+import { isCompactDensityFeature } from "../map/compactPointDisplay";
 import {
   createDefaultRegionBoundsSettings,
   normalizeRegionBoundsSettings
@@ -9,6 +11,7 @@ import { safeQueryRenderedFeatures } from "./safeQueryRenderedFeatures";
 
 export const REGION_BOUNDS_SOURCE_ID = "region-bounds";
 export const REGION_BOUNDS_FILL_LAYER_ID = "region-bounds-fill";
+export const REGION_BOUNDS_HIT_LAYER_ID = "region-bounds-hit";
 export const REGION_BOUNDS_OUTLINE_LAYER_ID = "region-bounds-outline";
 export const REGION_BUFFER_SOURCE_ID = "region-selection-buffer";
 export const REGION_BUFFER_FILL_LAYER_ID = "region-selection-buffer-fill";
@@ -24,8 +27,10 @@ const EMPTY_COLLECTION = {
 
 const HOVER_FILL_OPACITY_BOOST = 0.23;
 const SELECTED_FILL_OPACITY_BOOST = 0.32;
+const HAS_DATA_FILL_OPACITY_BOOST = 0.1;
 const HOVER_LINE_WIDTH_BOOST = 1.1;
 const SELECTED_LINE_WIDTH_BOOST = 1.6;
+const HAS_DATA_LINE_WIDTH_BOOST = 0.55;
 
 let regionSelectListener = null;
 let cachedRegionCollection = null;
@@ -52,6 +57,8 @@ function buildFillPaint(settings = regionBoundsPaintSettings, colorsByIso = regi
       Math.min(1, fillOpacity + SELECTED_FILL_OPACITY_BOOST),
       ["boolean", ["feature-state", "hover"], false],
       hoverOpacity,
+      ["boolean", ["feature-state", "hasData"], false],
+      Math.min(1, fillOpacity + HAS_DATA_FILL_OPACITY_BOOST),
       fillOpacity
     ],
     "fill-antialias": true
@@ -68,9 +75,16 @@ function buildOutlinePaint(settings = regionBoundsPaintSettings, colorsByIso = r
       lineWidth + SELECTED_LINE_WIDTH_BOOST,
       ["boolean", ["feature-state", "hover"], false],
       lineWidth + HOVER_LINE_WIDTH_BOOST,
+      ["boolean", ["feature-state", "hasData"], false],
+      lineWidth + HAS_DATA_LINE_WIDTH_BOOST,
       lineWidth
     ],
-    "line-opacity": 0.9
+    "line-opacity": [
+      "case",
+      ["boolean", ["feature-state", "hasData"], false],
+      1,
+      0.9
+    ]
   };
 }
 
@@ -538,7 +552,7 @@ export function applyRegionBoundsIsoFilter(map, visibleIsos) {
         ? ["==", ["get", "iso"], "__none__"]
         : ["match", ["get", "iso"], visibleIsos, true, false];
 
-  [REGION_BOUNDS_FILL_LAYER_ID, REGION_BOUNDS_OUTLINE_LAYER_ID].forEach((layerId) => {
+  [REGION_BOUNDS_FILL_LAYER_ID, REGION_BOUNDS_HIT_LAYER_ID, REGION_BOUNDS_OUTLINE_LAYER_ID].forEach((layerId) => {
     if (map.getLayer(layerId)) {
       map.setFilter(layerId, filter);
     }
@@ -583,6 +597,48 @@ export function setRegionBoundsSelectedIso(map, iso) {
   setRegionBoundsSelectedIsos(map, iso == null ? [] : [iso]);
 }
 
+/** Подсвечивает субъекты, для которых уже загружены точки. */
+export function setRegionBoundsLoadedIsos(map, isos = []) {
+  if (!map?.getSource || !map.getSource(REGION_BOUNDS_SOURCE_ID)) {
+    return;
+  }
+
+  const nextIds = [...new Set((isos ?? []).filter(Boolean).map(String))];
+  const state = mapsWithRegionHover.get(map) ?? {
+    hoveredId: null,
+    selectedId: null,
+    selectedIds: [],
+    loadedIds: [],
+    attached: false
+  };
+  mapsWithRegionHover.set(map, state);
+
+  const previousIds = Array.isArray(state.loadedIds) ? state.loadedIds : [];
+
+  previousIds.forEach((id) => {
+    if (!nextIds.includes(id)) {
+      map.setFeatureState({ source: REGION_BOUNDS_SOURCE_ID, id }, { hasData: false });
+    }
+  });
+
+  nextIds.forEach((id) => {
+    map.setFeatureState({ source: REGION_BOUNDS_SOURCE_ID, id }, { hasData: true });
+  });
+
+  state.loadedIds = nextIds;
+}
+
+export function getFeaturePopupLngLat(feature) {
+  if (!feature?.geometry) {
+    return null;
+  }
+  const bounds = bbox(feature);
+  return {
+    lng: (bounds[0] + bounds[2]) / 2,
+    lat: (bounds[1] + bounds[3]) / 2
+  };
+}
+
 export function flyToRegionBoundsFeature(map, feature, { padding = 48, maxZoom = 6, duration = 800 } = {}) {
   if (!map || !feature?.geometry) {
     return;
@@ -609,20 +665,14 @@ export function emitRegionBoundsSelect(entry, lngLat) {
   regionSelectListener?.(entry, lngLat);
 }
 
-export function getRegionFeatureAtClick(map, event) {
-  if (!map || !event?.point) {
-    return null;
-  }
-
-  const hits = safeQueryRenderedFeatures(map, event.point).filter(
-    (hit) => hit.layer?.id === REGION_BOUNDS_FILL_LAYER_ID
-  );
-  const feature = hits[0];
+function regionEntryFromFeature(feature) {
   if (!feature) {
     return null;
   }
-
   const iso = getRegionFeatureId(feature);
+  if (!iso) {
+    return null;
+  }
   return getRegionEntryByIso(iso) ?? {
     iso,
     name: getRegionFeatureTitle(feature),
@@ -630,6 +680,58 @@ export function getRegionFeatureAtClick(map, event) {
     fo: feature.properties?.fo || "Прочие",
     feature
   };
+}
+
+function getRegionEntryAtLngLat(lngLat) {
+  if (lngLat?.lng == null || lngLat?.lat == null) {
+    return null;
+  }
+  const pt = [lngLat.lng, lngLat.lat];
+  const catalog = getCachedRegionCatalog();
+  for (let index = 0; index < catalog.length; index += 1) {
+    const entry = catalog[index];
+    if (!entry?.feature?.geometry) {
+      continue;
+    }
+    try {
+      if (booleanPointInPolygon(point(pt), entry.feature)) {
+        return entry;
+      }
+    } catch {
+      // некорректная геометрия субъекта — пропускаем
+    }
+  }
+  return null;
+}
+
+export function getRegionFeatureAtClick(map, event) {
+  if (!map || !event?.point) {
+    return null;
+  }
+
+  const hits = safeQueryRenderedFeatures(map, event.point).filter((hit) => {
+    const layerId = hit.layer?.id;
+    return (
+      layerId === REGION_BOUNDS_FILL_LAYER_ID ||
+      layerId === REGION_BOUNDS_HIT_LAYER_ID ||
+      layerId === REGION_BOUNDS_OUTLINE_LAYER_ID ||
+      layerId === "temp-layer-overlays-fill" ||
+      layerId === "temp-layer-overlays-archive-hatch"
+    );
+  });
+  const overlayHits = hits.filter(
+    (hit) =>
+      hit.layer?.id === "temp-layer-overlays-fill" ||
+      hit.layer?.id === "temp-layer-overlays-archive-hatch"
+  );
+  const preferredOverlay =
+    overlayHits.find((hit) => hit.properties?.overlayRole === "districts") || overlayHits[0];
+  const fromFill = regionEntryFromFeature(preferredOverlay || hits[0]);
+  if (fromFill) {
+    return fromFill;
+  }
+
+  return getRegionEntryAtLngLat(event.lngLat);
 }
 
 function setRegionBufferVisibility(map, visible) {
@@ -643,7 +745,7 @@ function setRegionBufferVisibility(map, visible) {
 
 function setRegionBoundsVisibility(map, visible) {
   const visibility = visible ? "visible" : "none";
-  [REGION_BOUNDS_FILL_LAYER_ID, REGION_BOUNDS_OUTLINE_LAYER_ID].forEach((layerId) => {
+  [REGION_BOUNDS_FILL_LAYER_ID, REGION_BOUNDS_HIT_LAYER_ID, REGION_BOUNDS_OUTLINE_LAYER_ID].forEach((layerId) => {
     if (map.getLayer(layerId)) {
       map.setLayoutProperty(layerId, "visibility", visibility);
     }
@@ -654,10 +756,23 @@ function setRegionBoundsVisibility(map, visible) {
   }
 }
 
+const appliedRegionBoundsData = new WeakMap();
+
 function applyRegionBoundsData(map, data) {
   const source = map.getSource(REGION_BOUNDS_SOURCE_ID);
-  if (source && typeof source.setData === "function" && data) {
-    source.setData(data);
+  if (!source || typeof source.setData !== "function" || !data) {
+    return;
+  }
+  if (appliedRegionBoundsData.get(map) === data) {
+    return;
+  }
+  source.setData(data);
+  appliedRegionBoundsData.set(map, data);
+  const loadedIds = mapsWithRegionHover.get(map)?.loadedIds;
+  if (Array.isArray(loadedIds) && loadedIds.length > 0) {
+    loadedIds.forEach((id) => {
+      map.setFeatureState({ source: REGION_BOUNDS_SOURCE_ID, id }, { hasData: true });
+    });
   }
 }
 
@@ -666,6 +781,8 @@ let regionHoverPopup = null;
 let regionActionPopup = null;
 let regionActionPopupAddHandler = null;
 let regionActionPopupIsolateHandler = null;
+let regionActionPopupToLayerHandler = null;
+let regionActionPopupLayerPickHandler = null;
 
 function escapeHtml(text) {
   return String(text ?? "")
@@ -689,14 +806,18 @@ function getRegionFeatureId(feature) {
 
 function getRegionFeatureTitle(feature) {
   const properties = feature?.properties ?? {};
-  return properties.name || properties.name_en || properties.iso || "Регион";
+  return properties.title || properties.name || properties.name_en || properties.iso || "Регион";
 }
 
-function hideRegionHoverPopup() {
+export function hideRegionHoverPopup() {
   if (regionHoverPopup) {
     regionHoverPopup.remove();
     regionHoverPopup = null;
   }
+}
+
+export function isRegionActionPopupOpen() {
+  return Boolean(regionActionPopup);
 }
 
 export function hideRegionActionPopup() {
@@ -712,8 +833,20 @@ export function hideRegionActionPopup() {
       .querySelector("[data-region-action-isolate]")
       ?.removeEventListener("click", regionActionPopupIsolateHandler);
   }
+  if (regionActionPopupToLayerHandler && popupElement) {
+    popupElement
+      .querySelector("[data-region-action-to-layer]")
+      ?.removeEventListener("click", regionActionPopupToLayerHandler);
+  }
+  if (regionActionPopupLayerPickHandler && popupElement) {
+    popupElement
+      .querySelector("[data-region-action-layer-list]")
+      ?.removeEventListener("click", regionActionPopupLayerPickHandler);
+  }
   regionActionPopupAddHandler = null;
   regionActionPopupIsolateHandler = null;
+  regionActionPopupToLayerHandler = null;
+  regionActionPopupLayerPickHandler = null;
   regionActionPopup = null;
   popup?.remove();
 }
@@ -721,7 +854,22 @@ export function hideRegionActionPopup() {
 const REGION_PLUS_ICON = `<svg class="region-action-popup-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.5" d="M12 5v14M5 12h14"/></svg>`;
 const REGION_MINUS_ICON = `<svg class="region-action-popup-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.5" d="M5 12h14"/></svg>`;
 
-export function showRegionActionPopup(map, { title, lngLat, selected = false, onAdd, onRemove, onIsolate }) {
+function renderRegionLayerChoices(choices) {
+  if (!choices.length) {
+    return `<div class="region-action-popup-layers-empty">Нет временных слоёв</div>`;
+  }
+  return choices
+    .map(
+      (choice) =>
+        `<button type="button" class="region-action-popup-layer-btn" data-plaque-key="${escapeHtml(choice.key)}">${escapeHtml(choice.label)}</button>`
+    )
+    .join("");
+}
+
+export function showRegionActionPopup(
+  map,
+  { title, lngLat, selected = false, onAdd, onRemove, onIsolate, getTempLayerChoices, onAddToLayer }
+) {
   if (!map || !lngLat) {
     return;
   }
@@ -748,7 +896,9 @@ export function showRegionActionPopup(map, { title, lngLat, selected = false, on
       <div class="region-action-popup-actions">
         <button type="button" class="region-action-popup-icon-btn" data-region-action-add title="${toggleLabel}" aria-label="${toggleLabel}">${toggleIcon}</button>
         <button type="button" class="feature-popup-action-btn" data-region-action-isolate>Изолировать</button>
-      </div>`
+        <button type="button" class="feature-popup-action-btn" data-region-action-to-layer>В слой</button>
+      </div>
+      <div class="region-action-popup-layers" data-region-action-layer-list hidden></div>`
     );
 
   popup.on("close", () => {
@@ -763,6 +913,8 @@ export function showRegionActionPopup(map, { title, lngLat, selected = false, on
   const popupElement = popup.getElement();
   const addButton = popupElement?.querySelector("[data-region-action-add]");
   const isolateButton = popupElement?.querySelector("[data-region-action-isolate]");
+  const toLayerButton = popupElement?.querySelector("[data-region-action-to-layer]");
+  const layerList = popupElement?.querySelector("[data-region-action-layer-list]");
   const toggleHandler = selected ? onRemove : onAdd;
 
   if (addButton && toggleHandler) {
@@ -782,9 +934,38 @@ export function showRegionActionPopup(map, { title, lngLat, selected = false, on
     };
     isolateButton.addEventListener("click", regionActionPopupIsolateHandler);
   }
+
+  if (toLayerButton && layerList) {
+    regionActionPopupToLayerHandler = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const opening = layerList.hasAttribute("hidden");
+      if (opening) {
+        const choices = typeof getTempLayerChoices === "function" ? getTempLayerChoices() : [];
+        layerList.innerHTML = renderRegionLayerChoices(Array.isArray(choices) ? choices : []);
+        layerList.removeAttribute("hidden");
+      } else {
+        layerList.setAttribute("hidden", "");
+      }
+    };
+    toLayerButton.addEventListener("click", regionActionPopupToLayerHandler);
+  }
+
+  if (layerList && onAddToLayer) {
+    regionActionPopupLayerPickHandler = (event) => {
+      const button = event.target?.closest?.("[data-plaque-key]");
+      if (!button) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      onAddToLayer(button.getAttribute("data-plaque-key"));
+    };
+    layerList.addEventListener("click", regionActionPopupLayerPickHandler);
+  }
 }
 
-function showRegionHoverPopup(map, lngLat, title) {
+export function showRegionHoverPopup(map, lngLat, title) {
   if (!regionHoverPopup) {
     regionHoverPopup = new mapboxgl.Popup({
       closeButton: false,
@@ -819,11 +1000,40 @@ function clearRegionHover(map) {
   hideRegionHoverPopup();
 }
 
+function isBasemapLabelLayer(hit) {
+  const source = String(hit.layer?.source || "");
+  return !source || source === "composite" || source.startsWith("mapbox");
+}
+
+function isTransparentCircleHit(hit) {
+  if (hit.layer?.type !== "circle") {
+    return false;
+  }
+  const opacity = hit.layer?.paint?.["circle-opacity"];
+  const strokeOpacity = hit.layer?.paint?.["circle-stroke-opacity"];
+  return opacity === 0 && (strokeOpacity === 0 || strokeOpacity == null);
+}
+
 function hasPointLayerUnderCursor(map, point) {
+  if (shouldSuppressLoadedPointLayers()) {
+    return false;
+  }
   const hits = safeQueryRenderedFeatures(map, point);
   return hits.some((hit) => {
     const type = hit.layer?.type;
-    return type === "circle" || type === "symbol";
+    if (type !== "circle" && type !== "symbol") {
+      return false;
+    }
+    if (isBasemapLabelLayer(hit)) {
+      return false;
+    }
+    if (hit.layer?.layout?.visibility === "none") {
+      return false;
+    }
+    if (isTransparentCircleHit(hit) || isCompactDensityFeature(hit)) {
+      return false;
+    }
+    return true;
   });
 }
 
@@ -852,6 +1062,17 @@ function setRegionHover(map, feature, lngLat, point) {
   showRegionHoverPopup(map, lngLat, getRegionFeatureTitle(feature));
 }
 
+function selectRegionAtEvent(map, event) {
+  const feature = event.features?.[0];
+  const entry = regionEntryFromFeature(feature) || getRegionFeatureAtClick(map, event);
+  if (!entry) {
+    return false;
+  }
+  event.preventDefault?.();
+  regionSelectListener?.(entry, event.lngLat);
+  return true;
+}
+
 function attachRegionHoverHandlers(map) {
   const state = mapsWithRegionHover.get(map) ?? { hoveredId: null, selectedId: null, attached: false };
   mapsWithRegionHover.set(map, state);
@@ -860,38 +1081,33 @@ function attachRegionHoverHandlers(map) {
   }
   state.attached = true;
 
-  map.on("mousemove", REGION_BOUNDS_FILL_LAYER_ID, (event) => {
-    const feature = event.features?.[0];
-    if (!feature) {
-      return;
-    }
-    applyMapCursor(map, "pointer");
-    setRegionHover(map, feature, event.lngLat, event.point);
-  });
+  const interactiveLayerIds = [
+    REGION_BOUNDS_HIT_LAYER_ID,
+    REGION_BOUNDS_FILL_LAYER_ID,
+    REGION_BOUNDS_OUTLINE_LAYER_ID
+  ];
 
-  map.on("mouseleave", REGION_BOUNDS_FILL_LAYER_ID, () => {
-    applyMapCursor(map, "");
-    clearRegionHover(map);
-  });
+  interactiveLayerIds.forEach((layerId) => {
+    map.on("mousemove", layerId, (event) => {
+      const feature = event.features?.[0];
+      if (!feature) {
+        return;
+      }
+      applyMapCursor(map, "pointer");
+      setRegionHover(map, feature, event.lngLat, event.point);
+    });
 
-  map.on("click", REGION_BOUNDS_FILL_LAYER_ID, (event) => {
-    if (hasPointLayerUnderCursor(map, event.point)) {
-      return;
-    }
-    const feature = event.features?.[0];
-    if (!feature) {
-      return;
-    }
-    event.preventDefault?.();
-    const iso = getRegionFeatureId(feature);
-    const entry = getRegionEntryByIso(iso) ?? {
-      iso,
-      name: getRegionFeatureTitle(feature),
-      nameEn: feature.properties?.name_en || "",
-      fo: feature.properties?.fo || "Прочие",
-      feature
-    };
-    regionSelectListener?.(entry, event.lngLat);
+    map.on("mouseleave", layerId, () => {
+      applyMapCursor(map, "");
+      clearRegionHover(map);
+    });
+
+    map.on("click", layerId, (event) => {
+      if (hasPointLayerUnderCursor(map, event.point)) {
+        return;
+      }
+      selectRegionAtEvent(map, event);
+    });
   });
 }
 
@@ -1138,6 +1354,25 @@ export function addRegionBoundsLayer(map, { loadData = false } = {}) {
           visibility: "none"
         },
         paint: buildFillPaint()
+      },
+      beforeId
+    );
+  }
+
+  if (!map.getLayer(REGION_BOUNDS_HIT_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: REGION_BOUNDS_HIT_LAYER_ID,
+        type: "fill",
+        source: REGION_BOUNDS_SOURCE_ID,
+        layout: {
+          visibility: "none"
+        },
+        paint: {
+          "fill-color": "#000000",
+          "fill-opacity": 0.01,
+          "fill-antialias": false
+        }
       },
       beforeId
     );
