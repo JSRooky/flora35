@@ -61,7 +61,8 @@ import {
 } from "./locations/regionSpeciesAllowlist";
 import { buildRegionSpeciesInventory } from "./map/regionSpeciesInventory";
 import {
-  isLargePointCount
+  isLargePointCount,
+  resolveAutoRasterMode
 } from "./components/mapPerformance";
 import {
   buildSpeciesSummaryFromDensePile,
@@ -254,7 +255,7 @@ import MapCornerControls from "./components/MapCornerControls";
 import MapZoomControl from "./components/MapZoomControl";
 import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
-import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler } from "./components/addGbifLayer";
+import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler, setGbifMapUpdatesPaused, clearGbifLayer } from "./components/addGbifLayer";
 import {
   clearRegionLoadSummary,
   setRegionLoadSummaryDisplayHandler,
@@ -673,6 +674,7 @@ export default function MapView() {
     void tempLayersRevision;
     return getVisibleRegionOverlayEditState();
   }, [tempLayersRevision]);
+  const activeRegionBufferKm = overlayRegionEdit.active ? overlayRegionBufferKm : regionBufferKm;
   const osmLayerTargetLabel = useMemo(() => {
     void tempLayersRevision;
     if (!selectedOsmRegionKey) {
