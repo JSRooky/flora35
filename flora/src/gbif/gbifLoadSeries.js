@@ -15,12 +15,12 @@ export const GBIF_SERIES_SOFT_LIMIT = 10000;
 /** Диапазон year, покрывающий facet=year (записи вне диапазона считаем «без года»). */
 const DATED_YEAR_RANGE = "1,3000";
 
-const SERIES_DELAY_MS = 50;
+const SERIES_DELAY_MS = 400;
 const PREVIEW_DELAY_MS = 300;
 const YEAR_FACET_LIMIT = 400;
 const DATASET_FACET_LIMIT = 300;
 /** Parallel datedCount probes for undated dataset planning. */
-export const UNDATED_PROBE_CONCURRENCY = 2;
+export const UNDATED_PROBE_CONCURRENCY = 1;
 
 function wait(ms, signal) {
   return new Promise((resolve, reject) => {

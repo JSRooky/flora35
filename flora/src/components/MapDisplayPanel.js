@@ -15,15 +15,14 @@ function getCollapsedSummary(
   clusterByTempSublayers,
   hasTempLayers,
   clusterPieCharts,
-  denseClustersHighlight
+  denseClustersHighlight,
+  compactPointDisplay
 ) {
   const parts = [];
 
-  if (!markersVisible) {
-    parts.push("маркеры скрыты");
-  }
-
-  if (markersVisible && denseClustersHighlight) {
+  if (compactPointDisplay && markersVisible) {
+    parts.push("компактная отрисовка");
+  } else if (markersVisible && denseClustersHighlight) {
     parts.push("плотные группы");
   } else if (clusteringEnabled && markersVisible) {
     if (clusterPieCharts) {
@@ -41,8 +40,12 @@ function getCollapsedSummary(
     } else {
       parts.push("кластеризация");
     }
-  } else if (markersVisible) {
+  } else if (markersVisible && !compactPointDisplay) {
     parts.push("без кластеризации");
+  }
+
+  if (!markersVisible) {
+    parts.push("маркеры скрыты");
   }
 
   if (heatmapEnabled) {
@@ -73,6 +76,12 @@ export default function MapDisplayPanel({
   onClusterPieChartsChange,
   denseClustersHighlight = false,
   onDenseClustersHighlightChange,
+  compactPointDisplay = false,
+  compactGridForced = false,
+  displayedLayerPointCount = 0,
+  compactGridPointLimit = 50000,
+  onCompactPointDisplayChange,
+  onCompactGridSettingsOpen,
   onDenseProcessingOpen,
   mergedPointsVisible = true,
   onMergedPointsVisibleChange,
@@ -88,7 +97,8 @@ export default function MapDisplayPanel({
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const [helpOpen, setHelpOpen] = useState(false); // раздел ## map в docs/moduleHelp.md
   // Кластеризация имеет смысл только когда маркеры видны.
-  const clusteringDisabled = !markersVisible || denseClustersHighlight;
+  const clusteringDisabled =
+    !markersVisible || denseClustersHighlight || compactPointDisplay;
   const clusterPieChartsDisabled = clusteringDisabled || !clusteringEnabled;
   const clusterByRegnumDisabled =
     clusteringDisabled || !clusteringEnabled || clusterPieCharts;
@@ -96,7 +106,7 @@ export default function MapDisplayPanel({
     clusteringDisabled || !clusteringEnabled || clusterPieCharts;
   const clusterByTempSublayersDisabled =
     clusterByTempLayersDisabled || !clusterByTempLayers;
-  const denseClustersHighlightDisabled = !markersVisible;
+  const denseClustersHighlightDisabled = !markersVisible || compactPointDisplay;
 
   return (
     <aside className={`map-display-panel ${collapsed ? "map-display-panel--collapsed" : ""}`}>
@@ -130,11 +140,50 @@ export default function MapDisplayPanel({
             clusterByTempSublayers,
             hasTempLayers,
             clusterPieCharts,
-            denseClustersHighlight
+            denseClustersHighlight,
+            compactPointDisplay
           )}
         </p>
       ) : (
         <div className="map-display-panel-content">
+          <h4 className="map-display-section-title">Память</h4>
+          <div className="map-display-dense-row">
+            <label
+              className={`map-display-switch${!markersVisible ? " map-display-switch--disabled" : ""}`}
+              title={
+                compactGridForced
+                  ? "Сетка включена автоматически: в отображаемых слоях больше лимита точек"
+                  : "Компактная отрисовка: сетка при большом числе загруженных точек"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={compactPointDisplay}
+                disabled={!markersVisible || compactGridForced}
+                onChange={(e) => onCompactPointDisplayChange?.(e.target.checked)}
+              />
+              <span className="map-display-switch-slider" />
+              <span className="map-display-switch-label">Компактная отрисовка</span>
+            </label>
+            <button
+              type="button"
+              className="map-display-dense-process-btn"
+              disabled={!markersVisible}
+              onClick={() => onCompactGridSettingsOpen?.()}
+              title="Цвет и размер сетки, лимит точек"
+            >
+              Настроить
+            </button>
+          </div>
+          <p className="map-display-compact-hint">
+            Сетка, если в отображаемых слоях больше{" "}
+            {Number(compactGridPointLimit).toLocaleString("ru-RU")} точек
+            {displayedLayerPointCount
+              ? ` (сейчас ${Number(displayedLayerPointCount).toLocaleString("ru-RU")})`
+              : ""}
+            .
+          </p>
+
           <h4 className="map-display-section-title">Кластеризация</h4>
 
           <label
@@ -142,14 +191,16 @@ export default function MapDisplayPanel({
             title={
               !markersVisible
                 ? "Доступно только при включённых маркерах"
-                : denseClustersHighlight
-                  ? "Недоступно в режиме плотных групп"
-                  : "Кластеризовать близкие точки"
+                : compactPointDisplay
+                  ? "Недоступно при компактной отрисовке"
+                  : denseClustersHighlight
+                    ? "Недоступно в режиме плотных групп"
+                    : "Кластеризовать близкие точки"
             }
           >
             <input
               type="checkbox"
-              checked={clusteringEnabled && !denseClustersHighlight}
+              checked={clusteringEnabled && !denseClustersHighlight && !compactPointDisplay}
               disabled={clusteringDisabled}
               onChange={(e) => onClusteringEnabledChange?.(e.target.checked)}
             />

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   getTempLayers,
+  isRegionOverlayBufferFeature,
   isRegionTempLayer,
   listTempLayerOriginItems,
   listTempLayerPlaques,
@@ -68,7 +69,11 @@ function formatPlaqueMeta(plaque) {
       (sum, layer) => sum + (layer.regionIds?.length || 0),
       0
     ) || plaque.layers.reduce(
-      (sum, layer) => sum + (layer.overlays?.find((item) => item.kind === "regions")?.features?.length || 0),
+      (sum, layer) =>
+        sum +
+        (layer.overlays
+          ?.find((item) => item.kind === "regions")
+          ?.features?.filter((feature) => !isRegionOverlayBufferFeature(feature)).length || 0),
       0
     );
     const points = plaque.layers.reduce(

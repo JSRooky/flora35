@@ -36,7 +36,8 @@
     "audit:locations": "node scripts/audit-firestore-locations.mjs --dry-run",
     "audit:locations:fix-local": "node scripts/audit-firestore-locations.mjs --fix-local",
     "audit:locations:fix-firestore": "node scripts/audit-firestore-locations.mjs --fix-firestore",
-    "audit:locations:fix-all": "node scripts/audit-firestore-locations.mjs --fix-local --fix-firestore"
+    "audit:locations:fix-all": "node scripts/audit-firestore-locations.mjs --fix-local --fix-firestore",
+    "extract:osm-admin": "node scripts/extract-osm-admin-boundaries.mjs"
   },
   "eslintConfig": {
     "extends": [

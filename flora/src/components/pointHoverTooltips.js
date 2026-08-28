@@ -3,6 +3,8 @@ import { getRegnumLabel, REGNUM_ORDER } from "./featurePropertyLabels";
 import { getPointColorForRegnum } from "./pointColors";
 
 const POINT_TOOLTIP_FADE_MS = 120;
+/** Максимум точек кластера, вытаскиваемых для подсказки при наведении (не весь кластер). */
+const HOVER_CLUSTER_LEAVES_SAMPLE_LIMIT = 5000;
 
 let hoverTooltipsEnabled = true;
 let pointHoverPopup = null;
@@ -350,13 +352,30 @@ export function showClusterRegnumHover(map, event, { getDensePileLeaves } = {}) 
   const requestId = clusterHoverRequestId + 1;
   clusterHoverRequestId = requestId;
 
-  source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
-    if (leavesErr || requestId !== clusterHoverRequestId || !leaves?.length) {
-      return;
-    }
+  // Infinity здесь означало вытаскивать ВСЕ точки кластера при каждом наведении
+  // мыши — на кластере из сотен тысяч GBIF/iNat находок это вешает основной поток
+  // (и способно уронить вкладку в OOM). Для подсказки достаточно представительной
+  // выборки; реальный total берём из point_count кластера, а не из длины выборки.
+  const totalPointCount = Number(props.point_count) || null;
+  source.getClusterLeaves(
+    clusterId,
+    HOVER_CLUSTER_LEAVES_SAMPLE_LIMIT,
+    0,
+    (leavesErr, leaves) => {
+      if (leavesErr || requestId !== clusterHoverRequestId || !leaves?.length) {
+        return;
+      }
 
-    showPointHoverPopup(map, coordinates, buildClusterRegnumTooltipHtml(leaves));
-  });
+      showPointHoverPopup(
+        map,
+        coordinates,
+        buildClusterRegnumTooltipHtml(
+          getRegnumCountsFromLeaves(leaves),
+          totalPointCount
+        )
+      );
+    }
+  );
 
   return requestId;
 }

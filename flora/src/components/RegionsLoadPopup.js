@@ -22,7 +22,8 @@ export default function RegionsLoadPopup({
   onLoadError,
   focusRegions = null,
   spatialByRegionId = null,
-  unmatchedLabels = []
+  unmatchedLabels = [],
+  onTempLayersChange
 }) {
   const handleClose = useCallback(() => {
     onClose?.();
@@ -62,7 +63,7 @@ export default function RegionsLoadPopup({
         <PanelHint>
           {Array.isArray(focusRegions) && focusRegions.length > 0
             ? `Показаны выбранные субъекты (${focusRegions.length}). Кликайте по числам царств, затем «Загрузить».`
-            : "Кликайте по числам царств, чтобы выбрать одно или несколько (пусто — все). Затем «Загрузить» / «Обновить». Корзина удаляет локальный набор выбранного региона. Источник: GBIF или iNaturalist."}
+            : "Клик по числу царства — фильтр (пусто = все). Затем загрузка или обновление."}
           {unmatchedLabels.length > 0
             ? ` Не сопоставлены с базами: ${unmatchedLabels.join(", ")}.`
             : ""}
@@ -97,6 +98,7 @@ export default function RegionsLoadPopup({
           onLoadError={onLoadError}
           regions={focusRegions}
           spatialByRegionId={spatialByRegionId}
+          onTempLayersChange={onTempLayersChange}
         />
       </div>
     </div>

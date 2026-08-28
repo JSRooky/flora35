@@ -1,22 +1,23 @@
 import { stampFeatureRegionIds } from "../externalSources/regionVisibility";
 import { getExternalRegionById } from "../externalSources/regions";
 import { TEMP_LAYER_MARKER_PALETTE } from "./tempLayerPalette";
+import {
+  TEMP_WORKING_SET_POINT_LIMIT,
+  evaluateTempLayerBudget,
+  formatTempBudgetBlockMessage
+} from "./tempLayerMemory";
 
 export { TEMP_LAYER_MARKER_PALETTE } from "./tempLayerPalette";
 
 const listeners = new Set();
 
 function cloneFeature(feature) {
-  try {
-    return JSON.parse(JSON.stringify(feature));
-  } catch {
-    return {
-      type: "Feature",
-      id: feature?.id,
-      geometry: feature?.geometry ?? null,
-      properties: { ...(feature?.properties ?? {}) }
-    };
-  }
+  return {
+    type: feature?.type || "Feature",
+    id: feature?.id,
+    geometry: feature?.geometry ?? null,
+    properties: { ...(feature?.properties ?? {}) }
+  };
 }
 
 function cloneJson(value) {
@@ -41,7 +42,13 @@ function normalizeOverlays(raw) {
         return null;
       }
       return {
+        id: entry?.id ? String(entry.id) : null,
         kind: String(entry?.kind || "shape"),
+        role: String(entry?.role || "region"),
+        parentId: entry?.parentId ? String(entry.parentId) : null,
+        regionKey: entry?.regionKey ? String(entry.regionKey) : null,
+        visible: entry?.visible !== false,
+        sourceKind: entry?.sourceKind ? String(entry.sourceKind) : null,
         label: String(entry?.label || "").trim() || "Фигура",
         features
       };
@@ -214,8 +221,12 @@ export function normalizeTempLayerMarkerColor(color) {
  *   features: object[]
  * }>} */
 let layers = [];
+let tempGeometriesHeld = false;
+
+let dataRevision = 0;
 
 function emit() {
+  dataRevision += 1;
   listeners.forEach((listener) => {
     try {
       listener();
@@ -223,6 +234,33 @@ function emit() {
       // подписчик не должен ломать остальных
     }
   });
+}
+
+export function areTempLayerGeometriesHeld() {
+  if (layers.some((layer) => layer.unloaded)) {
+    return false;
+  }
+  return tempGeometriesHeld;
+}
+
+/** Снимает GeoJSON точек с RAM, оставляя метаданные табличек. IndexedDB не трогает. */
+export function unloadTempLayerGeometries() {
+  layers = layers.map((layer) => {
+    if (isRegionTempLayer(layer)) {
+      return layer;
+    }
+    return {
+      ...layer,
+      pointCount: Array.isArray(layer.features)
+        ? layer.features.length
+        : Number(layer.pointCount) || 0,
+      features: [],
+      overlays: [],
+      unloaded: true
+    };
+  });
+  tempGeometriesHeld = false;
+  emit();
 }
 
 export function isRegionTempLayer(layer) {
@@ -240,6 +278,76 @@ export function getRegionOverlayFeatureIso(feature, fallbackIndex = 0) {
 
 export function isRegionOverlayBufferFeature(feature) {
   return feature?.properties?.overlayRole === "buffer";
+}
+
+function recordHasPointData(record) {
+  return (Array.isArray(record?.layers) ? record.layers : []).some((layer) => {
+    if (isRegionTempLayer(layer)) {
+      return false;
+    }
+    if (Array.isArray(layer?.features) && layer.features.length > 0) {
+      return true;
+    }
+    return Number(layer?.pointCount) > 0;
+  });
+}
+
+/** Полигоны регионов из архивных слоёв, у которых ещё есть точки. */
+export function collectArchivedRegionOverlayFeatures(records) {
+  const features = [];
+  (Array.isArray(records) ? records : []).forEach((record) => {
+    if (!recordHasPointData(record)) {
+      return;
+    }
+    const layers = Array.isArray(record.layers) ? record.layers : [];
+    const color =
+      record.markerColor ||
+      layers.find((layer) => layer?.markerColor)?.markerColor ||
+      "#6b7280";
+    const seenIso = new Set();
+    const pushFeature = (feature, index) => {
+      if (isRegionOverlayBufferFeature(feature)) {
+        return;
+      }
+      const type = feature?.geometry?.type;
+      if (type !== "Polygon" && type !== "MultiPolygon") {
+        return;
+      }
+      const restyled = restyleRegionOverlayFeature(feature, index, {
+        style: { fillColor: color, fillOpacity: 0.2 },
+        featureColors: null
+      });
+      const iso = restyled.properties?.iso;
+      if (iso && seenIso.has(String(iso))) {
+        return;
+      }
+      if (iso) {
+        seenIso.add(String(iso));
+      }
+      features.push({
+        ...restyled,
+        properties: {
+          ...restyled.properties,
+          overlayRole: "archived-region",
+          archived: true,
+          color
+        }
+      });
+    };
+
+    layers.forEach((layer) => {
+      normalizeOverlays(layer.overlays).forEach((overlay) => {
+        if (overlay.kind !== "regions") {
+          return;
+        }
+        (overlay.features || []).forEach(pushFeature);
+      });
+      if (isRegionTempLayer(layer)) {
+        (layer.features || []).forEach(pushFeature);
+      }
+    });
+  });
+  return features;
 }
 
 function layerHasRegionOverlays(layer) {
@@ -276,6 +384,12 @@ export function listVisibleRegionOverlayPolygons() {
   const seenGroups = new Set();
   layers.forEach((layer) => {
     if (!layer.visible || !layerHasRegionOverlays(layer)) {
+      return;
+    }
+    if (isRegionsRootLayer(layer) && !shouldShowRegionsRootOverlays()) {
+      return;
+    }
+    if (isRegionsRootLayer(layer)) {
       return;
     }
     const key = layerGroupKey(layer);
@@ -332,8 +446,14 @@ export function getVisibleRegionOverlayEditState() {
   };
 }
 
-/** Заливка, обводка и буфер — сразу на все видимые временные слои с регионами. */
-export function patchVisibleRegionOverlays({ style, featureColors, bufferKm } = {}) {
+/**
+ * Заливка, обводка и буфер — сразу на все видимые временные слои с регионами.
+ * `buildBufferFeature(regionFeatures, bufferKm)` — опциональный колбэк
+ * (внедряется вызывающим кодом, у которого есть доступ к turf/картe),
+ * который пересчитывает кольцо буфера, когда радиус меняется. Без него
+ * буфер просто убирается вместе со старыми (уже неверными) фичами.
+ */
+export function patchVisibleRegionOverlays({ style, featureColors, bufferKm, buildBufferFeature } = {}) {
   const nextStyle = style && typeof style === "object" ? style : undefined;
   const nextColors = featureColors;
   const nextBuffer = bufferKm === undefined ? undefined : Number(bufferKm) || 0;
@@ -356,6 +476,25 @@ export function patchVisibleRegionOverlays({ style, featureColors, bufferKm } = 
             featureColors: nextColors === undefined ? layer.regionFeatureColors : nextColors
           })
         );
+      }
+      const effectiveBufferKm = nextBuffer === undefined ? layer.bufferKm : nextBuffer;
+      if (effectiveBufferKm > 0 && typeof buildBufferFeature === "function") {
+        const halo = buildBufferFeature(features, effectiveBufferKm);
+        if (halo?.geometry) {
+          features = [
+            ...features,
+            {
+              type: "Feature",
+              geometry: halo.geometry,
+              properties: {
+                ...(halo.properties ?? {}),
+                overlayRole: "buffer",
+                color: "#0284c7",
+                fillOpacity: 0.16
+              }
+            }
+          ];
+        }
       }
       return { ...overlay, features };
     });
@@ -390,6 +529,60 @@ export function getTempLayerStaging() {
 
 export function getTempLayerStagingCount() {
   return staging.features.length;
+}
+
+/** Все точки во вкладке: staging + все плашки, включая скрытые. */
+export function getTempLayerRamPointCount() {
+  let count = staging.features.length;
+  layers.forEach((layer) => {
+    count += Array.isArray(layer?.features) ? layer.features.length : 0;
+  });
+  return count;
+}
+
+export function getTempLayerBudgetStatus(incomingCount = 0) {
+  return evaluateTempLayerBudget({
+    currentCount: getTempLayerRamPointCount(),
+    incomingCount
+  });
+}
+
+export function getTempLayerLoadBlockMessage(incomingCount = 0) {
+  const status = getTempLayerBudgetStatus(incomingCount);
+  return status.ok ? null : formatTempBudgetBlockMessage(status);
+}
+
+export function collectTempLayerFeaturesForRegion(source, regionId) {
+  const wanted = String(regionId || "");
+  const src = normalizeTempSource(source);
+  if (!wanted) {
+    return [];
+  }
+
+  const seen = new Set();
+  const features = [];
+  const take = (feature) => {
+    if (String(feature?.properties?.region_id || "") !== wanted) {
+      return;
+    }
+    const key = featureStableKey(feature);
+    if (key) {
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+    }
+    features.push(feature);
+  };
+
+  staging.features.forEach(take);
+  layers.forEach((layer) => {
+    if (normalizeTempSource(layer.source) !== src) {
+      return;
+    }
+    (layer.features ?? []).forEach(take);
+  });
+  return features;
 }
 
 export function getTempTaxonGroupKey(input = {}) {
@@ -461,13 +654,19 @@ export function upsertTempLayerStagingFeatures(features, regionId) {
     if (regionId && !staging.regionIds.includes(regionId)) {
       staging.regionIds = [...staging.regionIds, regionId];
     }
-    return { added: 0 };
+    return { added: 0, overBudget: false };
   }
 
   stampFeatureRegionIds(features, regionId);
   let added = 0;
+  let overBudget = false;
+  let ramCount = getTempLayerRamPointCount();
 
   features.forEach((feature) => {
+    if (ramCount >= TEMP_WORKING_SET_POINT_LIMIT) {
+      overBudget = true;
+      return;
+    }
     const key = featureStableKey(feature);
     if (!key || staging.keys.has(key)) {
       return;
@@ -475,13 +674,14 @@ export function upsertTempLayerStagingFeatures(features, regionId) {
     staging.keys.add(key);
     staging.features.push(feature);
     added += 1;
+    ramCount += 1;
   });
 
   if (regionId && !staging.regionIds.includes(regionId)) {
     staging.regionIds = [...staging.regionIds, regionId];
   }
 
-  return { added };
+  return { added, overBudget };
 }
 
 export function clearTempLayerStaging() {
@@ -647,9 +847,206 @@ function createLayerId() {
   return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function commitTempLayerStaging() {
+export const REGIONS_ROOT_GROUP_KEY = "regions-root";
+export const REGIONS_ROOT_LAYER_ID = "regions-root";
+
+export const REGION_BOUNDS_DISPLAY_SOURCES = {
+  DEFAULT: "default",
+  OSM: "osm"
+};
+
+let regionBoundsDisplaySource = REGION_BOUNDS_DISPLAY_SOURCES.DEFAULT;
+let regionBoundsContoursEnabled = true;
+const REGION_BOUNDS_DISPLAY_SOURCE_KEY = "flora35-region-bounds-display-source";
+
+export function getRegionBoundsDisplaySource() {
+  return regionBoundsDisplaySource;
+}
+
+export function hydrateRegionBoundsDisplaySource() {
+  if (typeof localStorage === "undefined") {
+    return regionBoundsDisplaySource;
+  }
+  try {
+    const saved = localStorage.getItem(REGION_BOUNDS_DISPLAY_SOURCE_KEY);
+    if (
+      saved === REGION_BOUNDS_DISPLAY_SOURCES.OSM ||
+      saved === REGION_BOUNDS_DISPLAY_SOURCES.DEFAULT
+    ) {
+      regionBoundsDisplaySource = saved;
+    }
+  } catch {
+    // ignore quota / private mode
+  }
+  return regionBoundsDisplaySource;
+}
+
+export function setRegionBoundsDisplaySource(source) {
+  regionBoundsDisplaySource =
+    source === REGION_BOUNDS_DISPLAY_SOURCES.OSM
+      ? REGION_BOUNDS_DISPLAY_SOURCES.OSM
+      : REGION_BOUNDS_DISPLAY_SOURCES.DEFAULT;
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  try {
+    localStorage.setItem(REGION_BOUNDS_DISPLAY_SOURCE_KEY, regionBoundsDisplaySource);
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+export function setRegionBoundsContoursEnabled(enabled) {
+  regionBoundsContoursEnabled = Boolean(enabled);
+}
+
+function shouldShowRegionsRootOverlays() {
+  return (
+    regionBoundsContoursEnabled &&
+    regionBoundsDisplaySource === REGION_BOUNDS_DISPLAY_SOURCES.OSM
+  );
+}
+
+export const REGION_OVERLAY_ROLES = {
+  COUNTRY: "country",
+  BOUNDARY: "boundary",
+  DISTRICTS: "districts"
+};
+
+function isRegionsRootLayer(layer) {
+  return (
+    isRegionTempLayer(layer) &&
+    (layer.id === REGIONS_ROOT_LAYER_ID || layerGroupKey(layer) === REGIONS_ROOT_GROUP_KEY)
+  );
+}
+
+function regionOverlayId(role, regionKey) {
+  return `${role}:${regionKey}`;
+}
+
+function isOverlayChainVisible(overlay, byId) {
+  if (overlay.visible === false) {
+    return false;
+  }
+  // Районы включаются отдельно от контура субъекта.
+  if (overlay.role === REGION_OVERLAY_ROLES.DISTRICTS) {
+    return true;
+  }
+  let parentId = overlay.parentId;
+  const seen = new Set();
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId);
+    const parent = byId.get(parentId);
+    if (!parent) {
+      break;
+    }
+    if (parent.visible === false) {
+      return false;
+    }
+    parentId = parent.parentId;
+  }
+  return true;
+}
+
+export function regionKeyFromFeature(feature, fallback = "") {
+  const properties = feature?.properties ?? {};
+  if (properties.ISO3166_2) {
+    return `osm:${properties.ISO3166_2}`;
+  }
+  if (properties.iso) {
+    return `iso:${properties.iso}`;
+  }
+  if (properties.OSM_ID != null && properties.OSM_ID !== "") {
+    return `osm:${properties.OSM_ID}`;
+  }
+  if (properties.title || properties.name) {
+    return `name:${properties.title || properties.name}`;
+  }
+  return fallback || "unknown";
+}
+
+function overlayOsmNumericId(properties) {
+  if (properties.OSM_ID != null && properties.OSM_ID !== "") {
+    return String(properties.OSM_ID);
+  }
+  if (properties.osm_id != null && properties.osm_id !== "") {
+    return String(properties.osm_id);
+  }
+  const atId = properties["@id"];
+  if (atId != null && String(atId).trim() !== "") {
+    const match = String(atId).match(/(\d+)\s*$/);
+    if (match) {
+      return match[1];
+    }
+  }
+  return "";
+}
+
+export function overlayFeatureIso(feature) {
+  const properties = feature?.properties ?? {};
+  const role = String(properties.overlayRole || "");
+  const osmId = overlayOsmNumericId(properties);
+  const existingIso = properties.iso != null ? String(properties.iso).trim() : "";
+  if (role === "districts" && osmId) {
+    return `osm:${osmId}`;
+  }
+  if (existingIso.startsWith("osm:")) {
+    return existingIso;
+  }
+  if (osmId && (role === "districts" || !existingIso)) {
+    return `osm:${osmId}`;
+  }
+  if (existingIso) {
+    return existingIso;
+  }
+  if (properties.ISO_1 != null && String(properties.ISO_1).trim() !== "") {
+    return String(properties.ISO_1);
+  }
+  if (osmId) {
+    return `osm:${osmId}`;
+  }
+  if (properties.ISO3166_2) {
+    return String(properties.ISO3166_2).replace("-", ".");
+  }
+  return "";
+}
+
+function paintOverlayFeatures(features, { color, fillOpacity, overlayRole }) {
+  return cloneFeatures(features).map((feature) => {
+    const iso = overlayFeatureIso(feature);
+    return {
+      ...feature,
+      id: iso || feature.id,
+      properties: {
+        ...(feature.properties ?? {}),
+        iso: iso || undefined,
+        overlayRole,
+        color,
+        fillOpacity
+      }
+    };
+  });
+}
+
+export function commitTempLayerStaging(options = {}) {
   if (staging.features.length === 0) {
     return null;
+  }
+
+  const plaqueKey = String(options?.plaqueKey || "").trim();
+  const forceNew = Boolean(options?.forceNew);
+
+  if (plaqueKey) {
+    const plaque = listTempLayerPlaques().find((item) => item.key === plaqueKey);
+    const base = plaque?.layers?.[0];
+    if (base) {
+      const buckets = bucketFeaturesBySource(staging.features);
+      mergeBucketsIntoPlaque(base, buckets, staging.regionIds);
+      staging = createEmptyStaging();
+      tempGeometriesHeld = true;
+      emit();
+      return layers.find((layer) => layerGroupKey(layer) === plaqueKey) || base;
+    }
   }
 
   const source = normalizeTempSource(staging.source);
@@ -665,9 +1062,11 @@ export function commitTempLayerStaging() {
   const sibling = layers.find(
     (layer) => layerGroupKey(layer) === groupKey && normalizeTempSource(layer.source) !== source
   );
-  const sameSource = layers.find(
-    (layer) => layerGroupKey(layer) === groupKey && normalizeTempSource(layer.source) === source
-  );
+  const sameSource = forceNew
+    ? null
+    : layers.find(
+        (layer) => layerGroupKey(layer) === groupKey && normalizeTempSource(layer.source) === source
+      );
   const markerColor = sibling?.markerColor ?? sameSource?.markerColor ?? null;
   const taxonFields = {
     taxonName: staging.taxonName || sibling?.taxonName || "",
@@ -721,7 +1120,7 @@ export function commitTempLayerStaging() {
     ...taxonFields,
     regionIds,
     createdAt: new Date().toISOString(),
-    visible: true,
+    visible: false,
     heatmapEnabled: sibling ? Boolean(sibling.heatmapEnabled) : false,
     markerColor,
     archiveId: sameSource?.archiveId ?? sibling?.archiveId ?? null,
@@ -733,6 +1132,7 @@ export function commitTempLayerStaging() {
   );
   layers = [layer, ...layers];
   staging = createEmptyStaging();
+  tempGeometriesHeld = true;
   emit();
   return layer;
 }
@@ -833,6 +1233,7 @@ export function createTempLayerFromFilterSnapshot({ features, filters, overlays 
       createdIds.has(layer.id) ? layer : { ...layer, visible: false }
     )
   ];
+  tempGeometriesHeld = true;
   emit();
   return { ok: true, layers: created };
 }
@@ -842,6 +1243,73 @@ function nextUnusedMarkerColor() {
     layers.map((layer) => normalizeTempLayerMarkerColor(layer.markerColor)).filter(Boolean)
   );
   return TEMP_LAYER_MARKER_PALETTE.find((color) => !used.has(color)) ?? TEMP_LAYER_MARKER_PALETTE[0];
+}
+
+/**
+ * Кладёт полигон субъекта в overlays выбранной рабочей плашки.
+ */
+export function appendRegionPolygonToTempPlaque(plaqueKey, { iso, feature, name } = {}) {
+  const regionIso = iso == null ? "" : String(iso);
+  const geomType = feature?.geometry?.type;
+  if (!plaqueKey || !regionIso || (geomType !== "Polygon" && geomType !== "MultiPolygon")) {
+    return { ok: false, reason: "invalid" };
+  }
+
+  const plaque = listTempLayerPlaques().find((item) => item.key === plaqueKey);
+  const host =
+    plaque?.layers?.find((layer) => layerHasRegionOverlays(layer) || isRegionTempLayer(layer)) ??
+    plaque?.layers?.[0];
+  if (!host) {
+    return { ok: false, reason: "missing" };
+  }
+
+  const markerColor = host.markerColor || plaque.markerColor;
+  const overlayFeature = cloneSnapshotFeature(feature);
+  overlayFeature.properties = {
+    ...(overlayFeature.properties ?? {}),
+    iso: regionIso,
+    name: name || overlayFeature.properties?.name,
+    overlayRole: "region",
+    color: markerColor,
+    fillOpacity:
+      overlayFeature.properties.fillOpacity == null ? 0.18 : overlayFeature.properties.fillOpacity
+  };
+
+  layers = layers.map((layer) => {
+    if (layer.id !== host.id) {
+      return layer;
+    }
+    const overlays = normalizeOverlays(layer.overlays);
+    const regionIndex = overlays.findIndex((item) => item.kind === "regions");
+    if (regionIndex >= 0) {
+      const existing = overlays[regionIndex];
+      const already = (existing.features ?? []).some(
+        (item) => getRegionOverlayFeatureIso(item) === regionIso
+      );
+      const features = already ? existing.features : [...existing.features, overlayFeature];
+      return {
+        ...layer,
+        regionIds: mergeRegionIds(layer.regionIds, [regionIso]),
+        overlays: overlays.map((item, index) =>
+          index === regionIndex ? { ...item, features } : item
+        )
+      };
+    }
+    return {
+      ...layer,
+      regionIds: mergeRegionIds(layer.regionIds, [regionIso]),
+      overlays: [
+        ...overlays,
+        {
+          kind: "regions",
+          label: name || layer.label || "Регионы",
+          features: [overlayFeature]
+        }
+      ]
+    };
+  });
+  emit();
+  return { ok: true };
 }
 
 export function commitRegionSelectionTempLayer({
@@ -901,6 +1369,402 @@ export function commitRegionSelectionTempLayer({
   layers = [layer, ...layers];
   emit();
   return layer;
+}
+
+function ensureRegionsRootLayer() {
+  const existing = layers.find((layer) => isRegionsRootLayer(layer));
+  if (existing) {
+    return existing;
+  }
+  const markerColor = nextUnusedMarkerColor();
+  const layer = {
+    id: REGIONS_ROOT_LAYER_ID,
+    kind: "regions",
+    label: "Регионы",
+    source: TEMP_SOURCE_IDS.REGIONS,
+    groupKey: REGIONS_ROOT_GROUP_KEY,
+    taxonName: "Регионы",
+    taxonMode: null,
+    taxonKey: null,
+    familyKey: null,
+    inatTaxonId: null,
+    regionIds: [],
+    bufferKm: 0,
+    createdAt: new Date().toISOString(),
+    visible: true,
+    heatmapEnabled: false,
+    markerColor,
+    archiveId: null,
+    overlays: [],
+    features: []
+  };
+  layers = [layer, ...layers];
+  tempGeometriesHeld = true;
+  return layer;
+}
+
+function writeRegionsRoot(mutate) {
+  ensureRegionsRootLayer();
+  layers = layers.map((layer) => (isRegionsRootLayer(layer) ? mutate(layer) : layer));
+  const root = layers.find((layer) => isRegionsRootLayer(layer));
+  emit();
+  return root;
+}
+
+function upsertOverlayOnRoot(layer, overlay) {
+  const overlays = normalizeOverlays(layer.overlays);
+  const index = overlays.findIndex((item) => item.id === overlay.id);
+  const nextOverlays =
+    index >= 0
+      ? overlays.map((item, itemIndex) => (itemIndex === index ? { ...item, ...overlay } : item))
+      : [...overlays, overlay];
+  const regionIds = mergeRegionIds(layer.regionIds, overlay.regionKey ? [overlay.regionKey] : []);
+  return { ...layer, overlays: nextOverlays, regionIds };
+}
+
+export function ensureMapRegionBoundary({ iso, name, feature } = {}) {
+  const regionIso = iso == null ? "" : String(iso);
+  const geomType = feature?.geometry?.type;
+  if (!regionIso || (geomType !== "Polygon" && geomType !== "MultiPolygon")) {
+    return null;
+  }
+  const regionKey = `iso:${regionIso}`;
+  const overlayId = regionOverlayId(REGION_OVERLAY_ROLES.BOUNDARY, regionKey);
+  const root = writeRegionsRoot((layer) => {
+    const color = layer.markerColor;
+    return upsertOverlayOnRoot(layer, {
+      id: overlayId,
+      kind: "regions",
+      role: REGION_OVERLAY_ROLES.BOUNDARY,
+      parentId: null,
+      regionKey,
+      visible: true,
+      sourceKind: "map",
+      label: name || feature.properties?.name || regionIso,
+      features: paintOverlayFeatures([feature], {
+        color,
+        fillOpacity: 0.16,
+        overlayRole: "region"
+      })
+    });
+  });
+  return { regionKey, overlayId, layer: root };
+}
+
+export function ingestOsmAdminOverlays({ mode, collection, parent } = {}) {
+  const features = (collection?.features ?? []).filter((feature) => {
+    const type = feature?.geometry?.type;
+    return type === "Polygon" || type === "MultiPolygon";
+  });
+  if (!features.length) {
+    return null;
+  }
+
+  return writeRegionsRoot((layer) => {
+    const color = layer.markerColor;
+    let next = layer;
+
+    if (mode === "country") {
+      const regionKey = "country:RU";
+      next = upsertOverlayOnRoot(next, {
+        id: regionOverlayId(REGION_OVERLAY_ROLES.COUNTRY, regionKey),
+        kind: "regions",
+        role: REGION_OVERLAY_ROLES.COUNTRY,
+        parentId: null,
+        regionKey,
+        visible: true,
+        sourceKind: "osm",
+        label: "Граница России",
+        features: paintOverlayFeatures(features, {
+          color,
+          fillOpacity: 0.08,
+          overlayRole: "region"
+        })
+      });
+      return next;
+    }
+
+    if (mode === "regions") {
+      features.forEach((feature) => {
+        const regionKey = regionKeyFromFeature(feature);
+        const label = feature.properties?.title || feature.properties?.name || regionKey;
+        next = upsertOverlayOnRoot(next, {
+          id: regionOverlayId(REGION_OVERLAY_ROLES.BOUNDARY, regionKey),
+          kind: "regions",
+          role: REGION_OVERLAY_ROLES.BOUNDARY,
+          parentId: null,
+          regionKey,
+          visible: true,
+          sourceKind: "osm",
+          label,
+          features: paintOverlayFeatures([feature], {
+            color,
+            fillOpacity: 0.16,
+            overlayRole: "region"
+          })
+        });
+      });
+      return next;
+    }
+
+    const parentKey = parent?.regionKey;
+    const parentLabel = parent?.label || "Регион";
+    if (!parentKey) {
+      return next;
+    }
+    const parentId = regionOverlayId(REGION_OVERLAY_ROLES.BOUNDARY, parentKey);
+    if (parent?.features?.length) {
+      next = upsertOverlayOnRoot(next, {
+        id: parentId,
+        kind: "regions",
+        role: REGION_OVERLAY_ROLES.BOUNDARY,
+        parentId: null,
+        regionKey: parentKey,
+        visible: true,
+        sourceKind: parent.sourceKind || "osm",
+        label: parentLabel,
+        features: paintOverlayFeatures(parent.features, {
+          color,
+          fillOpacity: 0.16,
+          overlayRole: "region"
+        })
+      });
+    }
+    next = upsertOverlayOnRoot(next, {
+      id: regionOverlayId(REGION_OVERLAY_ROLES.DISTRICTS, parentKey),
+      kind: "regions",
+      role: REGION_OVERLAY_ROLES.DISTRICTS,
+      parentId,
+      regionKey: parentKey,
+      visible: true,
+      sourceKind: "osm",
+      label: `Адм. деление · ${parentLabel}`,
+      features: paintOverlayFeatures(features, {
+        color,
+        fillOpacity: 0.22,
+        overlayRole: "districts"
+      })
+    });
+    return next;
+  });
+}
+
+export function setRegionsRootVisible(visible) {
+  writeRegionsRoot((layer) => ({ ...layer, visible: Boolean(visible) }));
+}
+
+export function setRegionOverlayVisible(overlayId, visible) {
+  if (!overlayId) {
+    return;
+  }
+  writeRegionsRoot((layer) => ({
+    ...layer,
+    overlays: normalizeOverlays(layer.overlays).map((overlay) =>
+      overlay.id === overlayId ? { ...overlay, visible: Boolean(visible) } : overlay
+    )
+  }));
+}
+
+function collectOverlayIdsToRemove(overlays, overlayId) {
+  const ids = new Set([overlayId]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    overlays.forEach((item) => {
+      if (item?.id && item.parentId && ids.has(item.parentId) && !ids.has(item.id)) {
+        ids.add(item.id);
+        grew = true;
+      }
+    });
+  }
+  return ids;
+}
+
+export function removeRegionOverlay(overlayId) {
+  if (!overlayId) {
+    return;
+  }
+  const existing = layers.find((layer) => isRegionsRootLayer(layer));
+  if (!existing) {
+    return;
+  }
+  const overlays = normalizeOverlays(existing.overlays);
+  const removeIds = collectOverlayIdsToRemove(overlays, overlayId);
+  const nextOverlays = overlays.filter((item) => !removeIds.has(item.id));
+  if (nextOverlays.length === 0) {
+    layers = layers.filter((layer) => !isRegionsRootLayer(layer));
+    emit();
+    return;
+  }
+  layers = layers.map((layer) =>
+    isRegionsRootLayer(layer) ? { ...layer, overlays: nextOverlays } : layer
+  );
+  emit();
+}
+
+export function removeRegionsRootLayer() {
+  if (!layers.some((layer) => isRegionsRootLayer(layer))) {
+    return;
+  }
+  layers = layers.filter((layer) => !isRegionsRootLayer(layer));
+  emit();
+}
+
+export function listRegionLayerTree() {
+  const layer = layers.find((item) => isRegionsRootLayer(item));
+  if (!layer) {
+    return { visible: true, items: [], empty: true };
+  }
+  const overlays = normalizeOverlays(layer.overlays);
+  const byId = new Map(overlays.filter((item) => item.id).map((item) => [item.id, item]));
+  const collator = new Intl.Collator("ru");
+  const top = overlays
+    .filter(
+      (item) =>
+        !item.parentId &&
+        (item.role === REGION_OVERLAY_ROLES.COUNTRY || item.role === REGION_OVERLAY_ROLES.BOUNDARY)
+    )
+    .sort((a, b) => {
+      if (a.role !== b.role) {
+        return a.role === REGION_OVERLAY_ROLES.COUNTRY ? -1 : 1;
+      }
+      return collator.compare(a.label, b.label);
+    })
+    .map((item) => {
+      const children = overlays
+        .filter((child) => child.parentId === item.id)
+        .map((child) => ({
+          id: child.id,
+          regionKey: child.regionKey,
+          role: child.role,
+          label: child.label,
+          visible: child.visible !== false,
+          effectiveVisible: layer.visible && isOverlayChainVisible(child, byId),
+          featureCount: child.features?.length ?? 0,
+          sourceKind: child.sourceKind,
+          hasDistricts: true,
+          children: []
+        }));
+      return {
+        id: item.id,
+        regionKey: item.regionKey,
+        role: item.role,
+        label: item.label,
+        visible: item.visible !== false,
+        effectiveVisible: layer.visible && isOverlayChainVisible(item, byId),
+        featureCount: item.features?.length ?? 0,
+        sourceKind: item.sourceKind,
+        hasDistricts: children.some((child) => child.role === REGION_OVERLAY_ROLES.DISTRICTS),
+        children
+      };
+    });
+
+  return {
+    visible: Boolean(layer.visible),
+    items: top,
+    empty: top.length === 0
+  };
+}
+
+export function getRegionOverlayByKey(regionKey) {
+  const layer = layers.find((item) => isRegionsRootLayer(item));
+  if (!layer || !regionKey) {
+    return null;
+  }
+  return (
+    normalizeOverlays(layer.overlays).find(
+      (item) => item.regionKey === regionKey && item.role === REGION_OVERLAY_ROLES.BOUNDARY
+    ) ?? null
+  );
+}
+
+export function listRegionOverlayPlaceNames(overlayId) {
+  const layer = layers.find((item) => isRegionsRootLayer(item));
+  if (!layer || !overlayId) {
+    return [];
+  }
+  const overlay = normalizeOverlays(layer.overlays).find((item) => item.id === overlayId);
+  if (!overlay) {
+    return [];
+  }
+  const collator = new Intl.Collator("ru");
+  const seen = new Set();
+  return (overlay.features ?? [])
+    .map((feature, index) => {
+      const properties = feature?.properties ?? {};
+      const name = String(
+        properties.title || properties.name || properties.official_name || ""
+      ).trim();
+      return {
+        id: String(overlayFeatureIso(feature) || properties.iso || properties.OSM_ID || `${overlayId}:${index}`),
+        iso: overlayFeatureIso(feature) || String(properties.iso || ""),
+        name: name || `Участок ${index + 1}`,
+        adminLevel: properties.admin_level ?? null
+      };
+    })
+    .filter((entry) => {
+      const key = `${entry.id}:${entry.name}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => collator.compare(left.name, right.name));
+}
+
+export function findOsmOverlayFeatureByIso(iso) {
+  const needle = String(iso || "").trim();
+  if (!needle) {
+    return null;
+  }
+  const layer = layers.find((item) => isRegionsRootLayer(item));
+  if (!layer) {
+    return null;
+  }
+  for (const overlay of normalizeOverlays(layer.overlays)) {
+    for (const feature of overlay.features || []) {
+      if (overlayFeatureIso(feature) === needle || String(feature.properties?.iso || "") === needle) {
+        return feature;
+      }
+    }
+  }
+  return null;
+}
+
+export function listOsmOverlaySelectableIsos() {
+  const layer = layers.find((item) => isRegionsRootLayer(item));
+  if (!layer) {
+    return [];
+  }
+  const isos = [];
+  normalizeOverlays(layer.overlays).forEach((overlay) => {
+    (overlay.features || []).forEach((feature) => {
+      const id = overlayFeatureIso(feature);
+      if (id) {
+        isos.push(id);
+      }
+    });
+  });
+  return [...new Set(isos)];
+}
+
+export function osmOverlayEntryFromFeature(feature) {
+  if (!feature) {
+    return null;
+  }
+  const iso = overlayFeatureIso(feature);
+  if (!iso) {
+    return null;
+  }
+  const properties = feature.properties ?? {};
+  return {
+    iso,
+    name: properties.title || properties.name || properties.name_en || iso,
+    nameEn: properties.name_en || "",
+    fo: properties.fo || "OSM",
+    feature
+  };
 }
 
 function mergeUniqueFeatures(existing, incoming) {
@@ -990,7 +1854,10 @@ function mergeBucketsIntoPlaque(base, buckets, regionIds) {
     }
     const existing = nextLayers.find(
       (layer) =>
-        layerGroupKey(layer) === groupKey && normalizeTempSource(layer.source) === source
+        !isRegionTempLayer(layer) &&
+        !layerHasRegionOverlays(layer) &&
+        layerGroupKey(layer) === groupKey &&
+        normalizeTempSource(layer.source) === source
     );
     if (existing) {
       const merged = mergeUniqueFeatures(existing.features, incoming);
@@ -1051,6 +1918,41 @@ function explodeMixedRegionPointLayers(list) {
   return extra.length > 0 ? [...extra, ...next] : list;
 }
 
+function overlayFeatureKey(feature) {
+  const props = feature?.properties ?? {};
+  return String(props.iso || props.ISO_1 || props.region_id || feature?.id || "");
+}
+
+/** Добавляет новые overlay-полигоны регионов к уже существующим, без дублей. */
+function mergeRegionOverlaySnapshots(existingOverlays, incomingOverlays) {
+  const existing = normalizeOverlays(existingOverlays);
+  const incoming = normalizeOverlays(incomingOverlays);
+  if (incoming.length === 0) {
+    return existing;
+  }
+
+  const merged = existing.map((entry) => ({ ...entry, features: [...entry.features] }));
+  incoming.forEach((incomingEntry) => {
+    let target = merged.find((entry) => entry.kind === incomingEntry.kind);
+    if (!target) {
+      target = { ...incomingEntry, features: [] };
+      merged.push(target);
+    }
+    const seen = new Set(target.features.map((feature) => overlayFeatureKey(feature)));
+    incomingEntry.features.forEach((feature) => {
+      const key = overlayFeatureKey(feature);
+      if (key && seen.has(key)) {
+        return;
+      }
+      if (key) {
+        seen.add(key);
+      }
+      target.features.push(feature);
+    });
+  });
+  return merged;
+}
+
 /**
  * Кладёт точки в видимый временный слой с контурами регионов.
  * Если такого слоя нет, создаёт его из переданных overlays.
@@ -1070,6 +1972,13 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
   const buckets = bucketFeaturesBySource(incoming);
   const target = layers.find((layer) => layer.visible && layerHasRegionOverlays(layer));
   if (target) {
+    const incomingOverlaySnapshot = normalizeOverlays(overlays);
+    if (incomingOverlaySnapshot.length > 0) {
+      const mergedOverlays = mergeRegionOverlaySnapshots(target.overlays, incomingOverlaySnapshot);
+      layers = layers.map((layer) =>
+        layer.id === target.id ? { ...layer, overlays: mergedOverlays } : layer
+      );
+    }
     const added = mergeBucketsIntoPlaque(target, buckets, regionIds);
     emit();
     return { ok: true, appended: true, added, layer: target };
@@ -1226,6 +2135,19 @@ export function replaceTempLayers(nextLayers) {
   layers = explodeMixedRegionPointLayers(
     Array.isArray(nextLayers) ? nextLayers.map(normalizePersistedLayer) : []
   );
+  tempGeometriesHeld = true;
+  emit();
+}
+
+export function mergePersistedRegionTempLayers(regionLayers) {
+  const incoming = (Array.isArray(regionLayers) ? regionLayers : [])
+    .filter((layer) => isRegionTempLayer(layer))
+    .map(normalizePersistedLayer);
+  if (!incoming.length) {
+    return;
+  }
+  const others = layers.filter((layer) => !isRegionTempLayer(layer));
+  layers = [...incoming, ...others];
   emit();
 }
 
@@ -1239,9 +2161,12 @@ function stampGroupFeatures(rawFeatures, layerId, markerColor, source) {
     if (markerColor) {
       properties.temp_marker_color = markerColor;
     }
-    const inferred = inferFeatureTempSource(feature) || tempSource;
-    if (inferred) {
-      properties.temp_source = inferred;
+    // Слой уже корректно рассортирован по источнику (bucketFeaturesBySource /
+    // explodeMixedRegionPointLayers) — его source приоритетнее, чем догадка
+    // по возможно устаревшим properties отдельной точки.
+    const resolvedSource = tempSource || inferFeatureTempSource(feature);
+    if (resolvedSource) {
+      properties.temp_source = resolvedSource;
     }
     return {
       ...feature,
@@ -1265,7 +2190,14 @@ function inferFeatureTempSource(feature) {
   return null;
 }
 
+let cachedFeatureGroupsRevision = -1;
+let cachedFeatureGroups = null;
+
 export function getTempLayerFeatureGroups() {
+  if (cachedFeatureGroups && cachedFeatureGroupsRevision === dataRevision) {
+    return cachedFeatureGroups;
+  }
+
   const groups = [];
 
   if (staging.features.length > 0) {
@@ -1296,11 +2228,46 @@ export function getTempLayerFeatureGroups() {
     });
   });
 
+  cachedFeatureGroups = groups;
+  cachedFeatureGroupsRevision = dataRevision;
   return groups;
 }
 
 export function getVisibleTempLayerFeatures() {
   return getTempLayerFeatureGroups().flatMap((group) => group.features);
+}
+
+/**
+ * Проходит по координатам видимых точек временных слоёв без клонирования
+ * фич и без сборки объектов properties (в отличие от getVisibleTempLayerFeatures).
+ * Предназначено для режима плотностной сетки, где нужны только координаты —
+ * иначе на каждый pan/zoom при сотнях тысяч точек пришлось бы пересобирать
+ * полный набор GeoJSON-объектов.
+ */
+export function forEachVisibleTempLayerPoint(visitPoint) {
+  if (typeof visitPoint !== "function") {
+    return;
+  }
+
+  const visitList = (features) => {
+    if (!Array.isArray(features)) {
+      return;
+    }
+    for (let i = 0; i < features.length; i += 1) {
+      const feature = features[i];
+      const coordinates = feature?.geometry?.coordinates;
+      if (Array.isArray(coordinates) && coordinates.length >= 2) {
+        visitPoint(coordinates[0], coordinates[1], feature);
+      }
+    }
+  };
+
+  visitList(staging.features);
+  layers.forEach((layer) => {
+    if (layer.visible) {
+      visitList(layer.features);
+    }
+  });
 }
 
 export function getVisibleTempLayerOverlays() {
@@ -1309,6 +2276,9 @@ export function getVisibleTempLayerOverlays() {
 
   layers.forEach((layer) => {
     if (!layer.visible) {
+      return;
+    }
+    if (isRegionsRootLayer(layer) && !shouldShowRegionsRootOverlays()) {
       return;
     }
     const key = layerGroupKey(layer);
@@ -1320,7 +2290,14 @@ export function getVisibleTempLayerOverlays() {
       layers.find(
         (item) => layerGroupKey(item) === key && normalizeOverlays(item.overlays).length > 0
       ) || layer;
-    normalizeOverlays(overlayOwner.overlays).forEach((overlay) => overlays.push(overlay));
+    const allOverlays = normalizeOverlays(overlayOwner.overlays);
+    const byId = new Map(allOverlays.filter((item) => item.id).map((item) => [item.id, item]));
+    allOverlays.forEach((overlay) => {
+      if (!isOverlayChainVisible(overlay, byId)) {
+        return;
+      }
+      overlays.push(overlay);
+    });
   });
 
   return overlays;
@@ -1341,11 +2318,18 @@ export function getAllTempLayerFeatures() {
 }
 
 export function getAllTempLayerFeatureCount() {
-  return getAllTempLayerFeatures().length;
+  return getTempLayerRamPointCount();
 }
+
+let cachedPlaqueGroupsRevision = -1;
+let cachedPlaqueGroups = null;
 
 /** Группы для кластеризации «по слоям»: одна единица на плашку (GBIF+iNat вместе). */
 export function getTempLayerPlaqueFeatureGroups() {
+  if (cachedPlaqueGroups && cachedPlaqueGroupsRevision === dataRevision) {
+    return cachedPlaqueGroups;
+  }
+
   const groups = [];
 
   if (staging.features.length > 0) {
@@ -1394,15 +2378,16 @@ export function getTempLayerPlaqueFeatureGroups() {
     });
   });
 
+  cachedPlaqueGroups = groups;
+  cachedPlaqueGroupsRevision = dataRevision;
   return groups;
 }
 
 export function listTempLayerPlaques() {
-  layers = explodeMixedRegionPointLayers(layers);
   const plaques = [];
   const indexByKey = new Map();
 
-  layers.forEach((layer) => {
+  explodeMixedRegionPointLayers(layers).forEach((layer) => {
     const key = layerGroupKey(layer);
     let plaque = indexByKey.get(key);
     if (!plaque) {
@@ -1441,15 +2426,30 @@ export function serializeTempLayers() {
   return layers.map((layer) => serializeLayer(layer));
 }
 
+export function canPersistTempLayersSafely() {
+  return tempGeometriesHeld && !layers.some((layer) => layer.unloaded);
+}
+
 /** @type {Array<object>} */
 let archiveIndex = [];
+/** @type {object[]} */
+let archivedRegionOverlayFeatures = [];
 
 export function getTempLayerArchiveIndex() {
   return archiveIndex;
 }
 
+export function getArchivedRegionOverlayFeatures() {
+  return archivedRegionOverlayFeatures;
+}
+
 export function replaceTempLayerArchiveIndex(entries) {
   archiveIndex = Array.isArray(entries) ? entries : [];
+  emit();
+}
+
+export function replaceArchivedRegionOverlayFeatures(features) {
+  archivedRegionOverlayFeatures = Array.isArray(features) ? features : [];
   emit();
 }
 
@@ -1524,6 +2524,66 @@ function serializeLayer(layer) {
     overlays: normalizeOverlays(layer.overlays),
     features: layer.features
   };
+}
+
+export function summarizeTempLayerSettings(layer) {
+  return {
+    id: layer.id,
+    kind: isRegionTempLayer(layer) ? "regions" : layer.kind ?? "points",
+    label: layer.label,
+    source: normalizeTempSource(layer.source),
+    groupKey: layerGroupKey(layer),
+    taxonName: layer.taxonName ?? null,
+    visible: Boolean(layer.visible),
+    heatmapEnabled: Boolean(layer.heatmapEnabled),
+    markerColor: layer.markerColor ?? null,
+    regionStyle: layer.regionStyle ?? null,
+    regionFeatureColors: layer.regionFeatureColors ?? null,
+    createdAt: layer.createdAt ?? null,
+    updatedAt: layer.updatedAt ?? layer.createdAt ?? null,
+    archiveId: layer.archiveId ?? null,
+    pointCount: Array.isArray(layer.features)
+      ? layer.features.length
+      : Number(layer.pointCount) || 0,
+    filterSnapshot: normalizeFilterSnapshot(layer.filterSnapshot)
+  };
+}
+
+export function summarizeTempLayersSettings() {
+  return layers.map((layer) => summarizeTempLayerSettings(layer));
+}
+
+export function applyTempLayerSettingsMeta(entries) {
+  const metas = Array.isArray(entries) ? entries : [];
+  if (metas.length === 0) {
+    return;
+  }
+
+  layers = layers.map((layer) => {
+    const meta =
+      metas.find((item) => item?.id && item.id === layer.id) ||
+      metas.find(
+        (item) =>
+          item?.groupKey &&
+          item.groupKey === layerGroupKey(layer) &&
+          (!item.source || item.source === normalizeTempSource(layer.source))
+      );
+    if (!meta) {
+      return layer;
+    }
+    return {
+      ...layer,
+      label: meta.label || layer.label,
+      taxonName: meta.taxonName ?? layer.taxonName,
+      visible: typeof meta.visible === "boolean" ? meta.visible : layer.visible,
+      heatmapEnabled:
+        typeof meta.heatmapEnabled === "boolean" ? meta.heatmapEnabled : layer.heatmapEnabled,
+      markerColor: meta.markerColor !== undefined ? meta.markerColor : layer.markerColor,
+      regionStyle: meta.regionStyle ?? layer.regionStyle,
+      regionFeatureColors: meta.regionFeatureColors ?? layer.regionFeatureColors
+    };
+  });
+  emit();
 }
 
 export function buildArchiveRecordFromLayerId(layerId) {

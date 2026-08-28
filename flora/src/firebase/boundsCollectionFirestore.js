@@ -184,7 +184,7 @@ export function serializeBoundsGeometry(geometry) {
 }
 
 /** Восстанавливает geometry объекта из его представления в документе Firestore. */
-export function parseBoundsGeometry(record) {
+export function parseBoundsGeometry(record, docId = null) {
   if (!record) {
     return null;
   }
@@ -195,7 +195,14 @@ export function parseBoundsGeometry(record) {
     } catch (error) {
       // Один повреждённый документ не должен ронять загрузку всего слоя —
       // пропускаем его (boundsFeatureDocsToGeoJSON отфильтрует null).
-      console.warn("Не удалось разобрать geometry_json объекта bounds:", error);
+      // Значит geometry_json этого документа битый/обрезанный JSON — обычно
+      // из-за превышения лимита Firestore в 1 MiB на документ при записи
+      // не через import-bounds-to-firestore.mjs (тот скрипт такую запись
+      // блокирует заранее).
+      console.warn(
+        `Не удалось разобрать geometry_json объекта bounds${docId ? ` (doc "${docId}", title "${record.title ?? ""}")` : ""}, длина строки ${record.geometry_json.length}:`,
+        error
+      );
       return null;
     }
   }
@@ -263,7 +270,8 @@ export function boundsFeatureDocsToGeoJSON(docs) {
   const features = sortedDocs
     .map((doc) => {
       const record = doc.data?.() ?? doc.data ?? doc;
-      const geometry = parseBoundsGeometry(record);
+      const docId = doc.id ?? record.id ?? null;
+      const geometry = parseBoundsGeometry(record, docId);
 
       if (!geometry) {
         return null;

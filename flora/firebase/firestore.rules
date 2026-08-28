@@ -1,12 +1,83 @@
 rules_version = '2';
 
-// Тестовый режим Firestore (открытый доступ до 29.08.2026).
-// После проверки замените на ограничения из firebase/firestore.rules.production.example
-// или задеплойте production-правила с аутентификацией/модерацией.
+// Клиент без Firebase Auth: чтение справочных коллекций открыто,
+// запись только в коллекции, которые реально пишет UI, с проверкой полей.
+// Импорт через Admin SDK (скрипты import:*) правилами не ограничивается.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2026, 8, 29);
+    function isLngLat(value) {
+      return value is list
+        && value.size() == 2
+        && value[0] is number
+        && value[1] is number
+        && value[0] >= -180
+        && value[0] <= 180
+        && value[1] >= -90
+        && value[1] <= 90;
+    }
+
+    function isValidSubmission() {
+      let data = request.resource.data;
+      return data.keys().hasAll([
+          'name_ru',
+          'name_latin',
+          'regnum',
+          'found_year',
+          'found_by',
+          'coordinates',
+          'source'
+        ])
+        && data.source == 'flora35-test'
+        && data.name_latin is string
+        && data.name_latin.size() > 0
+        && data.name_latin.size() < 200
+        && isLngLat(data.coordinates);
+    }
+
+    function isValidMergedPoint() {
+      let data = request.resource.data;
+      return data.source == 'merged'
+        && data.merged_id is string
+        && data.merged_id.size() > 0
+        && isLngLat(data.coordinates)
+        && data.merged_from is list
+        && data.merged_from.size() == 2;
+    }
+
+    function isValidAttribution() {
+      let data = request.resource.data;
+      return data.point_key is string
+        && data.point_key.size() > 0
+        && data.attributes is map;
+    }
+
+    match /findings/{findingId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /user_submissions/{submissionId} {
+      allow read: if true;
+      allow create, update: if isValidSubmission();
+      allow delete: if false;
+    }
+
+    match /merged_points/{mergedId} {
+      allow read: if true;
+      allow create, update: if isValidMergedPoint();
+      allow delete: if true;
+    }
+
+    match /point_attributions/{attributionId} {
+      allow read: if true;
+      allow create, update: if isValidAttribution();
+      allow delete: if false;
+    }
+
+    // Границы ООПТ/заповедников: collections bounds_<layer_id>
+    match /{collectionId}/{documentId} {
+      allow read: if collectionId.matches('^bounds_.*');
+      allow write: if false;
     }
   }
 }

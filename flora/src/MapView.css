@@ -458,3 +458,43 @@
 .region-action-popup .feature-popup-action-btn:active {
   background: rgba(42, 157, 143, 0.14);
 }
+
+.region-action-popup-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.region-action-popup-layers[hidden] {
+  display: none;
+}
+
+.region-action-popup-layers-empty {
+  font-size: 12px;
+  color: #777;
+  padding: 4px 2px;
+}
+
+.region-action-popup-layer-btn {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.05);
+  color: #333;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.region-action-popup-layer-btn:hover,
+.region-action-popup-layer-btn:focus,
+.region-action-popup-layer-btn:focus-visible {
+  background: rgba(42, 157, 143, 0.14);
+  outline: none;
+}

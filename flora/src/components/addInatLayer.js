@@ -1,7 +1,17 @@
+import { findInatFeatureById, getInatSlimMapCollection } from "../inaturalist/inatStore";
+import { shouldSuppressLoadedPointLayers } from "../map/regionLoadSummary";
+import { buildCompactInatViewportFeatures } from "../map/compactInatViewport";
 import {
-  findInatFeatureById,
-  getInatSlimMapCollection
-} from "../inaturalist/inatStore";
+  addCompactGridLayers,
+  compactCircleRadiusExpression,
+  compactDensityFalseFilter,
+  compactGridLayerIds,
+  easeToCompactDensityCell,
+  ensureCompactViewportSync,
+  isCompactDensityFeature,
+  isCompactPointDisplayEnabled,
+  isRegionContourPickActive
+} from "../map/compactPointDisplay";
 import {
   DEFAULT_CLUSTER_COLOR,
   REGNUM_COLORS,
@@ -46,6 +56,8 @@ const CLUSTER_OPTIONS = {
 };
 
 const MARKER_RADIUS = 5;
+/** Максимум точек, вытаскиваемых из кластера по клику (не весь кластер целиком). */
+const CLUSTER_CLICK_LEAVES_LIMIT = 20000;
 const REGNUM_KEYS = ["plantae", "animalia", "fungi", "protozoa"];
 
 /** Агрегаты царств для «Кластеры-диаграммы» (тот же инструмент, что у локальных точек). */
@@ -126,6 +138,9 @@ function getInatDensePileMembers(feature) {
 }
 
 function isInatMapboxClusteringActive() {
+  if (isCompactPointDisplayEnabled()) {
+    return false;
+  }
   return inatClusteringEnabled && !inatDenseClustersHighlightEnabled;
 }
 
@@ -191,13 +206,25 @@ function getAllInatUnclusteredLayerIds() {
   return [INAT_UNCLUSTERED_LAYER_ID];
 }
 
+function getAllInatCompactGridLayerIds() {
+  return getInatSourceIds().flatMap((sourceId) => {
+    const { fillId, lineId } = compactGridLayerIds(sourceId);
+    return [fillId, lineId];
+  });
+}
+
+function getInatPointClickLayerIds() {
+  return getAllInatUnclusteredLayerIds();
+}
+
 function getAllInatLayerIds() {
   const dense = inatDenseClustersHighlightEnabled
     ? [INAT_DENSE_PILES_CLUSTER_LAYER_ID, INAT_DENSE_PILES_COUNT_LAYER_ID]
     : [];
+  const grid = getAllInatCompactGridLayerIds();
 
   if (!isInatMapboxClusteringActive()) {
-    return [INAT_UNCLUSTERED_LAYER_ID, ...dense];
+    return [INAT_UNCLUSTERED_LAYER_ID, ...grid, ...dense];
   }
 
   if (inatClusterByRegnum) {
@@ -209,18 +236,20 @@ function getAllInatLayerIds() {
       INAT_CLUSTER_LAYER_ID,
       INAT_CLUSTER_COUNT_LAYER_ID,
       INAT_UNCLUSTERED_LAYER_ID,
+      ...grid,
       ...dense
     ];
   }
 
   if (inatClusterPieChartsEnabled) {
-    return [INAT_CLUSTER_LAYER_ID, INAT_UNCLUSTERED_LAYER_ID, ...dense];
+    return [INAT_CLUSTER_LAYER_ID, INAT_UNCLUSTERED_LAYER_ID, ...grid, ...dense];
   }
 
   return [
     INAT_CLUSTER_LAYER_ID,
     INAT_CLUSTER_COUNT_LAYER_ID,
     INAT_UNCLUSTERED_LAYER_ID,
+    ...grid,
     ...dense
   ];
 }
@@ -229,7 +258,7 @@ function getAllInatLayerIds() {
 export function getInatInteractiveLayerIds(map) {
   return [
     ...getAllInatClusterLayerIds(),
-    ...getAllInatUnclusteredLayerIds()
+    ...getInatPointClickLayerIds()
   ].filter((layerId) => map?.getLayer(layerId));
 }
 
@@ -257,7 +286,7 @@ function applyInatUnclusteredFilter(map) {
       return;
     }
 
-    const parts = [];
+    const parts = [compactDensityFalseFilter()];
 
     if (isInatMapboxClusteringActive()) {
       parts.push(["!", ["has", "point_count"]]);
@@ -266,11 +295,6 @@ function applyInatUnclusteredFilter(map) {
     hiddenPointFeatureKeys.forEach((key) => {
       parts.push(buildInatPinnedKeyExclusion(key));
     });
-
-    if (parts.length === 0) {
-      map.setFilter(layerId, null);
-      return;
-    }
 
     map.setFilter(layerId, parts.length === 1 ? parts[0] : ["all", ...parts]);
   });
@@ -370,7 +394,7 @@ function attachInteractions(map) {
   detachInteractions(map);
 
   const clusterLayerIds = getAllInatClusterLayerIds().filter((id) => map.getLayer(id));
-  const unclusteredLayerIds = getAllInatUnclusteredLayerIds().filter((id) =>
+  const unclusteredLayerIds = getInatPointClickLayerIds().filter((id) =>
     map.getLayer(id)
   );
 
@@ -401,7 +425,9 @@ function attachInteractions(map) {
       return;
     }
 
-    source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
+    // Infinity вытаскивал ВЕСЬ кластер (при клике на низком зуме — весь регион,
+    // сотни тысяч точек) только чтобы найти совпадающие координаты — вешало вкладку.
+    source.getClusterLeaves(clusterId, CLUSTER_CLICK_LEAVES_LIMIT, 0, (leavesErr, leaves) => {
       if (leavesErr) {
         return;
       }
@@ -445,6 +471,16 @@ function attachInteractions(map) {
   const pointClick = (event) => {
     const rawFeature = event.features?.[0];
     if (!rawFeature) {
+      return;
+    }
+
+    if (isCompactDensityFeature(rawFeature)) {
+      if (isRegionContourPickActive(map)) {
+        return;
+      }
+      event.preventDefault?.();
+      event.originalEvent?.stopPropagation?.();
+      easeToCompactDensityCell(map, rawFeature);
       return;
     }
 
@@ -561,18 +597,21 @@ function addUnclusteredInatLayer(map, sourceId, layerId, regnum = null) {
     id: layerId,
     type: "circle",
     source: sourceId,
-    ...(isInatMapboxClusteringActive()
-      ? { filter: ["!", ["has", "point_count"]] }
-      : {}),
+    filter: isInatMapboxClusteringActive()
+      ? ["all", compactDensityFalseFilter(), ["!", ["has", "point_count"]]]
+      : compactDensityFalseFilter(),
     paint: {
       "circle-color": regnum
         ? getPointColorForRegnum(regnum)
         : getPointColorExpression(),
-      "circle-radius": MARKER_RADIUS,
+      "circle-radius": compactCircleRadiusExpression(MARKER_RADIUS),
       "circle-stroke-width": 1,
       "circle-stroke-color": "#ffffff"
     }
   });
+  if (map.getSource(sourceId)) {
+    addCompactGridLayers(map, sourceId);
+  }
 }
 
 function addClusterInatLayers(map, sourceId, layerIds, regnum = null) {
@@ -691,18 +730,53 @@ function syncInatDensePilesLayers(map, denseClusterFeatures) {
   );
 }
 
+function bindInatCompactSync(map) {
+  ensureCompactViewportSync(map, "inat", () => {
+    if (!isCompactPointDisplayEnabled() || inatMapUpdatesPaused || shouldSuppressLoadedPointLayers()) {
+      return;
+    }
+    setInatData(map, lastInatInputCollection);
+  });
+}
+
+function getInatPreparedForMap(map, options = {}) {
+  if (shouldSuppressLoadedPointLayers() && !options.preview) {
+    return {
+      mapFeatures: [],
+      denseClusterFeatures: []
+    };
+  }
+
+  if (isCompactPointDisplayEnabled() && !options.preview) {
+    bindInatCompactSync(map);
+    return {
+      mapFeatures: buildCompactInatViewportFeatures(map).features,
+      denseClusterFeatures: []
+    };
+  }
+
+  // При активной паузе (авто-растровый режим/загрузка) не тянем весь store в Supercluster —
+  // именно первый rebuild после hydrate из IndexedDB с сотнями тысяч точек валит вкладку в OOM.
+  const collection = inatMapUpdatesPaused
+    ? EMPTY_FEATURE_COLLECTION
+    : lastInatInputCollection?.type === "FeatureCollection"
+      ? lastInatInputCollection
+      : getInatSlimMapCollection();
+  if (options.preview) {
+    return {
+      mapFeatures: spreadCoincidentFeatures(collection.features ?? []),
+      denseClusterFeatures: []
+    };
+  }
+  return prepareMapInatFeatures(collection.features ?? []);
+}
+
 function rebuildInatLayers(map) {
   if (!map?.getStyle()) {
     return;
   }
 
-  const collection =
-    lastInatInputCollection?.type === "FeatureCollection"
-      ? lastInatInputCollection
-      : getInatSlimMapCollection();
-  const { mapFeatures, denseClusterFeatures } = prepareMapInatFeatures(
-    collection.features ?? []
-  );
+  const { mapFeatures, denseClusterFeatures } = getInatPreparedForMap(map);
   const renderFeatures = slimMapFeatures(excludeInatHiddenPinFeatures(mapFeatures));
   removeInatFromMap(map);
 
@@ -816,13 +890,15 @@ export function setInatData(map, collection, options = {}) {
   }
 
   const data = collection?.type === "FeatureCollection" ? collection : EMPTY_FEATURE_COLLECTION;
-  lastInatInputCollection = data;
+  if (!isCompactPointDisplayEnabled() || options.preview) {
+    lastInatInputCollection = data;
+  }
   const { mapFeatures, denseClusterFeatures } = options.preview
     ? {
         mapFeatures: spreadCoincidentFeatures(data.features ?? []),
         denseClusterFeatures: []
       }
-    : prepareMapInatFeatures(data.features ?? []);
+    : getInatPreparedForMap(map, options);
   const preparedFeatures = options.preview
     ? mapFeatures
     : excludeInatHiddenPinFeatures(mapFeatures);

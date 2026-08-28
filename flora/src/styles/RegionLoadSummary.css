@@ -1,0 +1,243 @@
+.region-load-plaque-anchor {
+  width: 0 !important;
+  height: 0 !important;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.region-load-plaque {
+  --temp-layer-color-gbif: #3b82f6;
+  --temp-layer-color-inat: #22c55e;
+  --region-load-plaque-stack: 0px;
+  box-sizing: border-box;
+  position: absolute;
+  left: 0;
+  top: var(--region-load-plaque-stack);
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  width: max-content;
+  max-width: min(220px, 78vw);
+  align-items: center;
+  gap: 4px;
+  min-height: 0;
+  padding: 4px 5px 4px 14px;
+  border: none;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.08);
+  color: #1f2937;
+  cursor: default;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.region-load-plaque::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  border-radius: 10px 0 0 10px;
+  background: var(
+    --temp-layer-color,
+    var(--region-load-plaque-stripe, #6b7280)
+  );
+  pointer-events: none;
+}
+
+.region-load-plaque--split::before {
+  background: linear-gradient(
+    to bottom,
+    var(--temp-layer-color-gbif) 0 50%,
+    var(--temp-layer-color-inat) 50% 100%
+  );
+}
+
+.region-load-plaque--gbif::before {
+  background: var(--temp-layer-color-gbif);
+}
+
+.region-load-plaque--inat::before {
+  background: var(--temp-layer-color-inat);
+}
+
+.region-load-plaque:hover {
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
+}
+
+.region-load-plaque-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.region-load-plaque-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.15;
+  color: #1f2937;
+}
+
+.region-load-plaque-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.region-load-plaque-count {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: #334155;
+}
+
+.region-load-plaque-sources {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.region-load-plaque-source {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 4px;
+  min-height: 13px;
+  color: #9ca3af;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 13px;
+}
+
+.region-load-plaque-source + .region-load-plaque-source {
+  box-shadow: inset 1px 0 0 rgba(15, 23, 42, 0.08);
+}
+
+.region-load-plaque-source--gbif {
+  color: #1d4ed8;
+  background: color-mix(in srgb, var(--temp-layer-color-gbif) 22%, #fff);
+}
+
+.region-load-plaque-source--inat {
+  color: #15803d;
+  background: color-mix(in srgb, var(--temp-layer-color-inat) 22%, #fff);
+}
+
+.region-load-plaque-source--map {
+  color: #4b5563;
+  background: color-mix(in srgb, var(--temp-layer-color, #6b7280) 22%, #fff);
+}
+
+.region-load-plaque-display {
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8e8e93;
+  cursor: pointer;
+}
+
+.region-load-plaque-list {
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8e8e93;
+  cursor: pointer;
+}
+
+.region-load-plaque-list-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.region-load-plaque-display:hover,
+.region-load-plaque-display--off,
+.region-load-plaque-list:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #4b5563;
+}
+
+.region-load-plaque-display-icon {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.region-load-plaque--compact {
+  gap: 3px;
+  max-width: none;
+  padding: 3px 5px 3px 10px;
+  border-radius: 999px;
+}
+
+.region-load-plaque--compact::before {
+  width: 6px;
+  border-radius: 999px 0 0 999px;
+}
+
+.region-load-plaque--compact .region-load-plaque-name,
+.region-load-plaque--compact .region-load-plaque-sources {
+  display: none;
+}
+
+.region-load-plaque--compact .region-load-plaque-body,
+.region-load-plaque--compact .region-load-plaque-meta {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.region-load-plaque--compact .region-load-plaque-count {
+  font-size: 10px;
+}
+
+.region-load-plaque--compact .region-load-plaque-display,
+.region-load-plaque--compact .region-load-plaque-list {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}
+
+.region-load-plaque--compact .region-load-plaque-list-label {
+  display: none;
+}
+
+.region-load-plaque--compact .region-load-plaque-display-icon {
+  width: 12px;
+  height: 12px;
+}

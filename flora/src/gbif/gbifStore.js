@@ -310,6 +310,20 @@ export function getGbifFeatureCount() {
   return table.rowCount;
 }
 
+/** Число загруженных точек GBIF по region_id. */
+export function countGbifFeaturesByRegionId() {
+  const counts = new Map();
+  for (let i = 0; i < table.rowCount; i += 1) {
+    const regionId = readGbifRegionId(table, i);
+    if (!regionId) {
+      continue;
+    }
+    const key = String(regionId);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return counts;
+}
+
 export function hasGbifDataset() {
   return table.rowCount > 0;
 }

@@ -1,5 +1,25 @@
 import { DEFAULT_CLUSTER_COLOR, DEFAULT_POINT_COLOR, getPointColorExpression } from "./pointColors";
 import {
+  addCompactGridLayers,
+  buildCompactViewportFeatures,
+  buildCompactViewportFromGeojson,
+  compactCircleRadiusExpression,
+  compactDensityFalseFilter,
+  compactGridLayerIds,
+  easeToCompactDensityCell,
+  ensureCompactViewportSync,
+  isCompactDensityFeature,
+  isCompactPointDisplayEnabled,
+  isRegionContourPickActive
+} from "../map/compactPointDisplay";
+import { shouldUseCompactDensityGrid } from "../map/compactGridSettings";
+import {
+  compactPropertiesMatchFilters,
+  getCompactLocationFilters,
+  locationFiltersNeedProperties
+} from "../map/compactFilterState";
+import {
+  forEachVisibleTempLayerPoint,
   getTempLayerFeatureGroups,
   getTempLayerPlaqueFeatureGroups,
   getVisibleTempLayerFeatures,
@@ -38,6 +58,8 @@ const CLUSTER_OPTIONS = {
   clusterMaxZoom: 14,
   clusterRadius: 50
 };
+/** Максимум точек, вытаскиваемых из кластера по клику (не весь кластер целиком). */
+const CLUSTER_CLICK_LEAVES_LIMIT = 20000;
 
 const TEMP_LAYER_CIRCLE_COLOR = [
   "case",
@@ -83,6 +105,14 @@ let locationFeatureFilter = (features) => features;
 
 export function setTempLayersLocationFeatureFilter(filterFn) {
   locationFeatureFilter = typeof filterFn === "function" ? filterFn : (features) => features;
+}
+
+function tempPointMatchesCompactFilters(lng, lat, feature) {
+  const locationFilters = getCompactLocationFilters();
+  if (!locationFiltersNeedProperties(locationFilters)) {
+    return true;
+  }
+  return compactPropertiesMatchFilters(feature?.properties, lng, lat, locationFilters);
 }
 
 function getTempDensePileMembers(feature) {
@@ -182,6 +212,9 @@ function sanitizeUnitId(id) {
 }
 
 function isTempMapboxClusteringActive() {
+  if (isCompactPointDisplayEnabled()) {
+    return false;
+  }
   return clusteringEnabled && !denseClustersHighlightEnabled;
 }
 
@@ -288,11 +321,14 @@ function getClusterPaint(markerColor) {
 function applyVisibility(map) {
   const visibility = layerVisible ? "visible" : "none";
   activeUnits.forEach((unit) => {
-    [unit.clusterLayerId, unit.countLayerId, unit.pointLayerId].forEach((layerId) => {
-      if (map?.getLayer?.(layerId)) {
-        map.setLayoutProperty(layerId, "visibility", visibility);
+    const { fillId, lineId } = compactGridLayerIds(unit.sourceId);
+    [unit.clusterLayerId, unit.countLayerId, unit.pointLayerId, fillId, lineId].forEach(
+      (layerId) => {
+        if (map?.getLayer?.(layerId)) {
+          map.setLayoutProperty(layerId, "visibility", visibility);
+        }
       }
-    });
+    );
   });
   [TEMP_DENSE_PILES_CLUSTER_LAYER_ID, TEMP_DENSE_PILES_COUNT_LAYER_ID].forEach((layerId) => {
     if (map?.getLayer?.(layerId)) {
@@ -349,11 +385,14 @@ function detachInteractions(map) {
 function removeTempLayersFromMap(map) {
   detachInteractions(map);
   activeUnits.forEach((unit) => {
-    [unit.clusterLayerId, unit.countLayerId, unit.pointLayerId].forEach((layerId) => {
-      if (map.getLayer(layerId)) {
-        map.removeLayer(layerId);
+    const { fillId, lineId } = compactGridLayerIds(unit.sourceId);
+    [unit.clusterLayerId, unit.countLayerId, unit.pointLayerId, fillId, lineId].forEach(
+      (layerId) => {
+        if (map.getLayer(layerId)) {
+          map.removeLayer(layerId);
+        }
       }
-    });
+    );
     if (map.getSource(unit.sourceId)) {
       map.removeSource(unit.sourceId);
     }
@@ -379,7 +418,10 @@ function attachInteractions(map) {
     TEMP_DENSE_PILES_COUNT_LAYER_ID
   ].filter((layerId) => map.getLayer(layerId));
   const pointLayerIds = activeUnits
-    .map((unit) => unit.pointLayerId)
+    .flatMap((unit) => [
+      unit.pointLayerId,
+      compactGridLayerIds(unit.sourceId).fillId
+    ])
     .filter((layerId) => map.getLayer(layerId));
 
   const clusterClick = (event) => {
@@ -412,7 +454,8 @@ function attachInteractions(map) {
     event.preventDefault?.();
     event.originalEvent?.stopPropagation?.();
 
-    source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
+    // Infinity вытаскивал ВЕСЬ кластер только чтобы найти совпадающие координаты — вешало вкладку.
+    source.getClusterLeaves(clusterId, CLUSTER_CLICK_LEAVES_LIMIT, 0, (leavesErr, leaves) => {
       if (leavesErr) {
         return;
       }
@@ -442,6 +485,15 @@ function attachInteractions(map) {
   const pointClick = (event) => {
     const feature = event.features?.[0];
     if (!feature) {
+      return;
+    }
+    if (isCompactDensityFeature(feature)) {
+      if (isRegionContourPickActive(map)) {
+        return;
+      }
+      event.preventDefault?.();
+      event.originalEvent?.stopPropagation?.();
+      easeToCompactDensityCell(map, feature);
       return;
     }
     event.preventDefault?.();
@@ -500,7 +552,10 @@ function addUnitToMap(map, unit) {
   const ids = unitLayerIds(unit.id);
   const collection = {
     type: "FeatureCollection",
-    features: unit.features
+    features: (unit.features ?? []).filter((feature) => {
+      const type = feature?.geometry?.type;
+      return type === "Point" || type === "Polygon";
+    })
   };
   const useClustering = isTempMapboxClusteringActive();
   const clusterProperties = {
@@ -561,16 +616,19 @@ function addUnitToMap(map, unit) {
     id: ids.pointLayerId,
     type: "circle",
     source: ids.sourceId,
-    ...(useClustering ? { filter: ["!", ["has", "point_count"]] } : {}),
+    filter: useClustering
+      ? ["all", compactDensityFalseFilter(), ["!", ["has", "point_count"]]]
+      : compactDensityFalseFilter(),
     paint: {
       "circle-color": circleColorForUnit(unit.markerColor),
-      "circle-radius": 5,
+      "circle-radius": compactCircleRadiusExpression(5),
       "circle-stroke-width": 1,
       "circle-stroke-color": "#ffffff"
     }
   });
+  addCompactGridLayers(map, ids.sourceId, unit.markerColor);
 
-  activeUnits.push(ids);
+  activeUnits.push({ ...ids, markerColor: unit.markerColor });
 }
 
 export function setTempLayersData(map) {
@@ -578,27 +636,56 @@ export function setTempLayersData(map) {
     return;
   }
 
+  if (isCompactPointDisplayEnabled()) {
+    ensureCompactViewportSync(map, "temp", () => setTempLayersData(map));
+  }
+
   removeTempLayersFromMap(map);
   pieLayerKeys = [];
   tempDensePileMembers = new Map();
   const denseClusterFeatures = [];
-  buildUnits()
-    .filter((unit) => unit.features.length > 0)
-    .forEach((unit) => {
-      const prepared = prepareMapTempFeatures(unit.features);
-      denseClusterFeatures.push(...prepared.denseClusterFeatures);
-      (prepared.densePileMembersById ?? new Map()).forEach((members, key) => {
-        tempDensePileMembers.set(key, members);
-      });
-      addUnitToMap(map, {
-        ...unit,
-        features: excludeHiddenPinFeatures(prepared.mapFeatures)
-      });
+
+  if (isCompactPointDisplayEnabled() && shouldUseCompactDensityGrid() && !isSplitByLayer()) {
+    const built = buildCompactViewportFeatures({
+      map,
+      source: "temp",
+      forEachPoint: (visit) =>
+        forEachVisibleTempLayerPoint((lng, lat, feature) => {
+          if (!tempPointMatchesCompactFilters(lng, lat, feature)) {
+            return;
+          }
+          visit(lng, lat);
+        })
     });
+    addUnitToMap(map, { id: "all", markerColor: null, features: built.features });
+  } else {
+    buildUnits()
+      .filter((unit) => unit.features.length > 0)
+      .forEach((unit) => {
+        if (isCompactPointDisplayEnabled()) {
+          const built = buildCompactViewportFromGeojson(map, unit.features, "temp");
+          addUnitToMap(map, {
+            ...unit,
+            features: excludeHiddenPinFeatures(built.features)
+          });
+          return;
+        }
+        const prepared = prepareMapTempFeatures(unit.features);
+        denseClusterFeatures.push(...prepared.denseClusterFeatures);
+        (prepared.densePileMembersById ?? new Map()).forEach((members, key) => {
+          tempDensePileMembers.set(key, members);
+        });
+        addUnitToMap(map, {
+          ...unit,
+          features: excludeHiddenPinFeatures(prepared.mapFeatures)
+        });
+      });
+  }
+
   syncTempDensePilesLayers(map, denseClusterFeatures);
   attachInteractions(map);
   applyVisibility(map);
-  setTempLayerOverlaysData(map);
+  setTempLayerOverlaysData(map, { visible: layerVisible });
 }
 
 export function applyTempLayersGroupingMode(
@@ -663,19 +750,31 @@ export function setTempLayersVisibility(map, visible) {
       setTempLayersData(map);
     } else {
       applyVisibility(map);
-      setTempLayerOverlaysData(map);
+      setTempLayerOverlaysData(map, { visible: layerVisible });
     }
     return;
   }
   applyVisibility(map);
-  setTempLayerOverlaysData(map);
+  setTempLayerOverlaysData(map, { visible: layerVisible });
 }
 
+/**
+ * Слои, по которым клик считается попаданием в точку/кластер данных.
+ * Плотностную сетку (compact grid) сюда не включаем: это грубый агрегат,
+ * покрывающий большие площади карты, и если считать клик по нему «попаданием
+ * в данные», это полностью блокирует клики по фоновым слоям карты — например,
+ * выбор региона по контуру, если он оказался под ячейкой сетки.
+ */
 export function getTempLayersInteractiveLayerIds() {
   return [
     ...activeUnits.flatMap((unit) => [unit.clusterLayerId, unit.pointLayerId]),
     TEMP_DENSE_PILES_CLUSTER_LAYER_ID
   ];
+}
+
+export function getTempCompactGridLayerColor(sourceId) {
+  const unit = activeUnits.find((entry) => entry.sourceId === sourceId);
+  return unit?.markerColor || null;
 }
 
 export function clearTempLayersLayer(map) {

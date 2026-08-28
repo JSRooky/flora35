@@ -308,6 +308,7 @@ export default function DataSourcesPanel({
           focusRegions={focusRequest?.regions}
           spatialByRegionId={focusRequest?.spatialByRegionId}
           unmatchedLabels={focusRequest?.unmatchedLabels}
+          onTempLayersChange={onTempLayersChange}
         />
       <SelectiveLoadPopup
         open={selectiveTableOpen}

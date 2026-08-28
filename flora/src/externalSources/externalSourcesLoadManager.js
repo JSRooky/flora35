@@ -43,9 +43,13 @@ import {
 import { clearGbifLayer, setGbifData, setGbifMapUpdatesPaused } from "../components/addGbifLayer";
 import { clearInatLayer, setInatData, setInatMapUpdatesPaused } from "../components/addInatLayer";
 import {
+  clearTempLayerStaging,
+  getTempLayerBudgetStatus,
   prepareTempLayerStaging,
   upsertTempLayerStagingFeatures
 } from "../tempLayers/tempLayerStore";
+import { formatTempBudgetBlockMessage } from "../tempLayers/tempLayerMemory";
+import { resolveReusableExternalLoad } from "./reuseLoadedFeatures";
 
 /**
  * Долгоживущая оркестрация загрузки GBIF/iNat.
@@ -83,6 +87,10 @@ let snapshot = {
 let mapRef = null;
 /** @type {(() => void) | null} */
 let onDataChangeRef = null;
+/** @type {(() => void | Promise<void>) | null} */
+let onEnterTempWorkingSetRef = null;
+/** @type {(() => void | Promise<void>) | null} */
+let onEnterExternalWorkingSetRef = null;
 
 /** @type {AbortController | null} */
 let gbifAbort = null;
@@ -131,6 +139,12 @@ export function setExternalSourcesLoadContext(ctx = {}) {
   if ("onDataChange" in ctx) {
     onDataChangeRef = ctx.onDataChange ?? null;
   }
+  if ("onEnterTempWorkingSet" in ctx) {
+    onEnterTempWorkingSetRef = ctx.onEnterTempWorkingSet ?? null;
+  }
+  if ("onEnterExternalWorkingSet" in ctx) {
+    onEnterExternalWorkingSetRef = ctx.onEnterExternalWorkingSet ?? null;
+  }
 }
 
 export function getExternalSourcesLoadSnapshot() {
@@ -152,6 +166,17 @@ export function subscribeExternalSourcesLoad(listener) {
     listeners.delete(listener);
   };
 }
+
+function tempStagingBudgetError(previewCount) {
+  if (previewCount == null) {
+    return null;
+  }
+  const status = getTempLayerBudgetStatus(previewCount);
+  return status.ok ? null : formatTempBudgetBlockMessage(status);
+}
+
+const TEMP_LAYER_LIVE_BUDGET_MESSAGE =
+  "Загрузка во временный слой остановлена: достигнут лимит точек в памяти.";
 
 export function cancelGbifExternalLoad() {
   gbifAbort?.abort();
@@ -187,8 +212,39 @@ export async function startGbifExternalLoad({
 
   const generation = snapshot.gbif.generation + 1;
   if (intoTempStaging) {
+    const reuse = resolveReusableExternalLoad({
+      source: "gbif",
+      region,
+      kingdomId,
+      query,
+      extras,
+      taxon
+    });
+    const reusedFeatures = reuse.mode === "reuse" ? reuse.features : null;
+    await onEnterTempWorkingSetRef?.();
     prepareTempLayerStaging({ source: "gbif", taxon, bundleKey });
+    if (reusedFeatures) {
+      const { added } = upsertTempLayerStagingFeatures(reusedFeatures, region.id);
+      patchSource("gbif", {
+        loading: false,
+        error: null,
+        total: reuse.features.length,
+        added,
+        fetched: reuse.features.length,
+        loaded: added,
+        seriesIndex: null,
+        seriesTotal: null,
+        seriesLabel: "из уже загруженных"
+      });
+      return;
+    }
+    const blocked = tempStagingBudgetError(previewCount);
+    if (blocked) {
+      patchSource("gbif", { loading: false, error: blocked });
+      return;
+    }
   } else {
+    await onEnterExternalWorkingSetRef?.();
     setGbifMapUpdatesPaused(true);
     clearGbifLayer(map);
   }
@@ -213,6 +269,7 @@ export async function startGbifExternalLoad({
   let addedTotal = 0;
   let fetchedTotal = 0;
   let succeeded = false;
+  let budgetHit = false;
 
   try {
     await loadOccurrencesInSeries(region, {
@@ -233,10 +290,17 @@ export async function startGbifExternalLoad({
       },
       onPage: (features) => {
         fetchedTotal += features.length;
-        const { added } = intoTempStaging
-          ? upsertTempLayerStagingFeatures(features, region.id)
-          : upsertGbifFeatures(features, region.id);
-        addedTotal += added;
+        if (intoTempStaging) {
+          const { added, overBudget } = upsertTempLayerStagingFeatures(features, region.id);
+          addedTotal += added;
+          if (overBudget) {
+            budgetHit = true;
+            controller.abort();
+          }
+        } else {
+          const { added } = upsertGbifFeatures(features, region.id);
+          addedTotal += added;
+        }
         patchSource("gbif", {
           fetched: fetchedTotal,
           added: addedTotal,
@@ -251,14 +315,24 @@ export async function startGbifExternalLoad({
       }
     });
 
-    succeeded = true;
+    succeeded = !budgetHit;
   } catch (err) {
-    if (!isGbifAbortError(err, controller.signal)) {
+    if (budgetHit) {
+      patchSource("gbif", { error: TEMP_LAYER_LIVE_BUDGET_MESSAGE });
+    } else if (!isGbifAbortError(err, controller.signal)) {
       patchSource("gbif", { error: getGbifNetworkErrorMessage(err) });
     }
   } finally {
     if (gbifAbort === controller) {
       gbifAbort = null;
+    }
+
+    if (
+      intoTempStaging &&
+      !succeeded &&
+      (budgetHit || controller.signal.aborted)
+    ) {
+      clearTempLayerStaging();
     }
 
     if (snapshot.gbif.generation !== generation) {
@@ -333,8 +407,39 @@ export async function startInatExternalLoad({
 
   const generation = snapshot.inat.generation + 1;
   if (intoTempStaging) {
+    const reuse = resolveReusableExternalLoad({
+      source: "inat",
+      region,
+      kingdomId,
+      query,
+      extras,
+      taxon
+    });
+    const reusedFeatures = reuse.mode === "reuse" ? reuse.features : null;
+    await onEnterTempWorkingSetRef?.();
     prepareTempLayerStaging({ source: "inat", taxon, bundleKey });
+    if (reusedFeatures) {
+      const { added } = upsertTempLayerStagingFeatures(reusedFeatures, region.id);
+      patchSource("inat", {
+        loading: false,
+        error: null,
+        total: reuse.features.length,
+        added,
+        fetched: reuse.features.length,
+        loaded: added,
+        seriesIndex: null,
+        seriesTotal: null,
+        seriesLabel: "из уже загруженных"
+      });
+      return;
+    }
+    const blocked = tempStagingBudgetError(previewCount);
+    if (blocked) {
+      patchSource("inat", { loading: false, error: blocked });
+      return;
+    }
   } else {
+    await onEnterExternalWorkingSetRef?.();
     setInatMapUpdatesPaused(true);
     clearInatLayer(map);
   }
@@ -359,6 +464,7 @@ export async function startInatExternalLoad({
   let addedTotal = 0;
   let fetchedTotal = 0;
   let succeeded = false;
+  let budgetHit = false;
 
   try {
     await loadObservationsInSeries(region, {
@@ -375,10 +481,17 @@ export async function startInatExternalLoad({
       },
       onPage: (features) => {
         fetchedTotal += features.length;
-        const { added } = intoTempStaging
-          ? upsertTempLayerStagingFeatures(features, region.id)
-          : upsertInatFeatures(features, region.id);
-        addedTotal += added;
+        if (intoTempStaging) {
+          const { added, overBudget } = upsertTempLayerStagingFeatures(features, region.id);
+          addedTotal += added;
+          if (overBudget) {
+            budgetHit = true;
+            controller.abort();
+          }
+        } else {
+          const { added } = upsertInatFeatures(features, region.id);
+          addedTotal += added;
+        }
         patchSource("inat", {
           fetched: fetchedTotal,
           added: addedTotal,
@@ -392,14 +505,24 @@ export async function startInatExternalLoad({
       }
     });
 
-    succeeded = true;
+    succeeded = !budgetHit;
   } catch (err) {
-    if (!isInatAbortError(err, controller.signal)) {
+    if (budgetHit) {
+      patchSource("inat", { error: TEMP_LAYER_LIVE_BUDGET_MESSAGE });
+    } else if (!isInatAbortError(err, controller.signal)) {
       patchSource("inat", { error: getInatNetworkErrorMessage(err) });
     }
   } finally {
     if (inatAbort === controller) {
       inatAbort = null;
+    }
+
+    if (
+      intoTempStaging &&
+      !succeeded &&
+      (budgetHit || controller.signal.aborted)
+    ) {
+      clearTempLayerStaging();
     }
 
     if (snapshot.inat.generation !== generation) {

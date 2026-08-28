@@ -31,15 +31,18 @@ import TaxonLoadPicker, {
   splitTaxonQueryNames,
   suggestionLabel
 } from "./TaxonLoadPicker";
-import {
-  getTempLayerStaging,
-  getTempLayerStagingCount,
-  commitTempLayerStaging,
-  clearTempLayerStaging
-} from "../tempLayers/tempLayerStore";
-import { persistTempLayers } from "../tempLayers/tempLayerPersistence";
+import LoadDestinationSelect, {
+  LOAD_LAYER_DEST,
+  finalizeLoadDestination,
+  isExternalLoadDestination,
+  overlayPlaqueKey
+} from "./LoadDestinationSelect";
+import { getTempLayerLoadBlockMessage } from "../tempLayers/tempLayerStore";
+import { resolveReusableExternalLoad } from "../externalSources/reuseLoadedFeatures";
 import { DownloadIcon, SearchIcon } from "../images/buttons";
 import PanelHint from "./PanelHint";
+import "../styles/RegionsLoadPopup.css";
+import "../styles/GbifPanel.css";
 
 const SOURCE_GBIF = "gbif";
 const SOURCE_INAT = "inat";
@@ -171,14 +174,15 @@ export default function SelectiveLoadPopup({
   const [busyRegionId, setBusyRegionId] = useState(null);
   const [datasetRevision, setDatasetRevision] = useState(0);
   const [sourcesLoading, setSourcesLoading] = useState(() => isExternalSourcesLoadActive());
+  const [destination, setDestination] = useState(() =>
+    onSaveToRegionTempLayer ? overlayPlaqueKey() || LOAD_LAYER_DEST.NEW : LOAD_LAYER_DEST.NEW
+  );
   const searchAbortRef = useRef(null);
+  const createdPlaqueKeyRef = useRef("");
 
   const isInat = source === SOURCE_INAT;
   const isAll = source === SOURCE_ALL;
-  const canSaveIntoCurrentLayer =
-    Boolean(onSaveToRegionTempLayer) &&
-    Array.isArray(focusRegions) &&
-    focusRegions.length > 0;
+  const intoTempStaging = !isExternalLoadDestination(destination);
   void datasetRevision;
 
   const selectSource = (next) => {
@@ -224,6 +228,10 @@ export default function SelectiveLoadPopup({
     cancelGbifExternalLoad();
     cancelInatExternalLoad();
   }, []);
+
+  useEffect(() => {
+    createdPlaqueKeyRef.current = "";
+  }, [destination, source]);
 
   const gbifRegions = useMemo(() => {
     const list = Array.isArray(focusRegions) ? focusRegions : EXTERNAL_REGIONS;
@@ -394,6 +402,34 @@ export default function SelectiveLoadPopup({
     }
   }, [catalogRegions, gbifRegions, inatRegions, mode, onLoadError, query, selectedSuggestions, source, spatialByRegionId]);
 
+  const countFetchIncoming = useCallback(
+    (region, sourceId) => {
+      const taxa = resolvedTaxa.length ? resolvedTaxa : resolvedTaxon ? [resolvedTaxon] : [];
+      const loadRegion = withLoadSpatialOverride(region, spatialByRegionId);
+      const spatial =
+        sourceId === SOURCE_INAT
+          ? toInatSpatialRegion(loadRegion)
+          : toGbifSpatialRegion(loadRegion);
+      if (!spatial || !taxa.length) {
+        return 0;
+      }
+      const reuse = resolveReusableExternalLoad({
+        source: sourceId === SOURCE_INAT ? "inat" : "gbif",
+        region: spatial,
+        kingdomId: taxa[0]?.kingdomId || "",
+        query: buildLoadQuery(region.id, taxa[0]),
+        extras: {},
+        taxon: toBundleTaxon(taxa)
+      });
+      if (reuse.mode === "reuse") {
+        return 0;
+      }
+      const counts = sourceId === SOURCE_INAT ? inatCounts : gbifCounts;
+      return typeof counts[region.id]?.count === "number" ? counts[region.id].count : 0;
+    },
+    [gbifCounts, inatCounts, resolvedTaxa, resolvedTaxon, spatialByRegionId]
+  );
+
   const loadOneRegion = useCallback(
     async (region, sourceId) => {
       const taxa = resolvedTaxa.length ? resolvedTaxa : resolvedTaxon ? [resolvedTaxon] : [];
@@ -430,7 +466,7 @@ export default function SelectiveLoadPopup({
             extras,
             query: querySnapshot,
             previewCount,
-            intoTempStaging: true,
+            intoTempStaging,
             taxon: bundleTaxon,
             bundleKey
           });
@@ -443,21 +479,27 @@ export default function SelectiveLoadPopup({
           extras: buildGbifLoadExtras(taxon),
           query: buildLoadQuery(region.id, taxon),
           previewCount: gbifCounts[region.id]?.count ?? null,
-          intoTempStaging: true,
+          intoTempStaging,
           taxon: bundleTaxon,
           bundleKey
         });
       }
     },
-    [gbifCounts, inatCounts, resolvedTaxa, resolvedTaxon, spatialByRegionId]
+    [destination, gbifCounts, inatCounts, intoTempStaging, resolvedTaxa, resolvedTaxon, spatialByRegionId]
   );
 
-  const commitStagingIfAny = useCallback(() => {
-    if (getTempLayerStagingCount() === 0) {
-      return null;
+  const commitLoadedPoints = useCallback(async () => {
+    if (!intoTempStaging) {
+      return;
     }
-    return commitTempLayerStaging();
-  }, []);
+    const layer = await finalizeLoadDestination(destination, onTempLayersChange, {
+      forceNew: true,
+      plaqueKey: createdPlaqueKeyRef.current
+    });
+    if (layer?.groupKey) {
+      createdPlaqueKeyRef.current = layer.groupKey;
+    }
+  }, [destination, intoTempStaging, onTempLayersChange]);
 
   const loadRegionsForSource = useCallback(
     async (sourceId, regions) => {
@@ -478,15 +520,23 @@ export default function SelectiveLoadPopup({
       setBusyRegionId(region.id);
       onLoadError?.(null);
       try {
+        if (intoTempStaging) {
+          const incoming = isAll
+            ? countFetchIncoming(region, SOURCE_GBIF) + countFetchIncoming(region, SOURCE_INAT)
+            : countFetchIncoming(region, isInat ? SOURCE_INAT : SOURCE_GBIF);
+          const blocked = getTempLayerLoadBlockMessage(incoming);
+          if (blocked && incoming > 0) {
+            throw new Error(blocked);
+          }
+        }
         if (isAll) {
           await loadOneRegion(region, SOURCE_GBIF);
-          commitStagingIfAny();
+          await commitLoadedPoints();
           await loadOneRegion(region, SOURCE_INAT);
-          commitStagingIfAny();
-          await persistTempLayers();
-          onTempLayersChange?.();
+          await commitLoadedPoints();
         } else {
           await loadOneRegion(region, isInat ? SOURCE_INAT : SOURCE_GBIF);
+          await commitLoadedPoints();
         }
         setDatasetRevision((value) => value + 1);
         onTempLayersChange?.();
@@ -496,7 +546,7 @@ export default function SelectiveLoadPopup({
         setBusyRegionId(null);
       }
     },
-    [abortCountSearch, busyRegionId, commitStagingIfAny, isAll, isInat, loadOneRegion, loading, map, onLoadError, onTempLayersChange, sourcesLoading]
+    [abortCountSearch, busyRegionId, commitLoadedPoints, countFetchIncoming, intoTempStaging, isAll, isInat, loadOneRegion, loading, map, onLoadError, onTempLayersChange, sourcesLoading]
   );
 
   const runLoadAll = useCallback(async () => {
@@ -506,15 +556,29 @@ export default function SelectiveLoadPopup({
     abortCountSearch();
     onLoadError?.(null);
     try {
+      if (intoTempStaging) {
+        const incoming = isAll
+          ? gbifRegions.reduce((sum, region) => sum + countFetchIncoming(region, SOURCE_GBIF), 0) +
+            inatRegions.reduce((sum, region) => sum + countFetchIncoming(region, SOURCE_INAT), 0)
+          : availableRegions.reduce(
+              (sum, region) =>
+                sum + countFetchIncoming(region, isInat ? SOURCE_INAT : SOURCE_GBIF),
+              0
+            );
+        const blocked = getTempLayerLoadBlockMessage(incoming);
+        if (blocked) {
+          onLoadError?.(blocked);
+          return;
+        }
+      }
       if (isAll) {
         await loadRegionsForSource(SOURCE_GBIF, gbifRegions);
-        commitStagingIfAny();
+        await commitLoadedPoints();
         await loadRegionsForSource(SOURCE_INAT, inatRegions);
-        commitStagingIfAny();
-        await persistTempLayers();
-        onTempLayersChange?.();
+        await commitLoadedPoints();
       } else {
         await loadRegionsForSource(isInat ? SOURCE_INAT : SOURCE_GBIF, availableRegions);
+        await commitLoadedPoints();
       }
       setDatasetRevision((value) => value + 1);
       onTempLayersChange?.();
@@ -528,9 +592,13 @@ export default function SelectiveLoadPopup({
     abortCountSearch,
     availableRegions,
     busyRegionId,
-    commitStagingIfAny,
+    commitLoadedPoints,
+    countFetchIncoming,
+    gbifCounts,
     gbifRegions,
+    inatCounts,
     inatRegions,
+    intoTempStaging,
     isAll,
     isInat,
     loadRegionsForSource,
@@ -539,94 +607,6 @@ export default function SelectiveLoadPopup({
     onLoadError,
     onTempLayersChange,
     resolvedTaxon,
-    sourcesLoading
-  ]);
-
-  const saveToTempLayer = useCallback(async (intoCurrentLayer = false) => {
-    if (!map || sourcesLoading || loading || busyRegionId || !resolvedTaxon) {
-      return;
-    }
-    abortCountSearch();
-
-    const saveIntoCurrent = Boolean(intoCurrentLayer) && canSaveIntoCurrentLayer;
-
-    onLoadError?.(null);
-    try {
-      if (isAll) {
-        await loadRegionsForSource(SOURCE_GBIF, gbifRegions);
-        if (saveIntoCurrent) {
-          const gbifStaging = getTempLayerStaging();
-          const gbifFeatures = [...(gbifStaging.features ?? [])];
-          const gbifRegionIds = [...(gbifStaging.regionIds ?? [])];
-          clearTempLayerStaging();
-          await loadRegionsForSource(SOURCE_INAT, inatRegions);
-          const inatStaging = getTempLayerStaging();
-          const features = [...gbifFeatures, ...(inatStaging.features ?? [])];
-          const regionIds = [...gbifRegionIds, ...(inatStaging.regionIds ?? [])];
-          clearTempLayerStaging();
-          if (features.length === 0) {
-            onLoadError?.("Нет точек для временного слоя");
-            return;
-          }
-          const ok = onSaveToRegionTempLayer(features, regionIds);
-          if (!ok) {
-            onLoadError?.("Не удалось сохранить точки в слой регионов");
-            return;
-          }
-        } else {
-          const gbifLayer = commitStagingIfAny();
-          await loadRegionsForSource(SOURCE_INAT, inatRegions);
-          const inatLayer = commitStagingIfAny();
-          if (!gbifLayer && !inatLayer) {
-            onLoadError?.("Нет точек для временного слоя");
-            return;
-          }
-        }
-      } else {
-        await loadRegionsForSource(isInat ? SOURCE_INAT : SOURCE_GBIF, availableRegions);
-        setDatasetRevision((value) => value + 1);
-        if (getTempLayerStagingCount() === 0) {
-          onLoadError?.("Нет точек для временного слоя");
-          return;
-        }
-        if (saveIntoCurrent) {
-          const staging = getTempLayerStaging();
-          const ok = onSaveToRegionTempLayer(staging.features, staging.regionIds);
-          clearTempLayerStaging();
-          if (!ok) {
-            onLoadError?.("Не удалось сохранить точки в слой регионов");
-            return;
-          }
-        } else {
-          commitTempLayerStaging();
-        }
-      }
-      setDatasetRevision((value) => value + 1);
-      await persistTempLayers();
-      onTempLayersChange?.();
-    } catch (error) {
-      setDatasetRevision((value) => value + 1);
-      onLoadError?.(error?.message || "Не удалось сохранить временный слой");
-    } finally {
-      setBusyRegionId(null);
-    }
-  }, [
-    abortCountSearch,
-    availableRegions,
-    busyRegionId,
-    commitStagingIfAny,
-    gbifRegions,
-    inatRegions,
-    isAll,
-    isInat,
-    loadRegionsForSource,
-    loading,
-    map,
-    onLoadError,
-    onSaveToRegionTempLayer,
-    onTempLayersChange,
-    resolvedTaxon,
-    canSaveIntoCurrentLayer,
     sourcesLoading
   ]);
 
@@ -667,14 +647,19 @@ export default function SelectiveLoadPopup({
         {Array.isArray(focusRegions) && focusRegions.length > 0 ? (
           <PanelHint>
             Фильтр регионов включён: {focusRegions.length} субъект(ов) с карты.
-            {canSaveIntoCurrentLayer
-              ? " Точки можно сохранить в текущий слой выделенных регионов или в новый временный слой."
-              : ""}
+            Выберите слой ниже — сюда попадут точки.
             {unmatchedLabels.length > 0
               ? ` Не сопоставлены: ${unmatchedLabels.join(", ")}.`
               : ""}
           </PanelHint>
         ) : null}
+
+        <LoadDestinationSelect
+          value={destination}
+          onChange={setDestination}
+          source={source}
+          disabled={loadBusy}
+        />
 
         <div className="selective-load-toolbar">
           <TaxonLoadPicker
@@ -773,8 +758,8 @@ export default function SelectiveLoadPopup({
           </p>
         ) : (
           <PanelHint>
-            Выберите источник загрузки, уровень (вид, род...). Отметьте галочками варианты, которые нужно загрузить в один временный слой.
-            {isAll ? " в GBIF и iNat" : ""}.
+            Выберите источник загрузки, уровень (вид, род...). Отметьте галочками варианты и слой, в который сложить точки.
+            {isAll ? " Можно загрузить GBIF и iNat сразу." : ""}
           </PanelHint>
         )}
 
@@ -929,42 +914,8 @@ export default function SelectiveLoadPopup({
                 {isAll
                   ? `Всего: GBIF ${formatCount(totalGbif)} · iNat ${formatCount(totalInat)}`
                   : `Всего точек: ${formatCount(totalCount)}`}
-                {getTempLayerStagingCount() > 0
-                  ? ` · в сессии: ${formatCount(getTempLayerStagingCount())}`
-                  : ""}
               </span>
               <div className="selective-load-footer-actions">
-                {canSaveIntoCurrentLayer ? (
-                  <>
-                    <button
-                      type="button"
-                      className="gbif-panel-btn gbif-panel-btn--secondary"
-                      disabled={!canLoad || availableRegions.length === 0}
-                      onClick={() => saveToTempLayer(true)}
-                      title="Сохранить найденные точки в тот же временный слой, что и выделенные на карте регионы"
-                    >
-                      В текущий слой
-                    </button>
-                    <button
-                      type="button"
-                      className="gbif-panel-btn gbif-panel-btn--secondary"
-                      disabled={!canLoad || availableRegions.length === 0}
-                      onClick={() => saveToTempLayer(false)}
-                      title="Сохранить найденные точки в новый временный слой"
-                    >
-                      В новый слой
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="gbif-panel-btn gbif-panel-btn--secondary"
-                    disabled={!canLoad || availableRegions.length === 0}
-                    onClick={() => saveToTempLayer(false)}
-                  >
-                    Во временный слой
-                  </button>
-                )}
                 <button
                   type="button"
                   className="gbif-panel-btn"
