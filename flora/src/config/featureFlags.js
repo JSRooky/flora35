@@ -2,7 +2,7 @@
 export const FEATURE_FLAGS = {
   submitModuleDisabled: false,
   dataSourceSelectDisabled: false,
-  regionPointLoadDisabled: true,
+  regionPointLoadDisabled: false,
   compareModuleDisabled: true,
 };
 

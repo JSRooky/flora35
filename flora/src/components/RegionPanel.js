@@ -326,7 +326,7 @@ export default function RegionPanel({
             <button
               type="button"
               className="heatmap-settings-reset"
-              disabled={!hasSelection}
+              disabled={FEATURE_FLAGS.regionPointLoadDisabled || !hasSelection}
               onClick={() => onLoadSelectedRegions?.(canIncludeBuffer && includeBuffer)}
               title={
                 FEATURE_FLAGS.regionPointLoadDisabled
