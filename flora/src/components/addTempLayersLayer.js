@@ -12,7 +12,6 @@ import {
   isCompactPointDisplayEnabled,
   isRegionContourPickActive
 } from "../map/compactPointDisplay";
-import { shouldUseCompactDensityGrid } from "../map/compactGridSettings";
 import { shouldSuppressLoadedPointLayers } from "../map/regionLoadSummary";
 import {
   compactPropertiesMatchFilters,
@@ -652,7 +651,7 @@ export function setTempLayersData(map) {
   tempDensePileMembers = new Map();
   const denseClusterFeatures = [];
 
-  if (isCompactPointDisplayEnabled() && shouldUseCompactDensityGrid() && !isSplitByLayer()) {
+  if (isCompactPointDisplayEnabled() && !isSplitByLayer()) {
     const built = buildCompactViewportFeatures({
       map,
       source: "temp",

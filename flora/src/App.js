@@ -1544,6 +1544,14 @@ export default function MapView() {
         });
         persistTempLayers().catch(() => {});
         setTempLayersRevision((value) => value + 1);
+        if (visible) {
+          const count = getDisplayedLayerPointCount();
+          setCompactDisplayedLayerPointCount(count);
+          setDisplayedLayerPointCountState(count);
+          handleCompactPointDisplayChange(true, { auto: true });
+          autoRasterModeRef.current = false;
+          setAutoRasterMode(false);
+        }
         if (map.current) {
           setTempLayersData(map.current);
           refreshRegionLoadSummary(map.current);
@@ -4916,7 +4924,7 @@ export default function MapView() {
         return;
       }
 
-      if (shouldSuppressLoadedPointLayers()) {
+      if (shouldSuppressLoadedPointLayers() || tempOnly) {
         if (autoRasterModeRef.current) {
           autoRasterModeRef.current = false;
           setAutoRasterMode(false);
@@ -4950,7 +4958,7 @@ export default function MapView() {
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [locationFilters, externalOnly, tempLayersRevision, pointsDataRevision, mapReady]);
+  }, [locationFilters, externalOnly, tempOnly, tempLayersRevision, pointsDataRevision, mapReady]);
 
   useEffect(() => {
     if (!map.current) {
@@ -4963,7 +4971,9 @@ export default function MapView() {
       }
       refreshHeatmapSourceOptions(externalOnly);
       const showHeatmap =
-        (heatmapEnabled || autoRasterMode) && !shouldSuppressLoadedPointLayers();
+        (heatmapEnabled || autoRasterMode) &&
+        !compactPointDisplay &&
+        !shouldSuppressLoadedPointLayers();
       setHeatmapEnabled(map.current, showHeatmap, locationFilters);
       syncTempLayerHeatmaps(map.current, {
         active: externalOnly,
@@ -4976,7 +4986,7 @@ export default function MapView() {
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [heatmapEnabled, autoRasterMode, locationFilters, externalOnly, tempLayersRevision, heatmapSettings]);
+  }, [heatmapEnabled, autoRasterMode, compactPointDisplay, locationFilters, externalOnly, tempLayersRevision, heatmapSettings]);
 
   useEffect(() => {
     if (!mapReady || !map.current || !isFirebaseConfigured()) {
