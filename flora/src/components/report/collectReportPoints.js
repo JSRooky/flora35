@@ -1,8 +1,11 @@
 import { booleanPointInPolygon, circle, point, union, featureCollection } from "@turf/turf";
 import { getAreaContainedPointsSummary } from "../addAreaSelectionLayer";
-import { getFilteredFeatures } from "../addLocationsLayer";
+import { getToolFeatures } from "../addLocationsLayer";
 import { getPointsWithinPolygonFeature } from "../addSpeciesPolygonLayer";
 import { REPORT_SOURCES } from "./reportSources";
+
+/** Порог, после которого панель предупреждает о большом файле. */
+export const LARGE_REPORT_POINT_THRESHOLD = 50000;
 
 function unionCircles(centers, radiusKm) {
   if (!centers.length) {
@@ -55,6 +58,10 @@ function sortPointsByNameRu(points) {
   });
 }
 
+function maybeSortPoints(points, sort) {
+  return sort ? sortPointsByNameRu(points) : points;
+}
+
 function dedupePointsByFindingId(points) {
   const seen = new Set();
 
@@ -91,17 +98,15 @@ function getBufferContainedPointsSummary({
     return null;
   }
 
-  const points = sortPointsByNameRu(
-    getFilteredFeatures(filters).filter((feature) => {
-      const coordinates = feature.geometry?.coordinates;
+  const points = getToolFeatures(filters).filter((feature) => {
+    const coordinates = feature.geometry?.coordinates;
 
-      if (!coordinates) {
-        return false;
-      }
+    if (!coordinates) {
+      return false;
+    }
 
-      return booleanPointInPolygon(point(coordinates), bufferFeature);
-    })
-  );
+    return booleanPointInPolygon(point(coordinates), bufferFeature);
+  });
 
   return {
     count: points.length,
@@ -114,9 +119,7 @@ function getPolygonContainedPointsSummary({ activePolygon, filters }) {
     return null;
   }
 
-  const points = sortPointsByNameRu(
-    getPointsWithinPolygonFeature(activePolygon.polygon, filters)
-  );
+  const points = getPointsWithinPolygonFeature(activePolygon.polygon, filters);
 
   return {
     count: points.length,
@@ -201,27 +204,33 @@ export function isReportSourceAvailable(sourceId, context) {
   }
 }
 
-/** Собирает GeoJSON Feature[] для выбранного источника отчёта. */
-export function collectReportPoints(sourceId, context) {
+/**
+ * Собирает GeoJSON Feature[] для выбранного источника отчёта.
+ * Сортировку по name_ru включать только при скачивании — превью считает без неё.
+ */
+export function collectReportPoints(sourceId, context, { sort = false } = {}) {
   const filters = context.locationFilters ?? {};
 
   switch (sourceId) {
     case REPORT_SOURCES.VISIBLE_FILTERED:
-      return sortPointsByNameRu(getFilteredFeatures(filters));
+      return maybeSortPoints(getToolFeatures(filters), sort);
 
     case REPORT_SOURCES.SPATIAL_TOOL: {
       const summary = resolveSpatialToolSummary(context);
-      return summary?.points ?? [];
+      return maybeSortPoints(summary?.points ?? [], sort);
     }
 
     case REPORT_SOURCES.TOOL_FILTER_ONLY:
-      return sortPointsByNameRu(context.toolFilterPointsSummary?.points ?? []);
+      return maybeSortPoints(context.toolFilterPointsSummary?.points ?? [], sort);
 
     case REPORT_SOURCES.SELECTED_POINT:
       return context.selectedPoint ? [context.selectedPoint] : [];
 
     case REPORT_SOURCES.BUFFER_MULTI_SELECT:
-      return sortPointsByNameRu(dedupePointsByFindingId(context.bufferSelectedPoints ?? []));
+      return maybeSortPoints(
+        dedupePointsByFindingId(context.bufferSelectedPoints ?? []),
+        sort
+      );
 
     default:
       return [];

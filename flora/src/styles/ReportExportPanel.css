@@ -69,6 +69,16 @@
   color: #333;
 }
 
+.report-export-warning {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(180, 120, 0, 0.12);
+  font-size: 12px;
+  line-height: 1.4;
+  color: #5c4300;
+}
+
 .report-export-format-options {
   display: flex;
   flex-wrap: wrap;

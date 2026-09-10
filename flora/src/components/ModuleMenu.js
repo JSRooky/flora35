@@ -36,6 +36,8 @@ export const MODULE_IDS = {
   DATA_SOURCES: "data-sources",
   TEMP_ARCHIVE: "temp-archive",
   COMPARE: "compare",
+  REPORT: "report",
+  ANALYSIS: "analysis",
   EXTERNAL_PROCESSING: "external-processing",
   /** @deprecated Используйте EXTERNAL_PROCESSING */
   GBIF_PROCESSING: "external-processing",
@@ -100,6 +102,16 @@ const TEMP_ARCHIVE_MODULE_ITEM = {
 const COMPARE_MODULE_ITEM = {
   id: MODULE_IDS.COMPARE,
   label: "Сравнение"
+};
+
+const REPORT_MODULE_ITEM = {
+  id: MODULE_IDS.REPORT,
+  label: "Отчёт"
+};
+
+const ANALYSIS_MODULE_ITEM = {
+  id: MODULE_IDS.ANALYSIS,
+  label: "Анализ"
 };
 
 const ABOUT_MODULE_ITEM = { id: MODULE_IDS.ABOUT, label: "О проекте" };
@@ -308,6 +320,10 @@ export default function ModuleMenu({
   onTempArchivePanelToggle,
   comparePanelOpen = false,
   onComparePanelToggle,
+  reportPanelOpen = false,
+  onReportPanelToggle,
+  analysisPanelOpen = false,
+  onAnalysisPanelToggle,
   accountUser = null,
   onSaveUserSettings,
   onLoadUserSettings
@@ -373,6 +389,24 @@ export default function ModuleMenu({
               mapToolAccent
               activeModule={comparePanelOpen ? MODULE_IDS.COMPARE : activeModule}
               onModuleSelect={onComparePanelToggle}
+            />
+          </li>
+          <li>
+            <ModuleMenuButton
+              id={ANALYSIS_MODULE_ITEM.id}
+              label={ANALYSIS_MODULE_ITEM.label}
+              mapToolAccent
+              activeModule={analysisPanelOpen ? MODULE_IDS.ANALYSIS : activeModule}
+              onModuleSelect={onAnalysisPanelToggle}
+            />
+          </li>
+          <li>
+            <ModuleMenuButton
+              id={REPORT_MODULE_ITEM.id}
+              label={REPORT_MODULE_ITEM.label}
+              mapToolAccent
+              activeModule={reportPanelOpen ? MODULE_IDS.REPORT : activeModule}
+              onModuleSelect={onReportPanelToggle}
             />
           </li>
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />

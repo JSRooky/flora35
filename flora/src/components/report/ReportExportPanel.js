@@ -5,10 +5,13 @@ import {
 } from "../featurePropertyLabels";
 import { ModuleHelpButton, ModuleHelpPanel } from "../ModuleHelp";
 import { MODULE_IDS } from "../ModuleMenu";
+import PanelCloseButton from "../PanelCloseButton";
+import PanelMinimizeButton from "../PanelMinimizeButton";
 import { buildReportPayload } from "./buildReportPayload";
 import {
   collectReportPoints,
   isReportSourceAvailable,
+  LARGE_REPORT_POINT_THRESHOLD,
   resolveSpatialToolSummary
 } from "./collectReportPoints";
 import { downloadReportFile } from "./downloadReportFile";
@@ -43,7 +46,9 @@ function getPreviewSummary(sourceId, context) {
 export default function ReportExportPanel({
   reportContext,
   collapsed = false,
-  onCollapsedChange
+  onCollapsedChange,
+  onMinimize,
+  onClose
 }) {
   const [sourceId, setSourceId] = useState(REPORT_SOURCES.VISIBLE_FILTERED);
   const [format, setFormat] = useState(REPORT_FORMATS.CSV);
@@ -64,13 +69,14 @@ export default function ReportExportPanel({
   );
 
   const canDownload = preview.pointCount > 0;
+  const largeFile = preview.pointCount > LARGE_REPORT_POINT_THRESHOLD;
 
   const handleDownload = () => {
     if (!canDownload) {
       return;
     }
 
-    const points = collectReportPoints(sourceId, enrichedContext);
+    const points = collectReportPoints(sourceId, enrichedContext, { sort: true });
     const payload = buildReportPayload(sourceId, points, enrichedContext);
 
     if (sourceId === REPORT_SOURCES.SPATIAL_TOOL && enrichedContext.spatialToolLabel) {
@@ -93,6 +99,7 @@ export default function ReportExportPanel({
             open={helpOpen}
             onClick={() => setHelpOpen((value) => !value)}
           />
+          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
           {onCollapsedChange && (
             <button
               type="button"
@@ -104,6 +111,7 @@ export default function ReportExportPanel({
               {toggleLabel}
             </button>
           )}
+          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
         </div>
       </div>
 
@@ -162,6 +170,13 @@ export default function ReportExportPanel({
               "Нет точек для отчёта"
             )}
           </p>
+
+          {largeFile ? (
+            <p className="report-export-warning">
+              Файл будет большим ({formatPointCount(preview.pointCount)}). Скачивание
+              может занять время.
+            </p>
+          ) : null}
 
           <fieldset className="report-export-fieldset">
             <legend className="report-export-legend">Формат файла</legend>

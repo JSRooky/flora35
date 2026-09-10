@@ -80,6 +80,11 @@ import {
   updateHeatmapData
 } from "./components/addHeatmapLayer";
 import {
+  addAnalysisKdeLayer,
+  clearAnalysisKdeLayer,
+  setAnalysisKdeData
+} from "./components/addAnalysisKdeLayer";
+import {
   addBoundsLayers,
   clearBoundsLayerCache,
   ensureBoundsLayerGeoJSON,
@@ -227,6 +232,8 @@ import {
 import DataWorkPanel from "./components/DataWorkPanel";
 import TempLayerArchivePanel from "./components/TempLayerArchivePanel";
 import ComparePanel from "./components/ComparePanel";
+import ReportExportPanel from "./components/report/ReportExportPanel";
+import AnalysisPanel from "./components/analysis/AnalysisPanel";
 import CompareDiversityPopup from "./components/CompareDiversityPopup";
 import CompareSimilarityPopup from "./components/CompareSimilarityPopup";
 import CompareDistributionPopup from "./components/CompareDistributionPopup";
@@ -384,6 +391,8 @@ const PANEL_IDS = {
   REDBOOK: "redbook",
   TEMP_ARCHIVE: "temp-archive",
   COMPARE: "compare",
+  REPORT: "report",
+  ANALYSIS: "analysis",
   COMPARE_DIVERSITY: "compare-diversity",
   COMPARE_SIMILARITY: "compare-similarity",
   COMPARE_DISTRIBUTION: "compare-distribution",
@@ -424,6 +433,8 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.REDBOOK,
   PANEL_IDS.TEMP_ARCHIVE,
   PANEL_IDS.COMPARE,
+  PANEL_IDS.REPORT,
+  PANEL_IDS.ANALYSIS,
   PANEL_IDS.COMPARE_DIVERSITY,
   PANEL_IDS.COMPARE_SIMILARITY,
   PANEL_IDS.COMPARE_DISTRIBUTION,
@@ -706,6 +717,9 @@ export default function MapView() {
   const [tempArchivePanelOpen, setTempArchivePanelOpen] = useState(false);
   const [tempArchiveStatus, setTempArchiveStatus] = useState("");
   const [comparePanelOpen, setComparePanelOpen] = useState(false);
+  const [reportPanelOpen, setReportPanelOpen] = useState(false);
+  const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
+  const [kdeOverlay, setKdeOverlay] = useState(null);
   const [compareDiversityOpen, setCompareDiversityOpen] = useState(false);
   const [compareDiversityKeys, setCompareDiversityKeys] = useState([]);
   const [compareSimilarityOpen, setCompareSimilarityOpen] = useState(false);
@@ -865,6 +879,12 @@ export default function MapView() {
         break;
       case TASKBAR_PANEL_IDS.COMPARE:
         setComparePanelOpen(true);
+        break;
+      case TASKBAR_PANEL_IDS.REPORT:
+        setReportPanelOpen(true);
+        break;
+      case TASKBAR_PANEL_IDS.ANALYSIS:
+        setAnalysisPanelOpen(true);
         break;
       case TASKBAR_PANEL_IDS.COMPARE_DIVERSITY:
         setCompareDiversityOpen(true);
@@ -1724,6 +1744,34 @@ export default function MapView() {
     setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE]: false }));
     pinPanelsToTaskbar([PANEL_IDS.COMPARE]);
   }, [comparePanelOpen, isPanelMinimized, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
+
+  const handleReportPanelToggle = useCallback(() => {
+    if (reportPanelOpen && !isPanelMinimized(PANEL_IDS.REPORT)) {
+      setReportPanelOpen(false);
+      unpinPanelsFromTaskbar([PANEL_IDS.REPORT]);
+      return;
+    }
+
+    setReportPanelOpen(true);
+    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.REPORT]: false }));
+    pinPanelsToTaskbar([PANEL_IDS.REPORT]);
+  }, [reportPanelOpen, isPanelMinimized, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
+
+  const handleAnalysisPanelToggle = useCallback(() => {
+    if (analysisPanelOpen && !isPanelMinimized(PANEL_IDS.ANALYSIS)) {
+      setAnalysisPanelOpen(false);
+      unpinPanelsFromTaskbar([PANEL_IDS.ANALYSIS]);
+      return;
+    }
+
+    setAnalysisPanelOpen(true);
+    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.ANALYSIS]: false }));
+    pinPanelsToTaskbar([PANEL_IDS.ANALYSIS]);
+  }, [analysisPanelOpen, isPanelMinimized, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
+
+  const handleKdeOverlayChange = useCallback((collection) => {
+    setKdeOverlay(collection);
+  }, []);
 
   const handleCompareSetChange = useCallback((plaques) => {
     const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
@@ -2676,6 +2724,14 @@ export default function MapView() {
       ids.push(PANEL_IDS.COMPARE);
     }
 
+    if (reportPanelOpen && !isMin(PANEL_IDS.REPORT)) {
+      ids.push(PANEL_IDS.REPORT);
+    }
+
+    if (analysisPanelOpen && !isMin(PANEL_IDS.ANALYSIS)) {
+      ids.push(PANEL_IDS.ANALYSIS);
+    }
+
     if (compareDiversityOpen && !isMin(PANEL_IDS.COMPARE_DIVERSITY)) {
       ids.push(PANEL_IDS.COMPARE_DIVERSITY);
     }
@@ -2711,6 +2767,8 @@ export default function MapView() {
     dataSourcesPanelOpen,
     tempArchivePanelOpen,
     comparePanelOpen,
+    reportPanelOpen,
+    analysisPanelOpen,
     compareDiversityOpen,
     compareSimilarityOpen,
     compareDistributionOpen,
@@ -4932,6 +4990,23 @@ export default function MapView() {
   }, [heatmapEnabled, autoRasterMode, locationFilters, externalOnly, tempLayersRevision, heatmapSettings]);
 
   useEffect(() => {
+    if (!analysisPanelOpen) {
+      setKdeOverlay(null);
+    }
+  }, [analysisPanelOpen]);
+
+  useEffect(() => {
+    if (!map.current) {
+      return;
+    }
+    if (!analysisPanelOpen) {
+      clearAnalysisKdeLayer(map.current);
+      return;
+    }
+    setAnalysisKdeData(map.current, kdeOverlay);
+  }, [analysisPanelOpen, kdeOverlay, mapReady]);
+
+  useEffect(() => {
     if (!mapReady || !map.current || !isFirebaseConfigured()) {
       return;
     }
@@ -6602,6 +6677,16 @@ export default function MapView() {
           ]);
           break;
         }
+        case PANEL_IDS.REPORT: {
+          setReportPanelOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.REPORT]);
+          break;
+        }
+        case PANEL_IDS.ANALYSIS: {
+          setAnalysisPanelOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.ANALYSIS]);
+          break;
+        }
         case PANEL_IDS.COMPARE_DIVERSITY: {
           setCompareDiversityOpen(false);
           unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_DIVERSITY]);
@@ -6954,6 +7039,7 @@ export default function MapView() {
           }
         });
         addHeatmapLayer(mapInstance);
+        addAnalysisKdeLayer(mapInstance);
         addGbifLayer(mapInstance, {
           onPointClick: (feature) => {
             if (isAreaDrawingActive()) {
@@ -7360,12 +7446,47 @@ export default function MapView() {
 
   const denseProcessingExclusive = denseProcessingActive;
 
+  const reportContext = useMemo(() => {
+    void pointsDataRevision;
+
+    return {
+      locationFilters,
+      dataSourceMode,
+      areaGeometry,
+      intersectionContainedPoints,
+      activePolygon,
+      arealContainedPoints,
+      bufferEnabled,
+      bufferFeatures: bufferFilterFeatures,
+      bufferRadiiKm: bufferRadii,
+      toolFilterPointsSummary: activeToolFilterPointsSummary,
+      selectedPoint: popupData,
+      bufferSelectedPoints
+    };
+  }, [
+    activePolygon,
+    activeToolFilterPointsSummary,
+    areaGeometry,
+    arealContainedPoints,
+    bufferEnabled,
+    bufferFilterFeatures,
+    bufferRadii,
+    bufferSelectedPoints,
+    dataSourceMode,
+    intersectionContainedPoints,
+    locationFilters,
+    pointsDataRevision,
+    popupData
+  ]);
+
   const showModulePanelStack =
     (activeModule !== null && activeModule !== MODULE_IDS.TIMELINE) ||
     (showOoptFeaturePanel && activeModule !== MODULE_IDS.TIMELINE) ||
     dataSourcesPanelOpen ||
     tempArchivePanelOpen ||
     comparePanelOpen ||
+    reportPanelOpen ||
+    analysisPanelOpen ||
     dataSourceMode === DATA_SOURCE_MODES.EXTERNAL ||
     denseProcessingActive;
 
@@ -7387,6 +7508,10 @@ export default function MapView() {
         onTempArchivePanelToggle={handleTempArchivePanelToggle}
         comparePanelOpen={comparePanelOpen}
         onComparePanelToggle={handleComparePanelToggle}
+        reportPanelOpen={reportPanelOpen}
+        onReportPanelToggle={handleReportPanelToggle}
+        analysisPanelOpen={analysisPanelOpen}
+        onAnalysisPanelToggle={handleAnalysisPanelToggle}
         onSaveUserSettings={handleSaveMapConfig}
         onLoadUserSettings={handleLoadMapConfig}
       />
@@ -7435,6 +7560,25 @@ export default function MapView() {
               onOpenDistribution={handleOpenDistribution}
               onOpenStats={handleOpenStats}
               onCompareSetChange={handleCompareSetChange}
+            />
+          )}
+          {reportPanelOpen && !isPanelMinimized(PANEL_IDS.REPORT) && (
+            <ReportExportPanel
+              reportContext={reportContext}
+              collapsed={isPanelCollapsed(PANEL_IDS.REPORT)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.REPORT)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.REPORT)}
+              onClose={handleClosePanel(PANEL_IDS.REPORT)}
+            />
+          )}
+          {analysisPanelOpen && !isPanelMinimized(PANEL_IDS.ANALYSIS) && (
+            <AnalysisPanel
+              reportContext={reportContext}
+              collapsed={isPanelCollapsed(PANEL_IDS.ANALYSIS)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.ANALYSIS)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.ANALYSIS)}
+              onClose={handleClosePanel(PANEL_IDS.ANALYSIS)}
+              onKdeOverlayChange={handleKdeOverlayChange}
             />
           )}
           {denseProcessingExclusive ? (
