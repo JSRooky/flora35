@@ -4,6 +4,7 @@ import {
   getVisibleTempLayerFeatures,
   replaceTempLayers,
   saveFeaturesIntoRegionOverlayTempLayer,
+  setTempLayerVisible,
   TEMP_SOURCE_IDS
 } from "./tempLayerStore";
 
@@ -60,8 +61,57 @@ describe("saveFeaturesIntoRegionOverlayTempLayer", () => {
     const points = stored.filter((layer) => layer.source === TEMP_SOURCE_IDS.GBIF);
 
     expect(overlay?.features).toEqual([]);
+    expect(overlay?.visible).toBe(true);
     expect(points).toHaveLength(1);
     expect(points[0].features).toHaveLength(2);
+    expect(points[0].visible).toBe(false);
+    expect(getVisibleTempLayerFeatures()).toHaveLength(0);
+  });
+
+  it("keeps points visible when the plaque already shows them", () => {
+    const overlays = [
+      {
+        kind: "regions",
+        label: "Вологодская область",
+        features: [
+          {
+            type: "Feature",
+            properties: { iso: "RU-VLG" },
+            geometry: {
+              type: "Polygon",
+              coordinates: [
+                [
+                  [0, 0],
+                  [1, 0],
+                  [1, 1],
+                  [0, 1],
+                  [0, 0]
+                ]
+              ]
+            }
+          }
+        ]
+      }
+    ];
+    saveFeaturesIntoRegionOverlayTempLayer({
+      label: "Вологодская область",
+      regionIds: ["vologda"],
+      overlays,
+      features: [gbifPoint(1, "Betula pendula")]
+    });
+    const gbifId = getTempLayers().find((layer) => layer.source === TEMP_SOURCE_IDS.GBIF)?.id;
+    setTempLayerVisible(gbifId, true);
+
+    saveFeaturesIntoRegionOverlayTempLayer({
+      label: "Вологодская область",
+      regionIds: ["vologda"],
+      overlays,
+      features: [gbifPoint(2, "Pinus sylvestris")]
+    });
+
+    const points = getTempLayers().find((layer) => layer.source === TEMP_SOURCE_IDS.GBIF);
+    expect(points.visible).toBe(true);
+    expect(points.features).toHaveLength(2);
     expect(getVisibleTempLayerFeatures()).toHaveLength(2);
   });
 

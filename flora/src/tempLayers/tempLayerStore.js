@@ -1817,7 +1817,26 @@ function bucketFeaturesBySource(features) {
   return buckets;
 }
 
-function createPointSourceLayer(base, source, features) {
+function isOverlayHostLayer(layer) {
+  return isRegionTempLayer(layer) || layerHasRegionOverlays(layer);
+}
+
+/** Точки, загруженные в полигон региона, по умолчанию скрыты — на карте плашка. */
+function resolveNewPointLayerVisible(base, list = layers) {
+  if (!isOverlayHostLayer(base)) {
+    return Boolean(base.visible);
+  }
+  const groupKey = layerGroupKey(base);
+  return list.some(
+    (layer) =>
+      layerGroupKey(layer) === groupKey &&
+      !isOverlayHostLayer(layer) &&
+      layer.visible
+  );
+}
+
+function createPointSourceLayer(base, source, features, list = layers) {
+  const overlayHost = isOverlayHostLayer(base);
   return {
     id: createLayerId(),
     kind: "points",
@@ -1832,8 +1851,8 @@ function createPointSourceLayer(base, source, features) {
     regionIds: [...(base.regionIds || [])],
     bufferKm: base.bufferKm ?? 0,
     createdAt: base.createdAt,
-    visible: base.visible,
-    heatmapEnabled: Boolean(base.heatmapEnabled),
+    visible: resolveNewPointLayerVisible(base, list),
+    heatmapEnabled: overlayHost ? false : Boolean(base.heatmapEnabled),
     markerColor: base.markerColor ?? null,
     archiveId: base.archiveId ?? null,
     filterSnapshot: normalizeFilterSnapshot(base.filterSnapshot),
@@ -1854,8 +1873,7 @@ function mergeBucketsIntoPlaque(base, buckets, regionIds) {
     }
     const existing = nextLayers.find(
       (layer) =>
-        !isRegionTempLayer(layer) &&
-        !layerHasRegionOverlays(layer) &&
+        !isOverlayHostLayer(layer) &&
         layerGroupKey(layer) === groupKey &&
         normalizeTempSource(layer.source) === source
     );
@@ -1878,7 +1896,8 @@ function mergeBucketsIntoPlaque(base, buckets, regionIds) {
       createPointSourceLayer(
         { ...base, regionIds: mergeRegionIds(base.regionIds, regionIds) },
         source,
-        mergeUniqueFeatures([], incoming).features
+        mergeUniqueFeatures([], incoming).features,
+        nextLayers
       ),
       ...nextLayers
     ];
@@ -1902,7 +1921,7 @@ function mergeBucketsIntoPlaque(base, buckets, regionIds) {
 function explodeMixedRegionPointLayers(list) {
   const extra = [];
   const next = (list ?? []).map((layer) => {
-    const holdsRegionOverlay = isRegionTempLayer(layer) || layerHasRegionOverlays(layer);
+    const holdsRegionOverlay = isOverlayHostLayer(layer);
     if (!holdsRegionOverlay || !(layer.features?.length > 0)) {
       return layer;
     }

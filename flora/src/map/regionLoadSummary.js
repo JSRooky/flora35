@@ -423,7 +423,8 @@ export function buildTempLayerRegionSummaries({ catalog = [], plaques } = {}) {
     if (pointLayers.length === 0) {
       return;
     }
-    if ((plaque.layers || []).some((layer) => layer.visible)) {
+    // Полигон региона может оставаться видимым; плашка нужна, пока скрыты именно точки.
+    if (pointLayers.some((layer) => layer.visible)) {
       return;
     }
 
