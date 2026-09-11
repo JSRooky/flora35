@@ -1,0 +1,19 @@
+---
+description: Use the mathlas MCP for airtight math search and numeric/formal verification.
+alwaysApply: true
+---
+
+# Mathlas MCP
+
+When a claim needs a theorem name, closed form, integer sequence, or independent numeric/formal check, use the **mathlas** MCP (no API key, no LLM inside). It sits alongside **flora-math**: flora-math is for Flora JS stats vs SciPy; mathlas is for general math.
+
+Prefer these tools:
+
+- `search_existing_math` — ranked existing results (seed corpus unless a local index is installed)
+- `verify_numeric` — digit-agreement of a value vs a closed form
+- `identify_constant` / `identify_sequence` — PSLQ / OEIS
+- `search_formal_math` — mathlib names via Loogle/LeanSearch
+- `verify_formal` — Lean kernel typecheck if a Lean toolchain is present
+- `applicability_checklist` / `mapping_scaffold` — preconditions, not proofs
+
+Do not invent a match when a tool returns unavailable / undetermined. Optional extras (`[retrieve]`, Lean, OEIS) are not required for numeric verify.

@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "flora-math": {
+      "type": "stdio",
+      "command": "${workspaceFolder}/tools/flora-math-mcp/.venv/Scripts/python.exe",
+      "args": ["${workspaceFolder}/tools/flora-math-mcp/server.py"]
+    },
+    "mathlas": {
+      "type": "stdio",
+      "command": "${workspaceFolder}/tools/mathlas-mcp/.venv/Scripts/python.exe",
+      "args": ["-m", "mathlas.server"]
+    }
+  }
+}

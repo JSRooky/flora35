@@ -1,0 +1,15 @@
+---
+description: Use the flora-math MCP to independently verify statistical and geometric algorithms.
+globs: flora/src/dataWork/analysis/**/*.js,flora/src/dataWork/compare/**/*.js
+alwaysApply: false
+---
+
+# Flora math verification
+
+When changing or reviewing Chao1, Mann–Kendall, Pearson r, Shannon/Simpson, Jaccard/Sørensen, EOO/AOO, or KDE bandwidth, use the **flora-math** MCP (SciPy/NumPy references) instead of trusting mental arithmetic.
+
+1. Read resource `flora-math://algorithms` if unsure which tool maps to which JS file.
+2. Call the matching `*_reference` tool with the same fixture the JS code uses.
+3. Call `compare_js_to_reference` and report mismatches.
+4. EOO area may differ slightly: JS is Turf geodesic, MCP is local km hull.
+5. Mann–Kendall tau in JS is Kendall-a (`S / C(n,2)`); SciPy `kendalltau` variant b can differ with ties.
