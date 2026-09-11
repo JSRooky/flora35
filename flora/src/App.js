@@ -80,6 +80,11 @@ import {
   updateHeatmapData
 } from "./components/addHeatmapLayer";
 import {
+  addAnalysisKdeLayer,
+  clearAnalysisKdeLayer,
+  setAnalysisKdeData
+} from "./components/addAnalysisKdeLayer";
+import {
   addBoundsLayers,
   clearBoundsLayerCache,
   ensureBoundsLayerGeoJSON,
@@ -227,6 +232,8 @@ import {
 import DataWorkPanel from "./components/DataWorkPanel";
 import TempLayerArchivePanel from "./components/TempLayerArchivePanel";
 import ComparePanel from "./components/ComparePanel";
+import ReportExportPanel from "./components/report/ReportExportPanel";
+import AnalysisPanel from "./components/analysis/AnalysisPanel";
 import CompareDiversityPopup from "./components/CompareDiversityPopup";
 import CompareSimilarityPopup from "./components/CompareSimilarityPopup";
 import CompareDistributionPopup from "./components/CompareDistributionPopup";
@@ -265,7 +272,7 @@ import {
   setRegionLoadSummaryActive,
   setRegionLoadSummaryOptions
 } from "./components/addRegionLoadSummaryLayer";
-import { listLoadedRegionCatalogIsos, shouldSuppressLoadedPointLayers } from "./map/regionLoadSummary";
+import { listLoadedRegionCatalogIsos } from "./map/regionLoadSummary";
 import {
   OSM_ADMIN_LOAD_MODES,
   downloadGeoJson,
@@ -351,7 +358,12 @@ import {
   EXTERNAL_LAYER_IDS
 } from "./components/ExternalLayersPicker";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
-import { FEATURE_FLAGS } from "./config/featureFlags";
+import ExperimentalFeatureDialog from "./components/ExperimentalFeatureDialog";
+import {
+  EXPERIMENTAL_FEATURE_IDS,
+  acknowledgeExperimentalFeature,
+  hasAcknowledgedExperimentalFeature
+} from "./config/experimentalFeatures";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
 import { ReactComponent as YandexLogo } from "./images/yandex_logo_ru.svg";
@@ -385,6 +397,8 @@ const PANEL_IDS = {
   REDBOOK: "redbook",
   TEMP_ARCHIVE: "temp-archive",
   COMPARE: "compare",
+  REPORT: "report",
+  ANALYSIS: "analysis",
   COMPARE_DIVERSITY: "compare-diversity",
   COMPARE_SIMILARITY: "compare-similarity",
   COMPARE_DISTRIBUTION: "compare-distribution",
@@ -425,6 +439,8 @@ const FEATURE_PEER_PANEL_IDS = [
   PANEL_IDS.REDBOOK,
   PANEL_IDS.TEMP_ARCHIVE,
   PANEL_IDS.COMPARE,
+  PANEL_IDS.REPORT,
+  PANEL_IDS.ANALYSIS,
   PANEL_IDS.COMPARE_DIVERSITY,
   PANEL_IDS.COMPARE_SIMILARITY,
   PANEL_IDS.COMPARE_DISTRIBUTION,
@@ -707,6 +723,10 @@ export default function MapView() {
   const [tempArchivePanelOpen, setTempArchivePanelOpen] = useState(false);
   const [tempArchiveStatus, setTempArchiveStatus] = useState("");
   const [comparePanelOpen, setComparePanelOpen] = useState(false);
+  const [reportPanelOpen, setReportPanelOpen] = useState(false);
+  const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
+  const [experimentalPrompt, setExperimentalPrompt] = useState(null);
+  const [kdeOverlay, setKdeOverlay] = useState(null);
   const [compareDiversityOpen, setCompareDiversityOpen] = useState(false);
   const [compareDiversityKeys, setCompareDiversityKeys] = useState([]);
   const [compareSimilarityOpen, setCompareSimilarityOpen] = useState(false);
@@ -796,17 +816,6 @@ export default function MapView() {
   );
 
   const restorePanel = useCallback((panelId) => {
-    if (
-      FEATURE_FLAGS.compareModuleDisabled &&
-      (panelId === TASKBAR_PANEL_IDS.COMPARE ||
-        panelId === TASKBAR_PANEL_IDS.COMPARE_DIVERSITY ||
-        panelId === TASKBAR_PANEL_IDS.COMPARE_SIMILARITY ||
-        panelId === TASKBAR_PANEL_IDS.COMPARE_DISTRIBUTION ||
-        panelId === TASKBAR_PANEL_IDS.COMPARE_STATS)
-    ) {
-      return;
-    }
-
     // Текущие видимые панели уводим в taskbar, затем поднимаем выбранную.
     stashVisiblePanelsToTaskbarRef.current(panelId);
 
@@ -877,6 +886,12 @@ export default function MapView() {
         break;
       case TASKBAR_PANEL_IDS.COMPARE:
         setComparePanelOpen(true);
+        break;
+      case TASKBAR_PANEL_IDS.REPORT:
+        setReportPanelOpen(true);
+        break;
+      case TASKBAR_PANEL_IDS.ANALYSIS:
+        setAnalysisPanelOpen(true);
         break;
       case TASKBAR_PANEL_IDS.COMPARE_DIVERSITY:
         setCompareDiversityOpen(true);
@@ -1424,10 +1439,6 @@ export default function MapView() {
       return;
     }
 
-    if (moduleId === MODULE_IDS.SUBMIT && FEATURE_FLAGS.submitModuleDisabled) {
-      return;
-    }
-
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature(false);
     setPolygonDockedWithFeature(false);
@@ -1544,14 +1555,6 @@ export default function MapView() {
         });
         persistTempLayers().catch(() => {});
         setTempLayersRevision((value) => value + 1);
-        if (visible) {
-          const count = getDisplayedLayerPointCount();
-          setCompactDisplayedLayerPointCount(count);
-          setDisplayedLayerPointCountState(count);
-          handleCompactPointDisplayChange(true, { auto: true });
-          autoRasterModeRef.current = false;
-          setAutoRasterMode(false);
-        }
         if (map.current) {
           setTempLayersData(map.current);
           refreshRegionLoadSummary(map.current);
@@ -1727,11 +1730,13 @@ export default function MapView() {
     unpinPanelsFromTaskbar
   ]);
 
-  const handleComparePanelToggle = useCallback(() => {
-    if (FEATURE_FLAGS.compareModuleDisabled) {
-      return;
-    }
+  const openComparePanel = useCallback(() => {
+    setComparePanelOpen(true);
+    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE]: false }));
+    pinPanelsToTaskbar([PANEL_IDS.COMPARE]);
+  }, [pinPanelsToTaskbar]);
 
+  const handleComparePanelToggle = useCallback(() => {
     if (comparePanelOpen && !isPanelMinimized(PANEL_IDS.COMPARE)) {
       setComparePanelOpen(false);
       setCompareDiversityOpen(false);
@@ -1748,10 +1753,89 @@ export default function MapView() {
       return;
     }
 
-    setComparePanelOpen(true);
-    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE]: false }));
-    pinPanelsToTaskbar([PANEL_IDS.COMPARE]);
-  }, [comparePanelOpen, isPanelMinimized, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
+    if (
+      !comparePanelOpen &&
+      !hasAcknowledgedExperimentalFeature(EXPERIMENTAL_FEATURE_IDS.COMPARE)
+    ) {
+      setExperimentalPrompt(EXPERIMENTAL_FEATURE_IDS.COMPARE);
+      return;
+    }
+
+    openComparePanel();
+  }, [
+    comparePanelOpen,
+    isPanelMinimized,
+    openComparePanel,
+    unpinPanelsFromTaskbar
+  ]);
+
+  const handleReportPanelToggle = useCallback(() => {
+    if (reportPanelOpen && !isPanelMinimized(PANEL_IDS.REPORT)) {
+      setReportPanelOpen(false);
+      unpinPanelsFromTaskbar([PANEL_IDS.REPORT]);
+      return;
+    }
+
+    setReportPanelOpen(true);
+    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.REPORT]: false }));
+    pinPanelsToTaskbar([PANEL_IDS.REPORT]);
+  }, [reportPanelOpen, isPanelMinimized, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
+
+  const openAnalysisPanel = useCallback(() => {
+    setAnalysisPanelOpen(true);
+    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.ANALYSIS]: false }));
+    pinPanelsToTaskbar([PANEL_IDS.ANALYSIS]);
+  }, [pinPanelsToTaskbar]);
+
+  const handleAnalysisPanelToggle = useCallback(() => {
+    if (analysisPanelOpen && !isPanelMinimized(PANEL_IDS.ANALYSIS)) {
+      setAnalysisPanelOpen(false);
+      unpinPanelsFromTaskbar([PANEL_IDS.ANALYSIS]);
+      return;
+    }
+
+    if (
+      !analysisPanelOpen &&
+      !hasAcknowledgedExperimentalFeature(EXPERIMENTAL_FEATURE_IDS.ANALYSIS)
+    ) {
+      setExperimentalPrompt(EXPERIMENTAL_FEATURE_IDS.ANALYSIS);
+      return;
+    }
+
+    openAnalysisPanel();
+  }, [
+    analysisPanelOpen,
+    isPanelMinimized,
+    openAnalysisPanel,
+    unpinPanelsFromTaskbar
+  ]);
+
+  const handleExperimentalContinue = useCallback(() => {
+    const featureId = experimentalPrompt;
+    if (!featureId) {
+      return;
+    }
+
+    acknowledgeExperimentalFeature(featureId);
+    setExperimentalPrompt(null);
+
+    if (featureId === EXPERIMENTAL_FEATURE_IDS.COMPARE) {
+      openComparePanel();
+      return;
+    }
+
+    if (featureId === EXPERIMENTAL_FEATURE_IDS.ANALYSIS) {
+      openAnalysisPanel();
+    }
+  }, [experimentalPrompt, openAnalysisPanel, openComparePanel]);
+
+  const handleExperimentalCancel = useCallback(() => {
+    setExperimentalPrompt(null);
+  }, []);
+
+  const handleKdeOverlayChange = useCallback((collection) => {
+    setKdeOverlay(collection);
+  }, []);
 
   const handleCompareSetChange = useCallback((plaques) => {
     const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
@@ -1768,9 +1852,6 @@ export default function MapView() {
 
   const handleOpenSimilarity = useCallback(
     (plaques) => {
-      if (FEATURE_FLAGS.compareModuleDisabled) {
-        return;
-      }
       const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
       setCompareDiversityKeys(nextKeys);
       setCompareSimilarityOpen(true);
@@ -1787,9 +1868,6 @@ export default function MapView() {
 
   const handleOpenDistribution = useCallback(
     (plaques) => {
-      if (FEATURE_FLAGS.compareModuleDisabled) {
-        return;
-      }
       const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
       setCompareDiversityKeys(nextKeys);
       setCompareDistributionOpen(true);
@@ -1806,9 +1884,6 @@ export default function MapView() {
 
   const handleOpenStats = useCallback(
     (kind, plaques) => {
-      if (FEATURE_FLAGS.compareModuleDisabled) {
-        return;
-      }
       const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
       setCompareDiversityKeys(nextKeys);
       setCompareStatsKind(kind);
@@ -1825,9 +1900,6 @@ export default function MapView() {
 
   const handleOpenDiversity = useCallback(
     (plaques) => {
-      if (FEATURE_FLAGS.compareModuleDisabled) {
-        return;
-      }
       const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
       setCompareDiversityKeys(nextKeys);
       setCompareDiversityOpen(true);
@@ -2716,6 +2788,14 @@ export default function MapView() {
       ids.push(PANEL_IDS.COMPARE);
     }
 
+    if (reportPanelOpen && !isMin(PANEL_IDS.REPORT)) {
+      ids.push(PANEL_IDS.REPORT);
+    }
+
+    if (analysisPanelOpen && !isMin(PANEL_IDS.ANALYSIS)) {
+      ids.push(PANEL_IDS.ANALYSIS);
+    }
+
     if (compareDiversityOpen && !isMin(PANEL_IDS.COMPARE_DIVERSITY)) {
       ids.push(PANEL_IDS.COMPARE_DIVERSITY);
     }
@@ -2751,6 +2831,8 @@ export default function MapView() {
     dataSourcesPanelOpen,
     tempArchivePanelOpen,
     comparePanelOpen,
+    reportPanelOpen,
+    analysisPanelOpen,
     compareDiversityOpen,
     compareSimilarityOpen,
     compareDistributionOpen,
@@ -2841,9 +2923,6 @@ export default function MapView() {
 
   const handleRegionOpenDataLoad = useCallback(
     (kind, includeBuffer = false) => {
-      if (FEATURE_FLAGS.regionPointLoadDisabled) {
-        return;
-      }
       const overlayActive = overlayRegionEdit.active;
       const entries = overlayActive
         ? overlayRegionEdit.isos.map((iso) => {
@@ -2897,7 +2976,6 @@ export default function MapView() {
       selectedRegionIsos
     ]
   );
-
 
   const handleDataSourcesPanelToggle = useCallback(() => {
     if (dataSourcesPanelOpen) {
@@ -4782,9 +4860,6 @@ export default function MapView() {
       });
       refreshRegionLoadSummary(map.current);
     } else if (tempOnly) {
-      if (!compactPointDisplay) {
-        setCompactPointDisplayEnabled(false);
-      }
       setGbifVisibility(map.current, false);
       setInatVisibility(map.current, false);
       setTempLayersVisibility(map.current, true);
@@ -4924,14 +4999,6 @@ export default function MapView() {
         return;
       }
 
-      if (shouldSuppressLoadedPointLayers() || tempOnly) {
-        if (autoRasterModeRef.current) {
-          autoRasterModeRef.current = false;
-          setAutoRasterMode(false);
-        }
-        return;
-      }
-
       const pointCount = getVisibleMapPointCount();
       const nextRaster = resolveAutoRasterMode(pointCount, autoRasterModeRef.current);
       if (nextRaster === autoRasterModeRef.current) {
@@ -4958,7 +5025,7 @@ export default function MapView() {
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [locationFilters, externalOnly, tempOnly, tempLayersRevision, pointsDataRevision, mapReady]);
+  }, [locationFilters, externalOnly, tempLayersRevision, pointsDataRevision, mapReady]);
 
   useEffect(() => {
     if (!map.current) {
@@ -4970,11 +5037,9 @@ export default function MapView() {
         return;
       }
       refreshHeatmapSourceOptions(externalOnly);
-      const showHeatmap =
-        (heatmapEnabled || autoRasterMode) &&
-        !compactPointDisplay &&
-        !shouldSuppressLoadedPointLayers();
-      setHeatmapEnabled(map.current, showHeatmap, locationFilters);
+      // Общая тепловая карта: в режиме временных слоёв — только они;
+      // при авто-растровом режиме включаем её независимо от ручного тумблера пользователя.
+      setHeatmapEnabled(map.current, heatmapEnabled || autoRasterMode, locationFilters);
       syncTempLayerHeatmaps(map.current, {
         active: externalOnly,
         filters: locationFilters,
@@ -4986,7 +5051,24 @@ export default function MapView() {
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [heatmapEnabled, autoRasterMode, compactPointDisplay, locationFilters, externalOnly, tempLayersRevision, heatmapSettings]);
+  }, [heatmapEnabled, autoRasterMode, locationFilters, externalOnly, tempLayersRevision, heatmapSettings]);
+
+  useEffect(() => {
+    if (!analysisPanelOpen) {
+      setKdeOverlay(null);
+    }
+  }, [analysisPanelOpen]);
+
+  useEffect(() => {
+    if (!map.current) {
+      return;
+    }
+    if (!analysisPanelOpen) {
+      clearAnalysisKdeLayer(map.current);
+      return;
+    }
+    setAnalysisKdeData(map.current, kdeOverlay);
+  }, [analysisPanelOpen, kdeOverlay, mapReady]);
 
   useEffect(() => {
     if (!mapReady || !map.current || !isFirebaseConfigured()) {
@@ -5565,12 +5647,6 @@ export default function MapView() {
     const count = getDisplayedLayerPointCount();
     setCompactDisplayedLayerPointCount(count);
     setDisplayedLayerPointCountState(count);
-    if (shouldSuppressLoadedPointLayers()) {
-      if (compactGridAutoRef.current && compactPointDisplay) {
-        handleCompactPointDisplayChange(false);
-      }
-      return;
-    }
     const over = count > getCompactGridPointLimit();
     if (over && !compactPointDisplay) {
       handleCompactPointDisplayChange(true, { auto: true });
@@ -6665,6 +6741,16 @@ export default function MapView() {
           ]);
           break;
         }
+        case PANEL_IDS.REPORT: {
+          setReportPanelOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.REPORT]);
+          break;
+        }
+        case PANEL_IDS.ANALYSIS: {
+          setAnalysisPanelOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.ANALYSIS]);
+          break;
+        }
         case PANEL_IDS.COMPARE_DIVERSITY: {
           setCompareDiversityOpen(false);
           unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_DIVERSITY]);
@@ -6830,37 +6916,6 @@ export default function MapView() {
   }, [mapReady, dataSourceMode, handleDataSourceModeChange]);
 
   // Инициализация карты Mapbox и всех слоёв/обработчиков — выполняется один раз при монтировании.
-  useEffect(() => {
-    const pendingShare = pendingSharePointRef.current;
-
-    if (!mapReady || !map.current || !pendingShare?.findingId) {
-      return;
-    }
-
-    const { findingId, zoom } = pendingShare;
-
-    if (!isFindingInDataSource(findingId, dataSourceMode)) {
-      if (dataSourceMode !== DATA_SOURCE_MODES.ALL) {
-        setDataSourceModeState(DATA_SOURCE_MODES.ALL);
-      } else {
-        pendingSharePointRef.current = null;
-      }
-      return;
-    }
-
-    const feature = findFeatureByFindingId(findingId);
-
-    if (!feature) {
-      pendingSharePointRef.current = null;
-      return;
-    }
-
-    pendingSharePointRef.current = null;
-    focusMapOnSharedPoint(map.current, feature, { zoom });
-    setPopupData(feature);
-    setActiveModule(MODULE_IDS.FEATURE);
-  }, [mapReady, dataSourceMode]);
-
   useEffect(() => {
     if (!map.current && ref.current) {
       map.current = initMap(ref.current);
@@ -7048,6 +7103,7 @@ export default function MapView() {
           }
         });
         addHeatmapLayer(mapInstance);
+        addAnalysisKdeLayer(mapInstance);
         addGbifLayer(mapInstance, {
           onPointClick: (feature) => {
             if (isAreaDrawingActive()) {
@@ -7454,12 +7510,47 @@ export default function MapView() {
 
   const denseProcessingExclusive = denseProcessingActive;
 
+  const reportContext = useMemo(() => {
+    void pointsDataRevision;
+
+    return {
+      locationFilters,
+      dataSourceMode,
+      areaGeometry,
+      intersectionContainedPoints,
+      activePolygon,
+      arealContainedPoints,
+      bufferEnabled,
+      bufferFeatures: bufferFilterFeatures,
+      bufferRadiiKm: bufferRadii,
+      toolFilterPointsSummary: activeToolFilterPointsSummary,
+      selectedPoint: popupData,
+      bufferSelectedPoints
+    };
+  }, [
+    activePolygon,
+    activeToolFilterPointsSummary,
+    areaGeometry,
+    arealContainedPoints,
+    bufferEnabled,
+    bufferFilterFeatures,
+    bufferRadii,
+    bufferSelectedPoints,
+    dataSourceMode,
+    intersectionContainedPoints,
+    locationFilters,
+    pointsDataRevision,
+    popupData
+  ]);
+
   const showModulePanelStack =
     (activeModule !== null && activeModule !== MODULE_IDS.TIMELINE) ||
     (showOoptFeaturePanel && activeModule !== MODULE_IDS.TIMELINE) ||
     dataSourcesPanelOpen ||
     tempArchivePanelOpen ||
     comparePanelOpen ||
+    reportPanelOpen ||
+    analysisPanelOpen ||
     dataSourceMode === DATA_SOURCE_MODES.EXTERNAL ||
     denseProcessingActive;
 
@@ -7481,9 +7572,20 @@ export default function MapView() {
         onTempArchivePanelToggle={handleTempArchivePanelToggle}
         comparePanelOpen={comparePanelOpen}
         onComparePanelToggle={handleComparePanelToggle}
+        reportPanelOpen={reportPanelOpen}
+        onReportPanelToggle={handleReportPanelToggle}
+        analysisPanelOpen={analysisPanelOpen}
+        onAnalysisPanelToggle={handleAnalysisPanelToggle}
         onSaveUserSettings={handleSaveMapConfig}
         onLoadUserSettings={handleLoadMapConfig}
       />
+      {experimentalPrompt ? (
+        <ExperimentalFeatureDialog
+          featureId={experimentalPrompt}
+          onContinue={handleExperimentalContinue}
+          onCancel={handleExperimentalCancel}
+        />
+      ) : null}
       <div
         ref={ref}
         className={`map-container${
@@ -7518,9 +7620,7 @@ export default function MapView() {
               statusMessage={tempArchiveStatus}
             />
           )}
-          {comparePanelOpen &&
-            !FEATURE_FLAGS.compareModuleDisabled &&
-            !isPanelMinimized(PANEL_IDS.COMPARE) && (
+          {comparePanelOpen && !isPanelMinimized(PANEL_IDS.COMPARE) && (
             <ComparePanel
               collapsed={isPanelCollapsed(PANEL_IDS.COMPARE)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.COMPARE)}
@@ -7531,6 +7631,25 @@ export default function MapView() {
               onOpenDistribution={handleOpenDistribution}
               onOpenStats={handleOpenStats}
               onCompareSetChange={handleCompareSetChange}
+            />
+          )}
+          {reportPanelOpen && !isPanelMinimized(PANEL_IDS.REPORT) && (
+            <ReportExportPanel
+              reportContext={reportContext}
+              collapsed={isPanelCollapsed(PANEL_IDS.REPORT)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.REPORT)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.REPORT)}
+              onClose={handleClosePanel(PANEL_IDS.REPORT)}
+            />
+          )}
+          {analysisPanelOpen && !isPanelMinimized(PANEL_IDS.ANALYSIS) && (
+            <AnalysisPanel
+              reportContext={reportContext}
+              collapsed={isPanelCollapsed(PANEL_IDS.ANALYSIS)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.ANALYSIS)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.ANALYSIS)}
+              onClose={handleClosePanel(PANEL_IDS.ANALYSIS)}
+              onKdeOverlayChange={handleKdeOverlayChange}
             />
           )}
           {denseProcessingExclusive ? (
@@ -8045,9 +8164,7 @@ export default function MapView() {
         />
       </TimelineSlider>
       <AboutProject open={aboutOpen} onOpenChange={setAboutOpen} />
-      {compareDiversityOpen &&
-      !FEATURE_FLAGS.compareModuleDisabled &&
-      !isPanelMinimized(PANEL_IDS.COMPARE_DIVERSITY) ? (
+      {compareDiversityOpen && !isPanelMinimized(PANEL_IDS.COMPARE_DIVERSITY) ? (
         <CompareDiversityPopup
           open
           plaqueKeys={compareDiversityKeys}
@@ -8055,9 +8172,7 @@ export default function MapView() {
           onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE_DIVERSITY)}
         />
       ) : null}
-      {compareSimilarityOpen &&
-      !FEATURE_FLAGS.compareModuleDisabled &&
-      !isPanelMinimized(PANEL_IDS.COMPARE_SIMILARITY) ? (
+      {compareSimilarityOpen && !isPanelMinimized(PANEL_IDS.COMPARE_SIMILARITY) ? (
         <CompareSimilarityPopup
           open
           plaqueKeys={compareDiversityKeys}
@@ -8065,9 +8180,7 @@ export default function MapView() {
           onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE_SIMILARITY)}
         />
       ) : null}
-      {compareDistributionOpen &&
-      !FEATURE_FLAGS.compareModuleDisabled &&
-      !isPanelMinimized(PANEL_IDS.COMPARE_DISTRIBUTION) ? (
+      {compareDistributionOpen && !isPanelMinimized(PANEL_IDS.COMPARE_DISTRIBUTION) ? (
         <CompareDistributionPopup
           open
           plaqueKeys={compareDiversityKeys}
@@ -8075,9 +8188,7 @@ export default function MapView() {
           onMinimize={handleMinimizePanel(PANEL_IDS.COMPARE_DISTRIBUTION)}
         />
       ) : null}
-      {compareStatsKind &&
-      !FEATURE_FLAGS.compareModuleDisabled &&
-      !isPanelMinimized(PANEL_IDS.COMPARE_STATS) ? (
+      {compareStatsKind && !isPanelMinimized(PANEL_IDS.COMPARE_STATS) ? (
         <CompareStatsPopup
           open
           kind={compareStatsKind}

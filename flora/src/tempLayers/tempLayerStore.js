@@ -1570,13 +1570,12 @@ function collectOverlayIdsToRemove(overlays, overlayId) {
   let grew = true;
   while (grew) {
     grew = false;
-    for (let i = 0; i < overlays.length; i += 1) {
-      const item = overlays[i];
+    overlays.forEach((item) => {
       if (item?.id && item.parentId && ids.has(item.parentId) && !ids.has(item.id)) {
         ids.add(item.id);
         grew = true;
       }
-    }
+    });
   }
   return ids;
 }
@@ -1818,13 +1817,26 @@ function bucketFeaturesBySource(features) {
   return buckets;
 }
 
-function hidePlaqueByGroupKey(groupKey) {
-  layers = layers.map((item) =>
-    layerGroupKey(item) === groupKey ? { ...item, visible: false } : item
+function isOverlayHostLayer(layer) {
+  return isRegionTempLayer(layer) || layerHasRegionOverlays(layer);
+}
+
+/** Точки, загруженные в полигон региона, по умолчанию скрыты — на карте плашка. */
+function resolveNewPointLayerVisible(base, list = layers) {
+  if (!isOverlayHostLayer(base)) {
+    return Boolean(base.visible);
+  }
+  const groupKey = layerGroupKey(base);
+  return list.some(
+    (layer) =>
+      layerGroupKey(layer) === groupKey &&
+      !isOverlayHostLayer(layer) &&
+      layer.visible
   );
 }
 
-function createPointSourceLayer(base, source, features) {
+function createPointSourceLayer(base, source, features, list = layers) {
+  const overlayHost = isOverlayHostLayer(base);
   return {
     id: createLayerId(),
     kind: "points",
@@ -1839,8 +1851,8 @@ function createPointSourceLayer(base, source, features) {
     regionIds: [...(base.regionIds || [])],
     bufferKm: base.bufferKm ?? 0,
     createdAt: base.createdAt,
-    visible: false,
-    heatmapEnabled: Boolean(base.heatmapEnabled),
+    visible: resolveNewPointLayerVisible(base, list),
+    heatmapEnabled: overlayHost ? false : Boolean(base.heatmapEnabled),
     markerColor: base.markerColor ?? null,
     archiveId: base.archiveId ?? null,
     filterSnapshot: normalizeFilterSnapshot(base.filterSnapshot),
@@ -1861,8 +1873,7 @@ function mergeBucketsIntoPlaque(base, buckets, regionIds) {
     }
     const existing = nextLayers.find(
       (layer) =>
-        !isRegionTempLayer(layer) &&
-        !layerHasRegionOverlays(layer) &&
+        !isOverlayHostLayer(layer) &&
         layerGroupKey(layer) === groupKey &&
         normalizeTempSource(layer.source) === source
     );
@@ -1885,7 +1896,8 @@ function mergeBucketsIntoPlaque(base, buckets, regionIds) {
       createPointSourceLayer(
         { ...base, regionIds: mergeRegionIds(base.regionIds, regionIds) },
         source,
-        mergeUniqueFeatures([], incoming).features
+        mergeUniqueFeatures([], incoming).features,
+        nextLayers
       ),
       ...nextLayers
     ];
@@ -1909,7 +1921,7 @@ function mergeBucketsIntoPlaque(base, buckets, regionIds) {
 function explodeMixedRegionPointLayers(list) {
   const extra = [];
   const next = (list ?? []).map((layer) => {
-    const holdsRegionOverlay = isRegionTempLayer(layer) || layerHasRegionOverlays(layer);
+    const holdsRegionOverlay = isOverlayHostLayer(layer);
     if (!holdsRegionOverlay || !(layer.features?.length > 0)) {
       return layer;
     }
@@ -1977,12 +1989,7 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
 
   layers = explodeMixedRegionPointLayers(layers);
   const buckets = bucketFeaturesBySource(incoming);
-  const target =
-    layers.find(
-      (layer) =>
-        !isRegionsRootLayer(layer) && layer.visible && layerHasRegionOverlays(layer)
-    ) ||
-    layers.find((layer) => !isRegionsRootLayer(layer) && layerHasRegionOverlays(layer));
+  const target = layers.find((layer) => layer.visible && layerHasRegionOverlays(layer));
   if (target) {
     const incomingOverlaySnapshot = normalizeOverlays(overlays);
     if (incomingOverlaySnapshot.length > 0) {
@@ -1992,7 +1999,6 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
       );
     }
     const added = mergeBucketsIntoPlaque(target, buckets, regionIds);
-    hidePlaqueByGroupKey(layerGroupKey(target));
     emit();
     return { ok: true, appended: true, added, layer: target };
   }
@@ -2020,7 +2026,7 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
     regionIds: mergeRegionIds([], regionIds),
     bufferKm: 0,
     createdAt,
-    visible: false,
+    visible: true,
     heatmapEnabled: false,
     markerColor,
     archiveId: null,
@@ -2032,7 +2038,6 @@ export function saveFeaturesIntoRegionOverlayTempLayer({
     ...layers.map((item) => ({ ...item, visible: false }))
   ];
   const added = mergeBucketsIntoPlaque(layer, buckets, regionIds);
-  hidePlaqueByGroupKey(layerGroupKey(layer));
   emit();
   return { ok: true, appended: false, added, layer };
 }

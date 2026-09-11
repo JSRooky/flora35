@@ -203,6 +203,45 @@ describe("regionLoadSummary", () => {
     expect(buildTempLayerRegionSummaries({ catalog, plaques })).toHaveLength(1);
   });
 
+  test("keeps the region plaque when only the overlay polygon is visible", () => {
+    const catalog = [
+      {
+        iso: "RU-VLG",
+        name: "Вологодская область",
+        nameEn: "Vologda",
+        feature: squareFeature(35, 58, 45, 62)
+      }
+    ];
+    const summaries = buildTempLayerRegionSummaries({
+      catalog,
+      plaques: [
+        {
+          key: "vologda",
+          taxonName: "Вологодская область",
+          layers: [
+            {
+              id: "overlay",
+              kind: "regions",
+              source: TEMP_SOURCE_IDS.REGIONS,
+              visible: true,
+              features: []
+            },
+            {
+              id: "gbif",
+              source: "gbif",
+              regionIds: ["vologda"],
+              visible: false,
+              features: [{ properties: { region_id: "vologda" } }]
+            }
+          ]
+        }
+      ]
+    });
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0].displayOn).toBe(false);
+    expect(summaries[0].pointCount).toBe(1);
+  });
+
   test("uses the temp-layer marker color for GBIF and iNat tints", () => {
     const vars = regionPlaqueColorVars({ markerColor: "#c45c26" });
     expect(vars["--temp-layer-color"]).toBe("#c45c26");
