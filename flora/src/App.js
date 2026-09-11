@@ -358,6 +358,7 @@ import {
   EXTERNAL_LAYER_IDS
 } from "./components/ExternalLayersPicker";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
+import { FEATURE_FLAGS } from "./config/featureFlags";
 import ExperimentalFeatureDialog from "./components/ExperimentalFeatureDialog";
 import {
   EXPERIMENTAL_FEATURE_IDS,
@@ -816,6 +817,10 @@ export default function MapView() {
   );
 
   const restorePanel = useCallback((panelId) => {
+    if (FEATURE_FLAGS.reportModuleDisabled && panelId === TASKBAR_PANEL_IDS.REPORT) {
+      return;
+    }
+
     // Текущие видимые панели уводим в taskbar, затем поднимаем выбранную.
     stashVisiblePanelsToTaskbarRef.current(panelId);
 
@@ -1770,6 +1775,10 @@ export default function MapView() {
   ]);
 
   const handleReportPanelToggle = useCallback(() => {
+    if (FEATURE_FLAGS.reportModuleDisabled) {
+      return;
+    }
+
     if (reportPanelOpen && !isPanelMinimized(PANEL_IDS.REPORT)) {
       setReportPanelOpen(false);
       unpinPanelsFromTaskbar([PANEL_IDS.REPORT]);
@@ -2788,7 +2797,11 @@ export default function MapView() {
       ids.push(PANEL_IDS.COMPARE);
     }
 
-    if (reportPanelOpen && !isMin(PANEL_IDS.REPORT)) {
+    if (
+      reportPanelOpen &&
+      !FEATURE_FLAGS.reportModuleDisabled &&
+      !isMin(PANEL_IDS.REPORT)
+    ) {
       ids.push(PANEL_IDS.REPORT);
     }
 
@@ -7633,7 +7646,9 @@ export default function MapView() {
               onCompareSetChange={handleCompareSetChange}
             />
           )}
-          {reportPanelOpen && !isPanelMinimized(PANEL_IDS.REPORT) && (
+          {reportPanelOpen &&
+            !FEATURE_FLAGS.reportModuleDisabled &&
+            !isPanelMinimized(PANEL_IDS.REPORT) && (
             <ReportExportPanel
               reportContext={reportContext}
               collapsed={isPanelCollapsed(PANEL_IDS.REPORT)}

@@ -412,15 +412,17 @@ export default function ModuleMenu({
               onModuleSelect={onAnalysisPanelToggle}
             />
           </li>
-          <li>
-            <ModuleMenuButton
-              id={REPORT_MODULE_ITEM.id}
-              label={REPORT_MODULE_ITEM.label}
-              mapToolAccent
-              activeModule={reportPanelOpen ? MODULE_IDS.REPORT : activeModule}
-              onModuleSelect={onReportPanelToggle}
-            />
-          </li>
+          {FEATURE_FLAGS.reportModuleDisabled ? null : (
+            <li>
+              <ModuleMenuButton
+                id={REPORT_MODULE_ITEM.id}
+                label={REPORT_MODULE_ITEM.label}
+                mapToolAccent
+                activeModule={reportPanelOpen ? MODULE_IDS.REPORT : activeModule}
+                onModuleSelect={onReportPanelToggle}
+              />
+            </li>
+          )}
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />
           {TEST_MODULE_ITEMS.map((item) =>
             renderModuleItem({

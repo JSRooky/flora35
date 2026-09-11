@@ -4,6 +4,7 @@ export const FEATURE_FLAGS = {
   dataSourceSelectDisabled: false,
   regionPointLoadDisabled: false,
   compareModuleDisabled: false,
+  reportModuleDisabled: true
 };
 
 export const FEATURE_UNAVAILABLE_TITLE = "Временно недоступно";
