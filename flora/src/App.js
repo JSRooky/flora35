@@ -358,6 +358,12 @@ import {
   EXTERNAL_LAYER_IDS
 } from "./components/ExternalLayersPicker";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
+import ExperimentalFeatureDialog from "./components/ExperimentalFeatureDialog";
+import {
+  EXPERIMENTAL_FEATURE_IDS,
+  acknowledgeExperimentalFeature,
+  hasAcknowledgedExperimentalFeature
+} from "./config/experimentalFeatures";
 import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
 import { ReactComponent as YandexLogo } from "./images/yandex_logo_ru.svg";
@@ -719,6 +725,7 @@ export default function MapView() {
   const [comparePanelOpen, setComparePanelOpen] = useState(false);
   const [reportPanelOpen, setReportPanelOpen] = useState(false);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
+  const [experimentalPrompt, setExperimentalPrompt] = useState(null);
   const [kdeOverlay, setKdeOverlay] = useState(null);
   const [compareDiversityOpen, setCompareDiversityOpen] = useState(false);
   const [compareDiversityKeys, setCompareDiversityKeys] = useState([]);
@@ -1723,6 +1730,12 @@ export default function MapView() {
     unpinPanelsFromTaskbar
   ]);
 
+  const openComparePanel = useCallback(() => {
+    setComparePanelOpen(true);
+    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE]: false }));
+    pinPanelsToTaskbar([PANEL_IDS.COMPARE]);
+  }, [pinPanelsToTaskbar]);
+
   const handleComparePanelToggle = useCallback(() => {
     if (comparePanelOpen && !isPanelMinimized(PANEL_IDS.COMPARE)) {
       setComparePanelOpen(false);
@@ -1740,10 +1753,21 @@ export default function MapView() {
       return;
     }
 
-    setComparePanelOpen(true);
-    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE]: false }));
-    pinPanelsToTaskbar([PANEL_IDS.COMPARE]);
-  }, [comparePanelOpen, isPanelMinimized, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
+    if (
+      !comparePanelOpen &&
+      !hasAcknowledgedExperimentalFeature(EXPERIMENTAL_FEATURE_IDS.COMPARE)
+    ) {
+      setExperimentalPrompt(EXPERIMENTAL_FEATURE_IDS.COMPARE);
+      return;
+    }
+
+    openComparePanel();
+  }, [
+    comparePanelOpen,
+    isPanelMinimized,
+    openComparePanel,
+    unpinPanelsFromTaskbar
+  ]);
 
   const handleReportPanelToggle = useCallback(() => {
     if (reportPanelOpen && !isPanelMinimized(PANEL_IDS.REPORT)) {
@@ -1757,6 +1781,12 @@ export default function MapView() {
     pinPanelsToTaskbar([PANEL_IDS.REPORT]);
   }, [reportPanelOpen, isPanelMinimized, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
 
+  const openAnalysisPanel = useCallback(() => {
+    setAnalysisPanelOpen(true);
+    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.ANALYSIS]: false }));
+    pinPanelsToTaskbar([PANEL_IDS.ANALYSIS]);
+  }, [pinPanelsToTaskbar]);
+
   const handleAnalysisPanelToggle = useCallback(() => {
     if (analysisPanelOpen && !isPanelMinimized(PANEL_IDS.ANALYSIS)) {
       setAnalysisPanelOpen(false);
@@ -1764,10 +1794,44 @@ export default function MapView() {
       return;
     }
 
-    setAnalysisPanelOpen(true);
-    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.ANALYSIS]: false }));
-    pinPanelsToTaskbar([PANEL_IDS.ANALYSIS]);
-  }, [analysisPanelOpen, isPanelMinimized, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
+    if (
+      !analysisPanelOpen &&
+      !hasAcknowledgedExperimentalFeature(EXPERIMENTAL_FEATURE_IDS.ANALYSIS)
+    ) {
+      setExperimentalPrompt(EXPERIMENTAL_FEATURE_IDS.ANALYSIS);
+      return;
+    }
+
+    openAnalysisPanel();
+  }, [
+    analysisPanelOpen,
+    isPanelMinimized,
+    openAnalysisPanel,
+    unpinPanelsFromTaskbar
+  ]);
+
+  const handleExperimentalContinue = useCallback(() => {
+    const featureId = experimentalPrompt;
+    if (!featureId) {
+      return;
+    }
+
+    acknowledgeExperimentalFeature(featureId);
+    setExperimentalPrompt(null);
+
+    if (featureId === EXPERIMENTAL_FEATURE_IDS.COMPARE) {
+      openComparePanel();
+      return;
+    }
+
+    if (featureId === EXPERIMENTAL_FEATURE_IDS.ANALYSIS) {
+      openAnalysisPanel();
+    }
+  }, [experimentalPrompt, openAnalysisPanel, openComparePanel]);
+
+  const handleExperimentalCancel = useCallback(() => {
+    setExperimentalPrompt(null);
+  }, []);
 
   const handleKdeOverlayChange = useCallback((collection) => {
     setKdeOverlay(collection);
@@ -7515,6 +7579,13 @@ export default function MapView() {
         onSaveUserSettings={handleSaveMapConfig}
         onLoadUserSettings={handleLoadMapConfig}
       />
+      {experimentalPrompt ? (
+        <ExperimentalFeatureDialog
+          featureId={experimentalPrompt}
+          onContinue={handleExperimentalContinue}
+          onCancel={handleExperimentalCancel}
+        />
+      ) : null}
       <div
         ref={ref}
         className={`map-container${
