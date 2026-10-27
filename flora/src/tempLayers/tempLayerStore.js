@@ -22,7 +22,7 @@ function cloneFeature(feature) {
 
 function cloneJson(value) {
   try {
-    return JSON.parse(JSON.stringify(value));
+    return structuredClone(value);
   } catch {
     return null;
   }

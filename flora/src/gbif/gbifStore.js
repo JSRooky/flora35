@@ -26,6 +26,7 @@ const EMPTY_COLLECTION = {
 
 let table = createEmptyGbifTable();
 let idToIndex = new Map();
+let regionIdToIndices = null; // lazy-built index: Map<string, number[]>
 let loadedRegionId = null;
 let loadedRegionIds = new Set();
 let loadedQuery = null;
@@ -45,6 +46,27 @@ function bumpGeneration() {
   enrichedCollectionOverlayVersion = -1;
   slimMapFeaturesCache = null;
   slimMapFeaturesOverlayVersion = -1;
+  regionIdToIndices = null; // invalidate region index
+}
+
+/** Build regionId → indices index (O(N) once, then O(1) per query). */
+function buildRegionIdIndex() {
+  if (regionIdToIndices) return regionIdToIndices;
+  const index = new Map();
+  for (let i = 0; i < table.rowCount; i++) {
+    const regionId = readGbifRegionId(table, i);
+    if (regionId) {
+      const key = String(regionId);
+      const arr = index.get(key);
+      if (arr) {
+        arr.push(i);
+      } else {
+        index.set(key, [i]);
+      }
+    }
+  }
+  regionIdToIndices = index;
+  return index;
 }
 
 function resolveRowNameRu(rowIndex) {
@@ -225,13 +247,14 @@ export function getGbifFeaturesForRegionIds(regionIds) {
     return [];
   }
 
+  const index = buildRegionIdIndex();
   const indices = [];
-  for (let i = 0; i < table.rowCount; i += 1) {
-    const regionId = readGbifRegionId(table, i);
-    if (regionId && wanted.has(String(regionId))) {
-      indices.push(i);
+  wanted.forEach((regionId) => {
+    const arr = index.get(regionId);
+    if (arr) {
+      indices.push(...arr);
     }
-  }
+  });
   return getGbifFeaturesByIndices(indices);
 }
 

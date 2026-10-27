@@ -26,6 +26,8 @@ const NOMINATIM_DETAILS_URL = "https://nominatim.openstreetmap.org/details";
 const NOMINATIM_LOOKUP_URL = "https://nominatim.openstreetmap.org/lookup";
 const POLYGONS_FR_URL = "https://polygons.openstreetmap.fr/get_geojson.py";
 const NOMINATIM_LOOKUP_CHUNK = 20;
+const OSM_CACHE_TTL_MS = 86400000; // 24 hours
+const OSM_CACHE_PREFIX = "flora35-osm-cache:";
 
 /**
  * Собирает Overpass QL для административных границ (relation + geometry).
@@ -558,7 +560,53 @@ function isPolygonGeometry(geometry) {
   return geometry?.type === "Polygon" || geometry?.type === "MultiPolygon";
 }
 
+/** Simple hash for Overpass query strings. */
+function hashOverpassQuery(query) {
+  let hash = 0;
+  for (let i = 0; i < query.length; i++) {
+    const char = query.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
+
+/** Get cached Overpass response by query hash. */
+function getOverpassCache(query) {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const key = OSM_CACHE_PREFIX + hashOverpassQuery(query);
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const entry = JSON.parse(raw);
+    if (Date.now() - entry.timestamp > OSM_CACHE_TTL_MS) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return entry.data;
+  } catch {
+    return null;
+  }
+}
+
+/** Cache Overpass response by query hash. */
+function setOverpassCache(query, data) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    const key = OSM_CACHE_PREFIX + hashOverpassQuery(query);
+    localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch {
+    // Ignore quota errors
+  }
+}
+
 async function requestOverpassJson(query, { overpassUrl, overpassUrls, fetchImpl, retryDelayMs = 350 }) {
+  // Check cache first
+  const cached = getOverpassCache(query);
+  if (cached) {
+    return cached;
+  }
+
   const urls = resolveOverpassUrls({ overpassUrl, overpassUrls });
   let lastError = null;
   for (let index = 0; index < urls.length; index += 1) {
@@ -610,6 +658,8 @@ async function requestOverpassJson(query, { overpassUrl, overpassUrls, fetchImpl
         if (typeof json?.remark === "string" && /error|timeout/i.test(json.remark)) {
           throw new Error(`Overpass remark: ${json.remark}`);
         }
+        // Cache successful response
+        setOverpassCache(query, json);
         return json;
       } catch (error) {
         lastError = error;

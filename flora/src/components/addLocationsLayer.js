@@ -689,8 +689,18 @@ function attachClusterPieChartMarkers(map) {
   }
 
   clusterPieChartMap = map;
-  clusterPieChartRenderHandler = () => updateClusterPieChartMarkers(map);
-  map.on("render", clusterPieChartRenderHandler);
+  let pieDebounceTimer = null;
+  clusterPieChartRenderHandler = () => {
+    if (pieDebounceTimer) {
+      clearTimeout(pieDebounceTimer);
+    }
+    pieDebounceTimer = setTimeout(() => {
+      pieDebounceTimer = null;
+      updateClusterPieChartMarkers(map);
+    }, 100);
+  };
+  map.on("moveend", clusterPieChartRenderHandler);
+  map.on("zoomend", clusterPieChartRenderHandler);
   updateClusterPieChartMarkers(map);
 }
 
@@ -1633,6 +1643,21 @@ function getFeatureKey(feature) {
   return getStablePointKey(feature);
 }
 
+/** Быстрый хеш-кэш для сравнения фильтров: JSON.stringify + кэш в WeakMap. */
+const filterHashCache = new WeakMap();
+
+function stableFilterHash(obj) {
+  if (obj == null) return String(obj);
+  if (typeof obj !== "object") return String(obj);
+  // Кэш для объектов — не сериализуем каждый раз
+  if (filterHashCache.has(obj)) {
+    return filterHashCache.get(obj);
+  }
+  const hash = JSON.stringify(obj);
+  filterHashCache.set(obj, hash);
+  return hash;
+}
+
 function filterValueEqual(a, b) {
   if (a === b) {
     return true;
@@ -1647,14 +1672,7 @@ function filterValueEqual(a, b) {
   }
 
   if (a && b && typeof a === "object" && typeof b === "object") {
-    const keysA = Object.keys(a);
-    const keysB = Object.keys(b);
-
-    if (keysA.length !== keysB.length) {
-      return false;
-    }
-
-    return keysA.every((key) => filterValueEqual(a[key], b[key]));
+    return stableFilterHash(a) === stableFilterHash(b);
   }
 
   return false;
