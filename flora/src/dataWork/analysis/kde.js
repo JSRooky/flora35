@@ -145,12 +145,112 @@ function isoplethFeature(mask, cols, rows, xmin, ymin, dx, dy, toLonLat, propert
   };
 }
 
+// ─── Web Worker cache ───────────────────────────────────────────────
+
+/** @type {Promise<Worker> | null} */
+let _workerPromise = null;
+
+/**
+ * Lazily creates a Blob-URL worker from kdeWorker.js source.
+ * The worker instance is cached and reused across all calls.
+ * @returns {Promise<Worker>}
+ */
+function getWorker() {
+  if (!_workerPromise) {
+    _workerPromise = fetch("./kdeWorker.js")
+      .then((response) => response.text())
+      .then((source) => {
+        const blob = new Blob([source], { type: "application/javascript" });
+        const url = URL.createObjectURL(blob);
+        return new Worker(url);
+      });
+  }
+  return _workerPromise;
+}
+
+let _workerId = 0;
+
+/**
+ * Send a message to the cached worker and return a promise that resolves
+ * with the worker's response object ({ id, result } | { id, error }).
+ * @param {object} message
+ * @returns {Promise<{ id: string, result?: object, error?: string }>}
+ */
+function postToWorker(message) {
+  const id = `kde-${++_workerId}-${Date.now()}`;
+  return getWorker().then((worker) => {
+    return new Promise((resolve, reject) => {
+      function handler(e) {
+        if (e.data && e.data.id === id) {
+          worker.removeEventListener("message", handler);
+          resolve(e.data);
+        }
+      }
+      worker.addEventListener("message", handler);
+      worker.addEventListener("error", (err) => {
+        worker.removeEventListener("message", handler);
+        reject(err);
+      });
+      worker.postMessage({ ...message, id });
+    });
+  });
+}
+
+// ─── Main API ───────────────────────────────────────────────────────
+
 /**
  * Гауссово KDE уникальных локалитетов в локальной километровой проекции.
  * Изоплеты — объёмные (Worton): наименьшая площадь, содержащая 50% и 95% массы.
+ *
+ * Для datasets >= 500 точек вычисление переносится в Web Worker.
+ * Для меньших — выполняется синхронно в основном потоке.
+ *
+ * @param {Array} features
+ * @param {object} [options]
+ * @param {number} [options.bandwidthScale=1]
+ * @param {number} [options.gridSize=96]
+ * @returns {object|Promise<object>} KDE result (sync for <500, Promise for >=500)
  */
 export function computeKde(features, { bandwidthScale = 1, gridSize = KDE_GRID_SIZE } = {}) {
   const coords = collectOccurrenceCoords(features);
+
+  // Fast path: not enough points for KDE — always synchronous
+  if (coords.length < 2) {
+    return {
+      uniqueLocalities: coords.length,
+      sampledCount: 0,
+      binned: false,
+      bandwidthKm: null,
+      bandwidthScale: Number.isFinite(bandwidthScale) && bandwidthScale > 0 ? bandwidthScale : 1,
+      peakDensityPerKm2: null,
+      cellKm2: null,
+      area50Km2: null,
+      area95Km2: null,
+      threshold50: null,
+      threshold95: null,
+      reason: "need_two_points",
+      grid: null,
+      overlay: { type: "FeatureCollection", features: [] }
+    };
+  }
+
+  // Threshold: switch to async worker for large datasets
+  if (features.length >= 500) {
+    const scale = Number.isFinite(bandwidthScale) && bandwidthScale > 0 ? bandwidthScale : 1;
+    return postToWorker({
+      coords,
+      bandwidthScale: scale,
+      gridSize: Math.max(16, Math.round(gridSize) || KDE_GRID_SIZE)
+    }).then((msg) => {
+      if (msg.error) {
+        throw new Error(`KDE worker error: ${msg.error}`);
+      }
+      return msg.result;
+    });
+  }
+
+  // ── Synchronous path (kept from original) ────────────────────────
+
   const scale = Number.isFinite(bandwidthScale) && bandwidthScale > 0 ? bandwidthScale : 1;
   const cols = Math.max(16, Math.round(gridSize) || KDE_GRID_SIZE);
   const rows = cols;
@@ -171,10 +271,6 @@ export function computeKde(features, { bandwidthScale = 1, gridSize = KDE_GRID_S
     grid: null,
     overlay: { type: "FeatureCollection", features: [] }
   };
-
-  if (coords.length < 2) {
-    return empty;
-  }
 
   const projector = makeProjector(coords);
   const rawXy = coords.map(([lon, lat]) => projector.toKm(lon, lat));

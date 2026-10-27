@@ -374,6 +374,17 @@ function rebuildSpeciesPointCountsOnMap() {
   speciesPointCountsOnMap = counts;
 }
 
+/** Debounced wrapper: ждёт 100мс тишины перед пересчётом. */
+function scheduleRebuildSpeciesPointCounts() {
+  if (speciesCountsDebounceTimer !== null) {
+    clearTimeout(speciesCountsDebounceTimer);
+  }
+  speciesCountsDebounceTimer = setTimeout(() => {
+    speciesCountsDebounceTimer = null;
+    rebuildSpeciesPointCountsOnMap();
+  }, 100);
+}
+
 function getSpeciesPointCountOnMap(nameRu, nameLatin) {
   const key = nameLatin || nameRu || "";
   return key ? (speciesPointCountsOnMap.get(key) ?? 0) : 0;
@@ -381,7 +392,7 @@ function getSpeciesPointCountOnMap(nameRu, nameLatin) {
 
 function setCurrentFilteredFeatures(features) {
   currentFilteredFeatures = features;
-  rebuildSpeciesPointCountsOnMap();
+  scheduleRebuildSpeciesPointCounts();
 }
 
 function formatClusterPointsCount(count) {
@@ -3313,8 +3324,4 @@ export function addLocationsLayer(
   rebuildLocationsLayers(map);
 }
 
-/** Перечитывает активную коллекцию (с учётом фильтра источника) и перестраивает слой маркеров. */
-export function reloadLocationsData(map) {
-  locationsData = enrichWithImages(getFeatureCollection());
-  rebuildLocationsLayers(map);
-}
+/** Перечитывает активную коллекцию (с учётом фильтра источника) и перестраивает сло                                                                                                                                                                     
