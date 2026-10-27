@@ -85,6 +85,22 @@ export function slimMapFeatures(features) {
   return out;
 }
 
+export function partitionMapFeaturesByRegnum(features, regnumKeys) {
+  const groups = new Map(regnumKeys.map((regnum) => [regnum, []]));
+  const other = [];
+  for (let i = 0; i < features.length; i += 1) {
+    const feature = features[i];
+    const regnum = String(feature.properties?.regnum || "").toLowerCase();
+    const group = groups.get(regnum);
+    if (group) {
+      group.push(feature);
+    } else {
+      other.push(feature);
+    }
+  }
+  return { groups, other };
+}
+
 export function slimMapFeaturesFromGbifTable(table, rowIndices, getNameRu) {
   const indices = rowIndices ?? allRowIndices(table?.rowCount ?? 0);
   const out = new Array(indices.length);

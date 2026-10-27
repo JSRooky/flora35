@@ -19,20 +19,40 @@ import {
 } from "./compactFilterState";
 import {
   buildCompactViewportFeatures,
-  paddedBoundsFromMap,
-  pointInCompactBounds
+  forEachCompactPointInBounds
 } from "./compactPointDisplay";
 import { shouldUseCompactDensityGrid } from "./compactGridSettings";
+
+let cachedProcessingMask = null;
+
+function getProcessingMask(table, filters) {
+  if (!hasActiveInatProcessingFilters(filters)) {
+    return null;
+  }
+
+  const filtersKey = JSON.stringify(filters);
+  if (
+    cachedProcessingMask?.table === table &&
+    cachedProcessingMask.filtersKey === filtersKey
+  ) {
+    return cachedProcessingMask.mask;
+  }
+
+  const mask = new Uint8Array(table?.rowCount ?? 0);
+  const indices = filterInatTableIndices(table, filters);
+  for (let i = 0; i < indices.length; i += 1) {
+    mask[indices[i]] = 1;
+  }
+  cachedProcessingMask = { table, filtersKey, mask };
+  return mask;
+}
 
 export function buildCompactInatViewportFeatures(map) {
   const table = getInatColumnarTable();
   const processingFilters = getCompactInatProcessingFilters();
   const locationFilters = getCompactLocationFilters();
-  const indices = hasActiveInatProcessingFilters(processingFilters)
-    ? filterInatTableIndices(table, processingFilters)
-    : null;
+  const processingMask = getProcessingMask(table, processingFilters);
   const rowCount = table?.rowCount ?? 0;
-  const bounds = paddedBoundsFromMap(map);
   const needProperties =
     !shouldUseCompactDensityGrid() || locationFiltersNeedProperties(locationFilters);
 
@@ -40,38 +60,42 @@ export function buildCompactInatViewportFeatures(map) {
     map,
     source: "inaturalist",
     forEachPoint: (visit) => {
-      const n = indices ? indices.length : rowCount;
-      for (let i = 0; i < n; i += 1) {
-        const rowIndex = indices ? indices[i] : i;
-        const lng = table.lng[rowIndex];
-        const lat = table.lat[rowIndex];
-        if (bounds && !pointInCompactBounds(lng, lat, bounds)) {
-          continue;
-        }
+      forEachCompactPointInBounds({
+        map,
+        source: "inaturalist",
+        token: table,
+        count: rowCount,
+        getLng: (rowIndex) => table.lng[rowIndex],
+        getLat: (rowIndex) => table.lat[rowIndex],
+        visit: (lng, lat, rowIndex) => {
+          if (processingMask && !processingMask[rowIndex]) {
+            return;
+          }
 
-        if (!needProperties) {
-          // Ни один активный фильтр не требует свойств точки — можно
-          // отдать координаты в сетку плотности без чтения строк из таблицы.
+          if (!needProperties) {
+            // Ни один активный фильтр не требует свойств точки — можно
+            // отдать координаты в сетку плотности без чтения строк из таблицы.
+            visit(lng, lat, rowIndex);
+            return;
+          }
+
+          const nameLatin = readInatNameLatin(table, rowIndex);
+          const overlayEntry = nameLatin ? getOverlayEntry(nameLatin) : undefined;
+          const id = readInatId(table, rowIndex);
+          const properties = {
+            inat_id: id,
+            id: `inat-${id}`,
+            regnum: readInatRegnum(table, rowIndex),
+            found_year: readInatFoundYear(table, rowIndex),
+            name_latin: nameLatin,
+            name_ru: overlayEntry?.nameRu ?? null
+          };
+          if (!compactPropertiesMatchFilters(properties, lng, lat, locationFilters)) {
+            return;
+          }
           visit(lng, lat, rowIndex);
-          continue;
         }
-
-        const nameLatin = readInatNameLatin(table, rowIndex);
-        const overlayEntry = nameLatin ? getOverlayEntry(nameLatin) : undefined;
-        const id = readInatId(table, rowIndex);
-        const properties = {
-          inat_id: id,
-          id: `inat-${id}`,
-          regnum: readInatRegnum(table, rowIndex),
-          found_year: readInatFoundYear(table, rowIndex),
-          name_latin: nameLatin,
-          name_ru: overlayEntry?.nameRu ?? null
-        };
-        if (!compactPropertiesMatchFilters(properties, lng, lat, locationFilters)) {
-          continue;
-        }
-        visit(lng, lat, rowIndex);
-      }
+      });
     },
     toPointFeature: (rowIndex) => inatRowToSlimFeature(table, rowIndex)
   });

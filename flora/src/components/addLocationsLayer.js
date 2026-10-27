@@ -64,6 +64,7 @@ import {
 import {
   concatFeatures,
   hashLocationFilters,
+  partitionMapFeaturesByRegnum,
   slimMapFeatures
 } from "./mapPerformance";
 import {
@@ -188,6 +189,8 @@ let locationsData = null;
 let clusterByRegnum = false;
 let clusteringEnabled = true;
 let clusterPieChartsEnabled = false;
+let cachedRegnumFeatures = null;
+let cachedRegnumValues = null;
 /** Режим сверхплотных куч: без Mapbox-кластеризации, только кастомные кластеры ≥10. */
 let denseClustersHighlightEnabled = false;
 /** Раскрытые сверхплотные кучи (показывают отдельные точки). */
@@ -242,6 +245,7 @@ let processedInatCache = {
 };
 let currentFilteredFeatures = [];
 let speciesPointCountsOnMap = new Map();
+let speciesCountsDebounceTimer = null;
 let interactionHandlers = null;
 let onClusterExpandedCallback = null;
 let onPointClickCallback = null;
@@ -738,7 +742,11 @@ function enrichWithImages(data) {
 }
 
 function getRegnumValues(features = locationsData?.features ?? []) {
-  return [
+  if (features === cachedRegnumFeatures) {
+    return cachedRegnumValues;
+  }
+
+  const values = [
     ...new Set(
       features
         .map((feature) => {
@@ -751,6 +759,10 @@ function getRegnumValues(features = locationsData?.features ?? []) {
         .filter(Boolean)
     )
   ];
+
+  cachedRegnumFeatures = features;
+  cachedRegnumValues = values;
+  return values;
 }
 
 /** ID GeoJSON-источника: общий или отдельный для каждого regnum. */
@@ -1842,7 +1854,15 @@ function updateLocationsSourceData(map, filteredFeatures) {
     ensureCompactViewportSync(map, "locations", () => {
       updateLocationsSourceData(map, currentFilteredFeatures);
     });
-    const built = buildCompactViewportFromGeojson(map, filteredFeatures, "locations");
+    const built = buildCompactViewportFromGeojson(
+      map,
+      filteredFeatures,
+      "locations",
+      {
+        indexFeatures: locationsData.features,
+        getFeatureKey: getStablePointKey
+      }
+    );
     map.getSource("locations")?.setData({
       type: "FeatureCollection",
       features: built.features
@@ -1864,19 +1884,17 @@ function updateLocationsSourceData(map, filteredFeatures) {
   }
 
   if (clusterByRegnum) {
-    getRegnumValues().forEach((regnum) => {
+    const regnums = getRegnumValues();
+    const featuresByRegnum = partitionMapFeaturesByRegnum(slimFeatures, regnums).groups;
+    regnums.forEach((regnum) => {
       const source = map.getSource(getSourceId(regnum));
       if (!source) {
         return;
       }
 
-      const regnumKey = String(regnum).toLowerCase();
       source.setData({
         type: "FeatureCollection",
-        features: slimFeatures.filter(
-          (feature) =>
-            String(feature.properties?.regnum || "").toLowerCase() === regnumKey
-        )
+        features: featuresByRegnum.get(regnum)
       });
     });
     syncDensePilesLayers(map, denseClusterFeatures);
@@ -1987,7 +2005,15 @@ function rebuildLocationsLayers(map, { reuseFiltered = false } = {}) {
     setCurrentFilteredFeatures(filteredFeatures);
   }
   const compactBuilt = isCompactPointDisplayEnabled()
-    ? buildCompactViewportFromGeojson(map, filteredFeatures, "locations")
+    ? buildCompactViewportFromGeojson(
+        map,
+        filteredFeatures,
+        "locations",
+        {
+          indexFeatures: locationsData.features,
+          getFeatureKey: getStablePointKey
+        }
+      )
     : null;
   const { mapFeatures, denseClusterFeatures } = compactBuilt
     ? { mapFeatures: compactBuilt.features, denseClusterFeatures: [] }
@@ -2006,13 +2032,11 @@ function rebuildLocationsLayers(map, { reuseFiltered = false } = {}) {
     addUnclusteredLayer(map, "locations");
   } else if (clusterByRegnum) {
     // Отдельный кластеризуемый источник на каждое царство — кластеры не смешивают regnum.
-    getRegnumValues().forEach((regnum) => {
+    const regnums = getRegnumValues();
+    const featuresByRegnum = partitionMapFeaturesByRegnum(slimFeatures, regnums).groups;
+    regnums.forEach((regnum) => {
       const sourceId = getSourceId(regnum);
-      const regnumKey = String(regnum).toLowerCase();
-      const features = slimFeatures.filter(
-        (feature) =>
-          String(feature.properties?.regnum || "").toLowerCase() === regnumKey
-      );
+      const features = featuresByRegnum.get(regnum);
 
       map.addSource(sourceId, {
         type: "geojson",
@@ -3080,7 +3104,19 @@ export function applyLocationsFilter(map, filters = {}) {
   expandedCoincidentKeys = new Set();
 
   if (map) {
-    rebuildLocationsLayers(map);
+    if (locationsData && locationsSourcesExist(map)) {
+      const filteredFeatures = filterFeatures(
+        enrichFeaturesWithAttribution(locationsData.features, getStablePointKey),
+        filters
+      );
+      setCurrentFilteredFeatures(filteredFeatures);
+      updateLocationsSourceData(map, filteredFeatures);
+      applyMarkersVisibility(map);
+      applyUnclusteredLayerFilters(map);
+      refreshClusterPieChartMarkers(map);
+    } else {
+      rebuildLocationsLayers(map);
+    }
     applyGbifLocationsFilter(map, filters);
     applyInatLocationsFilter(map, filters);
     applyRedBookLocationsFilter(map, filters);
@@ -3322,6 +3358,12 @@ export function setHoverTooltipsEnabled(enabled) {
 
 export { isHoverTooltipsEnabled };
 
+/** Перечитывает активную коллекцию точек и перестраивает слой маркеров. */
+export function reloadLocationsData(map) {
+  locationsData = enrichWithImages(getFeatureCollection());
+  rebuildLocationsLayers(map);
+}
+
 /** Точка входа: инициализация слоя маркеров и регистрация колбэков из App. */
 export function addLocationsLayer(
   map,
@@ -3344,4 +3386,4 @@ export function addLocationsLayer(
   onPointClickCallback = onPointClick;
   onMapBackgroundClickCallback = onMapBackgroundClick;
   rebuildLocationsLayers(map);
-}                                                                                                                                                                     
+}

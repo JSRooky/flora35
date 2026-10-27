@@ -1,6 +1,8 @@
 import {
   buildCompactViewportFeatures,
+  buildCompactViewportFromGeojson,
   COMPACT_MAX_VIEWPORT_POINTS,
+  forEachCompactPointInBounds,
   squareDegreesForZoom
 } from "./compactPointDisplay";
 import {
@@ -103,5 +105,124 @@ describe("compactPointDisplay", () => {
 
   test("default point limit is a large viewport budget", () => {
     expect(COMPACT_MAX_VIEWPORT_POINTS).toBeGreaterThan(1000);
+  });
+
+  test("compact viewport visits nearby spatial buckets instead of scanning every point", () => {
+    const points = Array.from({ length: 20000 }, (_, index) => ({
+      lng: (index % 512) * (360 / 512) - 180,
+      lat: Math.floor(index / 512) * (180 / 40) - 90
+    }));
+    points.push({ lng: 40, lat: 57 });
+    const map = fakeMap({
+      zoom: 8,
+      west: 39.9,
+      south: 56.9,
+      east: 40.1,
+      north: 57.1
+    });
+    let coordinateReads = 0;
+    const visited = [];
+    const options = {
+      map,
+      source: "spatial-index-performance-test",
+      token: points,
+      count: points.length,
+      getLng: (index) => {
+        coordinateReads += 1;
+        return points[index].lng;
+      },
+      getLat: (index) => {
+        coordinateReads += 1;
+        return points[index].lat;
+      },
+      visit: (_lng, _lat, index) => visited.push(index)
+    };
+
+    forEachCompactPointInBounds(options);
+    expect(visited).toContain(points.length - 1);
+    expect(coordinateReads).toBeGreaterThanOrEqual(points.length * 2);
+
+    coordinateReads = 0;
+    forEachCompactPointInBounds(options);
+    expect(coordinateReads).toBeLessThan(points.length / 100);
+  });
+
+  test("filtered local points reuse the unfiltered spatial index", () => {
+    const features = Array.from({ length: 20000 }, (_, index) => {
+      const lng = (index % 512) * (360 / 512) - 180;
+      const lat = Math.floor(index / 512) * (180 / 40) - 90;
+      return {
+        properties: { id: String(index) },
+        get geometry() {
+          coordinateReads += 1;
+          return {
+            type: "Point",
+            coordinates: [lng, lat]
+          };
+        }
+      };
+    });
+    const selectedFeature = {
+      properties: { id: "selected" },
+      get geometry() {
+        coordinateReads += 1;
+        return { type: "Point", coordinates: [40, 57] };
+      }
+    };
+    features.push(selectedFeature);
+    const map = fakeMap({
+      zoom: 8,
+      west: 39.9,
+      south: 56.9,
+      east: 40.1,
+      north: 57.1
+    });
+    let coordinateReads = 0;
+    const options = {
+      indexFeatures: features,
+      getFeatureKey: (feature) => feature.properties.id
+    };
+
+    expect(
+      buildCompactViewportFromGeojson(
+        map,
+        [selectedFeature],
+        "filtered-local-index-test",
+        options
+      ).features
+    ).toEqual([selectedFeature]);
+
+    coordinateReads = 0;
+    expect(
+      buildCompactViewportFromGeojson(
+        map,
+        [],
+        "filtered-local-index-test",
+        options
+      ).features
+    ).toEqual([]);
+    expect(coordinateReads).toBeLessThan(features.length / 100);
+  });
+
+  test("density grid cells use the coordinates of each source", () => {
+    setCompactGridSettings({ pointLimit: 1 });
+    setCompactDisplayedLayerPointCount(2);
+    const map = fakeMap({ zoom: 6, west: -180, south: -80, east: 180, north: 80 });
+    const makePoint = (source, lng, lat) =>
+      buildCompactViewportFeatures({
+        map,
+        source,
+        forEachPoint: (visit) => visit(lng, lat, 0)
+      }).features[0];
+
+    const first = makePoint("cache-source-a", 40, 57);
+    const second = makePoint("cache-source-b", -100, -20);
+    const firstCenter = first.properties;
+    const secondCenter = second.properties;
+
+    expect(firstCenter.center_lng).toBeGreaterThan(0);
+    expect(firstCenter.center_lat).toBeGreaterThan(0);
+    expect(secondCenter.center_lng).toBeLessThan(0);
+    expect(secondCenter.center_lat).toBeLessThan(0);
   });
 });
