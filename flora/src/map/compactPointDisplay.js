@@ -428,16 +428,25 @@ export function ensureCompactViewportSync(map, key, syncFn) {
   }
   let entry = syncByMap.get(map);
   if (!entry) {
-    entry = { fns: new Map(), timer: null, run: null };
+    entry = { fns: new Map(), timer: null, run: null, idleId: null };
     const run = () => {
       if (!compactEnabled) {
         return;
       }
+      // Отменяем предыдущий idle/scheduled call
+      if (entry.idleId !== null) {
+        cancelIdleCallback(entry.idleId);
+        entry.idleId = null;
+      }
       if (entry.timer) {
         clearTimeout(entry.timer);
-      }
-      entry.timer = setTimeout(() => {
         entry.timer = null;
+      }
+
+      // Пробуем requestIdleCallback — выполняется в idle, не блокируя UI.
+      // Fallback на setTimeout, если API недоступен или deadline слишком короткий.
+      const idleFn = () => {
+        entry.idleId = null;
         entry.fns.forEach((fn) => {
           try {
             fn();
@@ -445,7 +454,17 @@ export function ensureCompactViewportSync(map, key, syncFn) {
             /* ignore */
           }
         });
-      }, 80);
+      };
+
+      if (typeof requestIdleCallback === "function") {
+        const idleId = requestIdleCallback(idleFn, { timeout: 100 });
+        if (idleId) {
+          entry.idleId = idleId;
+          return;
+        }
+        // requestIdleCallback вернул 0 — fallback на setTimeout
+      }
+      entry.timer = setTimeout(idleFn, 80);
     };
     entry.run = run;
     map.on("moveend", run);
