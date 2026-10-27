@@ -179,6 +179,9 @@ const CLUSTER_REGNUM_PROPERTIES = Object.fromEntries(
   ])
 );
 
+/** Лимит листьев кластера при клике — предотвращает OOM на кластерах из 500k+ точек. */
+const CLUSTER_CLICK_LEAVES_LIMIT = 10000;
+
 // Модульное состояние слоя: карта одна, пересборка слоёв идёт через rebuildLocationsLayers.
 let locationsData = null;
 /** По умолчанию один clustered-source (дешевле при больших N, чем clusterByRegnum). */
@@ -1335,7 +1338,8 @@ function attachLocationsInteractions(map) {
     const requestId = clusterExpandRequestId;
 
     // Сначала получаем точки кластера, затем зумим до уровня их «раскрытия».
-    source.getClusterLeaves(clusterId, Infinity, 0, (leavesErr, leaves) => {
+    // Лимит вместо Infinity предотвращает OOM на кластерах из 500k+ точек.
+    source.getClusterLeaves(clusterId, CLUSTER_CLICK_LEAVES_LIMIT, 0, (leavesErr, leaves) => {
       if (leavesErr || requestId !== clusterExpandRequestId) {
         return;
       }
