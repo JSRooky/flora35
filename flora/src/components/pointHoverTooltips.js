@@ -308,16 +308,36 @@ export function showClusterRegnumHover(map, event, { getDensePileLeaves } = {}) 
   }
 
   if (clusterFeature.properties?.dense_pile) {
-    const leaves = getDensePileLeaves?.(clusterFeature) ?? [];
-    if (leaves.length) {
-      showPointHoverPopup(map, coordinates, buildClusterRegnumTooltipHtml(leaves));
-    } else {
+    const denseData = getDensePileLeaves?.(clusterFeature);
+    // denseData может быть массивом leaves или Map<regnum, count> (оптимизация)
+    if (denseData instanceof Map) {
+      // Оптимизированный путь: regnumCounts уже посчитаны
       const pointCount = Number(clusterFeature.properties?.point_count) || 0;
-      showPointHoverPopup(
-        map,
-        coordinates,
-        `<div class="cluster-tooltip-title">${formatClusterPointsCount(pointCount)}</div>`
-      );
+      if (denseData.size > 0) {
+        showPointHoverPopup(
+          map,
+          coordinates,
+          buildClusterRegnumTooltipHtml(denseData, pointCount)
+        );
+      } else {
+        showPointHoverPopup(
+          map,
+          coordinates,
+          `<div class="cluster-tooltip-title">${formatClusterPointsCount(pointCount)}</div>`
+        );
+      }
+    } else {
+      const leaves = denseData ?? [];
+      if (leaves.length) {
+        showPointHoverPopup(map, coordinates, buildClusterRegnumTooltipHtml(leaves));
+      } else {
+        const pointCount = Number(clusterFeature.properties?.point_count) || 0;
+        showPointHoverPopup(
+          map,
+          coordinates,
+          `<div class="cluster-tooltip-title">${formatClusterPointsCount(pointCount)}</div>`
+        );
+      }
     }
     return null;
   }
