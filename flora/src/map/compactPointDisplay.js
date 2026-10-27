@@ -17,6 +17,10 @@ export const COMPACT_DENSITY_PROP = "compact_density";
 const VIEWPORT_PAD = 0.12;
 const syncByMap = new WeakMap();
 
+/** Кэш [ix, iy] для текущих zoom-level: Map<`${worldSize}_${extra}`, cellKey>. */
+const cellKeyCache = new Map();
+let cachedWorldSize = 0;
+
 let compactEnabled = false;
 
 export function isCompactPointDisplayEnabled() {
@@ -217,6 +221,39 @@ export function addCompactGridLayers(map, sourceId, layerColor) {
   applyCompactGridLayerPaint(map, sourceId, layerColor);
 }
 
+/** Получить или вычислить cellKey для точки. Кэширует при панорамировании. */
+function getCellKeyForPoint(lng, lat, extra, worldSize) {
+  // extra — rowIndex из columnar table (число) или feature (объект).
+  // Кэшируем только для числовых extra (stable across pan/zoom).
+  if (typeof extra === "number") {
+    const cacheKey = `${worldSize}_${extra}`;
+    const cached = cellKeyCache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+    // Вычисляем и кэшируем
+    const [wx, wy] = lngLatToWorld(lng, lat, worldSize);
+    const ix = Math.floor(wrapWorldX(wx, worldSize));
+    const iy = Math.min(worldSize - 1, Math.max(0, Math.floor(wy)));
+    const key = iy * worldSize + ix;
+    cellKeyCache.set(cacheKey, key);
+    return key;
+  }
+  // Для object extra — без кэша (координаты меняются)
+  const [wx, wy] = lngLatToWorld(lng, lat, worldSize);
+  const ix = Math.floor(wrapWorldX(wx, worldSize));
+  const iy = Math.min(worldSize - 1, Math.max(0, Math.floor(wy)));
+  return iy * worldSize + ix;
+}
+
+/** Очистить кэш cellKey при смене zoom (worldSize). */
+function maybeInvalidateCellKeyCache(newWorldSize) {
+  if (newWorldSize !== cachedWorldSize) {
+    cellKeyCache.clear();
+    cachedWorldSize = newWorldSize;
+  }
+}
+
 export function buildCompactViewportFeatures({
   map,
   zoom,
@@ -233,6 +270,9 @@ export function buildCompactViewportFeatures({
   const useGrid = shouldUseCompactDensityGrid();
   const wantPoints = Boolean(toPointFeature) && !useGrid;
 
+  // Инвалидация кэша при смене zoom
+  maybeInvalidateCellKeyCache(worldSize);
+
   if (!bounds || typeof forEachPoint !== "function") {
     return { features: [], mode: "density", inBoundsCount: 0 };
   }
@@ -246,14 +286,12 @@ export function buildCompactViewportFeatures({
       pointFeatures.push(toPointFeature(extra, lng, lat));
       return;
     }
-    const [wx, wy] = lngLatToWorld(lng, lat, worldSize);
-    const ix = Math.floor(wrapWorldX(wx, worldSize));
-    const iy = Math.min(worldSize - 1, Math.max(0, Math.floor(wy)));
-    // Числовой ключ вместо строкового — на сотнях тысяч точек это заметно
-    // дешевле, чем конкатенация строк и Map<string>.
-    const key = iy * worldSize + ix;
+    const key = getCellKeyForPoint(lng, lat, extra, worldSize);
     let cell = cells.get(key);
     if (!cell) {
+      // Восстановим [ix, iy] из key для вычисления центра
+      const ix = key % worldSize;
+      const iy = Math.floor(key / worldSize);
       const [centerLng, centerLat] = worldToLngLat(ix + 0.5, iy + 0.5, worldSize);
       cell = {
         ix,
