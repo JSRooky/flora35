@@ -31,10 +31,13 @@ export async function getCacheEntry(url) {
         const entry = req.result;
         if (!entry) return resolve(null);
         if (Date.now() - entry.timestamp > TTL_MS) {
-          // Expired - delete it
-          const deleteReq = store.delete(url);
-          deleteReq.onsuccess = () => resolve(null);
-          deleteReq.onerror = () => resolve(null);
+          resolve(null);
+          try {
+            const writeTx = db.transaction(STORE_NAME, "readwrite");
+            writeTx.objectStore(STORE_NAME).delete(url);
+          } catch {
+            /* ignore */
+          }
           return;
         }
         resolve({ response: entry.response, timestamp: entry.timestamp });

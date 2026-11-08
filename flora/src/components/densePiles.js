@@ -77,9 +77,8 @@ function abbreviatePointCount(count) {
  * Сверхплотный кластер — ≥ minSize точек с полностью одинаковыми координатами.
  * Раскрытые кучи возвращаются отдельно (expandedDenseFeatures).
  *
- * Оптимизация: для нераскрытых dense-групп не создаём полный массив members —
- * храним только count + regnumCounts для hover-тултипа. Полный массив
- * собирается только при раскрытии pile (ленивая загрузка).
+ * Свёрнутая плотная группа хранит только count и regnumCounts: полный список
+ * точек нужен карте при раскрытии и для всех групп меньше порога.
  */
 export function partitionFeaturesByDensePiles(
   features,
@@ -94,23 +93,24 @@ export function partitionFeaturesByDensePiles(
     }
 
     const key = exactCoordKey(coordinates[0], coordinates[1]);
-    if (!groups.has(key)) {
-      groups.set(key, {
+    let group = groups.get(key);
+    if (!group) {
+      group = {
         key,
         coordinates,
         count: 0,
         regnumCounts: new Map(),
-        firstFeature: null
-      });
+        members: [],
+        keepMembers: expandedPileKeys?.has(key) === true
+      };
+      groups.set(key, group);
     }
-    const group = groups.get(key);
     group.count += 1;
-    if (!group.firstFeature) {
-      group.firstFeature = feature;
-    }
-    // Считаем regnum для hover-тултипа (дешевле, чем хранить все members)
     const regnum = feature?.properties?.regnum || "";
     group.regnumCounts.set(regnum, (group.regnumCounts.get(regnum) ?? 0) + 1);
+    if (group.keepMembers || group.members.length < minSize) {
+      group.members.push(feature);
+    }
   });
 
   const otherFeatures = [];
@@ -128,12 +128,9 @@ export function partitionFeaturesByDensePiles(
     }
 
     if (!isDense) {
-      // Non-dense: members не хранили, но для expanded/other нужно вернуть features.
-      // Возвращаем только firstFeature (или пустой массив).
-      if (isExpanded && group.firstFeature) {
-        expandedDenseFeatures.push(group.firstFeature);
-      } else if (!isExpanded && group.firstFeature) {
-        otherFeatures.push(group.firstFeature);
+      const target = isExpanded ? expandedDenseFeatures : otherFeatures;
+      for (let i = 0; i < group.members.length; i += 1) {
+        target.push(group.members[i]);
       }
       return;
     }
@@ -141,16 +138,13 @@ export function partitionFeaturesByDensePiles(
     const clusterId = `dense-${group.key}`;
 
     if (isExpanded) {
-      // Для раскрытых групп возвращаем firstFeature (полный массив не собираем)
-      if (group.firstFeature) {
-        expandedDenseFeatures.push(group.firstFeature);
+      for (let i = 0; i < group.members.length; i += 1) {
+        expandedDenseFeatures.push(group.members[i]);
       }
-      densePileMembersById.set(clusterId, group.regnumCounts);
+      densePileMembersById.set(clusterId, group.members);
       return;
     }
 
-    // Нераскрытый dense: densePileMembersById хранит Map<regnum, count>
-    // вместо полного массива. Hover-код должен это учитывать.
     densePileMembersById.set(clusterId, group.regnumCounts);
 
     denseClusterFeatures.push({

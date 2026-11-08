@@ -107,7 +107,13 @@ export function pointInCompactBounds(lng, lat, bounds) {
   if (!bounds || !Number.isFinite(lng) || !Number.isFinite(lat)) {
     return false;
   }
-  return lng >= bounds.west && lng <= bounds.east && lat >= bounds.south && lat <= bounds.north;
+  if (lat < bounds.south || lat > bounds.north) {
+    return false;
+  }
+  if (bounds.east >= bounds.west) {
+    return lng >= bounds.west && lng <= bounds.east;
+  }
+  return lng >= bounds.west || lng <= bounds.east;
 }
 
 function getSpatialBucket(lng, lat) {
@@ -185,7 +191,6 @@ export function forEachCompactPointInBounds({
   const pointCount = Math.max(0, Math.floor(Number(count) || 0));
   if (
     !bounds ||
-    bounds.east < bounds.west ||
     bounds.north < bounds.south ||
     pointCount === 0 ||
     typeof getLng !== "function" ||
@@ -205,13 +210,6 @@ export function forEachCompactPointInBounds({
     spatialIndexesBySource.set(source, cached);
   }
 
-  const xRange = getSpatialBucketRange(
-    bounds.west,
-    bounds.east,
-    -180,
-    360,
-    SPATIAL_INDEX_COLUMNS
-  );
   const yRange = getSpatialBucketRange(
     bounds.south,
     bounds.north,
@@ -219,23 +217,42 @@ export function forEachCompactPointInBounds({
     180,
     SPATIAL_INDEX_ROWS
   );
-  if (!xRange || !yRange) {
+  const xSpans =
+    bounds.east >= bounds.west
+      ? [[bounds.west, bounds.east]]
+      : [
+          [bounds.west, 180],
+          [-180, bounds.east]
+        ];
+  if (!yRange) {
     return;
   }
 
-  for (let y = yRange[0]; y <= yRange[1]; y += 1) {
-    for (let x = xRange[0]; x <= xRange[1]; x += 1) {
-      const bucket = y * SPATIAL_INDEX_COLUMNS + x;
-      for (
-        let offset = cached.offsets[bucket];
-        offset < cached.offsets[bucket + 1];
-        offset += 1
-      ) {
-        const index = cached.pointIndices[offset];
-        const lng = getLng(index);
-        const lat = getLat(index);
-        if (pointInCompactBounds(lng, lat, bounds)) {
-          visit(lng, lat, index);
+  for (let span = 0; span < xSpans.length; span += 1) {
+    const xRange = getSpatialBucketRange(
+      xSpans[span][0],
+      xSpans[span][1],
+      -180,
+      360,
+      SPATIAL_INDEX_COLUMNS
+    );
+    if (!xRange) {
+      continue;
+    }
+    for (let y = yRange[0]; y <= yRange[1]; y += 1) {
+      for (let x = xRange[0]; x <= xRange[1]; x += 1) {
+        const bucket = y * SPATIAL_INDEX_COLUMNS + x;
+        for (
+          let offset = cached.offsets[bucket];
+          offset < cached.offsets[bucket + 1];
+          offset += 1
+        ) {
+          const index = cached.pointIndices[offset];
+          const lng = getLng(index);
+          const lat = getLat(index);
+          if (pointInCompactBounds(lng, lat, bounds)) {
+            visit(lng, lat, index);
+          }
         }
       }
     }

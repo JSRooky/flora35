@@ -3,6 +3,7 @@ import {
   buildCompactViewportFromGeojson,
   COMPACT_MAX_VIEWPORT_POINTS,
   forEachCompactPointInBounds,
+  pointInCompactBounds,
   squareDegreesForZoom
 } from "./compactPointDisplay";
 import {
@@ -224,5 +225,25 @@ describe("compactPointDisplay", () => {
     expect(firstCenter.center_lat).toBeGreaterThan(0);
     expect(secondCenter.center_lng).toBeLessThan(0);
     expect(secondCenter.center_lat).toBeLessThan(0);
+  });
+
+  test("viewport crossing the antimeridian still visits points on both sides", () => {
+    const bounds = { west: 170, south: -10, east: -170, north: 10 };
+    expect(pointInCompactBounds(175, 0, bounds)).toBe(true);
+    expect(pointInCompactBounds(-175, 0, bounds)).toBe(true);
+    expect(pointInCompactBounds(0, 0, bounds)).toBe(false);
+
+    const map = fakeMap({ zoom: 4, ...bounds });
+    const seen = [];
+    forEachCompactPointInBounds({
+      map,
+      source: "antimeridian-test",
+      token: { id: "antimeridian-test" },
+      count: 3,
+      getLng: (index) => [175, -175, 0][index],
+      getLat: () => 0,
+      visit: (_lng, _lat, index) => seen.push(index)
+    });
+    expect(seen.sort()).toEqual([0, 1]);
   });
 });
