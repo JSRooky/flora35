@@ -1,4 +1,9 @@
-import { DEFAULT_CLUSTER_COLOR, DEFAULT_POINT_COLOR, getPointColorExpression } from "./pointColors";
+import {
+  DEFAULT_CLUSTER_COLOR,
+  DEFAULT_POINT_COLOR,
+  getPointColorExpression
+} from "./pointColors";
+import { splitTempUnitsByRegnum } from "./tempRegnumUnits";
 import {
   addCompactGridLayers,
   buildCompactViewportFeatures,
@@ -82,6 +87,7 @@ const TEMP_LAYER_CLUSTER_COLOR = [
 let layerVisible = false;
 let clusterByTempLayers = true;
 let clusterByTempSublayers = true;
+let clusterByRegnum = false;
 let clusterPieChartsEnabled = false;
 let clusteringEnabled = true;
 let denseClustersHighlightEnabled = false;
@@ -226,6 +232,10 @@ function isSplitBySublayer() {
   return isSplitByLayer() && clusterByTempSublayers;
 }
 
+function shouldSplitTempByRegnum() {
+  return clusterByRegnum && !clusterPieChartsEnabled && !denseClustersHighlightEnabled;
+}
+
 function buildUnits() {
   const units = !isSplitByLayer()
     ? [
@@ -246,7 +256,7 @@ function buildUnits() {
 }
 
 function unitLayerIds(unitId) {
-  if (!isSplitByLayer()) {
+  if (!unitId || unitId === "all") {
     return {
       sourceId: TEMP_LAYERS_SOURCE_ID,
       clusterLayerId: TEMP_LAYERS_CLUSTER_LAYER_ID,
@@ -651,7 +661,7 @@ export function setTempLayersData(map) {
   tempDensePileMembers = new Map();
   const denseClusterFeatures = [];
 
-  if (isCompactPointDisplayEnabled() && !isSplitByLayer()) {
+  if (isCompactPointDisplayEnabled() && !isSplitByLayer() && !shouldSplitTempByRegnum()) {
     const built = buildCompactViewportFeatures({
       map,
       source: "temp",
@@ -665,11 +675,11 @@ export function setTempLayersData(map) {
     });
     addUnitToMap(map, { id: "all", markerColor: null, features: built.features });
   } else {
-    buildUnits()
+    splitTempUnitsByRegnum(buildUnits(), shouldSplitTempByRegnum())
       .filter((unit) => unit.features.length > 0)
       .forEach((unit) => {
         if (isCompactPointDisplayEnabled()) {
-          const built = buildCompactViewportFromGeojson(map, unit.features, "temp");
+          const built = buildCompactViewportFromGeojson(map, unit.features, `temp-${unit.id}`);
           addUnitToMap(map, {
             ...unit,
             features: excludeHiddenPinFeatures(built.features)
@@ -699,6 +709,7 @@ export function applyTempLayersGroupingMode(
   {
     clusterByTempLayers: nextClusterByTempLayers,
     clusterByTempSublayers: nextClusterByTempSublayers,
+    clusterByRegnum: nextByRegnum,
     clusterPieCharts: nextPie,
     clusteringEnabled: nextClustering,
     denseClustersHighlight: nextDense
@@ -718,6 +729,9 @@ export function applyTempLayersGroupingMode(
   }
   if (nextClusterByTempSublayers !== undefined) {
     clusterByTempSublayers = Boolean(nextClusterByTempSublayers);
+  }
+  if (nextByRegnum !== undefined) {
+    clusterByRegnum = Boolean(nextByRegnum);
   }
   if (
     nextDense !== undefined &&

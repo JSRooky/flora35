@@ -4938,6 +4938,7 @@ export default function MapView() {
     applyTempLayersGroupingMode(map.current, {
       clusterByTempLayers,
       clusterByTempSublayers,
+      clusterByRegnum,
       clusterPieCharts: grouping.clusterPieCharts,
       clusteringEnabled: grouping.clusteringEnabled,
       denseClustersHighlight: grouping.denseClustersHighlight
@@ -5049,12 +5050,12 @@ export default function MapView() {
       if (!map.current) {
         return;
       }
-      refreshHeatmapSourceOptions(externalOnly);
-      // Общая тепловая карта: в режиме временных слоёв — только они;
-      // при авто-растровом режиме включаем её независимо от ручного тумблера пользователя.
-      setHeatmapEnabled(map.current, heatmapEnabled || autoRasterMode, locationFilters);
+      refreshHeatmapSourceOptions(tempOnly);
+      // Тепловая карта только по переключателям: общая — в «Группах точек»,
+      // отдельные — у временных слоёв. Порог числа точек её сам не включает.
+      setHeatmapEnabled(map.current, heatmapEnabled, locationFilters);
       syncTempLayerHeatmaps(map.current, {
-        active: externalOnly,
+        active: tempOnly,
         filters: locationFilters,
         layers: getTempLayers()
       });
@@ -5064,7 +5065,7 @@ export default function MapView() {
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [heatmapEnabled, autoRasterMode, locationFilters, externalOnly, tempLayersRevision, heatmapSettings]);
+  }, [heatmapEnabled, locationFilters, tempOnly, tempLayersRevision, heatmapSettings]);
 
   useEffect(() => {
     if (!analysisPanelOpen) {
@@ -7795,7 +7796,7 @@ export default function MapView() {
               onMarkersVisibleChange={setMarkersVisibleState}
               heatmapEnabled={heatmapEnabled}
               onHeatmapEnabledChange={setHeatmapEnabledState}
-              heatmapTempLayersOnly={externalOnly}
+              heatmapTempLayersOnly={tempOnly}
               onHeatmapSettingsOpen={() => setHeatmapSettingsOpen(true)}
               clusteringEnabled={clusteringEnabled}
               onClusteringEnabledChange={handleClusteringEnabledChange}

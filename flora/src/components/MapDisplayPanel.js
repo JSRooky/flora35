@@ -101,7 +101,7 @@ export default function MapDisplayPanel({
     !markersVisible || denseClustersHighlight || compactPointDisplay;
   const clusterPieChartsDisabled = clusteringDisabled || !clusteringEnabled;
   const clusterByRegnumDisabled =
-    clusteringDisabled || !clusteringEnabled || clusterPieCharts;
+    !markersVisible || denseClustersHighlight || clusterPieCharts;
   const clusterByTempLayersDisabled =
     clusteringDisabled || !clusteringEnabled || clusterPieCharts;
   const clusterByTempSublayersDisabled =
@@ -217,11 +217,9 @@ export default function MapDisplayPanel({
                 ? "Доступно только при включённых маркерах"
                 : denseClustersHighlight
                   ? "Недоступно в режиме плотных групп"
-                  : !clusteringEnabled
-                    ? "Доступно только при включённой кластеризации"
-                    : clusterPieCharts
-                      ? "Недоступно при включённых диаграммах"
-                      : "Кластеризовать только точки с одинаковым царством"
+                  : clusterPieCharts
+                    ? "Недоступно при включённых диаграммах"
+                    : "Группировать точки с указанным царством отдельно"
             }
           >
             <input
