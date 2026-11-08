@@ -486,23 +486,42 @@ function donutSegment(start, end, radius, innerRadius, color) {
   } ${radius + innerRadius * y0}" fill="${color}" />`;
 }
 
+function getRegnumPieSegments(props) {
+  const segments = CLUSTER_REGNUM_KEYS.map((key) => ({
+    count: Number(props[key]) || 0,
+    color: REGNUM_COLORS[key]
+  }));
+  const known = segments.reduce((sum, segment) => sum + segment.count, 0);
+  if (known <= 0) {
+    return null;
+  }
+  const other = (Number(props.point_count) || known) - known;
+  if (other > 0) {
+    segments.push({ count: other, color: "#94a3b8" });
+  }
+  return segments;
+}
+
+function getClusterPieSegments(props) {
+  return getRegnumPieSegments(props) ?? getTempLayerPieSegments(props);
+}
+
 function getClusterPieChartSignature(props) {
-  const tempSegments = getTempLayerPieSegments(props);
-  if (tempSegments) {
-    return `temp:${tempSegments.map((segment) => segment.count).join(":")}`;
+  const segments = getClusterPieSegments(props);
+  if (segments) {
+    return segments.map((segment) => segment.count).join(":");
   }
   return CLUSTER_REGNUM_KEYS.map((key) => Number(props[key]) || 0).join(":");
 }
 
-/** SVG-пончик: доли по царству или по временным слоям и общее число точек в центре. */
+/** SVG-пончик: доли по царству, а если царства нет — по временным слоям. */
 function createClusterPieChartElement(props) {
-  const tempSegments = getTempLayerPieSegments(props);
-  const segments = tempSegments
-    ? tempSegments
-    : CLUSTER_REGNUM_KEYS.map((key) => ({
-        count: Number(props[key]) || 0,
-        color: REGNUM_COLORS[key]
-      }));
+  const segments =
+    getClusterPieSegments(props) ??
+    CLUSTER_REGNUM_KEYS.map((key) => ({
+      count: Number(props[key]) || 0,
+      color: REGNUM_COLORS[key]
+    }));
   const total =
     Number(props.point_count) ||
     segments.reduce((sum, segment) => sum + segment.count, 0);

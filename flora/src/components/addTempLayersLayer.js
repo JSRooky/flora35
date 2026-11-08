@@ -287,6 +287,25 @@ function clusterColorForUnit(markerColor) {
   return TEMP_LAYER_CLUSTER_COLOR;
 }
 
+const TEMP_PIE_REGNUM_KEYS = ["plantae", "animalia", "fungi", "protozoa"];
+
+function buildRegnumClusterProperties() {
+  return Object.fromEntries(
+    TEMP_PIE_REGNUM_KEYS.map((regnum) => [
+      regnum,
+      [
+        "+",
+        [
+          "case",
+          ["==", ["downcase", ["coalesce", ["get", "regnum"], ""]], regnum],
+          1,
+          0
+        ]
+      ]
+    ])
+  );
+}
+
 function buildPieClusterProperties() {
   const groups = getTempLayerFeatureGroups();
   pieLayerKeys = groups.map((group, index) => ({
@@ -298,15 +317,18 @@ function buildPieClusterProperties() {
     layerId: group.id
   }));
 
-  return Object.fromEntries(
-    pieLayerKeys.map(({ prop, layerId }) => [
-      prop,
-      [
-        "+",
-        ["case", ["==", ["get", "temp_layer_id"], layerId], 1, 0]
-      ]
-    ])
-  );
+  return {
+    ...buildRegnumClusterProperties(),
+    ...Object.fromEntries(
+      pieLayerKeys.map(({ prop, layerId }) => [
+        prop,
+        [
+          "+",
+          ["case", ["==", ["get", "temp_layer_id"], layerId], 1, 0]
+        ]
+      ])
+    )
+  };
 }
 
 function getClusterPaint(markerColor) {
