@@ -11,7 +11,7 @@ export const MAP_CONFIG_VERSION = 2;
 export const MAP_CONFIG_FILENAME = "flora35-user-settings.json";
 
 function cloneJson(value) {
-  return JSON.parse(JSON.stringify(value ?? null));
+  return structuredClone(value ?? null);
 }
 
 function isPlainObject(value) {

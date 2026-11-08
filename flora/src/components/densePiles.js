@@ -76,6 +76,9 @@ function abbreviatePointCount(count) {
  * Делит точки на сверхплотные кластеры и остальные.
  * Сверхплотный кластер — ≥ minSize точек с полностью одинаковыми координатами.
  * Раскрытые кучи возвращаются отдельно (expandedDenseFeatures).
+ *
+ * Свёрнутая плотная группа хранит только count и regnumCounts: полный список
+ * точек нужен карте при раскрытии и для всех групп меньше порога.
  */
 export function partitionFeaturesByDensePiles(
   features,
@@ -90,14 +93,24 @@ export function partitionFeaturesByDensePiles(
     }
 
     const key = exactCoordKey(coordinates[0], coordinates[1]);
-    if (!groups.has(key)) {
-      groups.set(key, {
+    let group = groups.get(key);
+    if (!group) {
+      group = {
         key,
         coordinates,
-        members: []
-      });
+        count: 0,
+        regnumCounts: new Map(),
+        members: [],
+        keepMembers: expandedPileKeys?.has(key) === true
+      };
+      groups.set(key, group);
     }
-    groups.get(key).members.push(feature);
+    group.count += 1;
+    const regnum = feature?.properties?.regnum || "";
+    group.regnumCounts.set(regnum, (group.regnumCounts.get(regnum) ?? 0) + 1);
+    if (group.keepMembers || group.members.length < minSize) {
+      group.members.push(feature);
+    }
   });
 
   const otherFeatures = [];
@@ -106,7 +119,7 @@ export function partitionFeaturesByDensePiles(
   const densePileMembersById = new Map();
 
   groups.forEach((group) => {
-    const isDense = group.members.length >= minSize;
+    const isDense = group.count >= minSize;
     const isExpanded = expandedPileKeys?.has(group.key);
     const isHidden = hiddenDensePileKeys.has(group.key);
 
@@ -115,29 +128,24 @@ export function partitionFeaturesByDensePiles(
     }
 
     if (!isDense) {
-      // Ключ мог быть раскрыт на другом источнике (локальные/GBIF) —
-      // тогда показываем и эти точки, даже если их < minSize.
-      if (isExpanded) {
-        for (let i = 0; i < group.members.length; i += 1) {
-          expandedDenseFeatures.push(group.members[i]);
-        }
-      } else {
-        for (let i = 0; i < group.members.length; i += 1) {
-          otherFeatures.push(group.members[i]);
-        }
+      const target = isExpanded ? expandedDenseFeatures : otherFeatures;
+      for (let i = 0; i < group.members.length; i += 1) {
+        target.push(group.members[i]);
       }
       return;
     }
 
     const clusterId = `dense-${group.key}`;
-    densePileMembersById.set(clusterId, group.members);
 
     if (isExpanded) {
       for (let i = 0; i < group.members.length; i += 1) {
         expandedDenseFeatures.push(group.members[i]);
       }
+      densePileMembersById.set(clusterId, group.members);
       return;
     }
+
+    densePileMembersById.set(clusterId, group.regnumCounts);
 
     denseClusterFeatures.push({
       type: "Feature",
@@ -150,8 +158,8 @@ export function partitionFeaturesByDensePiles(
         cluster: true,
         dense_pile: true,
         dense_pile_key: group.key,
-        point_count: group.members.length,
-        point_count_abbreviated: abbreviatePointCount(group.members.length)
+        point_count: group.count,
+        point_count_abbreviated: abbreviatePointCount(group.count)
       }
     });
   });

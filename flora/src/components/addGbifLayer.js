@@ -46,7 +46,10 @@ import {
   removePointHoverPopup,
   showClusterRegnumHover
 } from "./pointHoverTooltips";
-import { slimMapFeatures } from "./mapPerformance";
+import {
+  partitionMapFeaturesByRegnum,
+  slimMapFeatures
+} from "./mapPerformance";
 import "../styles/GbifPanel.css";
 
 export const GBIF_SOURCE_ID = "gbif-locations";
@@ -833,12 +836,13 @@ function rebuildGbifLayers(map) {
     });
     addUnclusteredGbifLayer(map, GBIF_SOURCE_ID, GBIF_UNCLUSTERED_LAYER_ID);
   } else if (gbifClusterByRegnum) {
+    const partitionedFeatures = partitionMapFeaturesByRegnum(
+      renderFeatures,
+      REGNUM_KEYS
+    );
     REGNUM_KEYS.forEach((regnum) => {
       const sourceId = getGbifSourceId(regnum);
-      const features = renderFeatures.filter(
-        (feature) =>
-          String(feature.properties?.regnum || "").toLowerCase() === regnum
-      );
+      const features = partitionedFeatures.groups.get(regnum);
 
       map.addSource(sourceId, {
         type: "geojson",
@@ -851,10 +855,7 @@ function rebuildGbifLayers(map) {
     });
 
     // Точки без regnum — в общий независящий от царства источник.
-    const otherFeatures = renderFeatures.filter(
-      (feature) =>
-        !REGNUM_KEYS.includes(String(feature.properties?.regnum || "").toLowerCase())
-    );
+    const { other: otherFeatures } = partitionedFeatures;
     if (otherFeatures.length > 0) {
       map.addSource(GBIF_SOURCE_ID, {
         type: "geojson",
@@ -961,6 +962,10 @@ export function setGbifData(map, collection, options = {}) {
       features: renderFeatures
     });
   } else if (gbifClusterByRegnum) {
+    const partitionedFeatures = partitionMapFeaturesByRegnum(
+      renderFeatures,
+      REGNUM_KEYS
+    );
     REGNUM_KEYS.forEach((regnum) => {
       const source = map.getSource(getGbifSourceId(regnum));
       if (!source) {
@@ -969,10 +974,7 @@ export function setGbifData(map, collection, options = {}) {
 
       source.setData({
         type: "FeatureCollection",
-        features: renderFeatures.filter(
-          (feature) =>
-          String(feature.properties?.regnum || "").toLowerCase() === regnum
-        )
+        features: partitionedFeatures.groups.get(regnum)
       });
     });
 
@@ -980,10 +982,7 @@ export function setGbifData(map, collection, options = {}) {
     if (otherSource) {
       otherSource.setData({
         type: "FeatureCollection",
-        features: renderFeatures.filter(
-          (feature) =>
-        !REGNUM_KEYS.includes(String(feature.properties?.regnum || "").toLowerCase())
-        )
+        features: partitionedFeatures.other
       });
     }
   } else {

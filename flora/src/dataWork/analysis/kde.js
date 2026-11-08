@@ -148,6 +148,12 @@ function isoplethFeature(mask, cols, rows, xmin, ymin, dx, dy, toLonLat, propert
 /**
  * Гауссово KDE уникальных локалитетов в локальной километровой проекции.
  * Изоплеты — объёмные (Worton): наименьшая площадь, содержащая 50% и 95% массы.
+ *
+ * @param {Array} features
+ * @param {object} [options]
+ * @param {number} [options.bandwidthScale=1]
+ * @param {number} [options.gridSize=96]
+ * @returns {object} KDE result
  */
 export function computeKde(features, { bandwidthScale = 1, gridSize = KDE_GRID_SIZE } = {}) {
   const coords = collectOccurrenceCoords(features);

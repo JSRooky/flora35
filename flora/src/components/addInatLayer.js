@@ -42,7 +42,10 @@ import {
   removePointHoverPopup,
   showClusterRegnumHover
 } from "./pointHoverTooltips";
-import { slimMapFeatures } from "./mapPerformance";
+import {
+  partitionMapFeaturesByRegnum,
+  slimMapFeatures
+} from "./mapPerformance";
 import "../styles/GbifPanel.css";
 
 export const INAT_SOURCE_ID = "inat-locations";
@@ -787,12 +790,13 @@ function rebuildInatLayers(map) {
     });
     addUnclusteredInatLayer(map, INAT_SOURCE_ID, INAT_UNCLUSTERED_LAYER_ID);
   } else if (inatClusterByRegnum) {
+    const partitionedFeatures = partitionMapFeaturesByRegnum(
+      renderFeatures,
+      REGNUM_KEYS
+    );
     REGNUM_KEYS.forEach((regnum) => {
       const sourceId = getInatSourceId(regnum);
-      const features = renderFeatures.filter(
-        (feature) =>
-          String(feature.properties?.regnum || "").toLowerCase() === regnum
-      );
+      const features = partitionedFeatures.groups.get(regnum);
 
       map.addSource(sourceId, {
         type: "geojson",
@@ -805,10 +809,7 @@ function rebuildInatLayers(map) {
     });
 
     // Точки без regnum — в общий независящий от царства источник.
-    const otherFeatures = renderFeatures.filter(
-      (feature) =>
-        !REGNUM_KEYS.includes(String(feature.properties?.regnum || "").toLowerCase())
-    );
+    const { other: otherFeatures } = partitionedFeatures;
     if (otherFeatures.length > 0) {
       map.addSource(INAT_SOURCE_ID, {
         type: "geojson",
@@ -915,6 +916,10 @@ export function setInatData(map, collection, options = {}) {
       features: renderFeatures
     });
   } else if (inatClusterByRegnum) {
+    const partitionedFeatures = partitionMapFeaturesByRegnum(
+      renderFeatures,
+      REGNUM_KEYS
+    );
     REGNUM_KEYS.forEach((regnum) => {
       const source = map.getSource(getInatSourceId(regnum));
       if (!source) {
@@ -923,10 +928,7 @@ export function setInatData(map, collection, options = {}) {
 
       source.setData({
         type: "FeatureCollection",
-        features: renderFeatures.filter(
-          (feature) =>
-          String(feature.properties?.regnum || "").toLowerCase() === regnum
-        )
+        features: partitionedFeatures.groups.get(regnum)
       });
     });
 
@@ -934,10 +936,7 @@ export function setInatData(map, collection, options = {}) {
     if (otherSource) {
       otherSource.setData({
         type: "FeatureCollection",
-        features: renderFeatures.filter(
-          (feature) =>
-        !REGNUM_KEYS.includes(String(feature.properties?.regnum || "").toLowerCase())
-        )
+        features: partitionedFeatures.other
       });
     }
   } else {
@@ -1123,4 +1122,3 @@ export function setInatDensePileExpandedHandler(handler) {
 export function setInatPointClickHandler(handler) {
   onPointClickCallback = handler ?? null;
 }
-

@@ -16,6 +16,11 @@ export const COMPACT_DENSITY_PROP = "compact_density";
 
 const VIEWPORT_PAD = 0.12;
 const syncByMap = new WeakMap();
+const spatialIndexesBySource = new Map();
+const SPATIAL_INDEX_COLUMNS = 512;
+const SPATIAL_INDEX_ROWS = 256;
+const SPATIAL_INDEX_BUCKET_COUNT =
+  SPATIAL_INDEX_COLUMNS * SPATIAL_INDEX_ROWS;
 
 let compactEnabled = false;
 
@@ -102,7 +107,156 @@ export function pointInCompactBounds(lng, lat, bounds) {
   if (!bounds || !Number.isFinite(lng) || !Number.isFinite(lat)) {
     return false;
   }
-  return lng >= bounds.west && lng <= bounds.east && lat >= bounds.south && lat <= bounds.north;
+  if (lat < bounds.south || lat > bounds.north) {
+    return false;
+  }
+  if (bounds.east >= bounds.west) {
+    return lng >= bounds.west && lng <= bounds.east;
+  }
+  return lng >= bounds.west || lng <= bounds.east;
+}
+
+function getSpatialBucket(lng, lat) {
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+    return -1;
+  }
+  const x = Math.min(
+    SPATIAL_INDEX_COLUMNS - 1,
+    Math.max(0, Math.floor(((lng + 180) / 360) * SPATIAL_INDEX_COLUMNS))
+  );
+  const y = Math.min(
+    SPATIAL_INDEX_ROWS - 1,
+    Math.max(0, Math.floor(((lat + 90) / 180) * SPATIAL_INDEX_ROWS))
+  );
+  return y * SPATIAL_INDEX_COLUMNS + x;
+}
+
+function buildSpatialIndex(count, getLng, getLat) {
+  const bucketCounts = new Uint32Array(SPATIAL_INDEX_BUCKET_COUNT);
+
+  for (let i = 0; i < count; i += 1) {
+    const bucket = getSpatialBucket(getLng(i), getLat(i));
+    if (bucket >= 0) {
+      bucketCounts[bucket] += 1;
+    }
+  }
+
+  const offsets = new Uint32Array(SPATIAL_INDEX_BUCKET_COUNT + 1);
+  for (let i = 0; i < SPATIAL_INDEX_BUCKET_COUNT; i += 1) {
+    offsets[i + 1] = offsets[i] + bucketCounts[i];
+  }
+
+  const pointIndices = new Uint32Array(offsets[SPATIAL_INDEX_BUCKET_COUNT]);
+  const nextIndexByBucket = offsets.slice(0, SPATIAL_INDEX_BUCKET_COUNT);
+  for (let i = 0; i < count; i += 1) {
+    const bucket = getSpatialBucket(getLng(i), getLat(i));
+    if (bucket >= 0) {
+      pointIndices[nextIndexByBucket[bucket]] = i;
+      nextIndexByBucket[bucket] += 1;
+    }
+  }
+
+  return { offsets, pointIndices };
+}
+
+function getSpatialBucketRange(min, max, origin, span, bucketCount) {
+  const clampedMin = Math.max(origin, min);
+  const clampedMax = Math.min(origin + span, max);
+  if (clampedMin > clampedMax) {
+    return null;
+  }
+  return [
+    Math.min(
+      bucketCount - 1,
+      Math.max(0, Math.floor(((clampedMin - origin) / span) * bucketCount))
+    ),
+    Math.min(
+      bucketCount - 1,
+      Math.max(0, Math.floor(((clampedMax - origin) / span) * bucketCount))
+    )
+  ];
+}
+
+/** Visits only points in spatial buckets intersecting the padded map viewport. */
+export function forEachCompactPointInBounds({
+  map,
+  source,
+  token,
+  count,
+  getLng,
+  getLat,
+  visit
+}) {
+  const bounds = paddedBoundsFromMap(map);
+  const pointCount = Math.max(0, Math.floor(Number(count) || 0));
+  if (
+    !bounds ||
+    bounds.north < bounds.south ||
+    pointCount === 0 ||
+    typeof getLng !== "function" ||
+    typeof getLat !== "function" ||
+    typeof visit !== "function"
+  ) {
+    return;
+  }
+
+  let cached = spatialIndexesBySource.get(source);
+  if (cached?.token !== token || cached.count !== pointCount) {
+    cached = {
+      token,
+      count: pointCount,
+      ...buildSpatialIndex(pointCount, getLng, getLat)
+    };
+    spatialIndexesBySource.set(source, cached);
+  }
+
+  const yRange = getSpatialBucketRange(
+    bounds.south,
+    bounds.north,
+    -90,
+    180,
+    SPATIAL_INDEX_ROWS
+  );
+  const xSpans =
+    bounds.east >= bounds.west
+      ? [[bounds.west, bounds.east]]
+      : [
+          [bounds.west, 180],
+          [-180, bounds.east]
+        ];
+  if (!yRange) {
+    return;
+  }
+
+  for (let span = 0; span < xSpans.length; span += 1) {
+    const xRange = getSpatialBucketRange(
+      xSpans[span][0],
+      xSpans[span][1],
+      -180,
+      360,
+      SPATIAL_INDEX_COLUMNS
+    );
+    if (!xRange) {
+      continue;
+    }
+    for (let y = yRange[0]; y <= yRange[1]; y += 1) {
+      for (let x = xRange[0]; x <= xRange[1]; x += 1) {
+        const bucket = y * SPATIAL_INDEX_COLUMNS + x;
+        for (
+          let offset = cached.offsets[bucket];
+          offset < cached.offsets[bucket + 1];
+          offset += 1
+        ) {
+          const index = cached.pointIndices[offset];
+          const lng = getLng(index);
+          const lat = getLat(index);
+          if (pointInCompactBounds(lng, lat, bounds)) {
+            visit(lng, lat, index);
+          }
+        }
+      }
+    }
+  }
 }
 
 function wrapWorldX(x, worldSize) {
@@ -217,6 +371,13 @@ export function addCompactGridLayers(map, sourceId, layerColor) {
   applyCompactGridLayerPaint(map, sourceId, layerColor);
 }
 
+function getCellKeyForPoint(lng, lat, worldSize) {
+  const [wx, wy] = lngLatToWorld(lng, lat, worldSize);
+  const ix = Math.floor(wrapWorldX(wx, worldSize));
+  const iy = Math.min(worldSize - 1, Math.max(0, Math.floor(wy)));
+  return iy * worldSize + ix;
+}
+
 export function buildCompactViewportFeatures({
   map,
   zoom,
@@ -246,14 +407,12 @@ export function buildCompactViewportFeatures({
       pointFeatures.push(toPointFeature(extra, lng, lat));
       return;
     }
-    const [wx, wy] = lngLatToWorld(lng, lat, worldSize);
-    const ix = Math.floor(wrapWorldX(wx, worldSize));
-    const iy = Math.min(worldSize - 1, Math.max(0, Math.floor(wy)));
-    // Числовой ключ вместо строкового — на сотнях тысяч точек это заметно
-    // дешевле, чем конкатенация строк и Map<string>.
-    const key = iy * worldSize + ix;
+    const key = getCellKeyForPoint(lng, lat, worldSize);
     let cell = cells.get(key);
     if (!cell) {
+      // Восстановим [ix, iy] из key для вычисления центра
+      const ix = key % worldSize;
+      const iy = Math.floor(key / worldSize);
       const [centerLng, centerLat] = worldToLngLat(ix + 0.5, iy + 0.5, worldSize);
       cell = {
         ix,
@@ -290,21 +449,45 @@ export function buildCompactViewportFeatures({
   return { features, mode: "density", inBoundsCount };
 }
 
-export function buildCompactViewportFromGeojson(map, features, source = "compact") {
+export function buildCompactViewportFromGeojson(
+  map,
+  features,
+  source = "compact",
+  { indexFeatures = features, getFeatureKey } = {}
+) {
   const list = Array.isArray(features) ? features : [];
+  const indexedList = Array.isArray(indexFeatures) ? indexFeatures : list;
+  let featureByKey = null;
+  if (indexedList !== list && typeof getFeatureKey === "function") {
+    featureByKey = new Map();
+    for (let i = 0; i < list.length; i += 1) {
+      const feature = list[i];
+      featureByKey.set(getFeatureKey(feature) || feature, feature);
+    }
+  }
   return buildCompactViewportFeatures({
     map,
     source,
-    forEachPoint: (visit) => {
-      for (let i = 0; i < list.length; i += 1) {
-        const feature = list[i];
-        const coordinates = feature?.geometry?.coordinates;
-        if (!Array.isArray(coordinates) || coordinates.length < 2) {
-          continue;
+    forEachPoint: (visit) =>
+      forEachCompactPointInBounds({
+        map,
+        source,
+        token: indexedList,
+        count: indexedList.length,
+        getLng: (index) => indexedList[index]?.geometry?.coordinates?.[0],
+        getLat: (index) => indexedList[index]?.geometry?.coordinates?.[1],
+        visit: (lng, lat, index) => {
+          const feature = indexedList[index];
+          const selectedFeature = featureByKey
+            ? featureByKey.get(getFeatureKey(feature) || feature)
+            : list === indexedList
+              ? feature
+              : null;
+          if (selectedFeature) {
+            visit(lng, lat, selectedFeature);
+          }
         }
-        visit(coordinates[0], coordinates[1], feature);
-      }
-    },
+      }),
     toPointFeature: (feature) => feature
   });
 }
@@ -390,16 +573,25 @@ export function ensureCompactViewportSync(map, key, syncFn) {
   }
   let entry = syncByMap.get(map);
   if (!entry) {
-    entry = { fns: new Map(), timer: null, run: null };
+    entry = { fns: new Map(), timer: null, run: null, idleId: null };
     const run = () => {
       if (!compactEnabled) {
         return;
       }
+      // Отменяем предыдущий idle/scheduled call
+      if (entry.idleId !== null) {
+        cancelIdleCallback(entry.idleId);
+        entry.idleId = null;
+      }
       if (entry.timer) {
         clearTimeout(entry.timer);
-      }
-      entry.timer = setTimeout(() => {
         entry.timer = null;
+      }
+
+      // Пробуем requestIdleCallback — выполняется в idle, не блокируя UI.
+      // Fallback на setTimeout, если API недоступен или deadline слишком короткий.
+      const idleFn = () => {
+        entry.idleId = null;
         entry.fns.forEach((fn) => {
           try {
             fn();
@@ -407,7 +599,17 @@ export function ensureCompactViewportSync(map, key, syncFn) {
             /* ignore */
           }
         });
-      }, 80);
+      };
+
+      if (typeof requestIdleCallback === "function") {
+        const idleId = requestIdleCallback(idleFn, { timeout: 100 });
+        if (idleId) {
+          entry.idleId = idleId;
+          return;
+        }
+        // requestIdleCallback вернул 0 — fallback на setTimeout
+      }
+      entry.timer = setTimeout(idleFn, 80);
     };
     entry.run = run;
     map.on("moveend", run);
