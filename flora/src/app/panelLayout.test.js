@@ -1,4 +1,9 @@
-import { collapseOtherPanels, DOCKED_TOOL_PANEL_IDS, isPanelExpanded } from "../app/panelLayout";
+import {
+  collapseOtherPanels,
+  DOCKED_TOOL_PANEL_IDS,
+  isPanelExpanded,
+  pickPanelToExpand
+} from "../app/panelLayout";
 import { PANEL_IDS } from "../app/panelConstants";
 
 describe("collapseOtherPanels", () => {
@@ -50,6 +55,30 @@ describe("collapseOtherPanels", () => {
 
     expect(next[PANEL_IDS.AREAL]).toBe(false);
     expect(next[PANEL_IDS.FEATURE]).toBe(false);
+  });
+});
+
+describe("pickPanelToExpand", () => {
+  test("разворачивает появившуюся панель", () => {
+    expect(pickPanelToExpand([], [PANEL_IDS.YEAR], {})).toBe(PANEL_IDS.YEAR);
+  });
+
+  test("из нескольких новых панелей берёт последнюю", () => {
+    expect(pickPanelToExpand([], [PANEL_IDS.YEAR, PANEL_IDS.SEASONALITY], {})).toBe(
+      PANEL_IDS.SEASONALITY
+    );
+  });
+
+  test("не разворачивает панель, убранную в док", () => {
+    expect(pickPanelToExpand([], [PANEL_IDS.YEAR], { [PANEL_IDS.YEAR]: true })).toBe(null);
+  });
+
+  test("ничего не делает, если состав панелей не менялся", () => {
+    expect(pickPanelToExpand([PANEL_IDS.YEAR], [PANEL_IDS.YEAR], {})).toBe(null);
+  });
+
+  test("игнорирует закрытие панели", () => {
+    expect(pickPanelToExpand([PANEL_IDS.YEAR], [], {})).toBe(null);
   });
 });
 

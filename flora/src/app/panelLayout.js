@@ -60,3 +60,29 @@ export function isPanelExpanded(panelCollapsed, panelMinimized, panelId) {
 
   return (panelCollapsed ?? {})[panelId] !== true;
 }
+
+/**
+ * Выбирает панель, которую нужно развернуть, когда на экране появилась новая.
+ *
+ * Правило «одна раскрытая»: новая панель разворачивается, ранее развёрнутые
+ * сворачиваются в полоску. Панели, убранные в док, не разворачиваем — их
+ * показывать в стеке не просили.
+ *
+ * @param {string[]} previousOpenIds — открытые панели до изменения
+ * @param {string[]} openIds — открытые панели сейчас
+ * @param {Record<string, boolean>} panelMinimized
+ * @returns {string|null} id панели для разворота или null
+ */
+export function pickPanelToExpand(previousOpenIds, openIds, panelMinimized) {
+  const previous = new Set(previousOpenIds ?? []);
+  const added = (openIds ?? []).filter((panelId) => !previous.has(panelId));
+
+  for (let i = added.length - 1; i >= 0; i -= 1) {
+    const panelId = added[i];
+    if (!panelMinimized?.[panelId]) {
+      return panelId;
+    }
+  }
+
+  return null;
+}

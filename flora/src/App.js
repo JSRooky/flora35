@@ -358,6 +358,7 @@ import {
 } from "./app/panelConstants";
 import { usePanelDomain } from "./app/panelDomain";
 import { useTaskbarDomain } from "./app/taskbarDomain";
+import { pickPanelToExpand } from "./app/panelLayout";
 import { useExternalSourcesDomain } from "./app/externalSourcesDomain";
 import { useGeometryToolsDomain } from "./app/geometryToolsDomain";
 import { useLayerSyncDomain } from "./app/layerSyncDomain";
@@ -2321,6 +2322,24 @@ export default function MapView() {
     selectedBoundsFeature,
     tempArchivePanelOpen,
   });
+
+  // Правило «одна раскрытая»: когда панель появляется на экране, разворачиваем её,
+  // а остальные оставляем свёрнутыми в полоску (убранные в док не трогаем).
+  // Ловит случаи, когда панель открывается НЕ через expandPanel: «Сведения об ООПТ»
+  // по клику на полигон, список видов региона, обработка внешних данных и т.п.
+  const previousOpenPanelIdsRef = useRef([]);
+  useEffect(() => {
+    const panelToExpand = pickPanelToExpand(
+      previousOpenPanelIdsRef.current,
+      activeTaskbarPanelIds,
+      panelMinimized
+    );
+    previousOpenPanelIdsRef.current = activeTaskbarPanelIds;
+
+    if (panelToExpand) {
+      expandPanel(panelToExpand);
+    }
+  }, [activeTaskbarPanelIds, expandPanel, panelMinimized]);
 
   const {
     externalSourcesLoadActive,
