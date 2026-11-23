@@ -7,7 +7,6 @@ import { TASKBAR_PANEL_IDS, PANEL_TASKBAR_MODULE_ID } from "../panelTaskbarRegis
 import { MODULE_IDS } from "../components/ModuleMenu";
 import { DATA_SOURCE_MODES } from "../locations/loadPoints";
 import { syncDataWorkingSet } from "../map/dataWorkingSet";
-import { collapseOtherPanels } from "./panelLayout";
 
 /**
  * @param {object} deps — значения из App.js, захваченные замыканиями вынесенного кода.
@@ -68,11 +67,7 @@ export function usePanelDomain({
 
   const handlePanelCollapsedChange = useCallback(
     (panelId) => (collapsed) => {
-      setPanelCollapsed((prev) =>
-        collapsed
-          ? { ...prev, [panelId]: true }
-          : collapseOtherPanels(prev, panelId)
-      );
+      setPanelCollapsed((prev) => ({ ...prev, [panelId]: collapsed }));
     },
     []
   );
@@ -132,11 +127,17 @@ export function usePanelDomain({
       return;
     }
 
-    // Остальные панели не убираем в док: они остаются в стеке свёрнутыми
-    // (правило «одна раскрытая»), чтобы их можно было развернуть в один клик.
+    // Панели, которые уже на экране, не трогаем: открытие ещё одной панели
+    // не должно их закрывать или сворачивать (в док уводит только кнопка «В панель задач»).
     setPanelMinimized((prev) => ({ ...prev, [panelId]: false }));
     pinPanelsToTaskbar([panelId]);
-    setPanelCollapsed((prev) => collapseOtherPanels(prev, panelId));
+    setPanelCollapsed((prev) => {
+      if (!prev[panelId]) {
+        return prev;
+      }
+
+      return { ...prev, [panelId]: false };
+    });
 
     // Вернуть контекст модуля/режима, иначе панель останется размонтированной
     // (типичный случай: в taskbar несколько иконок от разных модулей).
@@ -229,7 +230,13 @@ export function usePanelDomain({
   );
 
   const expandPanel = useCallback((panelId) => {
-    setPanelCollapsed((prev) => collapseOtherPanels(prev, panelId));
+    setPanelCollapsed((prev) => {
+      if (!prev[panelId]) {
+        return prev;
+      }
+
+      return { ...prev, [panelId]: false };
+    });
     setPanelMinimized((prev) => {
       if (!prev[panelId]) {
         return prev;
@@ -249,9 +256,8 @@ export function usePanelDomain({
 
     setPanelCollapsed((prev) => {
       const next = { ...prev };
-      // Правило «одна раскрытая»: возвращаем только первую из ранее развёрнутых панелей.
-      peerIds.forEach((panelId, index) => {
-        next[panelId] = index !== 0;
+      peerIds.forEach((panelId) => {
+        next[panelId] = false;
       });
       return next;
     });
@@ -267,13 +273,19 @@ export function usePanelDomain({
       return { ...prev, [PANEL_IDS.FEATURE]: false };
     });
     setPanelCollapsed((prev) => {
+      const next = { ...prev, [PANEL_IDS.FEATURE]: false };
+
       if (!panelsCollapsedByFeatureRef.current) {
         panelsCollapsedByFeatureRef.current = FEATURE_PEER_PANEL_IDS.filter((panelId) =>
           isPanelExpandedInState(prev, panelId)
         );
       }
 
-      return collapseOtherPanels(prev, PANEL_IDS.FEATURE);
+      FEATURE_PEER_PANEL_IDS.forEach((panelId) => {
+        next[panelId] = true;
+      });
+
+      return next;
     });
   }, []);
 
@@ -317,7 +329,7 @@ export function usePanelDomain({
         next[PANEL_IDS.FEATURE] = true;
       }
 
-      return collapseOtherPanels(next, PANEL_IDS.DENSE);
+      return next;
     });
   }, [activeModule]);
 
@@ -340,7 +352,11 @@ export function usePanelDomain({
       ...prev,
       [PANEL_IDS.GBIF]: false
     }));
-    setPanelCollapsed((prev) => collapseOtherPanels(prev, PANEL_IDS.GBIF));
+    setPanelCollapsed((prev) => ({
+      ...prev,
+      [PANEL_IDS.GBIF]: false,
+      [PANEL_IDS.GBIF_PROCESSING]: true
+    }));
   }, []);
 
   // Обработка GBIF развёрнута — панель загрузки сворачиваем.
@@ -350,7 +366,11 @@ export function usePanelDomain({
       ...prev,
       [PANEL_IDS.GBIF_PROCESSING]: false
     }));
-    setPanelCollapsed((prev) => collapseOtherPanels(prev, PANEL_IDS.GBIF_PROCESSING));
+    setPanelCollapsed((prev) => ({
+      ...prev,
+      [PANEL_IDS.GBIF]: true,
+      [PANEL_IDS.GBIF_PROCESSING]: false
+    }));
   }, []);
 
   const handleGbifPanelCollapsedChange = useCallback(
