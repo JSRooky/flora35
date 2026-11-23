@@ -44,8 +44,6 @@ export function usePanelDomain({
   const [compareStatsKind, setCompareStatsKind] = useState(null);
   /** Порядок иконок в taskbar (открытая панель остаётся в ряду и подсвечивается). */
   const [panelTaskbarOrder, setPanelTaskbarOrder] = useState([]);
-  /** Актуальный stashVisiblePanelsToTaskbar — вызывается из ранних колбэков. */
-  const stashVisiblePanelsToTaskbarRef = useRef(() => {});
   /** Какие peer-панели свернули из‑за разворота «Сведений о точке» (для восстановления). */
   const panelsCollapsedByFeatureRef = useRef(null);
   /** Ключ выбранной ООПТ — чтобы не откатывать minimize при каждом рендере. */
@@ -134,9 +132,8 @@ export function usePanelDomain({
       return;
     }
 
-    // Текущие видимые панели уводим в taskbar, затем поднимаем выбранную.
-    stashVisiblePanelsToTaskbarRef.current(panelId);
-
+    // Остальные панели не убираем в док: они остаются в стеке свёрнутыми
+    // (правило «одна раскрытая»), чтобы их можно было развернуть в один клик.
     setPanelMinimized((prev) => ({ ...prev, [panelId]: false }));
     pinPanelsToTaskbar([panelId]);
     setPanelCollapsed((prev) => collapseOtherPanels(prev, panelId));
@@ -437,7 +434,6 @@ export function usePanelDomain({
     setSubmissionLocationPicking,
     setTempArchivePanelOpen,
     setTempArchiveStatus,
-    stashVisiblePanelsToTaskbarRef,
     submissionCoordinates,
     submissionLocationPicking,
     submissionMapPickHandlerRef,

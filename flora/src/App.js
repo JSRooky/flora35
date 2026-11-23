@@ -696,7 +696,6 @@ export default function MapView() {
     setSubmissionLocationPicking,
     setTempArchivePanelOpen,
     setTempArchiveStatus,
-    stashVisiblePanelsToTaskbarRef,
     submissionCoordinates,
     submissionLocationPicking,
     submissionMapPickHandlerRef,
@@ -1008,7 +1007,6 @@ export default function MapView() {
     const selectModule = (nextModuleId) => {
       setActiveModule((current) => {
         if (current !== nextModuleId) {
-          stashVisiblePanelsToTaskbarRef.current(nextModuleId);
           return nextModuleId;
         }
 
@@ -1832,7 +1830,6 @@ export default function MapView() {
   const handleExternalLayerRequestLoad = useCallback(
     (layerId) => {
       setExternalLayersEnabled((prev) => ({ ...prev, [layerId]: true }));
-      stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DATA_SOURCES);
       expandGbifDataPanel();
     },
     [expandGbifDataPanel]
@@ -2292,6 +2289,7 @@ export default function MapView() {
   /** Какие панели сейчас реально на экране (не в taskbar). */
   const {
     activeTaskbarPanelIds,
+    expandedTaskbarPanelIds,
     handleTaskbarPanelClick
   } = useTaskbarDomain({
     activeModule,
@@ -2309,8 +2307,10 @@ export default function MapView() {
     densePileSpeciesListOpen,
     denseProcessingActive,
     externalProcessingActive,
+    expandPanel,
     minimizePanel,
     ooptPointsFilterActive,
+    panelCollapsed,
     panelMinimized,
     panelTaskbarOrder,
     pinPanelsToTaskbar,
@@ -2319,8 +2319,6 @@ export default function MapView() {
     reportPanelOpen,
     restorePanel,
     selectedBoundsFeature,
-    setPanelMinimized,
-    stashVisiblePanelsToTaskbarRef,
     tempArchivePanelOpen,
   });
 
@@ -4533,7 +4531,6 @@ export default function MapView() {
   }, [denseGroupsHidden]);
 
   const handleDenseProcessingOpen = useCallback(() => {
-    stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DENSE);
     setMarkersVisibleState(true);
     setDenseClustersHighlightState(true);
     setDenseGroupsHidden(false);
@@ -7180,8 +7177,8 @@ export default function MapView() {
         onSpeciesSelect={handleDensePileSpeciesSelect}
       />
       <PanelTaskbar
-        items={panelTaskbarOrder}
-        activeIds={activeTaskbarPanelIds}
+        items={activeTaskbarPanelIds}
+        activeIds={expandedTaskbarPanelIds}
         loadingIds={
           externalSourcesLoadActive ? [PANEL_IDS.DATA_SOURCES] : []
         }
