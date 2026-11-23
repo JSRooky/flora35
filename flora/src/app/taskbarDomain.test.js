@@ -20,6 +20,7 @@ function makeDeps(overrides = {}) {
     denseProcessingActive: false,
     expandPanel: jest.fn(),
     externalProcessingActive: false,
+    isPanelOpen: () => false,
     minimizePanel: jest.fn(),
     ooptPointsFilterActive: false,
     panelCollapsed: {},

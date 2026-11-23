@@ -1,7 +1,7 @@
 /** app/panelDomain.js — домен, вынесенный из App.js механически (без изменения поведения). */
 import { useState, useRef, useCallback } from "react";
 import { parseSharePointParams } from "../components/sharePointLink";
-import { PANEL_IDS, FEATURE_PEER_PANEL_IDS, isPanelExpandedInState } from "./panelConstants";
+import { PANEL_IDS } from "./panelConstants";
 import { FEATURE_FLAGS } from "../config/featureFlags";
 import { TASKBAR_PANEL_IDS, PANEL_TASKBAR_MODULE_ID } from "../panelTaskbarRegistry";
 import { MODULE_IDS } from "../components/ModuleMenu";
@@ -43,8 +43,29 @@ export function usePanelDomain({
   const [compareStatsKind, setCompareStatsKind] = useState(null);
   /** Порядок иконок в taskbar (открытая панель остаётся в ряду и подсвечивается). */
   const [panelTaskbarOrder, setPanelTaskbarOrder] = useState([]);
-  /** Какие peer-панели свернули из‑за разворота «Сведений о точке» (для восстановления). */
-  const panelsCollapsedByFeatureRef = useRef(null);
+  /**
+   * Панели, открытые пользователем. Видимость панели больше не выводится только
+   * из активного модуля: открыл «Год», переключился на «Сезонность» — обе остались.
+   */
+  const [openPanelIds, setOpenPanelIds] = useState([]);
+
+  const openPanel = useCallback((panelId) => {
+    if (!panelId) {
+      return;
+    }
+    setOpenPanelIds((prev) => (prev.includes(panelId) ? prev : [...prev, panelId]));
+  }, []);
+
+  const closePanelById = useCallback((panelId) => {
+    setOpenPanelIds((prev) =>
+      prev.includes(panelId) ? prev.filter((id) => id !== panelId) : prev
+    );
+  }, []);
+
+  const isPanelOpen = useCallback(
+    (panelId) => openPanelIds.includes(panelId),
+    [openPanelIds]
+  );
   /** Ключ выбранной ООПТ — чтобы не откатывать minimize при каждом рендере. */
   const prevSelectedBoundsFeatureKeyRef = useRef(null);
   const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
@@ -246,24 +267,7 @@ export function usePanelDomain({
     });
   }, []);
 
-  const restorePanelsCollapsedByFeature = useCallback(() => {
-    const peerIds = panelsCollapsedByFeatureRef.current;
-    panelsCollapsedByFeatureRef.current = null;
-
-    if (!peerIds?.length) {
-      return;
-    }
-
-    setPanelCollapsed((prev) => {
-      const next = { ...prev };
-      peerIds.forEach((panelId) => {
-        next[panelId] = false;
-      });
-      return next;
-    });
-  }, []);
-
-  /** Разворачивает «Сведения о точке» и сворачивает остальные открытые панели. */
+  /** Разворачивает «Сведения о точке», не трогая остальные панели. */
   const expandFeaturePanel = useCallback(() => {
     setPanelMinimized((prev) => {
       if (!prev[PANEL_IDS.FEATURE]) {
@@ -272,41 +276,21 @@ export function usePanelDomain({
 
       return { ...prev, [PANEL_IDS.FEATURE]: false };
     });
-    setPanelCollapsed((prev) => {
-      const next = { ...prev, [PANEL_IDS.FEATURE]: false };
-
-      if (!panelsCollapsedByFeatureRef.current) {
-        panelsCollapsedByFeatureRef.current = FEATURE_PEER_PANEL_IDS.filter((panelId) =>
-          isPanelExpandedInState(prev, panelId)
-        );
-      }
-
-      FEATURE_PEER_PANEL_IDS.forEach((panelId) => {
-        next[panelId] = true;
-      });
-
-      return next;
-    });
+    setPanelCollapsed((prev) => ({
+      ...prev,
+      [PANEL_IDS.FEATURE]: false
+    }));
   }, []);
 
   const handleFeaturePanelCollapsedChange = useCallback(
     (collapsed) => {
-      if (collapsed) {
-        setPanelCollapsed((prev) => ({ ...prev, [PANEL_IDS.FEATURE]: true }));
-        restorePanelsCollapsedByFeature();
-        return;
-      }
-
-      expandFeaturePanel();
+      setPanelCollapsed((prev) => ({ ...prev, [PANEL_IDS.FEATURE]: collapsed }));
     },
-    [expandFeaturePanel, restorePanelsCollapsedByFeature]
+    []
   );
 
-  // Разворачиваем обработку; если на экране «Сведения о точке» — сворачиваем её.
+  // Разворачиваем обработку плотных групп, не сворачивая другие панели.
   const expandDenseProcessingPanel = useCallback(() => {
-    const peerIds = panelsCollapsedByFeatureRef.current;
-    panelsCollapsedByFeatureRef.current = null;
-
     setPanelMinimized((prev) => {
       if (!prev[PANEL_IDS.DENSE]) {
         return prev;
@@ -315,23 +299,11 @@ export function usePanelDomain({
       return { ...prev, [PANEL_IDS.DENSE]: false };
     });
 
-    setPanelCollapsed((prev) => {
-      const next = { ...prev, [PANEL_IDS.DENSE]: false };
-
-      // Вернём панели, свёрнутые ради Feature (в exclusive-режиме их всё равно не видно).
-      if (peerIds?.length) {
-        peerIds.forEach((panelId) => {
-          next[panelId] = false;
-        });
-      }
-
-      if (activeModule === MODULE_IDS.FEATURE) {
-        next[PANEL_IDS.FEATURE] = true;
-      }
-
-      return next;
-    });
-  }, [activeModule]);
+    setPanelCollapsed((prev) => ({
+      ...prev,
+      [PANEL_IDS.DENSE]: false
+    }));
+  }, []);
 
   const handleDensePanelCollapsedChange = useCallback(
     (collapsed) => {
@@ -345,7 +317,7 @@ export function usePanelDomain({
     [expandDenseProcessingPanel]
   );
 
-  // Данные GBIF развёрнуты — обработку сворачиваем (не закрываем).
+  // Данные GBIF развёрнуты; панель обработки не трогаем.
   const expandGbifDataPanel = useCallback(() => {
     setDataSourcesPanelOpen(true);
     setPanelMinimized((prev) => ({
@@ -354,12 +326,11 @@ export function usePanelDomain({
     }));
     setPanelCollapsed((prev) => ({
       ...prev,
-      [PANEL_IDS.GBIF]: false,
-      [PANEL_IDS.GBIF_PROCESSING]: true
+      [PANEL_IDS.GBIF]: false
     }));
   }, []);
 
-  // Обработка GBIF развёрнута — панель загрузки сворачиваем.
+  // Обработка GBIF развёрнута; панель загрузки не трогаем.
   const expandGbifProcessingPanel = useCallback(() => {
     setExternalProcessingActive(true);
     setPanelMinimized((prev) => ({
@@ -368,7 +339,6 @@ export function usePanelDomain({
     }));
     setPanelCollapsed((prev) => ({
       ...prev,
-      [PANEL_IDS.GBIF]: true,
       [PANEL_IDS.GBIF_PROCESSING]: false
     }));
   }, []);
@@ -424,8 +394,11 @@ export function usePanelDomain({
     handlePanelCollapsedChange,
     isPanelCollapsed,
     isPanelMinimized,
+    isPanelOpen,
     kdeOverlay,
+    closePanelById,
     minimizePanel,
+    openPanel,
     panelCollapsed,
     panelMinimized,
     panelTaskbarOrder,
@@ -435,7 +408,6 @@ export function usePanelDomain({
     previousYearFilterEnabledRef,
     reportPanelOpen,
     restorePanel,
-    restorePanelsCollapsedByFeature,
     setAnalysisPanelOpen,
     setCompareDistributionOpen,
     setCompareDiversityKeys,

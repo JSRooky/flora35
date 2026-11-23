@@ -364,6 +364,37 @@ import { useLayerSyncDomain } from "./app/layerSyncDomain";
 
 hydrateRedBookStoreFromPersistence();
 
+/**
+ * Какой панели соответствует модуль меню.
+ * Нужно, чтобы панель оставалась открытой при переключении модуля:
+ * открытие панели запоминается в openPanelIds, а не выводится из activeModule.
+ */
+const MODULE_PANEL_IDS = {
+  [MODULE_IDS.FEATURE]: PANEL_IDS.FEATURE,
+  [MODULE_IDS.STATUS]: PANEL_IDS.STATUS,
+  [MODULE_IDS.REGNUM]: PANEL_IDS.REGNUM,
+  [MODULE_IDS.MAP]: PANEL_IDS.MAP,
+  [MODULE_IDS.YEAR]: PANEL_IDS.YEAR,
+  [MODULE_IDS.SEASONALITY]: PANEL_IDS.SEASONALITY,
+  [MODULE_IDS.POLYGON]: PANEL_IDS.POLYGON,
+  [MODULE_IDS.AREAL]: PANEL_IDS.AREAL,
+  [MODULE_IDS.BUFFER]: PANEL_IDS.BUFFER,
+  [MODULE_IDS.AREA]: PANEL_IDS.AREA,
+  [MODULE_IDS.SEARCH]: PANEL_IDS.SEARCH,
+  [MODULE_IDS.OOPT]: PANEL_IDS.OOPT,
+  [MODULE_IDS.REGIONS]: PANEL_IDS.REGIONS,
+  [MODULE_IDS.SUBMIT]: PANEL_IDS.SUBMIT,
+  [MODULE_IDS.DATA_WORK]: PANEL_IDS.DATA_WORK,
+  [MODULE_IDS.REDBOOK]: PANEL_IDS.REDBOOK,
+  [MODULE_IDS.DENSE]: PANEL_IDS.DENSE,
+  [MODULE_IDS.GBIF]: PANEL_IDS.DATA_SOURCES
+};
+
+/** Обратное соответствие: панель → модуль меню (чтобы закрытие снимало подсветку модуля). */
+const PANEL_MODULE_IDS = Object.fromEntries(
+  Object.entries(MODULE_PANEL_IDS).map(([moduleId, panelId]) => [panelId, moduleId])
+);
+
 const UserSubmissionPanel = lazy(() => import("./components/UserSubmissionPanel"));
 
 /** Корневой компонент карты: состояние всех инструментов/фильтров/слоёв и инициализация Mapbox. */
@@ -650,6 +681,7 @@ export default function MapView() {
     comparePanelOpen,
     compareSimilarityOpen,
     compareStatsKind,
+    closePanelById,
     dataSourcesFocusRequest,
     dataSourcesPanelOpen,
     expandDenseProcessingPanel,
@@ -666,8 +698,10 @@ export default function MapView() {
     handlePanelCollapsedChange,
     isPanelCollapsed,
     isPanelMinimized,
+    isPanelOpen,
     kdeOverlay,
     minimizePanel,
+    openPanel,
     panelCollapsed,
     panelMinimized,
     panelTaskbarOrder,
@@ -677,7 +711,6 @@ export default function MapView() {
     previousYearFilterEnabledRef,
     reportPanelOpen,
     restorePanel,
-    restorePanelsCollapsedByFeature,
     setAnalysisPanelOpen,
     setCompareDistributionOpen,
     setCompareDiversityKeys,
@@ -716,6 +749,14 @@ export default function MapView() {
   });
 
   useEffect(() => {
+    // Запоминаем открытие панели: она останется на экране и в доке, даже если
+    // пользователь переключит модуль. Исключение — «Группы точек» в режиме
+    // плотных групп: там стек занят обработкой.
+    const panelIdForModule = MODULE_PANEL_IDS[activeModule];
+    if (panelIdForModule && !(denseProcessingActive && activeModule === MODULE_IDS.MAP)) {
+      openPanel(panelIdForModule);
+    }
+
     switch (activeModule) {
       case MODULE_IDS.FEATURE:
         expandFeaturePanel();
@@ -773,7 +814,8 @@ export default function MapView() {
     denseProcessingActive,
     expandPanel,
     expandGbifDataPanel,
-    expandFeaturePanel
+    expandFeaturePanel,
+    openPanel
   ]);
 
   // Docked радиус/буфер — только когда «Сведения» свёрнуты.
@@ -807,14 +849,8 @@ export default function MapView() {
     panelCollapsed
   ]);
 
-  // Ушли со «Сведений о точке» — вернуть панели, свёрнутые ради неё.
-  useEffect(() => {
-    if (activeModule === MODULE_IDS.FEATURE) {
-      return;
-    }
-
-    restorePanelsCollapsedByFeature();
-  }, [activeModule, restorePanelsCollapsedByFeature]);
+  // Ушли со «Сведений о точке» — панели больше не восстанавливаем:
+  // они и не сворачивались (ограничений на одновременные панели нет).
 
   const handleOpenBoundsFeatureDetails = useCallback(() => {
     expandPanel(PANEL_IDS.OOPT_FEATURE);
@@ -2308,6 +2344,7 @@ export default function MapView() {
     denseProcessingActive,
     externalProcessingActive,
     expandPanel,
+    isPanelOpen,
     minimizePanel,
     ooptPointsFilterActive,
     panelCollapsed,
@@ -5474,6 +5511,16 @@ export default function MapView() {
 
   const closePanel = useCallback(
     (panelId) => {
+      // Панель закрывается окончательно: уходит и с экрана, и из дока.
+      closePanelById(panelId);
+
+      // Снимаем подсветку модуля, иначе повторный клик по нему только свернёт меню
+      // и не откроет панель заново.
+      const moduleIdForPanel = PANEL_MODULE_IDS[panelId];
+      if (moduleIdForPanel) {
+        setActiveModule((current) => (current === moduleIdForPanel ? null : current));
+      }
+
       switch (panelId) {
         case PANEL_IDS.FEATURE: {
           clearPointSelection();
@@ -5650,6 +5697,7 @@ export default function MapView() {
       bufferDockedWithFeature,
       polygonDockedWithFeature,
       clearPointSelection,
+      closePanelById,
       handleBoundsSpeciesListClose,
       handleCloseNearSpeciesMatches,
       handleCloseUnattributedPoints,
@@ -6495,7 +6543,7 @@ export default function MapView() {
           )}
           {denseProcessingExclusive ? (
             <>
-              {activeModule === MODULE_IDS.FEATURE &&
+              {(activeModule === MODULE_IDS.FEATURE || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.FEATURE])) &&
                 !isPanelMinimized(PANEL_IDS.FEATURE) && (
                 <FeaturePopup
                   feature={popupData}
@@ -6551,7 +6599,7 @@ export default function MapView() {
             </>
           ) : (
             <>
-          {activeModule === MODULE_IDS.FEATURE &&
+          {(activeModule === MODULE_IDS.FEATURE || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.FEATURE])) &&
             !isPanelMinimized(PANEL_IDS.FEATURE) && (
             <FeaturePopup
               feature={popupData}
@@ -6579,8 +6627,8 @@ export default function MapView() {
               onClearRussianName={handleClearRussianName}
             />
           )}
-          {(activeModule === MODULE_IDS.AREAL ||
-            (activeModule === MODULE_IDS.FEATURE && arealDockedWithFeature)) &&
+          {((activeModule === MODULE_IDS.AREAL || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.AREAL])) ||
+            ((activeModule === MODULE_IDS.FEATURE || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.FEATURE])) && arealDockedWithFeature)) &&
             !isPanelMinimized(PANEL_IDS.AREAL) && (
             <ArealPopup
               enabled={arealEnabled}
@@ -6604,7 +6652,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.AREAL)}
             />
           )}
-          {activeModule === MODULE_IDS.STATUS &&
+          {(activeModule === MODULE_IDS.STATUS || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.STATUS])) &&
             !isPanelMinimized(PANEL_IDS.STATUS) && (
             <StatusFilterPanel
               activeStatusFilters={statusFilters}
@@ -6615,7 +6663,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.STATUS)}
             />
           )}
-          {activeModule === MODULE_IDS.MAP && !isPanelMinimized(PANEL_IDS.MAP) && (
+          {(activeModule === MODULE_IDS.MAP || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.MAP])) && !isPanelMinimized(PANEL_IDS.MAP) && (
             <MapDisplayPanel
               markersVisible={markersVisible}
               onMarkersVisibleChange={setMarkersVisibleState}
@@ -6665,7 +6713,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.MAP)}
             />
           )}
-          {activeModule === MODULE_IDS.YEAR &&
+          {(activeModule === MODULE_IDS.YEAR || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.YEAR])) &&
             !isPanelMinimized(PANEL_IDS.YEAR) && (
             <YearFilterPanel
               enabled={yearFilterEnabled}
@@ -6682,7 +6730,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.YEAR)}
             />
           )}
-          {activeModule === MODULE_IDS.SEASONALITY &&
+          {(activeModule === MODULE_IDS.SEASONALITY || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.SEASONALITY])) &&
             !isPanelMinimized(PANEL_IDS.SEASONALITY) && (
             <SeasonalityPanel
               nameLatin={seasonalityNameLatin}
@@ -6695,8 +6743,8 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.SEASONALITY)}
             />
           )}
-          {(activeModule === MODULE_IDS.POLYGON ||
-            (activeModule === MODULE_IDS.FEATURE && polygonDockedWithFeature)) &&
+          {((activeModule === MODULE_IDS.POLYGON || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.POLYGON])) ||
+            ((activeModule === MODULE_IDS.FEATURE || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.FEATURE])) && polygonDockedWithFeature)) &&
             !isPanelMinimized(PANEL_IDS.POLYGON) && (
             <SpeciesPolygonPopup
               feature={popupData}
@@ -6736,8 +6784,8 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.POLYGON)}
             />
           )}
-          {(activeModule === MODULE_IDS.BUFFER ||
-            (activeModule === MODULE_IDS.FEATURE && bufferDockedWithFeature)) &&
+          {((activeModule === MODULE_IDS.BUFFER || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.BUFFER])) ||
+            ((activeModule === MODULE_IDS.FEATURE || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.FEATURE])) && bufferDockedWithFeature)) &&
           !isPanelMinimized(PANEL_IDS.BUFFER) ? (
             <BufferPopup
               feature={popupData}
@@ -6763,7 +6811,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.BUFFER)}
             />
           ) : null}
-          {activeModule === MODULE_IDS.AREA &&
+          {(activeModule === MODULE_IDS.AREA || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.AREA])) &&
             !isPanelMinimized(PANEL_IDS.AREA) && (
             <AreaSelectionPopup
               drawTool={areaDrawTool}
@@ -6785,7 +6833,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.AREA)}
             />
           )}
-          {activeModule === MODULE_IDS.SEARCH &&
+          {(activeModule === MODULE_IDS.SEARCH || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.SEARCH])) &&
             !isPanelMinimized(PANEL_IDS.SEARCH) && (
             <SpeciesSearchPanel
               query={speciesSearchInput}
@@ -6800,7 +6848,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.SEARCH)}
             />
           )}
-          {activeModule === MODULE_IDS.DATA_WORK &&
+          {(activeModule === MODULE_IDS.DATA_WORK || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.DATA_WORK])) &&
             !isPanelMinimized(PANEL_IDS.DATA_WORK) && (
             <DataWorkPanel
               collapsed={isPanelCollapsed(PANEL_IDS.DATA_WORK)}
@@ -6819,7 +6867,7 @@ export default function MapView() {
               }
             />
           )}
-          {activeModule === MODULE_IDS.REDBOOK &&
+          {(activeModule === MODULE_IDS.REDBOOK || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.REDBOOK])) &&
             !isPanelMinimized(PANEL_IDS.REDBOOK) && (
             <RedBookSearchPanel
               collapsed={isPanelCollapsed(PANEL_IDS.REDBOOK)}
@@ -6847,7 +6895,7 @@ export default function MapView() {
               }}
             />
           )}
-          {activeModule === MODULE_IDS.OOPT &&
+          {(activeModule === MODULE_IDS.OOPT || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.OOPT])) &&
             !isPanelMinimized(PANEL_IDS.OOPT) && (
             <OoptPanel
               catalogByLayerId={boundsCatalogByLayerId}
@@ -6869,7 +6917,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.OOPT)}
             />
           )}
-          {activeModule === MODULE_IDS.REGIONS &&
+          {(activeModule === MODULE_IDS.REGIONS || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.REGIONS])) &&
             !isPanelMinimized(PANEL_IDS.REGIONS) && (
             <RegionPanel
               layerEnabled={regionBoundsEnabled}
@@ -6925,7 +6973,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.OOPT_FEATURE)}
             />
           ) : null}
-          {activeModule === MODULE_IDS.SUBMIT &&
+          {(activeModule === MODULE_IDS.SUBMIT || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.SUBMIT])) &&
             !isPanelMinimized(PANEL_IDS.SUBMIT) && (
             <Suspense fallback={null}>
               <UserSubmissionPanel
