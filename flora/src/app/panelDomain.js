@@ -7,6 +7,7 @@ import { TASKBAR_PANEL_IDS, PANEL_TASKBAR_MODULE_ID } from "../panelTaskbarRegis
 import { MODULE_IDS } from "../components/ModuleMenu";
 import { DATA_SOURCE_MODES } from "../locations/loadPoints";
 import { syncDataWorkingSet } from "../map/dataWorkingSet";
+import { collapseOtherPanels } from "./panelLayout";
 
 /**
  * @param {object} deps — значения из App.js, захваченные замыканиями вынесенного кода.
@@ -69,7 +70,11 @@ export function usePanelDomain({
 
   const handlePanelCollapsedChange = useCallback(
     (panelId) => (collapsed) => {
-      setPanelCollapsed((prev) => ({ ...prev, [panelId]: collapsed }));
+      setPanelCollapsed((prev) =>
+        collapsed
+          ? { ...prev, [panelId]: true }
+          : collapseOtherPanels(prev, panelId)
+      );
     },
     []
   );
@@ -134,13 +139,7 @@ export function usePanelDomain({
 
     setPanelMinimized((prev) => ({ ...prev, [panelId]: false }));
     pinPanelsToTaskbar([panelId]);
-    setPanelCollapsed((prev) => {
-      if (!prev[panelId]) {
-        return prev;
-      }
-
-      return { ...prev, [panelId]: false };
-    });
+    setPanelCollapsed((prev) => collapseOtherPanels(prev, panelId));
 
     // Вернуть контекст модуля/режима, иначе панель останется размонтированной
     // (типичный случай: в taskbar несколько иконок от разных модулей).
@@ -233,13 +232,7 @@ export function usePanelDomain({
   );
 
   const expandPanel = useCallback((panelId) => {
-    setPanelCollapsed((prev) => {
-      if (!prev[panelId]) {
-        return prev;
-      }
-
-      return { ...prev, [panelId]: false };
-    });
+    setPanelCollapsed((prev) => collapseOtherPanels(prev, panelId));
     setPanelMinimized((prev) => {
       if (!prev[panelId]) {
         return prev;
@@ -259,8 +252,9 @@ export function usePanelDomain({
 
     setPanelCollapsed((prev) => {
       const next = { ...prev };
-      peerIds.forEach((panelId) => {
-        next[panelId] = false;
+      // Правило «одна раскрытая»: возвращаем только первую из ранее развёрнутых панелей.
+      peerIds.forEach((panelId, index) => {
+        next[panelId] = index !== 0;
       });
       return next;
     });
@@ -276,19 +270,13 @@ export function usePanelDomain({
       return { ...prev, [PANEL_IDS.FEATURE]: false };
     });
     setPanelCollapsed((prev) => {
-      const next = { ...prev, [PANEL_IDS.FEATURE]: false };
-
       if (!panelsCollapsedByFeatureRef.current) {
         panelsCollapsedByFeatureRef.current = FEATURE_PEER_PANEL_IDS.filter((panelId) =>
           isPanelExpandedInState(prev, panelId)
         );
       }
 
-      FEATURE_PEER_PANEL_IDS.forEach((panelId) => {
-        next[panelId] = true;
-      });
-
-      return next;
+      return collapseOtherPanels(prev, PANEL_IDS.FEATURE);
     });
   }, []);
 
@@ -332,7 +320,7 @@ export function usePanelDomain({
         next[PANEL_IDS.FEATURE] = true;
       }
 
-      return next;
+      return collapseOtherPanels(next, PANEL_IDS.DENSE);
     });
   }, [activeModule]);
 
@@ -355,11 +343,7 @@ export function usePanelDomain({
       ...prev,
       [PANEL_IDS.GBIF]: false
     }));
-    setPanelCollapsed((prev) => ({
-      ...prev,
-      [PANEL_IDS.GBIF]: false,
-      [PANEL_IDS.GBIF_PROCESSING]: true
-    }));
+    setPanelCollapsed((prev) => collapseOtherPanels(prev, PANEL_IDS.GBIF));
   }, []);
 
   // Обработка GBIF развёрнута — панель загрузки сворачиваем.
@@ -369,11 +353,7 @@ export function usePanelDomain({
       ...prev,
       [PANEL_IDS.GBIF_PROCESSING]: false
     }));
-    setPanelCollapsed((prev) => ({
-      ...prev,
-      [PANEL_IDS.GBIF]: true,
-      [PANEL_IDS.GBIF_PROCESSING]: false
-    }));
+    setPanelCollapsed((prev) => collapseOtherPanels(prev, PANEL_IDS.GBIF_PROCESSING));
   }, []);
 
   const handleGbifPanelCollapsedChange = useCallback(

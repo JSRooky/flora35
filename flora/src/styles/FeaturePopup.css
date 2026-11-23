@@ -192,11 +192,25 @@
 }
 
 .popup-item-text {
-  display: flex;
-  justify-content: space-between;
+  /* Колонка подписи фиксированной доли: значения во всех строках начинаются
+     на одной вертикали, а длинные латинские названия переносятся, а не распирают панель. */
+  display: grid;
+  grid-template-columns: minmax(0, 52%) minmax(0, 1fr);
+  align-items: baseline;
   flex: 1;
   min-width: 0;
   gap: 8px;
+}
+
+.popup-item-text > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.popup-item-text > span {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .popup-item-value-btn {

@@ -59,6 +59,8 @@ function getCollapsedSummary(
 export default function MapDisplayPanel({
   markersVisible = true,
   onMarkersVisibleChange,
+  lowPerformanceMode = false,
+  onPerformanceModeChange,
   heatmapEnabled = false,
   onHeatmapEnabledChange,
   heatmapTempLayersOnly = false,
@@ -391,6 +393,21 @@ export default function MapDisplayPanel({
               Настроить
             </button>
           </div>
+
+          <hr />
+
+          <label
+            className="map-display-switch"
+            title="Отключает размытие подложки, анимации, тени и подсказки при наведении — быстрее на слабой графике. Настройка запоминается"
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(lowPerformanceMode)}
+              onChange={(e) => onPerformanceModeChange?.(e.target.checked)}
+            />
+            <span className="map-display-switch-slider" />
+            <span className="map-display-switch-label">Режим слабых ПК</span>
+          </label>
         </div>
       )}
 

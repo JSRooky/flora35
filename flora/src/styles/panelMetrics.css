@@ -1,0 +1,89 @@
+/**
+ * Общие метрики панелей и режим для слабых ПК.
+ *
+ * Ширина панелей задаётся одним токеном, а не значениями в каждом файле:
+ * `.module-panel-stack` — единственный контейнер, в который монтируются панели,
+ * поэтому правило ниже переопределяет индивидуальные `width` панелей
+ * (специфичность 0,1,1 выше, чем 0,1,0 у `.some-panel { width: … }`).
+ */
+
+:root {
+  --flora-panel-width: 360px;
+  --flora-panel-gap: 10px;
+  --flora-panel-radius: 12px;
+  --flora-panel-body-pad: 12px;
+  --flora-panel-header-height: 40px;
+  /* Ограничение по ширине экрана: на узких экранах панель не вылезает за край. */
+  --flora-panel-max-width: calc(100vw - 40px);
+}
+
+/* Все панели одной ширины; min-width: 0 нужен flex-детям, иначе длинные
+   значения (названия видов, списки источников) распирают панель. */
+.module-panel-stack > * {
+  width: var(--flora-panel-width);
+  max-width: var(--flora-panel-max-width);
+  min-width: 0;
+  border-radius: var(--flora-panel-radius);
+  /* Длинные названия видов и списки источников переносятся, а не растягивают панель. */
+  overflow-wrap: anywhere;
+}
+
+.module-panel-stack {
+  gap: var(--flora-panel-gap);
+}
+
+@media (max-width: 768px) {
+  :root {
+    --flora-panel-width: min(360px, calc(100vw - 32px));
+  }
+
+  .module-panel-stack {
+    left: 8px;
+    right: 8px;
+    max-height: calc(100vh - 96px);
+  }
+
+  .module-panel-stack > * {
+    width: var(--flora-panel-width);
+    max-width: 100%;
+  }
+}
+
+/*
+ * Режим для слабых ПК.
+ *
+ * Включается атрибутом data-flora-perf="low" на <html> (см. config/performanceMode.js).
+ * Убирает самую дорогую графику: размытие подложки над WebGL-канвасом,
+ * анимации и переходы, тени панелей. Содержимое и логика не меняются.
+ */
+
+:root[data-flora-perf="low"] *,
+:root[data-flora-perf="low"] *::before,
+:root[data-flora-perf="low"] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
+/* Тени убираем только у «плавающих» поверхностей — фокус и состояния не трогаем. */
+:root[data-flora-perf="low"] .module-panel-stack > *,
+:root[data-flora-perf="low"] .map-corner-controls-bar,
+:root[data-flora-perf="low"] .map-corner-filters-popover,
+:root[data-flora-perf="low"] .panel-taskbar,
+:root[data-flora-perf="low"] .panel-taskbar-item,
+:root[data-flora-perf="low"] .module-menu,
+:root[data-flora-perf="low"] .module-menu-panel {
+  box-shadow: none !important;
+}
+
+/* Непрозрачная подложка панелей вместо размытой: текст остаётся читаемым. */
+:root[data-flora-perf="low"] .module-panel-stack > * {
+  background-color: var(--flora-panel-bg-solid, #ffffff);
+}
+
+:root[data-flora-perf="low"] .point-hover-tooltip.mapboxgl-popup {
+  display: none;
+}

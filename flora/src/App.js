@@ -327,6 +327,13 @@ import {
 } from "./components/ExternalLayersPicker";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
 import { FEATURE_FLAGS } from "./config/featureFlags";
+import {
+  PERFORMANCE_MODES,
+  applyPerformanceMode,
+  isLowPerformanceMode,
+  loadPerformanceMode,
+  savePerformanceMode
+} from "./config/performanceMode";
 import ExperimentalFeatureDialog from "./components/ExperimentalFeatureDialog";
 import {
   EXPERIMENTAL_FEATURE_IDS,
@@ -337,6 +344,7 @@ import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
 import { ReactComponent as YandexLogo } from "./images/yandex_logo_ru.svg";
 import "./styles/mapToolsTheme.css";
+import "./styles/panelMetrics.css";
 import "./MapView.css";
 import {
   DEFAULT_CLUSTER_BY_REGNUM,
@@ -499,6 +507,20 @@ export default function MapView() {
   const [areaDrawingActive, setAreaDrawingActive] = useState(false);
   const [areaGeometry, setAreaGeometry] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
+  // Режим «для слабых ПК»: без размытия/анимаций/подсказок. Значение хранится между сессиями.
+  const [performanceMode, setPerformanceMode] = useState(loadPerformanceMode);
+  const lowPerformanceMode = isLowPerformanceMode(performanceMode);
+  const effectiveHoverTooltipsDisabled = hoverTooltipsDisabled || lowPerformanceMode;
+
+  const handlePerformanceModeChange = useCallback((enabled) => {
+    const nextMode = enabled ? PERFORMANCE_MODES.LOW : PERFORMANCE_MODES.AUTO;
+    setPerformanceMode(nextMode);
+    savePerformanceMode(nextMode);
+  }, []);
+
+  useEffect(() => {
+    applyPerformanceMode(performanceMode);
+  }, [performanceMode]);
   const [regionBoundsEnabled, setRegionBoundsVisible] = useState(false);
   const [regionCatalog, setRegionCatalog] = useState([]);
   const [hiddenRegionIsos, setHiddenRegionIsos] = useState([]);
@@ -1315,9 +1337,9 @@ export default function MapView() {
   const handleOpenTempArchive = useCallback(() => {
     setTempArchiveStatus("");
     setTempArchivePanelOpen(true);
-    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.TEMP_ARCHIVE]: false }));
+    expandPanel(PANEL_IDS.TEMP_ARCHIVE);
     pinPanelsToTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
-  }, [pinPanelsToTaskbar]);
+  }, [expandPanel, pinPanelsToTaskbar]);
 
   const handleTempArchivePanelToggle = useCallback(() => {
     if (tempArchivePanelOpen && !isPanelMinimized(PANEL_IDS.TEMP_ARCHIVE)) {
@@ -1336,9 +1358,9 @@ export default function MapView() {
 
   const openComparePanel = useCallback(() => {
     setComparePanelOpen(true);
-    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE]: false }));
+    expandPanel(PANEL_IDS.COMPARE);
     pinPanelsToTaskbar([PANEL_IDS.COMPARE]);
-  }, [pinPanelsToTaskbar]);
+  }, [expandPanel, pinPanelsToTaskbar]);
 
   const handleComparePanelToggle = useCallback(() => {
     if (comparePanelOpen && !isPanelMinimized(PANEL_IDS.COMPARE)) {
@@ -1385,15 +1407,15 @@ export default function MapView() {
     }
 
     setReportPanelOpen(true);
-    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.REPORT]: false }));
+    expandPanel(PANEL_IDS.REPORT);
     pinPanelsToTaskbar([PANEL_IDS.REPORT]);
-  }, [reportPanelOpen, isPanelMinimized, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
+  }, [reportPanelOpen, isPanelMinimized, expandPanel, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
 
   const openAnalysisPanel = useCallback(() => {
     setAnalysisPanelOpen(true);
-    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.ANALYSIS]: false }));
+    expandPanel(PANEL_IDS.ANALYSIS);
     pinPanelsToTaskbar([PANEL_IDS.ANALYSIS]);
-  }, [pinPanelsToTaskbar]);
+  }, [expandPanel, pinPanelsToTaskbar]);
 
   const handleAnalysisPanelToggle = useCallback(() => {
     if (analysisPanelOpen && !isPanelMinimized(PANEL_IDS.ANALYSIS)) {
@@ -3454,7 +3476,7 @@ export default function MapView() {
     hiddenRegionIsoSet,
     hiddenRegionIsos,
     hiddenRegionIsosRef,
-    hoverTooltipsDisabled,
+    hoverTooltipsDisabled: effectiveHoverTooltipsDisabled,
     locationFilters,
     map,
     mapReady,
@@ -6600,6 +6622,8 @@ export default function MapView() {
             <MapDisplayPanel
               markersVisible={markersVisible}
               onMarkersVisibleChange={setMarkersVisibleState}
+              lowPerformanceMode={lowPerformanceMode}
+              onPerformanceModeChange={handlePerformanceModeChange}
               heatmapEnabled={heatmapEnabled}
               onHeatmapEnabledChange={setHeatmapEnabledState}
               heatmapTempLayersOnly={tempOnly}
