@@ -290,7 +290,12 @@ export default function FeaturePopup({
   const mergedFromEntries = fromMerged ? parseMergedFrom(properties) : [];
 
   const showExternalNameLookup = fromExternal && Boolean(nameLatin) && !nameRu;
-  const speciesPointCount = feature ? getPointsForSpecies(feature).length : 0;
+  // Полный проход по выборке: на 100k+ точек нельзя делать это в теле рендера
+  // (раньше пересчитывалось при любом локальном setState панели).
+  const speciesPointCount = useMemo(
+    () => (feature ? getPointsForSpecies(feature).length : 0),
+    [feature]
+  );
   const images = properties ? getImages(properties) : [];
   const descriptionPath = properties?.description_md;
   const gbifUrl = properties?.gbif_url;
@@ -298,41 +303,50 @@ export default function FeaturePopup({
   // status выводится отдельно — у него свой фильтр через StatusFilterPanel.
   // Для старых снимков GBIF/iNat: kingdom → regnum, чтобы в UI было одно «Царство».
   const resolvedRegnum = resolveFeatureRegnum(properties);
-  const displayProperties = properties
-    ? sortPropertyEntries(
-        Object.entries({
-          ...properties,
-          ...(resolvedRegnum ? { regnum: resolvedRegnum } : {})
-        }).filter(
-          ([key, value]) =>
-            !INTERNAL_PROPERTIES.has(key) &&
-            !GBIF_META_PROPERTIES.has(key) &&
-            !INAT_META_PROPERTIES.has(key) &&
-            key !== "status" &&
-            !(fromExternal && key === "name_ru") &&
-            hasDisplayValue(value)
-        )
-      )
-    : [];
-
-  const gbifMetaProperties =
-    (fromGbif || (fromRedBook && properties?.origin_source === "gbif")) && properties
-      ? sortGbifMetaEntries(
-          Object.entries(properties).filter(
-            ([key, value]) => GBIF_META_PROPERTIES.has(key) && hasDisplayValue(value)
+  const displayProperties = useMemo(
+    () =>
+      properties
+        ? sortPropertyEntries(
+            Object.entries({
+              ...properties,
+              ...(resolvedRegnum ? { regnum: resolvedRegnum } : {})
+            }).filter(
+              ([key, value]) =>
+                !INTERNAL_PROPERTIES.has(key) &&
+                !GBIF_META_PROPERTIES.has(key) &&
+                !INAT_META_PROPERTIES.has(key) &&
+                key !== "status" &&
+                !(fromExternal && key === "name_ru") &&
+                hasDisplayValue(value)
+            )
           )
-        )
-      : [];
+        : [],
+    [properties, resolvedRegnum, fromExternal]
+  );
 
-  const inatMetaProperties =
-    (fromInat || (fromRedBook && properties?.origin_source === "inaturalist")) &&
-    properties
-      ? sortInatMetaEntries(
-          Object.entries(properties).filter(
-            ([key, value]) => INAT_META_PROPERTIES.has(key) && hasDisplayValue(value)
+  const gbifMetaProperties = useMemo(
+    () =>
+      (fromGbif || (fromRedBook && properties?.origin_source === "gbif")) && properties
+        ? sortGbifMetaEntries(
+            Object.entries(properties).filter(
+              ([key, value]) => GBIF_META_PROPERTIES.has(key) && hasDisplayValue(value)
+            )
           )
-        )
-      : [];
+        : [],
+    [properties, fromGbif, fromRedBook]
+  );
+
+  const inatMetaProperties = useMemo(
+    () =>
+      (fromInat || (fromRedBook && properties?.origin_source === "inaturalist")) && properties
+        ? sortInatMetaEntries(
+            Object.entries(properties).filter(
+              ([key, value]) => INAT_META_PROPERTIES.has(key) && hasDisplayValue(value)
+            )
+          )
+        : [],
+    [properties, fromInat, fromRedBook]
+  );
 
   const toggleLabel = collapsed ? "Развернуть" : "Свернуть";
   const hasPropertyFilters = Object.keys(activeFilters).length > 0;

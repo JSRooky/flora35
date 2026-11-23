@@ -109,6 +109,8 @@ let lastGbifInputCollection = EMPTY_FEATURE_COLLECTION;
 let gbifMapUpdatesPaused = false;
 /** Ключи точек, скрытых под булавкой выделения / share. */
 let hiddenPointFeatureKeys = [];
+/** Применялись ли скрытые ключи к данным карты (первый вызов обязан пересобрать источник). */
+let hiddenPointFeatureKeysApplied = false;
 
 function getGbifFeatureStableKey(feature) {
   if (feature?.id != null && feature.id !== "") {
@@ -322,10 +324,20 @@ function applyGbifUnclusteredFilter(map) {
  * (выделение в «Сведения о точке» или share-ссылка).
  */
 export function setGbifHiddenPointFeatureKeys(map, keys) {
-  hiddenPointFeatureKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
-  if (!map) {
+  const nextKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
+  // Пересобираем источник только если набор скрытых ключей реально изменился:
+  // иначе клик по точке на 100k+ запускал полный setData + перестройку Supercluster.
+  const unchanged =
+    hiddenPointFeatureKeysApplied &&
+    nextKeys.length === hiddenPointFeatureKeys.length &&
+    nextKeys.every((key, index) => key === hiddenPointFeatureKeys[index]);
+  hiddenPointFeatureKeys = nextKeys;
+
+  if (!map || unchanged) {
     return;
   }
+
+  hiddenPointFeatureKeysApplied = true;
 
   if (lastGbifInputCollection) {
     setGbifData(map, lastGbifInputCollection);

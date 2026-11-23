@@ -107,6 +107,8 @@ let pieLayerKeys = [];
  * }>} */
 let activeUnits = [];
 let hiddenPointFeatureKeys = [];
+/** Применялись ли скрытые ключи к данным карты (первый вызов обязан пересобрать источник). */
+let hiddenPointFeatureKeysApplied = false;
 let locationFeatureFilter = (features) => features;
 
 export function setTempLayersLocationFeatureFilter(filterFn) {
@@ -925,10 +927,20 @@ export function setTempDensePileExpandedHandler(handler) {
  * Скрывает обычные маркеры временных слоёв для точек, показанных булавкой.
  */
 export function setTempLayersHiddenPointFeatureKeys(map, keys) {
-  hiddenPointFeatureKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
-  if (!map) {
+  const nextKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
+  // setTempLayersData снимает и заново создаёт все слои и источники временных слоёв,
+  // поэтому вызываем его только когда набор скрытых ключей действительно изменился.
+  const unchanged =
+    hiddenPointFeatureKeysApplied &&
+    nextKeys.length === hiddenPointFeatureKeys.length &&
+    nextKeys.every((key, index) => key === hiddenPointFeatureKeys[index]);
+  hiddenPointFeatureKeys = nextKeys;
+
+  if (!map || unchanged) {
     return;
   }
+
+  hiddenPointFeatureKeysApplied = true;
   setTempLayersData(map);
 }
 

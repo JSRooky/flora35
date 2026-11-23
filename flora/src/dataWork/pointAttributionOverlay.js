@@ -74,6 +74,11 @@ export function enrichFeatureWithAttribution(feature, getPointKey) {
     return feature;
   }
 
+  // Нет ни одной сохранённой атрибуции — накладывать нечего, не считаем ключ точки.
+  if (attributionByPointKey.size === 0) {
+    return feature;
+  }
+
   const key = getPointKey(feature);
   const overlay = getAttributionOverlay(key);
   if (!overlay) {
@@ -97,6 +102,11 @@ export function enrichFeatureWithAttribution(feature, getPointKey) {
 export function enrichFeaturesWithAttribution(features, getPointKey) {
   if (!Array.isArray(features) || features.length === 0) {
     return features ?? [];
+  }
+
+  // Оверлеев нет — возвращаем исходный массив без O(n) прохода и аллокаций.
+  if (attributionByPointKey.size === 0) {
+    return features;
   }
 
   return features.map((feature) => enrichFeatureWithAttribution(feature, getPointKey));

@@ -16,16 +16,36 @@ export function featureSpeciesDisplayKey(feature) {
   });
 }
 
-export function featureMatchesRegionSpeciesAllowlist(feature, allowlist) {
+/**
+ * Компилирует allowlist в предикат: ключи видов считаются один раз на фильтр.
+ * Раньше ключ каждого вида пересчитывался заново для каждой точки
+ * (N точек × M видов строковых операций).
+ * @param {Array<{nameLatin?: string, nameRu?: string}>|unknown} allowlist
+ * @returns {((feature: object) => boolean) | null} `null`, если фильтр не активен
+ */
+export function createRegionSpeciesAllowlistPredicate(allowlist) {
   if (!Array.isArray(allowlist)) {
-    return true;
+    return null;
   }
   if (allowlist.length === 0) {
-    return false;
+    return () => false;
   }
-  const key = featureSpeciesDisplayKey(feature);
-  if (!key) {
-    return false;
+
+  const allowed = new Set();
+  for (let i = 0; i < allowlist.length; i += 1) {
+    const key = speciesDisplayKey(allowlist[i]);
+    if (key) {
+      allowed.add(key);
+    }
   }
-  return allowlist.some((item) => speciesDisplayKey(item) === key);
+
+  return (feature) => {
+    const key = featureSpeciesDisplayKey(feature);
+    return Boolean(key) && allowed.has(key);
+  };
+}
+
+export function featureMatchesRegionSpeciesAllowlist(feature, allowlist) {
+  const predicate = createRegionSpeciesAllowlistPredicate(allowlist);
+  return predicate ? predicate(feature) : true;
 }
