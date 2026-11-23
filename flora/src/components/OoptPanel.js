@@ -211,7 +211,6 @@ export default function OoptPanel({
   errorsById = {},
   firebaseConfigured = false,
   markersVisible = true,
-  onMarkersVisibleChange,
   collapsed: collapsedProp,
   onCollapsedChange,
   onMinimize,

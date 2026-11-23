@@ -6866,7 +6866,6 @@ export default function MapView() {
               errorsById={boundsLayerErrors}
               firebaseConfigured={isFirebaseConfigured()}
               markersVisible={markersVisible}
-              onMarkersVisibleChange={setMarkersVisibleState}
               collapsed={isPanelCollapsed(PANEL_IDS.OOPT)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.OOPT)}
               onMinimize={handleMinimizePanel(PANEL_IDS.OOPT)}
