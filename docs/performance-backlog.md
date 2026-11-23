@@ -37,6 +37,9 @@
 | Открытие панелей из меню проводит через `expandPanel` | `flora/src/App.js` (`openComparePanel`, `openAnalysisPanel`, `handleReportPanelToggle`, `handleOpenTempArchive`) | правило работает и для панелей, которые не открывались вручную |
 | Режим «для слабых ПК» | `flora/src/config/performanceMode.js`, переключатель в «Группах точек» | отключает `backdrop-filter`, анимации/переходы, тени панелей и подсказки при наведении; выбор сохраняется в `localStorage` |
 | Выравнивание «подпись — значение» и перенос длинных названий | `flora/src/styles/FeaturePopup.css`, `panelMetrics.css` | значения в «О точке» стоят на одной вертикали, латинские названия переносятся вместо распирания панели |
+| Общий примитив разметки панелей | `flora/src/components/panel/PanelPrimitives.js`, `flora/src/styles/panelUi.css` | `PanelSection` / `PanelSwitch` / `PanelField` / `PanelActions` / `PanelEmpty` вместо копирования разметки в каждом файле; покрыто RTL-тестами |
+| Удалён дубль «Скрыть точки» в панели ООПТ | `flora/src/components/OoptPanel.js` | один канонический переключатель — в «Группах точек» |
+| Удалены неиспользуемые панели | `flora/src/components/GbifPanel.js`, `GbifProcessingPanel.js` | минус ~730 строк мёртвого кода в бандле |
 
 Режим слабых ПК реализован так, чтобы не менять данные: JS только переключает
 атрибут `data-flora-perf="low"` на `<html>` и перестаёт включать hover-подсказки.
