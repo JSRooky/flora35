@@ -1,70 +1,380 @@
-# Getting Started with Create React App
+# Карта Красной книги Вологодской области (`flora35`)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Веб-ГИС для работы с находками редких и исчезающих видов растений, грибов и животных
+Вологодской области: карта с кластеризацией, фильтры, геометрические инструменты
+(радиус, буфер, ареалы), загрузка внешних данных (GBIF, iNaturalist), сравнение выборок
+и статистический анализ.
 
-## Available Scripts
+Публичная версия: **https://jsrooky.github.io/flora35**
+(собирается из ветки `main` через GitHub Pages, базовый путь — `/flora35`).
 
-In the project directory, you can run:
+Лицензия: **GPL v3** — производные проекты должны распространяться на тех же условиях
+(см. раздел «Об авторских правах» в приложении: `src/docs/aboutProject.md`).
 
-### `npm start`
+---
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Содержание
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+1. [Стек](#стек)
+2. [Быстрый старт](#быстрый-старт)
+3. [Переменные окружения](#переменные-окружения)
+4. [Структура репозитория](#структура-репозитория)
+5. [Архитектура приложения](#архитектура-приложения)
+6. [Поток данных](#поток-данных)
+7. [Методы анализа и формулы](#методы-анализа-и-формулы)
+8. [Скрипты данных](#скрипты-данных)
+9. [Тесты и сборка](#тесты-и-сборка)
+10. [Деплой](#деплой)
+11. [Рефакторинг `App.js`](#рефакторинг-appjs)
 
-### `npm test`
+---
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Стек
 
-### `npm run build`
+| Слой | Технология |
+|---|---|
+| UI | React 19, Create React App (`react-scripts` 5.0.1), нативный CSS |
+| Карта | Mapbox GL JS 3 |
+| Геометрия | Turf.js 7 (`@turf/turf`) |
+| Бэкенд | Firebase 12 (Firestore; правила — `flora/firebase/firestore.rules`) |
+| Внешние данные | GBIF API, iNaturalist API, Overpass API (OSM), Wikidata |
+| Тесты | Jest + React Testing Library (`react-scripts test`) |
+| Сборка/деплой | GitHub Actions → GitHub Pages, Node.js 20 |
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+> `react-scripts` 5 официально не заявляет поддержку React 19. Сборка работает,
+> но при обновлении зависимостей это стоит проверить первым; переход на Vite —
+> отдельная задача (см. [«Рефакторинг App.js»](#рефакторинг-appjs)).
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+---
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Быстрый старт
 
-### `npm run eject`
+Требуется **Node.js 20+** и npm.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+cd flora
+npm install
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+# минимально нужен токен Mapbox; остальное — по необходимости
+cp .env.example .env.local
+# впишите REACT_APP_MAPBOX_TOKEN
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+npm start          # http://localhost:3000
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+`npm start` запускает `scripts/start-dev.js`: он копирует справку из `src/docs` в
+`public/` и следит за её изменениями, после чего стартует `react-scripts start`.
 
-## Learn More
+`src/setupProxy.js` поднимает same-origin прокси к трём зеркалам Overpass
+(`/overpass-ru`, `/overpass-de`, `/overpass-lz4`), чтобы браузер не упирался в CORS.
+Прокси работает только в dev-режиме (`npm start`); на GitHub Pages границы OSM
+подгружаются иначе, из уже подготовленных GeoJSON.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Полезные команды
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```bash
+npm test                       # jest в watch-режиме
+CI=true npm test -- --watchAll=false --runInBand   # однократный прогон
+npm run build                  # production-сборка в flora/build (sourcemap отключён)
+```
 
-### Code Splitting
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Переменные окружения
 
-### Analyzing the Bundle Size
+Все переменные имеют префикс `REACT_APP_` (иначе CRA не пробросит их в бандл).
+Значения по умолчанию и комментарии — в `flora/.env.example`. Файлы `.env`,
+`.env.local` в репозиторий не попадают.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+| Переменная | Обязательна | Назначение |
+|---|---|---|
+| `REACT_APP_MAPBOX_TOKEN` | да | Токен Mapbox GL JS. Без него карта не инициализируется |
+| `REACT_APP_FIREBASE_API_KEY` | нет | Firebase Web App. Без Firebase модуль «Ввод данных» не работает |
+| `REACT_APP_FIREBASE_AUTH_DOMAIN` | нет | Firebase Web App |
+| `REACT_APP_FIREBASE_PROJECT_ID` | нет | Firebase Web App (проект `redbook35-fa3f7`) |
+| `REACT_APP_FIREBASE_STORAGE_BUCKET` | нет | Firebase Web App |
+| `REACT_APP_FIREBASE_MESSAGING_SENDER_ID` | нет | Firebase Web App |
+| `REACT_APP_FIREBASE_APP_ID` | нет | Firebase Web App |
+| `REACT_APP_USE_FIRESTORE_LOCATIONS` | нет | `true` — грузить точки карты из Firestore (`findings`, `user_submissions`) вместо локального JSON |
+| `REACT_APP_YANDEX_MAPS_API_KEY` | нет | Экспериментальная подложка Яндекс.Карт (Tiles API) |
+| `REACT_APP_FEEDBACK_TELEGRAM_URL` | нет | Ссылка в виджете обратной связи |
+| `REACT_APP_FEEDBACK_MAX_URL` | нет | Ссылка в виджете обратной связи |
 
-### Making a Progressive Web App
+Для GitHub Pages те же значения задаются как **repository secrets**
+(`Settings → Secrets and variables → Actions`). Если Firebase-секреты не заданы,
+сборка не падает: workflow выводит предупреждение, а модуль ввода данных
+просто не работает.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Проверка конфигурации Firebase — `isFirebaseConfigured()` в
+`src/firebase/config.js`; при отсутствии ключей сетевые вызовы не выполняются.
 
-### Advanced Configuration
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+## Структура репозитория
 
-### Deployment
+```
+flora35/
+├── flora/                 # приложение (React SPA)
+│   ├── src/               # исходники
+│   ├── scripts/           # node-скрипты: импорт и аудит данных, dev-стартер
+│   ├── firebase/          # firestore.rules
+│   └── public/
+├── oopt/                  # границы ООПТ Вологодской области (GeoJSON + ZIP)
+├── regions/               # контуры субъектов РФ
+├── icons/                 # исходники иконок и логотипов (AI/SVG/PNG)
+├── tools/
+│   └── flora-math-mcp/    # MCP-сервер: эталоны математики на SciPy/NumPy
+├── .cursor/               # правила и MCP-конфиг для AI-агента
+└── .github/workflows/     # deploy.yml — сборка и публикация на GitHub Pages
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+### Внутри `flora/src`
 
-### `npm run build` fails to minify
+| Каталог | Что содержит |
+|---|---|
+| `app/` | домены, вынесенные из `App.js` (см. ниже) |
+| `components/` | React-компоненты панелей и слои Mapbox (самый крупный каталог) |
+| `dataWork/` | аналитика: `analysis/` (EOO/AOO, накопление, KDE, тренд), `compare/` (сравнение слоёв) |
+| `gbif/`, `inaturalist/` | клиенты, колоночные хранилища, фильтры, персистентность |
+| `externalSources/` | менеджер загрузки внешних источников по регионам |
+| `tempLayers/` | временные слои: store, память, архив, персистентность |
+| `map/` | компактное отображение, инвентарь видов региона, сводки загрузки |
+| `mapConfig/` | экспорт/импорт пользовательских настроек карты (JSON) |
+| `redbook/` | краснокнижные списки и сопоставление находок |
+| `locations/` | загрузка точек, поиск по видам, allowlist регионов |
+| `firebase/` | доступ к Firestore (находки, заявки, атрибуции, объединения, границы) |
+| `osm/` | границы из OSM/Overpass |
+| `bounds/` | GeoJSON-границы (субъекты РФ, ООПТ) |
+| `geo/`, `names/` | гео-утилиты и разрешение русских названий |
+| `docs/` | справка по модулям (`moduleHelp-full.md`), FAQ, `aboutProject.md` |
+| `styles/` | CSS (глобальные, без CSS-модулей) |
+| `config/` | базовые подложки, экспериментальные функции, feature flags |
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+---
+
+## Архитектура приложения
+
+Приложение — один SPA без роутера: состояние карты живёт в корневом компоненте
+`MapView` (`src/App.js`), панели открываются/сворачиваются как оверлеи, а нижняя
+«панель задач» хранит свёрнутые панели.
+
+### Слои
+
+1. **Карта (`components/initMap.js`)** — создаёт Mapbox-инстанс и источники/слои.
+2. **Домены (`src/app/`)** — состояние и обработчики по областям, подключаются
+   как хуки из `App.js`.
+3. **`components/add*Layer.js`** — императивные модули, которые создают и
+   обновляют слои Mapbox (`addLocationsLayer`, `addGbifLayer`, `addInatLayer`,
+   `addTempLayersLayer`, `addBoundsLayers`, `addRegionBoundsLayer`,
+   `addHeatmapLayer`, `addSpeciesPolygonLayer`, `addBufferLayer`,
+   `addArealLayer`, `addAreaSelectionLayer`, `addRedbookLayer`, `addMergedLayer`).
+   Они не React-компоненты, а функции над `map` и FeatureCollection.
+4. **`components/*Panel.js` / `*Popup.js`** — презентационные React-компоненты,
+   получают данные и колбэки пропсами.
+5. **Домен данных** — `dataWork/` (чистые функции, покрыты тестами),
+   `gbif/`, `inaturalist/`, `externalSources/`, `tempLayers/`.
+
+### Домены `src/app/`
+
+| Модуль | Ответственность | Строк |
+|---|---|---|
+| `panelConstants.js` | `PANEL_IDS`, значения по умолчанию, `isPanelExpandedInState` | 87 |
+| `panelDomain.js` | состояние панелей: свёрнуто/свёрнуто в таскбар/открыто, разворот «Сведений о точке», экспериментальные предупреждения | 468 |
+| `taskbarDomain.js` | нижняя панель задач: сбор видимых панелей, закрепление, клик по ярлыку | 281 |
+| `externalSourcesDomain.js` | статус загрузки внешних источников, открытие панели, запуск загрузки по регионам | 148 |
+| `geometryToolsDomain.js` | эффекты инструментов: радиус, буфер, полигон, пересечение ареалов, выделение области | 300 |
+| `layerSyncDomain.js` | эффекты синхронизации слоёв, границ регионов, временных слоёв, базовых подложек и сбросы инструментов | 437 |
+
+Это **механические** выносы: код перенесён без изменения логики, зависимости
+передаются объектом и перечислены в сигнатуре хука. Файлы — переходный этап,
+а не финальная архитектура (подробности — в конце README).
+
+### Визуальное состояние: карта и панели
+
+- `PANEL_IDS` — единый справочник идентификаторов панелей; `panelTaskbarRegistry.js`
+  задаёт заголовки и иконки для таскбара.
+- `collapsed`/`minimized` — два независимых флага; `minimized` определяет,
+  показана ли панель в нижней панели задач.
+- В `localStorage` хранятся: настройки тепловой карты, настройки границ регионов,
+  подтверждения экспериментальных функций, пользовательские настройки карты.
+- Пользовательские настройки карты экспортируются в JSON
+  (`flora35-user-settings.json`, версия схемы 2) — `mapConfig/mapConfigDocument.js`.
+
+---
+
+## Поток данных
+
+```
+источник → загрузка → фильтрация → слой(и) карты → инструменты/анализ → отчёт
+```
+
+1. **Источники** (`DATA_SOURCE_MODES` в `locations/loadPoints.js`):
+   `none`, `points` (локальный JSON), `userpoints`, `external` (GBIF + iNaturalist),
+   `temp` (временные слои), `merged` (объединённые точки), `redbook`, `all`.
+2. **Точки** приводятся к единому виду (FeatureCollection Mapbox) —
+   `gbif/mapOccurrenceToFeature.js`, `inaturalist/mapObservationToFeature.js`.
+3. **Фильтры** применяются каскадом: базовые (`baseLocationFilters`), свойства
+   точки (`propertyFilters`), охранный статус, царство, год, поиск по видам,
+   «внутри области/буфера/полигона», скрытые ключи.
+4. **Слои** обновляются через `applyLocationsFilter` / `applyGbifLocationsFilter` /
+   `applyInatLocationsFilter`; при больших выборках включается компактное
+   растровое отображение (`map/compactPointDisplay.js`).
+5. **Временные слои** (`tempLayers/tempLayerStore.js`) — снимки выборки,
+   сохраняемые пользователем; хранятся в памяти с лимитом и персистятся
+   (`tempLayerPersistence.js`), плюс архив (`tempLayerArchive.js`).
+6. **Анализ** (`dataWork/analysis/runAnalysis.js`) считает метрики по текущей
+   выборке и возвращает `{ method, meta, metrics, series, methodology }` —
+   именно эта структура попадает в отчёт и на графики.
+
+Коллекции Firestore: `findings` (проверенные находки), `user_submissions`
+(заявки пользователей), `merged_points`, `point_attributions`; границы —
+отдельные коллекции на слой (`firebase/boundsCollectionFirestore.js`).
+
+---
+
+## Методы анализа и формулы
+
+Метрики по выборке: `dataWork/analysis/`, сравнение слоёв: `dataWork/compare/`.
+У каждой метрики есть независимый эталон в `tools/flora-math-mcp` (SciPy/NumPy) —
+см. `.cursor/rules/flora-math-mcp.mdc`.
+
+### EOO и AOO (IUCN)
+
+- **EOO** (Extent of Occurrence) — площадь выпуклой оболочки уникальных
+  координат (геодезический расчёт Turf). По IUCN требует ≥ 3 локалитетов;
+  при меньшем числе возвращается причина отказа, а не число.
+- **AOO** (Area of Occupancy) — число занятых ячеек сетки × площадь ячейки:
+  `2 × 2 км → 4 км²`. Сетка примерно равновеликая: градусы переводятся в км
+  по широте точки (`KM_PER_DEG_LAT = 110.574`, `KM_PER_DEG_LON_EQUATOR = 111.32`).
+  Дубли координат схлопываются с точностью ~1 м (5 знаков).
+
+### Кривая накопления видов
+
+- **Разрежение (rarefaction, Hurlbert)**: ожидаемое число видов `E[S(n)]` при
+  случайной подвыборке объёма `n` из наблюдаемых обилий.
+- **Chao1**:
+  - при `f2 > 0`: `S_obs + f1² / (2·f2)`;
+  - при `f2 = 0` (bias-corrected): `S_obs + f1·(f1 − 1)/2`.
+- **Дисперсия Chao1** — по Chao (1987) / Colwell; при `f2 > 0` с поправкой
+  `k = (n − 1)/n`, иначе отдельная формула для bias-corrected варианта.
+- **95 % ДИ** — логнормальный (`z = 1.96`), как в EstimateS.
+- **Покрытие выборки (Good–Turing)**: `1 − f1 / n`, ограничено `[0, 1]`.
+
+### Тренд по годам
+
+- **Mann–Kendall**: `S = Σ_{i<j} sign(x_j − x_i)`,
+  `Var(S) = [n(n−1)(2n+5) − Σ_t t(t−1)(2t+5)] / 18` (поправка на связи),
+  `Z` с поправкой на непрерывность, `p` двустороннее по нормальному приближению.
+- **τ** в проекте — вариант **tau-a**: `S / C(n, 2)` (при связях отличается от
+  tau-b из SciPy — это ожидаемо).
+- **Theil–Sen** — медиана попарных наклонов, как устойчивая оценка тренда.
+
+### KDE (плотность)
+
+- Изотропная ширина полосы по Scott/Silverman для `d = 2`: `h = n^(−1/6) · σ`,
+  нижняя граница `0.25 км`; масштаб `h` можно менять (`KDE_BANDWIDTH_SCALES = [0.5, 1, 2]`).
+- Ядро гауссово: `K(dx, dy) = exp(−½·q) / (2π·h²)`,
+  `q = (dx² + dy²)/h²`; расчёт в локальных километрах, бининг по сетке.
+
+### Сравнение слоёв
+
+- **Жаккар**: `|A ∩ B| / |A ∪ B|`.
+- **Сёренсен**: `2·|A ∩ B| / (|A| + |B|)`.
+- Сравнение идёт по нескольким уровням: виды, роды, семейства, наборы точек
+  (`compare/similarityByLayers.js`).
+- Дополнительно: разнообразие, распределение по координатам, полнота,
+  выравненность, фенология, годы, охрана, индикаторы, качество данных
+  (`compare/compareExtraStats.js`).
+
+> В интерфейсе «Сравнение» и «Анализ» помечены как экспериментальные: при первом
+> открытии показывается предупреждение (`config/experimentalFeatures.js`), факт
+> подтверждения хранится в `localStorage`.
+
+---
+
+## Скрипты данных
+
+Запускаются из `flora/` (`npm run <скрипт>`); большинство поддерживает `--dry-run`.
+
+| Скрипт | Назначение |
+|---|---|
+| `import:firestore-locations` | импорт точек в Firestore |
+| `import:firestore-submissions` | импорт пользовательских заявок |
+| `import:firestore-bounds` | импорт границ (ООПТ, регионы) |
+| `audit:locations` | аудит координат; `:fix-local` / `:fix-firestore` / `:fix-all` |
+| `generate:oopt-findings` | генерация находок по ООПТ |
+| `extract:osm-admin` | извлечение административных границ из OSM |
+| `deploy:firestore-rules` | публикация `firestore.rules` |
+
+Остальные (`migrate-points-to-species`, `redistribute-points-coordinates`,
+`buildRussiaRegionsGadm`, `applyInatPlaceIds`, `resolveInatPlaceIds`) —
+разовые миграции и подготовка справочников.
+
+---
+
+## Тесты и сборка
+
+```bash
+cd flora
+CI=true npm test -- --watchAll=false --runInBand   # 26 наборов / 139 тестов
+npm run build                                      # flora/build
+```
+
+Тестами покрыт в первую очередь слой данных: `dataWork/analysis`,
+`dataWork/compare`, колоночные хранилища GBIF/iNat, `map/`, `tempLayers/`,
+`mapConfig/`, `locations/`. React-компоненты и `App.js` тестами не покрыты —
+это главный риск при рефакторинге интерфейса.
+
+`npm run build` выполняет ESLint (`react-app`): ошибки валят сборку, поэтому
+`no-undef` — практический контроль целостности при выносе кода.
+
+---
+
+## Деплой
+
+`.github/workflows/deploy.yml`:
+
+1. push в `main` (или ручной `workflow_dispatch`);
+2. проверка, что `REACT_APP_MAPBOX_TOKEN` задан (иначе сборка падает);
+3. `npm install` и `npm run build` в `flora/`;
+4. публикация `flora/build` на GitHub Pages.
+
+Правила Firestore публикуются отдельно: `npm run deploy:firestore-rules`
+(проект по умолчанию — `redbook35-fa3f7`, см. `flora/.firebaserc`).
+
+---
+
+## Рефакторинг `App.js`
+
+`src/App.js` исторически был одним компонентом `MapView` (~8400 строк:
+132 `useState`, 83 `useEffect`, 177 `useCallback`). Часть доменов уже вынесена
+в `src/app/` (см. таблицу выше): **8403 → 7209 строк** без изменения поведения.
+Заодно из `App.js` убраны импорты, которые использовал только вынесенный код.
+
+Как это делалось и как продолжать:
+
+- Код переносится **дословно**; список входов/выходов вычисляется по коду,
+  а не пишется руками. Хук вызывается ровно там, где раньше был блок, поэтому
+  порядок хуков сохраняется.
+- Все значения, которые вынесенный код использует, объявлены **выше** блока и
+  передаются параметром. Если значение объявлено ниже, вынос запрещён: замыкание
+  получило бы `undefined` (инструмент в такой ситуации отказывается работать).
+- Проверка после каждого шага: `npm run build` (ESLint `no-undef`) + `npm test`.
+
+**Следующие шаги** (в порядке пользы):
+
+1. Разбить `layerSyncDomain.js` (437 строк, 54 зависимости) на смысловые части:
+   границы регионов, временные слои, базовая подложка, загрузка данных.
+2. Вынести `App.js`-блок конфигурации карты (сохранение/загрузка настроек) —
+   сейчас он остаётся в `App.js`, потому что требует ~78 значений; разумнее
+   сначала собрать их в объект «снимок состояния».
+3. Вынести JSX (последние ~830 строк) в отдельный компонент вида, передавая
+   готовую view-модель. Требует ~320 пропсов, поэтому делать это стоит последним.
+4. Заменить Create React App на Vite (React 19 + `react-scripts` 5 — нештатная пара).
+5. Добавить smoke-тесты React Testing Library на ключевые панели.
+6. Убрать глобальные CSS в пользу CSS-модулей хотя бы для новых компонентов.
+
+> Ограничение текущего этапа: `App.js` по-прежнему оркестрирует почти всё
+> состояние (132 `useState`). Вынос доменов уменьшил размер файла и изолировал
+> связность, но не заменил проектирование состояния — это следующая, более
+> крупная задача.
