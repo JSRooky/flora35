@@ -11,7 +11,6 @@ import { DATA_SOURCE_MODES } from "../locations/loadPoints";
 import { listLoadedRegionCatalogIsos } from "../map/regionLoadSummary";
 import { setRegionBoundsEnabled, applyRegionBoundsPaintSettings, applyRegionBoundsIsoFilter, setRegionBoundsSelectedIsos, setRegionBoundsLoadedIsos, updateRegionSelectionBuffer, loadRegionBoundsGeoJSON, buildRegionCatalog, setRegionBoundsSelectHandler, showRegionActionPopup, hideRegionActionPopup, getRegionEntryByIso } from "../components/addRegionBoundsLayer";
 import { loadRegionBoundsSettingsFromStorage, createSubtleRegionColorMap } from "../components/regionBoundsSettings";
-import { MODULE_IDS } from "../components/ModuleMenu";
 import { BASEMAP_MODES } from "../config/basemapOptions";
 import { setOsmBasemapEnabled } from "../components/addOsmBasemapLayer";
 import { setYandexBasemapEnabled } from "../components/addYandexBasemapLayer";
@@ -48,7 +47,6 @@ export function useLayerSyncDomain({
   regionFeatureColors,
   selectedRegionIsos,
   selectedRegionIsosRef,
-  setActiveModule,
   setActivePolygonId,
   setArealAllMarkers,
   setArealEnabled,
@@ -69,7 +67,6 @@ export function useLayerSyncDomain({
   setRegionAddMode,
   setRegionBoundsDisplaySourceState,
   setRegionBoundsSettings,
-  setRegionBoundsVisible,
   setRegionCatalog,
   setRegionFeatureColors,
   setRegionOverlaysHydrated,
@@ -312,9 +309,6 @@ export function useLayerSyncDomain({
       if (!entry?.iso || !map.current) {
         return;
       }
-
-      setActiveModule(MODULE_IDS.REGIONS);
-      setRegionBoundsVisible(true);
 
       const alreadySelected = selectedRegionIsosRef.current.includes(entry.iso);
       const nextSelection = alreadySelected
