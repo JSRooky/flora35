@@ -1,0 +1,84 @@
+.settings-panel {
+  box-sizing: border-box;
+  width: var(--flora-panel-width, 360px);
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 100px);
+  overflow: auto;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.settings-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-panel-title {
+  flex: 1;
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--map-tool-accent);
+  color: #333;
+  font-size: 15px;
+}
+
+.settings-panel--collapsed .settings-panel-title {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.settings-panel-toggle {
+  border: 0;
+  padding: 4px 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.settings-panel-summary,
+.settings-panel-hint {
+  margin: 8px 0 0;
+  color: #555;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.settings-panel-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.settings-panel-content hr {
+  width: 100%;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid #ddd;
+}
+
+.map-display-panel--embedded {
+  width: auto;
+  max-width: none;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  animation: none;
+}
+
+@media (max-width: 640px) {
+  .settings-panel {
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 108px);
+  }
+}

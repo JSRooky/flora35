@@ -38,6 +38,7 @@ export function useTaskbarDomain({
   reportPanelOpen,
   restorePanel,
   selectedBoundsFeature,
+  settingsPanelOpen,
   tempArchivePanelOpen,
 }) {
   /**
@@ -157,6 +158,10 @@ export function useTaskbarDomain({
       ids.push(PANEL_IDS.TEMP_ARCHIVE);
     }
 
+    if (settingsPanelOpen) {
+      ids.push(PANEL_IDS.SETTINGS);
+    }
+
     if (comparePanelOpen) {
       ids.push(PANEL_IDS.COMPARE);
     }
@@ -207,6 +212,7 @@ export function useTaskbarDomain({
     tempArchivePanelOpen,
     comparePanelOpen,
     reportPanelOpen,
+    settingsPanelOpen,
     analysisPanelOpen,
     compareDiversityOpen,
     compareSimilarityOpen,

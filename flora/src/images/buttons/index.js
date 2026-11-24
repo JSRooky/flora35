@@ -47,3 +47,4 @@ export { ReactComponent as GlobeIcon } from "./globe.svg";
 export { ReactComponent as PointIcon } from "./point.svg";
 export { ReactComponent as PolygonStarIcon } from "./polygon-star.svg";
 export { ReactComponent as PolygonHullIcon } from "./polygon-hull.svg";
+export { ReactComponent as SettingsIcon } from "./settings.svg";

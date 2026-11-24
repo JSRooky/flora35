@@ -319,6 +319,7 @@ import {
   saveRussianNameChoice
 } from "./names/russianNameResolver";
 import DataSourcesPanel from "./components/DataSourcesPanel";
+import SettingsPanel from "./components/SettingsPanel";
 import { matchMapRegionsToExternal } from "./externalSources/matchMapRegionToExternal";
 import ExternalSourcesLoadStatusBar from "./components/ExternalSourcesLoadStatusBar";
 import ExternalProcessingPanel from "./components/ExternalProcessingPanel";
@@ -702,6 +703,7 @@ export default function MapView() {
     kdeOverlay,
     minimizePanel,
     openPanel,
+    openPanelIds,
     panelCollapsed,
     panelMinimized,
     panelTaskbarOrder,
@@ -711,6 +713,7 @@ export default function MapView() {
     previousYearFilterEnabledRef,
     reportPanelOpen,
     restorePanel,
+    settingsPanelOpen,
     setAnalysisPanelOpen,
     setCompareDistributionOpen,
     setCompareDiversityKeys,
@@ -725,6 +728,7 @@ export default function MapView() {
     setPanelCollapsed,
     setPanelMinimized,
     setReportPanelOpen,
+    setSettingsPanelOpen,
     setSubmissionCoordinates,
     setSubmissionLocationPicking,
     setTempArchivePanelOpen,
@@ -1471,6 +1475,25 @@ export default function MapView() {
     analysisPanelOpen,
     isPanelMinimized,
     openAnalysisPanel,
+    unpinPanelsFromTaskbar
+  ]);
+
+  const handleSettingsPanelToggle = useCallback(() => {
+    if (settingsPanelOpen && !isPanelMinimized(PANEL_IDS.SETTINGS)) {
+      setSettingsPanelOpen(false);
+      unpinPanelsFromTaskbar([PANEL_IDS.SETTINGS]);
+      return;
+    }
+
+    setSettingsPanelOpen(true);
+    expandPanel(PANEL_IDS.SETTINGS);
+    pinPanelsToTaskbar([PANEL_IDS.SETTINGS]);
+  }, [
+    expandPanel,
+    isPanelMinimized,
+    pinPanelsToTaskbar,
+    settingsPanelOpen,
+    setSettingsPanelOpen,
     unpinPanelsFromTaskbar
   ]);
 
@@ -2355,6 +2378,7 @@ export default function MapView() {
     regionSpeciesPanelOpen,
     reportPanelOpen,
     restorePanel,
+    settingsPanelOpen,
     selectedBoundsFeature,
     tempArchivePanelOpen,
   });
@@ -2368,6 +2392,7 @@ export default function MapView() {
     dataSourceMode,
     dataSourcesPanelOpen,
     handleDataSourceModeChange,
+    isPanelMinimized,
     minimizePanel,
     overlayRegionBufferKm,
     overlayRegionEdit,
@@ -5612,6 +5637,11 @@ export default function MapView() {
           unpinPanelsFromTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
           break;
         }
+        case PANEL_IDS.SETTINGS: {
+          setSettingsPanelOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.SETTINGS]);
+          break;
+        }
         case PANEL_IDS.COMPARE: {
           setComparePanelOpen(false);
           setCompareDiversityOpen(false);
@@ -5706,6 +5736,7 @@ export default function MapView() {
       handleDenseProcessingClose,
       handleCloseRegionSpeciesPanel,
       minimizePanel,
+      setSettingsPanelOpen,
       unpinPanelsFromTaskbar
     ]
   );
@@ -6379,6 +6410,49 @@ export default function MapView() {
 
   const arealDisplayedContainedPoints = arealContainedPoints ?? activeToolFilterPointsSummary;
 
+  const mapDisplaySettingsProps = {
+    markersVisible,
+    onMarkersVisibleChange: setMarkersVisibleState,
+    lowPerformanceMode,
+    onPerformanceModeChange: handlePerformanceModeChange,
+    heatmapEnabled,
+    onHeatmapEnabledChange: setHeatmapEnabledState,
+    heatmapTempLayersOnly: tempOnly,
+    onHeatmapSettingsOpen: () => setHeatmapSettingsOpen(true),
+    clusteringEnabled,
+    onClusteringEnabledChange: handleClusteringEnabledChange,
+    clusterByRegnum,
+    onClusterByRegnumChange: handleClusterByRegnumChange,
+    clusterByTempLayers,
+    onClusterByTempLayersChange: handleClusterByTempLayersChange,
+    clusterByTempSublayers,
+    onClusterByTempSublayersChange: handleClusterByTempSublayersChange,
+    hasTempLayers: getTempLayers().length > 0,
+    clusterPieCharts,
+    onClusterPieChartsChange: handleClusterPieChartsChange,
+    denseClustersHighlight,
+    onDenseClustersHighlightChange: handleDenseClustersHighlightChange,
+    compactPointDisplay,
+    compactGridForced: displayedLayerPointCount > compactGridSettings.pointLimit,
+    displayedLayerPointCount,
+    compactGridPointLimit: compactGridSettings.pointLimit,
+    onCompactPointDisplayChange: handleCompactPointDisplayChange,
+    onCompactGridSettingsOpen: () => setCompactGridSettingsOpen(true),
+    onDenseProcessingOpen: handleDenseProcessingOpen,
+    mergedPointsVisible,
+    onMergedPointsVisibleChange: (visible) => {
+      if (visible) {
+        handleDataSourceModeChange(DATA_SOURCE_MODES.MERGED);
+        return;
+      }
+      if (dataSourceMode === DATA_SOURCE_MODES.MERGED) {
+        handleDataSourceModeChange(DATA_SOURCE_MODES.NONE);
+        return;
+      }
+      setMergedPointsVisible(false);
+    }
+  };
+
   const showOoptFeaturePanel =
     Boolean(selectedBoundsFeature) &&
     (activeModule === MODULE_IDS.OOPT || ooptPointsFilterActive);
@@ -6432,12 +6506,14 @@ export default function MapView() {
 
   const showModulePanelStack =
     (activeModule !== null && activeModule !== MODULE_IDS.TIMELINE) ||
+    openPanelIds.length > 0 ||
     (showOoptFeaturePanel && activeModule !== MODULE_IDS.TIMELINE) ||
     dataSourcesPanelOpen ||
     tempArchivePanelOpen ||
     comparePanelOpen ||
     reportPanelOpen ||
     analysisPanelOpen ||
+    settingsPanelOpen ||
     dataSourceMode === DATA_SOURCE_MODES.EXTERNAL ||
     denseProcessingActive;
 
@@ -6463,6 +6539,8 @@ export default function MapView() {
         onReportPanelToggle={handleReportPanelToggle}
         analysisPanelOpen={analysisPanelOpen}
         onAnalysisPanelToggle={handleAnalysisPanelToggle}
+        settingsPanelOpen={settingsPanelOpen}
+        onSettingsPanelToggle={handleSettingsPanelToggle}
         onSaveUserSettings={handleSaveMapConfig}
         onLoadUserSettings={handleLoadMapConfig}
       />
@@ -6539,6 +6617,17 @@ export default function MapView() {
               onMinimize={handleMinimizePanel(PANEL_IDS.ANALYSIS)}
               onClose={handleClosePanel(PANEL_IDS.ANALYSIS)}
               onKdeOverlayChange={handleKdeOverlayChange}
+            />
+          )}
+          {settingsPanelOpen && !isPanelMinimized(PANEL_IDS.SETTINGS) && (
+            <SettingsPanel
+              mapDisplayProps={mapDisplaySettingsProps}
+              hoverTooltipsDisabled={hoverTooltipsDisabled}
+              onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
+              collapsed={isPanelCollapsed(PANEL_IDS.SETTINGS)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.SETTINGS)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.SETTINGS)}
+              onClose={handleClosePanel(PANEL_IDS.SETTINGS)}
             />
           )}
           {denseProcessingExclusive ? (
@@ -6665,48 +6754,7 @@ export default function MapView() {
           )}
           {(activeModule === MODULE_IDS.MAP || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.MAP])) && !isPanelMinimized(PANEL_IDS.MAP) && (
             <MapDisplayPanel
-              markersVisible={markersVisible}
-              onMarkersVisibleChange={setMarkersVisibleState}
-              lowPerformanceMode={lowPerformanceMode}
-              onPerformanceModeChange={handlePerformanceModeChange}
-              heatmapEnabled={heatmapEnabled}
-              onHeatmapEnabledChange={setHeatmapEnabledState}
-              heatmapTempLayersOnly={tempOnly}
-              onHeatmapSettingsOpen={() => setHeatmapSettingsOpen(true)}
-              clusteringEnabled={clusteringEnabled}
-              onClusteringEnabledChange={handleClusteringEnabledChange}
-              clusterByRegnum={clusterByRegnum}
-              onClusterByRegnumChange={handleClusterByRegnumChange}
-              clusterByTempLayers={clusterByTempLayers}
-              onClusterByTempLayersChange={handleClusterByTempLayersChange}
-              clusterByTempSublayers={clusterByTempSublayers}
-              onClusterByTempSublayersChange={handleClusterByTempSublayersChange}
-              hasTempLayers={getTempLayers().length > 0}
-              clusterPieCharts={clusterPieCharts}
-              onClusterPieChartsChange={handleClusterPieChartsChange}
-              denseClustersHighlight={denseClustersHighlight}
-              onDenseClustersHighlightChange={handleDenseClustersHighlightChange}
-              compactPointDisplay={compactPointDisplay}
-              compactGridForced={
-                displayedLayerPointCount > compactGridSettings.pointLimit
-              }
-              displayedLayerPointCount={displayedLayerPointCount}
-              compactGridPointLimit={compactGridSettings.pointLimit}
-              onCompactPointDisplayChange={handleCompactPointDisplayChange}
-              onCompactGridSettingsOpen={() => setCompactGridSettingsOpen(true)}
-              onDenseProcessingOpen={handleDenseProcessingOpen}
-              mergedPointsVisible={mergedPointsVisible}
-              onMergedPointsVisibleChange={(visible) => {
-                if (visible) {
-                  handleDataSourceModeChange(DATA_SOURCE_MODES.MERGED);
-                  return;
-                }
-                if (dataSourceMode === DATA_SOURCE_MODES.MERGED) {
-                  handleDataSourceModeChange(DATA_SOURCE_MODES.NONE);
-                  return;
-                }
-                setMergedPointsVisible(false);
-              }}
+              {...mapDisplaySettingsProps}
               collapsed={isPanelCollapsed(PANEL_IDS.MAP)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.MAP)}
               onMinimize={handleMinimizePanel(PANEL_IDS.MAP)}
@@ -6991,7 +7039,7 @@ export default function MapView() {
               />
             </Suspense>
           )}
-          {dataSourcesPanelOpen && (
+          {dataSourcesPanelOpen && !isPanelMinimized(PANEL_IDS.DATA_SOURCES) && (
               <DataSourcesPanel
                 map={map.current}
                 collapsed={isPanelCollapsed(PANEL_IDS.DATA_SOURCES)}

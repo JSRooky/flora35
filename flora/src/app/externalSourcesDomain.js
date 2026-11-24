@@ -13,6 +13,7 @@ export function useExternalSourcesDomain({
   dataSourceMode,
   dataSourcesPanelOpen,
   handleDataSourceModeChange,
+  isPanelMinimized,
   minimizePanel,
   overlayRegionBufferKm,
   overlayRegionEdit,
@@ -112,6 +113,10 @@ export function useExternalSourcesDomain({
 
   const handleDataSourcesPanelToggle = useCallback(() => {
     if (dataSourcesPanelOpen) {
+      if (isPanelMinimized(PANEL_IDS.DATA_SOURCES)) {
+        restorePanel(PANEL_IDS.DATA_SOURCES);
+        return;
+      }
       if (isExternalSourcesLoadActive()) {
         minimizePanel(PANEL_IDS.DATA_SOURCES);
         return;
@@ -135,7 +140,9 @@ export function useExternalSourcesDomain({
   }, [
     dataSourcesPanelOpen,
     handleOpenExternalLoadPanel,
+    isPanelMinimized,
     minimizePanel,
+    restorePanel,
     unpinPanelsFromTaskbar
   ]);
 

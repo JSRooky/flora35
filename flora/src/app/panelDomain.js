@@ -31,6 +31,7 @@ export function usePanelDomain({
   const [dataSourcesFocusRequest, setDataSourcesFocusRequest] = useState(null);
   const [tempArchivePanelOpen, setTempArchivePanelOpen] = useState(false);
   const [tempArchiveStatus, setTempArchiveStatus] = useState("");
+  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
   const [comparePanelOpen, setComparePanelOpen] = useState(false);
   const [reportPanelOpen, setReportPanelOpen] = useState(false);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
@@ -131,12 +132,6 @@ export function usePanelDomain({
 
   const minimizePanel = useCallback(
     (panelId) => {
-      if (
-        panelId === PANEL_IDS.DATA_SOURCES ||
-        panelId === PANEL_IDS.GBIF
-      ) {
-        setDataSourcesPanelOpen(false);
-      }
       setPanelMinimized((prev) => ({ ...prev, [panelId]: true }));
       pinPanelsToTaskbar([panelId]);
     },
@@ -215,6 +210,9 @@ export function usePanelDomain({
       case TASKBAR_PANEL_IDS.TEMP_ARCHIVE:
         setTempArchivePanelOpen(true);
         break;
+      case TASKBAR_PANEL_IDS.SETTINGS:
+        setSettingsPanelOpen(true);
+        break;
       case TASKBAR_PANEL_IDS.COMPARE:
         setComparePanelOpen(true);
         break;
@@ -243,7 +241,7 @@ export function usePanelDomain({
         break;
       }
     }
-  }, [pinPanelsToTaskbar]);
+  }, [pinPanelsToTaskbar, setSettingsPanelOpen]);
 
   const handleMinimizePanel = useCallback(
     (panelId) => () => minimizePanel(panelId),
@@ -399,6 +397,7 @@ export function usePanelDomain({
     closePanelById,
     minimizePanel,
     openPanel,
+    openPanelIds,
     panelCollapsed,
     panelMinimized,
     panelTaskbarOrder,
@@ -408,6 +407,7 @@ export function usePanelDomain({
     previousYearFilterEnabledRef,
     reportPanelOpen,
     restorePanel,
+    settingsPanelOpen,
     setAnalysisPanelOpen,
     setCompareDistributionOpen,
     setCompareDiversityKeys,
@@ -422,6 +422,7 @@ export function usePanelDomain({
     setPanelCollapsed,
     setPanelMinimized,
     setReportPanelOpen,
+    setSettingsPanelOpen,
     setSubmissionCoordinates,
     setSubmissionLocationPicking,
     setTempArchivePanelOpen,

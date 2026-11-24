@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ReactComponent as MainLogo } from "../images/main_logo.svg";
-import { DatabaseIcon, LayersArchiveIcon } from "../images/buttons";
+import { DatabaseIcon, LayersArchiveIcon, SettingsIcon } from "../images/buttons";
 import { DATA_SOURCE_OPTIONS, VISIBLE_DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
 import { FEATURE_FLAGS, FEATURE_UNAVAILABLE_TITLE } from "../config/featureFlags";
 import UserAccountControl from "./UserAccountControl";
@@ -39,6 +39,7 @@ export const MODULE_IDS = {
   COMPARE: "compare",
   REPORT: "report",
   ANALYSIS: "analysis",
+  SETTINGS: "settings",
   EXTERNAL_PROCESSING: "external-processing",
   /** @deprecated Используйте EXTERNAL_PROCESSING */
   GBIF_PROCESSING: "external-processing",
@@ -325,6 +326,8 @@ export default function ModuleMenu({
   onReportPanelToggle,
   analysisPanelOpen = false,
   onAnalysisPanelToggle,
+  settingsPanelOpen = false,
+  onSettingsPanelToggle,
   accountUser = null,
   onSaveUserSettings,
   onLoadUserSettings
@@ -410,6 +413,15 @@ export default function ModuleMenu({
               mapToolAccent
               activeModule={analysisPanelOpen ? MODULE_IDS.ANALYSIS : activeModule}
               onModuleSelect={onAnalysisPanelToggle}
+            />
+          </li>
+          <li>
+            <ModuleMenuButton
+              id={MODULE_IDS.SETTINGS}
+              label="Настройки"
+              icon={<SettingsIcon className="module-menu-btn-icon" aria-hidden="true" focusable="false" />}
+              activeModule={settingsPanelOpen ? MODULE_IDS.SETTINGS : activeModule}
+              onModuleSelect={onSettingsPanelToggle}
             />
           </li>
           {FEATURE_FLAGS.reportModuleDisabled ? null : (

@@ -29,6 +29,7 @@ export const PANEL_IDS = {
   SEARCH: "search",
   REDBOOK: "redbook",
   TEMP_ARCHIVE: "temp-archive",
+  SETTINGS: "settings",
   COMPARE: "compare",
   REPORT: "report",
   ANALYSIS: "analysis",

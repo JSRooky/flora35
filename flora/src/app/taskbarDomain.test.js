@@ -32,6 +32,7 @@ function makeDeps(overrides = {}) {
     reportPanelOpen: false,
     restorePanel: jest.fn(),
     selectedBoundsFeature: null,
+    settingsPanelOpen: false,
     tempArchivePanelOpen: false,
     ...overrides
   };
@@ -49,6 +50,27 @@ describe("useTaskbarDomain", () => {
     );
 
     expect(result.current.activeTaskbarPanelIds).toContain(PANEL_IDS.COMPARE);
+  });
+
+  test("док сохраняет панель источников данных после сворачивания", () => {
+    const { result } = renderHook(() =>
+      useTaskbarDomain(
+        makeDeps({
+          dataSourcesPanelOpen: true,
+          panelMinimized: { [PANEL_IDS.DATA_SOURCES]: true }
+        })
+      )
+    );
+
+    expect(result.current.activeTaskbarPanelIds).toContain(PANEL_IDS.DATA_SOURCES);
+  });
+
+  test("док содержит открытую панель настроек", () => {
+    const { result } = renderHook(() =>
+      useTaskbarDomain(makeDeps({ settingsPanelOpen: true }))
+    );
+
+    expect(result.current.activeTaskbarPanelIds).toContain(PANEL_IDS.SETTINGS);
   });
 
   test("развёрнутая панель помечается активной, свёрнутая — нет", () => {

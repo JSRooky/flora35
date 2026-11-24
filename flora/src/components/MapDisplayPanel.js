@@ -90,7 +90,8 @@ export default function MapDisplayPanel({
   collapsed: collapsedProp,
   onCollapsedChange,
   onMinimize,
-  onClose
+  onClose,
+  embedded = false
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(true);
   const isControlled = collapsedProp !== undefined;
@@ -110,28 +111,40 @@ export default function MapDisplayPanel({
     clusterByTempLayersDisabled || !clusterByTempLayers;
   const denseClustersHighlightDisabled = !markersVisible || compactPointDisplay;
 
-  return (
-    <aside className={`map-display-panel ${collapsed ? "map-display-panel--collapsed" : ""}`}>
-      <div className="map-display-panel-header">
-        <h3 className="map-display-panel-title">Группы точек</h3>
-        <div className="popup-panel-header-actions">
-          <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
-          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
-          <button
-            type="button"
-            className="map-display-panel-toggle"
-            onClick={() => setCollapsed(!collapsed)}
-            aria-expanded={!collapsed}
-            aria-label={toggleLabel}
-            title={toggleLabel}
-          >
-            {collapsed ? "▾" : "▴"}
-          </button>
-          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
-        </div>
-      </div>
+  const PanelContainer = embedded ? "div" : "aside";
 
-      {collapsed ? (
+  return (
+    <PanelContainer
+      className={`map-display-panel${collapsed ? " map-display-panel--collapsed" : ""}${
+        embedded ? " map-display-panel--embedded" : ""
+      }`}
+    >
+      {!embedded ? (
+        <div className="map-display-panel-header">
+          <h3 className="map-display-panel-title">Группы точек</h3>
+          <div className="popup-panel-header-actions">
+            <ModuleHelpButton
+              mapToolAccent
+              open={helpOpen}
+              onClick={() => setHelpOpen((value) => !value)}
+            />
+            {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
+            <button
+              type="button"
+              className="map-display-panel-toggle"
+              onClick={() => setCollapsed(!collapsed)}
+              aria-expanded={!collapsed}
+              aria-label={toggleLabel}
+              title={toggleLabel}
+            >
+              {collapsed ? "▾" : "▴"}
+            </button>
+            {onClose ? <PanelCloseButton onClick={onClose} /> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {collapsed && !embedded ? (
         <p className="map-display-panel-summary">
           {getCollapsedSummary(
             markersVisible,
@@ -411,7 +424,9 @@ export default function MapDisplayPanel({
         </div>
       )}
 
-      <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.MAP} open={helpOpen} />
-    </aside>
+      {!embedded ? (
+        <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.MAP} open={helpOpen} />
+      ) : null}
+    </PanelContainer>
   );
 }
