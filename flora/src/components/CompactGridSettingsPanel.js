@@ -6,6 +6,7 @@ import {
   COMPACT_GRID_POINT_LIMIT_MIN
 } from "../map/compactGridSettings";
 import { TEMP_LAYER_MARKER_PALETTE } from "../tempLayers/tempLayerPalette";
+import { PanelField, PanelHint, PanelSwitch } from "./panel/PanelPrimitives";
 import "../styles/CompactGridSettingsPanel.css";
 
 function cellSizeLabel(cellsPerTile) {
@@ -58,36 +59,26 @@ export default function CompactGridSettingsPanel({
           включается автоматически. Считается весь слой, не только кадр карты.
         </p>
 
-        <label className="compact-grid-settings-field">
-          <span className="compact-grid-settings-label">
-            Лимит точек в слоях
-            <span className="compact-grid-settings-hint">
-              {settings.pointLimit.toLocaleString("ru-RU")}
-            </span>
-          </span>
+        <PanelField label="Лимит точек в слоях" value={settings.pointLimit.toLocaleString("ru-RU")}>
           <input
             type="range"
             min={COMPACT_GRID_POINT_LIMIT_MIN}
             max={COMPACT_GRID_POINT_LIMIT_MAX}
             step={5000}
             value={settings.pointLimit}
+            aria-label="Лимит точек в слоях"
             onChange={(event) => patch({ pointLimit: Number(event.target.value) })}
           />
-        </label>
+        </PanelField>
 
-        <label className="compact-grid-settings-field">
-          <span className="compact-grid-settings-label">
-            Размер квадратов
-            <span className="compact-grid-settings-hint">
-              {cellSizeLabel(settings.cellsPerTile)}
-            </span>
-          </span>
+        <PanelField label="Размер квадратов" value={cellSizeLabel(settings.cellsPerTile)}>
           <input
             type="range"
             min={0}
             max={COMPACT_GRID_CELLS_OPTIONS.length - 1}
             step={1}
             value={cellsIndex}
+            aria-label="Размер квадратов"
             onChange={(event) =>
               patch({
                 cellsPerTile:
@@ -100,19 +91,14 @@ export default function CompactGridSettingsPanel({
             <span>Крупнее</span>
             <span>Мельче</span>
           </span>
-        </label>
+        </PanelField>
 
-        <label className="compact-grid-settings-switch">
-          <input
-            type="checkbox"
-            checked={settings.useLayerColor}
-            onChange={(event) => patch({ useLayerColor: event.target.checked })}
-          />
-          <span>Цвет временного слоя</span>
-        </label>
-        <p className="compact-grid-settings-hint-block">
-          Если слой без своего цвета, используется выбранный ниже.
-        </p>
+        <PanelSwitch
+          label="Цвет временного слоя"
+          checked={settings.useLayerColor}
+          onChange={(checked) => patch({ useLayerColor: checked })}
+        />
+        <PanelHint>Если слой без своего цвета, используется выбранный ниже.</PanelHint>
 
         <div
           className={`compact-grid-settings-colors${

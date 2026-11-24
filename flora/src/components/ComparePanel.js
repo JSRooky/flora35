@@ -17,6 +17,7 @@ import "../styles/ExternalLayersPicker.css";
 import "../styles/TempLayersPicker.css";
 import "../styles/ComparePanel.css";
 
+/** Кнопки сравнения живут здесь; доступ к модулю режется флагом в ModuleMenu и App. */
 const DRAG_TYPE = "application/x-flora-compare-plaque";
 
 function formatPlaqueMeta(plaque) {

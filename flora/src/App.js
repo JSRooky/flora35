@@ -30,7 +30,6 @@ import {
   collapseExpandedDensePiles,
   setDensePileExpandedHandler,
   setMarkersVisible,
-  setHoverTooltipsEnabled,
   setMapCursorOverride,
   setToolFeaturesContext,
   showSharedPointPin,
@@ -42,7 +41,6 @@ import {
   getVisibleMapPointCount,
   getDisplayedLayerPointCount,
   getStablePointKey,
-  setHiddenPointKeysForFilter,
   setGbifProcessingFilters,
   setInatProcessingFilters,
   WITHIN_FEATURE_FILTER_KEY,
@@ -100,24 +98,13 @@ import {
 } from "./components/addBoundsLayers";
 import {
   addRegionBoundsLayer,
-  applyRegionBoundsIsoFilter,
-  applyRegionBoundsPaintSettings,
-  buildRegionCatalog,
   buildRegionSelectionBufferFeature,
   emitRegionBoundsSelect,
   flyToRegionBoundsFeature,
   getFeaturePopupLngLat,
-  getRegionEntryByIso,
   getRegionFeatureAtClick,
   hideRegionActionPopup,
   getRegionSelectionWithinFeature,
-  loadRegionBoundsGeoJSON,
-  setRegionBoundsEnabled,
-  setRegionBoundsLoadedIsos,
-  setRegionBoundsSelectHandler,
-  setRegionBoundsSelectedIsos,
-  showRegionActionPopup,
-  updateRegionSelectionBuffer
 } from "./components/addRegionBoundsLayer";
 import OoptPanel from "./components/OoptPanel";
 import RegionPanel from "./components/RegionPanel";
@@ -144,11 +131,9 @@ import {
 } from "./locations/loadPoints";
 import {
   addOsmBasemapLayer,
-  setOsmBasemapEnabled
 } from "./components/addOsmBasemapLayer";
 import {
   addYandexBasemapLayer,
-  setYandexBasemapEnabled
 } from "./components/addYandexBasemapLayer";
 import { BASEMAP_MODES } from "./config/basemapOptions";
 import {
@@ -158,9 +143,7 @@ import {
   computeSpeciesPolygonIntersection,
   getPolygonIntersectionContainedSummary,
   getSpeciesPolygonContainedSummary,
-  syncSpeciesPolygonLayer,
   toggleSpeciesPolygonBuildMode,
-  updateSpeciesPolygonIntersectionLayer,
   upsertSpeciesPolygon,
   getUniqueCoordinateCountForSpecies,
   canBuildAllPointsPolygon,
@@ -169,12 +152,9 @@ import {
 import {
   addArealDynamicsLayer,
   clearArealDynamicsLayer,
-  syncArealDynamicsLayer
 } from "./components/addArealDynamicsLayer";
 import {
-  buildArealDynamicsSlices,
   clearArealDynamicsSliceCache,
-  filterSlicesUpToYear
 } from "./components/buildArealDynamicsSlices";
 import {
   addBufferLayer,
@@ -197,21 +177,15 @@ import {
 import { collectActiveMapFilters, MAP_FILTER_IDS } from "./mapActiveFilters";
 import {
   addAreaSelectionLayer,
-  applyAreaGeometryOperation,
   AREA_DRAW_MODES,
   AREA_OPERATION_MODES,
   clearAreaSelectionLayer,
   getAreaContainedPointsSummary,
   isAreaDrawingActive,
-  startAreaDrawing,
-  stopActiveAreaDrawing,
-  updateAreaSelectionLayer,
-  updateAreaSelectionPreview
 } from "./components/addAreaSelectionLayer";
 import FeaturePopup from "./components/FeaturePopup";
 import {
   focusMapOnSharedPoint,
-  parseSharePointParams
 } from "./components/sharePointLink";
 import ArealPopup, { DEFAULT_AREAL_RADIUS_KM } from "./components/ArealPopup";
 import SpeciesPolygonPopup from "./components/SpeciesPolygonPopup";
@@ -272,7 +246,6 @@ import {
   setRegionLoadSummaryActive,
   setRegionLoadSummaryOptions
 } from "./components/addRegionLoadSummaryLayer";
-import { listLoadedRegionCatalogIsos } from "./map/regionLoadSummary";
 import {
   OSM_ADMIN_LOAD_MODES,
   downloadGeoJson,
@@ -281,8 +254,8 @@ import {
   toOsmIso3166_2
 } from "./osm/osmAdminBoundaries";
 import { addTempLayersLayer, setTempLayersData, setTempLayersVisibility, applyTempLayersGroupingMode, expandTempDensePileByKey, collapseTempExpandedDensePiles, setTempDensePileExpandedHandler, refreshTempLayersDensePiles, getTempCompactGridLayerColor } from "./components/addTempLayersLayer";
-import { addTempLayerOverlaysLayer, applyTempRegionOverlayPaint, setTempLayerOverlaysData, setTempOverlaySelectedIsos } from "./components/addTempLayerOverlaysLayer";
-import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, appendRegionPolygonToTempPlaque, listTempLayerPlaques, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerLabel, setTempLayerMarkerColor, setTempLayerVisible, applyTempLayerSettingsMeta, ensureMapRegionBoundary, ingestOsmAdminOverlays, getRegionOverlayByKey, listRegionLayerTree, removeRegionOverlay, removeRegionsRootLayer, setRegionBoundsDisplaySource, hydrateRegionBoundsDisplaySource, getRegionBoundsDisplaySource, setRegionBoundsContoursEnabled, REGION_BOUNDS_DISPLAY_SOURCES, findOsmOverlayFeatureByIso, listOsmOverlaySelectableIsos } from "./tempLayers/tempLayerStore";
+import { addTempLayerOverlaysLayer, applyTempRegionOverlayPaint, setTempLayerOverlaysData } from "./components/addTempLayerOverlaysLayer";
+import { deleteTempLayer, getTempLayers, createTempLayerFromFilterSnapshot, getVisibleRegionOverlayEditState, patchVisibleRegionOverlays, saveFeaturesIntoRegionOverlayTempLayer, setAllTempLayersHeatmapEnabled, setTempLayerHeatmapEnabled, setTempLayerLabel, setTempLayerMarkerColor, setTempLayerVisible, applyTempLayerSettingsMeta, ensureMapRegionBoundary, ingestOsmAdminOverlays, getRegionOverlayByKey, listRegionLayerTree, removeRegionOverlay, removeRegionsRootLayer, setRegionBoundsDisplaySource, hydrateRegionBoundsDisplaySource, REGION_BOUNDS_DISPLAY_SOURCES, findOsmOverlayFeatureByIso } from "./tempLayers/tempLayerStore";
 import {
   collectMapToolOverlays,
   TEMP_OVERLAY_KINDS,
@@ -291,7 +264,6 @@ import {
 import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatDensePiles, expandInatDensePileByKey, collapseInatExpandedDensePiles, setInatDensePileExpandedHandler, setInatMapUpdatesPaused, clearInatLayer } from "./components/addInatLayer";
 import {
   addMergedLayer,
-  setMergedData,
   setMergedVisibility,
   applyMergedGroupingMode,
   upsertMergedFeature,
@@ -305,11 +277,9 @@ import {
 } from "./components/addRedBookLayer";
 import RedBookSearchPanel from "./components/RedBookSearchPanel";
 import { hydrateRedBookStoreFromPersistence } from "./redbook/redBookStore";
-import { loadMergedPointsFromFirestore } from "./firebase/loadMergedPointsFromFirestore";
 import { submitMergedPoint } from "./firebase/submitMergedPoint";
 import { deleteMergedPoint } from "./firebase/deleteMergedPoint";
-import { loadPointAttributionsFromFirestore } from "./firebase/loadPointAttributionsFromFirestore";
-import { persistTempLayers, hydrateRegionOverlaysFromPersistence, snapshotTempSettings, applyArchiveSettingsMeta, refreshTempLayerArchiveIndex } from "./tempLayers/tempLayerPersistence";
+import { persistTempLayers, snapshotTempSettings, applyArchiveSettingsMeta, refreshTempLayerArchiveIndex } from "./tempLayers/tempLayerPersistence";
 import { syncDataWorkingSet } from "./map/dataWorkingSet";
 import { applyCompactGridAppearance, setCompactPointDisplayEnabled } from "./map/compactPointDisplay";
 import {
@@ -342,7 +312,6 @@ import {
 import {
   isExternalSourcesLoadActive,
   setExternalSourcesLoadContext,
-  subscribeExternalSourcesLoad
 } from "./externalSources/externalSourcesLoadManager";
 import {
   clearRussianNameChoice,
@@ -350,14 +319,22 @@ import {
   saveRussianNameChoice
 } from "./names/russianNameResolver";
 import DataSourcesPanel from "./components/DataSourcesPanel";
+import SettingsPanel from "./components/SettingsPanel";
 import { matchMapRegionsToExternal } from "./externalSources/matchMapRegionToExternal";
-import { applyBufferToExternalRegion } from "./externalSources/bufferedSpatialRegion";
 import ExternalSourcesLoadStatusBar from "./components/ExternalSourcesLoadStatusBar";
 import ExternalProcessingPanel from "./components/ExternalProcessingPanel";
 import {
   EXTERNAL_LAYER_IDS
 } from "./components/ExternalLayersPicker";
 import ModuleMenu, { MODULE_IDS } from "./components/ModuleMenu";
+import { FEATURE_FLAGS } from "./config/featureFlags";
+import {
+  PERFORMANCE_MODES,
+  applyPerformanceMode,
+  isLowPerformanceMode,
+  loadPerformanceMode,
+  savePerformanceMode
+} from "./config/performanceMode";
 import ExperimentalFeatureDialog from "./components/ExperimentalFeatureDialog";
 import {
   EXPERIMENTAL_FEATURE_IDS,
@@ -368,89 +345,58 @@ import { getYearBounds } from "./components/yearBounds";
 import { GET_LOCATION_CURSOR } from "./mapCursors";
 import { ReactComponent as YandexLogo } from "./images/yandex_logo_ru.svg";
 import "./styles/mapToolsTheme.css";
+import "./styles/panelMetrics.css";
 import "./MapView.css";
+import {
+  DEFAULT_CLUSTER_BY_REGNUM,
+  DEFAULT_CLUSTER_PIE_CHARTS,
+  DEFAULT_CLUSTERING_ENABLED,
+  DEFAULT_DENSE_CLUSTERS_HIGHLIGHT,
+  DEFAULT_MARKERS_VISIBLE,
+  LOCATION_FILTERS_DEBOUNCE_MS,
+  PANEL_IDS,
+  SPECIES_SEARCH_DEBOUNCE_MS,
+} from "./app/panelConstants";
+import { usePanelDomain } from "./app/panelDomain";
+import { useTaskbarDomain } from "./app/taskbarDomain";
+import { useExternalSourcesDomain } from "./app/externalSourcesDomain";
+import { useGeometryToolsDomain } from "./app/geometryToolsDomain";
+import { useLayerSyncDomain } from "./app/layerSyncDomain";
 
 hydrateRedBookStoreFromPersistence();
 
-const UserSubmissionPanel = lazy(() => import("./components/UserSubmissionPanel"));
-
-const PANEL_IDS = {
-  FEATURE: "feature",
-  AREAL: "areal",
-  STATUS: "status",
-  REGNUM: "regnum",
-  MAP: "map",
-  DENSE: "dense",
-  YEAR: "year",
-  SEASONALITY: "seasonality",
-  POLYGON: "polygon",
-  BUFFER: "buffer",
-  AREA: "area",
-  OOPT: "oopt",
-  REGIONS: "regions",
-  OOPT_FEATURE: "oopt-feature",
-  SUBMIT: "submit",
-  DATA_SOURCES: "data-sources",
-  EXTERNAL_PROCESSING: "external-processing",
-  DATA_WORK: "data-work",
-  SEARCH: "search",
-  REDBOOK: "redbook",
-  TEMP_ARCHIVE: "temp-archive",
-  COMPARE: "compare",
-  REPORT: "report",
-  ANALYSIS: "analysis",
-  COMPARE_DIVERSITY: "compare-diversity",
-  COMPARE_SIMILARITY: "compare-similarity",
-  COMPARE_DISTRIBUTION: "compare-distribution",
-  COMPARE_STATS: "compare-stats",
-  REGION_SPECIES: "region-species",
-  /** @deprecated алиасы для taskbar */
-  GBIF: "data-sources",
-  GBIF_PROCESSING: "external-processing"
+/**
+ * Какой панели соответствует модуль меню.
+ * Нужно, чтобы панель оставалась открытой при переключении модуля:
+ * открытие панели запоминается в openPanelIds, а не выводится из activeModule.
+ */
+const MODULE_PANEL_IDS = {
+  [MODULE_IDS.FEATURE]: PANEL_IDS.FEATURE,
+  [MODULE_IDS.STATUS]: PANEL_IDS.STATUS,
+  [MODULE_IDS.REGNUM]: PANEL_IDS.REGNUM,
+  [MODULE_IDS.MAP]: PANEL_IDS.MAP,
+  [MODULE_IDS.YEAR]: PANEL_IDS.YEAR,
+  [MODULE_IDS.SEASONALITY]: PANEL_IDS.SEASONALITY,
+  [MODULE_IDS.POLYGON]: PANEL_IDS.POLYGON,
+  [MODULE_IDS.AREAL]: PANEL_IDS.AREAL,
+  [MODULE_IDS.BUFFER]: PANEL_IDS.BUFFER,
+  [MODULE_IDS.AREA]: PANEL_IDS.AREA,
+  [MODULE_IDS.SEARCH]: PANEL_IDS.SEARCH,
+  [MODULE_IDS.OOPT]: PANEL_IDS.OOPT,
+  [MODULE_IDS.REGIONS]: PANEL_IDS.REGIONS,
+  [MODULE_IDS.SUBMIT]: PANEL_IDS.SUBMIT,
+  [MODULE_IDS.DATA_WORK]: PANEL_IDS.DATA_WORK,
+  [MODULE_IDS.REDBOOK]: PANEL_IDS.REDBOOK,
+  [MODULE_IDS.DENSE]: PANEL_IDS.DENSE,
+  [MODULE_IDS.GBIF]: PANEL_IDS.DATA_SOURCES
 };
 
-const DEFAULT_CLUSTERING_ENABLED = true;
-const DEFAULT_CLUSTER_BY_REGNUM = false;
-const DEFAULT_CLUSTER_PIE_CHARTS = false;
-const LOCATION_FILTERS_DEBOUNCE_MS = 90;
-const SPECIES_SEARCH_DEBOUNCE_MS = 250;
-const DEFAULT_DENSE_CLUSTERS_HIGHLIGHT = false;
-const DEFAULT_MARKERS_VISIBLE = true;
+/** Обратное соответствие: панель → модуль меню (чтобы закрытие снимало подсветку модуля). */
+const PANEL_MODULE_IDS = Object.fromEntries(
+  Object.entries(MODULE_PANEL_IDS).map(([moduleId, panelId]) => [panelId, moduleId])
+);
 
-/** Панели, которые сворачиваем при развороте «Сведений о точке». */
-const FEATURE_PEER_PANEL_IDS = [
-  PANEL_IDS.AREAL,
-  PANEL_IDS.STATUS,
-  PANEL_IDS.MAP,
-  PANEL_IDS.DENSE,
-  PANEL_IDS.YEAR,
-  PANEL_IDS.SEASONALITY,
-  PANEL_IDS.POLYGON,
-  PANEL_IDS.BUFFER,
-  PANEL_IDS.AREA,
-  PANEL_IDS.OOPT,
-  PANEL_IDS.REGIONS,
-  PANEL_IDS.OOPT_FEATURE,
-  PANEL_IDS.SUBMIT,
-  PANEL_IDS.DATA_SOURCES,
-  PANEL_IDS.EXTERNAL_PROCESSING,
-  PANEL_IDS.DATA_WORK,
-  PANEL_IDS.SEARCH,
-  PANEL_IDS.REDBOOK,
-  PANEL_IDS.TEMP_ARCHIVE,
-  PANEL_IDS.COMPARE,
-  PANEL_IDS.REPORT,
-  PANEL_IDS.ANALYSIS,
-  PANEL_IDS.COMPARE_DIVERSITY,
-  PANEL_IDS.COMPARE_SIMILARITY,
-  PANEL_IDS.COMPARE_DISTRIBUTION,
-  PANEL_IDS.COMPARE_STATS,
-  PANEL_IDS.REGION_SPECIES
-];
-
-function isPanelExpandedInState(collapsedState, panelId) {
-  return collapsedState[panelId] !== true;
-}
+const UserSubmissionPanel = lazy(() => import("./components/UserSubmissionPanel"));
 
 /** Корневой компонент карты: состояние всех инструментов/фильтров/слоёв и инициализация Mapbox. */
 export default function MapView() {
@@ -593,6 +539,20 @@ export default function MapView() {
   const [areaDrawingActive, setAreaDrawingActive] = useState(false);
   const [areaGeometry, setAreaGeometry] = useState(null);
   const [hoverTooltipsDisabled, setHoverTooltipsDisabled] = useState(false);
+  // Режим «для слабых ПК»: без размытия/анимаций/подсказок. Значение хранится между сессиями.
+  const [performanceMode, setPerformanceMode] = useState(loadPerformanceMode);
+  const lowPerformanceMode = isLowPerformanceMode(performanceMode);
+  const effectiveHoverTooltipsDisabled = hoverTooltipsDisabled || lowPerformanceMode;
+
+  const handlePerformanceModeChange = useCallback((enabled) => {
+    const nextMode = enabled ? PERFORMANCE_MODES.LOW : PERFORMANCE_MODES.AUTO;
+    setPerformanceMode(nextMode);
+    savePerformanceMode(nextMode);
+  }, []);
+
+  useEffect(() => {
+    applyPerformanceMode(performanceMode);
+  }, [performanceMode]);
   const [regionBoundsEnabled, setRegionBoundsVisible] = useState(false);
   const [regionCatalog, setRegionCatalog] = useState([]);
   const [hiddenRegionIsos, setHiddenRegionIsos] = useState([]);
@@ -714,383 +674,93 @@ export default function MapView() {
   const [externalProcessingFilters, setExternalProcessingFiltersState] = useState(
     createDefaultExternalProcessingFilters
   );
-  const [panelCollapsed, setPanelCollapsed] = useState({});
-  /** Панели, убранные в нижнюю «панель задач» (модуль при этом остаётся активным). */
-  const [panelMinimized, setPanelMinimized] = useState({});
-  /** Отдельный флаг: panelMinimized для этой панели сбрасывают другие обработчики. */
-  const [dataSourcesPanelOpen, setDataSourcesPanelOpen] = useState(false);
-  const [dataSourcesFocusRequest, setDataSourcesFocusRequest] = useState(null);
-  const [tempArchivePanelOpen, setTempArchivePanelOpen] = useState(false);
-  const [tempArchiveStatus, setTempArchiveStatus] = useState("");
-  const [comparePanelOpen, setComparePanelOpen] = useState(false);
-  const [reportPanelOpen, setReportPanelOpen] = useState(false);
-  const [analysisPanelOpen, setAnalysisPanelOpen] = useState(false);
-  const [experimentalPrompt, setExperimentalPrompt] = useState(null);
-  const [kdeOverlay, setKdeOverlay] = useState(null);
-  const [compareDiversityOpen, setCompareDiversityOpen] = useState(false);
-  const [compareDiversityKeys, setCompareDiversityKeys] = useState([]);
-  const [compareSimilarityOpen, setCompareSimilarityOpen] = useState(false);
-  const [compareDistributionOpen, setCompareDistributionOpen] = useState(false);
-  const [compareStatsKind, setCompareStatsKind] = useState(null);
-  /** Порядок иконок в taskbar (открытая панель остаётся в ряду и подсвечивается). */
-  const [panelTaskbarOrder, setPanelTaskbarOrder] = useState([]);
-  /** Актуальный stashVisiblePanelsToTaskbar — вызывается из ранних колбэков. */
-  const stashVisiblePanelsToTaskbarRef = useRef(() => {});
-  /** Какие peer-панели свернули из‑за разворота «Сведений о точке» (для восстановления). */
-  const panelsCollapsedByFeatureRef = useRef(null);
-  /** Ключ выбранной ООПТ — чтобы не откатывать minimize при каждом рендере. */
-  const prevSelectedBoundsFeatureKeyRef = useRef(null);
-  const [submissionCoordinates, setSubmissionCoordinates] = useState(null);
-  const [submissionLocationPicking, setSubmissionLocationPicking] = useState(false);
-  const submissionMapPickHandlerRef = useRef(null);
-  const hadFoundYearPropertyFilterRef = useRef(false);
-  const previousYearFilterEnabledRef = useRef(false);
-  // Параметры share-ссылки на конкретную точку разбираем один раз при монтировании.
-  const pendingSharePointRef = useRef(parseSharePointParams(window.location.search));
-
-  const isPanelCollapsed = useCallback(
-    (panelId) => panelCollapsed[panelId] ?? false,
-    [panelCollapsed]
-  );
-
-  const isPanelMinimized = useCallback(
-    (panelId) => Boolean(panelMinimized[panelId]),
-    [panelMinimized]
-  );
-
-  const handlePanelCollapsedChange = useCallback(
-    (panelId) => (collapsed) => {
-      setPanelCollapsed((prev) => ({ ...prev, [panelId]: collapsed }));
-    },
-    []
-  );
-
-  const pinPanelsToTaskbar = useCallback((panelIds) => {
-    if (!panelIds?.length) {
-      return;
-    }
-
-    setPanelTaskbarOrder((prev) => {
-      const next = [...prev];
-      let changed = false;
-
-      panelIds.forEach((panelId) => {
-        if (!next.includes(panelId)) {
-          next.push(panelId);
-          changed = true;
-        }
-      });
-
-      return changed ? next : prev;
-    });
-  }, []);
-
-  const unpinPanelsFromTaskbar = useCallback((panelIds) => {
-    if (!panelIds?.length) {
-      return;
-    }
-
-    const idSet = new Set(panelIds);
-
-    setPanelTaskbarOrder((prev) => {
-      const next = prev.filter((panelId) => !idSet.has(panelId));
-      return next.length === prev.length ? prev : next;
-    });
-    // Не сбрасываем panelMinimized: для «Источники данных» видимость —
-    // EXTERNAL && !minimized. Сброс флага сразу после закрытия снова
-    // монтирует панель.
-  }, []);
-
-  const minimizePanel = useCallback(
-    (panelId) => {
-      if (
-        panelId === PANEL_IDS.DATA_SOURCES ||
-        panelId === PANEL_IDS.GBIF
-      ) {
-        setDataSourcesPanelOpen(false);
-      }
-      setPanelMinimized((prev) => ({ ...prev, [panelId]: true }));
-      pinPanelsToTaskbar([panelId]);
-    },
-    [pinPanelsToTaskbar]
-  );
-
-  const restorePanel = useCallback((panelId) => {
-    // Текущие видимые панели уводим в taskbar, затем поднимаем выбранную.
-    stashVisiblePanelsToTaskbarRef.current(panelId);
-
-    setPanelMinimized((prev) => ({ ...prev, [panelId]: false }));
-    pinPanelsToTaskbar([panelId]);
-    setPanelCollapsed((prev) => {
-      if (!prev[panelId]) {
-        return prev;
-      }
-
-      return { ...prev, [panelId]: false };
-    });
-
-    // Вернуть контекст модуля/режима, иначе панель останется размонтированной
-    // (типичный случай: в taskbar несколько иконок от разных модулей).
-    switch (panelId) {
-      case TASKBAR_PANEL_IDS.DENSE:
-        setDenseProcessingActive(true);
-        setActiveModule(MODULE_IDS.MAP);
-        break;
-      case TASKBAR_PANEL_IDS.DATA_SOURCES:
-      case TASKBAR_PANEL_IDS.GBIF:
-        setDataSourcesPanelOpen(true);
-        setDataSourceModeState(DATA_SOURCE_MODES.EXTERNAL);
-        dataSourceModeRef.current = DATA_SOURCE_MODES.EXTERNAL;
-        void syncDataWorkingSet({ mode: DATA_SOURCE_MODES.EXTERNAL, map: map.current });
-        setActiveModule(null);
-        setPanelCollapsed((prev) => ({
-          ...prev,
-          [PANEL_IDS.DATA_SOURCES]: false,
-          [PANEL_IDS.EXTERNAL_PROCESSING]: true
-        }));
-        break;
-      case TASKBAR_PANEL_IDS.EXTERNAL_PROCESSING:
-      case TASKBAR_PANEL_IDS.GBIF_PROCESSING:
-        setDataSourceModeState(DATA_SOURCE_MODES.EXTERNAL);
-        dataSourceModeRef.current = DATA_SOURCE_MODES.EXTERNAL;
-        void syncDataWorkingSet({ mode: DATA_SOURCE_MODES.EXTERNAL, map: map.current });
-        setExternalProcessingActive(true);
-        setActiveModule(null);
-        setPanelCollapsed((prev) => ({
-          ...prev,
-          [PANEL_IDS.DATA_SOURCES]: true,
-          [PANEL_IDS.EXTERNAL_PROCESSING]: false
-        }));
-        break;
-      case TASKBAR_PANEL_IDS.OOPT_SPECIES:
-        setBoundsSpeciesListOpen(true);
-        setActiveModule(MODULE_IDS.OOPT);
-        break;
-      case TASKBAR_PANEL_IDS.DENSE_SPECIES:
-        setDenseProcessingActive(true);
-        setDensePileSpeciesListOpen(true);
-        setActiveModule(MODULE_IDS.MAP);
-        break;
-      case TASKBAR_PANEL_IDS.REGION_SPECIES:
-        setRegionSpeciesPanelOpen(true);
-        break;
-      case TASKBAR_PANEL_IDS.FEATURE:
-        setActiveModule(MODULE_IDS.FEATURE);
-        break;
-      case TASKBAR_PANEL_IDS.MAP:
-        setDenseProcessingActive(false);
-        setActiveModule(MODULE_IDS.MAP);
-        break;
-      case TASKBAR_PANEL_IDS.TEMP_ARCHIVE:
-        setTempArchivePanelOpen(true);
-        break;
-      case TASKBAR_PANEL_IDS.COMPARE:
-        setComparePanelOpen(true);
-        break;
-      case TASKBAR_PANEL_IDS.REPORT:
-        setReportPanelOpen(true);
-        break;
-      case TASKBAR_PANEL_IDS.ANALYSIS:
-        setAnalysisPanelOpen(true);
-        break;
-      case TASKBAR_PANEL_IDS.COMPARE_DIVERSITY:
-        setCompareDiversityOpen(true);
-        break;
-      case TASKBAR_PANEL_IDS.COMPARE_SIMILARITY:
-        setCompareSimilarityOpen(true);
-        break;
-      case TASKBAR_PANEL_IDS.COMPARE_DISTRIBUTION:
-        setCompareDistributionOpen(true);
-        break;
-      case TASKBAR_PANEL_IDS.COMPARE_STATS:
-        break;
-      default: {
-        const moduleId = PANEL_TASKBAR_MODULE_ID[panelId];
-        if (moduleId) {
-          setActiveModule(moduleId);
-        }
-        break;
-      }
-    }
-  }, [pinPanelsToTaskbar]);
-
-  const handleMinimizePanel = useCallback(
-    (panelId) => () => minimizePanel(panelId),
-    [minimizePanel]
-  );
-
-  const expandPanel = useCallback((panelId) => {
-    setPanelCollapsed((prev) => {
-      if (!prev[panelId]) {
-        return prev;
-      }
-
-      return { ...prev, [panelId]: false };
-    });
-    setPanelMinimized((prev) => {
-      if (!prev[panelId]) {
-        return prev;
-      }
-
-      return { ...prev, [panelId]: false };
-    });
-  }, []);
-
-  const restorePanelsCollapsedByFeature = useCallback(() => {
-    const peerIds = panelsCollapsedByFeatureRef.current;
-    panelsCollapsedByFeatureRef.current = null;
-
-    if (!peerIds?.length) {
-      return;
-    }
-
-    setPanelCollapsed((prev) => {
-      const next = { ...prev };
-      peerIds.forEach((panelId) => {
-        next[panelId] = false;
-      });
-      return next;
-    });
-  }, []);
-
-  /** Разворачивает «Сведения о точке» и сворачивает остальные открытые панели. */
-  const expandFeaturePanel = useCallback(() => {
-    setPanelMinimized((prev) => {
-      if (!prev[PANEL_IDS.FEATURE]) {
-        return prev;
-      }
-
-      return { ...prev, [PANEL_IDS.FEATURE]: false };
-    });
-    setPanelCollapsed((prev) => {
-      const next = { ...prev, [PANEL_IDS.FEATURE]: false };
-
-      if (!panelsCollapsedByFeatureRef.current) {
-        panelsCollapsedByFeatureRef.current = FEATURE_PEER_PANEL_IDS.filter((panelId) =>
-          isPanelExpandedInState(prev, panelId)
-        );
-      }
-
-      FEATURE_PEER_PANEL_IDS.forEach((panelId) => {
-        next[panelId] = true;
-      });
-
-      return next;
-    });
-  }, []);
-
-  const handleFeaturePanelCollapsedChange = useCallback(
-    (collapsed) => {
-      if (collapsed) {
-        setPanelCollapsed((prev) => ({ ...prev, [PANEL_IDS.FEATURE]: true }));
-        restorePanelsCollapsedByFeature();
-        return;
-      }
-
-      expandFeaturePanel();
-    },
-    [expandFeaturePanel, restorePanelsCollapsedByFeature]
-  );
-
-  // Разворачиваем обработку; если на экране «Сведения о точке» — сворачиваем её.
-  const expandDenseProcessingPanel = useCallback(() => {
-    const peerIds = panelsCollapsedByFeatureRef.current;
-    panelsCollapsedByFeatureRef.current = null;
-
-    setPanelMinimized((prev) => {
-      if (!prev[PANEL_IDS.DENSE]) {
-        return prev;
-      }
-
-      return { ...prev, [PANEL_IDS.DENSE]: false };
-    });
-
-    setPanelCollapsed((prev) => {
-      const next = { ...prev, [PANEL_IDS.DENSE]: false };
-
-      // Вернём панели, свёрнутые ради Feature (в exclusive-режиме их всё равно не видно).
-      if (peerIds?.length) {
-        peerIds.forEach((panelId) => {
-          next[panelId] = false;
-        });
-      }
-
-      if (activeModule === MODULE_IDS.FEATURE) {
-        next[PANEL_IDS.FEATURE] = true;
-      }
-
-      return next;
-    });
-  }, [activeModule]);
-
-  const handleDensePanelCollapsedChange = useCallback(
-    (collapsed) => {
-      if (collapsed) {
-        setPanelCollapsed((prev) => ({ ...prev, [PANEL_IDS.DENSE]: true }));
-        return;
-      }
-
-      expandDenseProcessingPanel();
-    },
-    [expandDenseProcessingPanel]
-  );
-
-  // Данные GBIF развёрнуты — обработку сворачиваем (не закрываем).
-  const expandGbifDataPanel = useCallback(() => {
-    setDataSourcesPanelOpen(true);
-    setPanelMinimized((prev) => ({
-      ...prev,
-      [PANEL_IDS.GBIF]: false
-    }));
-    setPanelCollapsed((prev) => ({
-      ...prev,
-      [PANEL_IDS.GBIF]: false,
-      [PANEL_IDS.GBIF_PROCESSING]: true
-    }));
-  }, []);
-
-  // Обработка GBIF развёрнута — панель загрузки сворачиваем.
-  const expandGbifProcessingPanel = useCallback(() => {
-    setExternalProcessingActive(true);
-    setPanelMinimized((prev) => ({
-      ...prev,
-      [PANEL_IDS.GBIF_PROCESSING]: false
-    }));
-    setPanelCollapsed((prev) => ({
-      ...prev,
-      [PANEL_IDS.GBIF]: true,
-      [PANEL_IDS.GBIF_PROCESSING]: false
-    }));
-  }, []);
-
-  const handleGbifPanelCollapsedChange = useCallback(
-    (collapsed) => {
-      if (collapsed) {
-        setPanelCollapsed((prev) => ({ ...prev, [PANEL_IDS.GBIF]: true }));
-        return;
-      }
-
-      expandGbifDataPanel();
-    },
-    [expandGbifDataPanel]
-  );
-
-  const handleGbifProcessingPanelCollapsedChange = useCallback(
-    (collapsed) => {
-      if (collapsed) {
-        setPanelCollapsed((prev) => ({
-          ...prev,
-          [PANEL_IDS.GBIF_PROCESSING]: true
-        }));
-        return;
-      }
-
-      expandGbifProcessingPanel();
-    },
-    [expandGbifProcessingPanel]
-  );
+  const {
+    analysisPanelOpen,
+    compareDistributionOpen,
+    compareDiversityKeys,
+    compareDiversityOpen,
+    comparePanelOpen,
+    compareSimilarityOpen,
+    compareStatsKind,
+    closePanelById,
+    dataSourcesFocusRequest,
+    dataSourcesPanelOpen,
+    expandDenseProcessingPanel,
+    expandFeaturePanel,
+    expandGbifDataPanel,
+    expandPanel,
+    experimentalPrompt,
+    hadFoundYearPropertyFilterRef,
+    handleDensePanelCollapsedChange,
+    handleFeaturePanelCollapsedChange,
+    handleGbifPanelCollapsedChange,
+    handleGbifProcessingPanelCollapsedChange,
+    handleMinimizePanel,
+    handlePanelCollapsedChange,
+    isPanelCollapsed,
+    isPanelMinimized,
+    isPanelOpen,
+    kdeOverlay,
+    minimizePanel,
+    openPanel,
+    openPanelIds,
+    panelCollapsed,
+    panelMinimized,
+    panelTaskbarOrder,
+    pendingSharePointRef,
+    pinPanelsToTaskbar,
+    prevSelectedBoundsFeatureKeyRef,
+    previousYearFilterEnabledRef,
+    reportPanelOpen,
+    restorePanel,
+    settingsPanelOpen,
+    setAnalysisPanelOpen,
+    setCompareDistributionOpen,
+    setCompareDiversityKeys,
+    setCompareDiversityOpen,
+    setComparePanelOpen,
+    setCompareSimilarityOpen,
+    setCompareStatsKind,
+    setDataSourcesFocusRequest,
+    setDataSourcesPanelOpen,
+    setExperimentalPrompt,
+    setKdeOverlay,
+    setPanelCollapsed,
+    setPanelMinimized,
+    setReportPanelOpen,
+    setSettingsPanelOpen,
+    setSubmissionCoordinates,
+    setSubmissionLocationPicking,
+    setTempArchivePanelOpen,
+    setTempArchiveStatus,
+    submissionCoordinates,
+    submissionLocationPicking,
+    submissionMapPickHandlerRef,
+    tempArchivePanelOpen,
+    tempArchiveStatus,
+    unpinPanelsFromTaskbar
+  } = usePanelDomain({
+    activeModule,
+    dataSourceModeRef,
+    map,
+    setActiveModule,
+    setBoundsSpeciesListOpen,
+    setDataSourceModeState,
+    setDensePileSpeciesListOpen,
+    setDenseProcessingActive,
+    setExternalProcessingActive,
+    setRegionSpeciesPanelOpen,
+  });
 
   useEffect(() => {
+    // Запоминаем открытие панели: она останется на экране и в доке, даже если
+    // пользователь переключит модуль. Исключение — «Группы точек» в режиме
+    // плотных групп: там стек занят обработкой.
+    const panelIdForModule = MODULE_PANEL_IDS[activeModule];
+    if (panelIdForModule && !(denseProcessingActive && activeModule === MODULE_IDS.MAP)) {
+      openPanel(panelIdForModule);
+    }
+
     switch (activeModule) {
       case MODULE_IDS.FEATURE:
         expandFeaturePanel();
@@ -1148,7 +818,8 @@ export default function MapView() {
     denseProcessingActive,
     expandPanel,
     expandGbifDataPanel,
-    expandFeaturePanel
+    expandFeaturePanel,
+    openPanel
   ]);
 
   // Docked радиус/буфер — только когда «Сведения» свёрнуты.
@@ -1182,14 +853,8 @@ export default function MapView() {
     panelCollapsed
   ]);
 
-  // Ушли со «Сведений о точке» — вернуть панели, свёрнутые ради неё.
-  useEffect(() => {
-    if (activeModule === MODULE_IDS.FEATURE) {
-      return;
-    }
-
-    restorePanelsCollapsedByFeature();
-  }, [activeModule, restorePanelsCollapsedByFeature]);
+  // Ушли со «Сведений о точке» — панели больше не восстанавливаем:
+  // они и не сворачивались (ограничений на одновременные панели нет).
 
   const handleOpenBoundsFeatureDetails = useCallback(() => {
     expandPanel(PANEL_IDS.OOPT_FEATURE);
@@ -1382,7 +1047,6 @@ export default function MapView() {
     const selectModule = (nextModuleId) => {
       setActiveModule((current) => {
         if (current !== nextModuleId) {
-          stashVisiblePanelsToTaskbarRef.current(nextModuleId);
           return nextModuleId;
         }
 
@@ -1711,9 +1375,9 @@ export default function MapView() {
   const handleOpenTempArchive = useCallback(() => {
     setTempArchiveStatus("");
     setTempArchivePanelOpen(true);
-    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.TEMP_ARCHIVE]: false }));
+    expandPanel(PANEL_IDS.TEMP_ARCHIVE);
     pinPanelsToTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
-  }, [pinPanelsToTaskbar]);
+  }, [expandPanel, pinPanelsToTaskbar]);
 
   const handleTempArchivePanelToggle = useCallback(() => {
     if (tempArchivePanelOpen && !isPanelMinimized(PANEL_IDS.TEMP_ARCHIVE)) {
@@ -1732,9 +1396,9 @@ export default function MapView() {
 
   const openComparePanel = useCallback(() => {
     setComparePanelOpen(true);
-    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE]: false }));
+    expandPanel(PANEL_IDS.COMPARE);
     pinPanelsToTaskbar([PANEL_IDS.COMPARE]);
-  }, [pinPanelsToTaskbar]);
+  }, [expandPanel, pinPanelsToTaskbar]);
 
   const handleComparePanelToggle = useCallback(() => {
     if (comparePanelOpen && !isPanelMinimized(PANEL_IDS.COMPARE)) {
@@ -1770,6 +1434,10 @@ export default function MapView() {
   ]);
 
   const handleReportPanelToggle = useCallback(() => {
+    if (FEATURE_FLAGS.reportModuleDisabled) {
+      return;
+    }
+
     if (reportPanelOpen && !isPanelMinimized(PANEL_IDS.REPORT)) {
       setReportPanelOpen(false);
       unpinPanelsFromTaskbar([PANEL_IDS.REPORT]);
@@ -1777,15 +1445,15 @@ export default function MapView() {
     }
 
     setReportPanelOpen(true);
-    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.REPORT]: false }));
+    expandPanel(PANEL_IDS.REPORT);
     pinPanelsToTaskbar([PANEL_IDS.REPORT]);
-  }, [reportPanelOpen, isPanelMinimized, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
+  }, [reportPanelOpen, isPanelMinimized, expandPanel, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
 
   const openAnalysisPanel = useCallback(() => {
     setAnalysisPanelOpen(true);
-    setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.ANALYSIS]: false }));
+    expandPanel(PANEL_IDS.ANALYSIS);
     pinPanelsToTaskbar([PANEL_IDS.ANALYSIS]);
-  }, [pinPanelsToTaskbar]);
+  }, [expandPanel, pinPanelsToTaskbar]);
 
   const handleAnalysisPanelToggle = useCallback(() => {
     if (analysisPanelOpen && !isPanelMinimized(PANEL_IDS.ANALYSIS)) {
@@ -1807,6 +1475,25 @@ export default function MapView() {
     analysisPanelOpen,
     isPanelMinimized,
     openAnalysisPanel,
+    unpinPanelsFromTaskbar
+  ]);
+
+  const handleSettingsPanelToggle = useCallback(() => {
+    if (settingsPanelOpen && !isPanelMinimized(PANEL_IDS.SETTINGS)) {
+      setSettingsPanelOpen(false);
+      unpinPanelsFromTaskbar([PANEL_IDS.SETTINGS]);
+      return;
+    }
+
+    setSettingsPanelOpen(true);
+    expandPanel(PANEL_IDS.SETTINGS);
+    pinPanelsToTaskbar([PANEL_IDS.SETTINGS]);
+  }, [
+    expandPanel,
+    isPanelMinimized,
+    pinPanelsToTaskbar,
+    settingsPanelOpen,
+    setSettingsPanelOpen,
     unpinPanelsFromTaskbar
   ]);
 
@@ -2202,7 +1889,6 @@ export default function MapView() {
   const handleExternalLayerRequestLoad = useCallback(
     (layerId) => {
       setExternalLayersEnabled((prev) => ({ ...prev, [layerId]: true }));
-      stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DATA_SOURCES);
       expandGbifDataPanel();
     },
     [expandGbifDataPanel]
@@ -2660,351 +2346,67 @@ export default function MapView() {
   );
 
   /** Какие панели сейчас реально на экране (не в taskbar). */
-  const collectVisiblePanelIds = useCallback(() => {
-    const ids = [];
-    const isMin = (panelId) => Boolean(panelMinimized[panelId]);
-
-    if (denseProcessingActive) {
-      if (!isMin(PANEL_IDS.DENSE)) {
-        ids.push(PANEL_IDS.DENSE);
-      }
-
-      if (activeModule === MODULE_IDS.FEATURE && !isMin(PANEL_IDS.FEATURE)) {
-        ids.push(PANEL_IDS.FEATURE);
-      }
-
-      if (
-        densePileSpeciesListOpen &&
-        !isMin(TASKBAR_PANEL_IDS.DENSE_SPECIES)
-      ) {
-        ids.push(TASKBAR_PANEL_IDS.DENSE_SPECIES);
-      }
-
-      return ids;
-    }
-
-    if (activeModule === MODULE_IDS.FEATURE && !isMin(PANEL_IDS.FEATURE)) {
-      ids.push(PANEL_IDS.FEATURE);
-    }
-
-    if (
-      (activeModule === MODULE_IDS.AREAL ||
-        (activeModule === MODULE_IDS.FEATURE && arealDockedWithFeature)) &&
-      !isMin(PANEL_IDS.AREAL)
-    ) {
-      ids.push(PANEL_IDS.AREAL);
-    }
-
-    if (activeModule === MODULE_IDS.STATUS && !isMin(PANEL_IDS.STATUS)) {
-      ids.push(PANEL_IDS.STATUS);
-    }
-
-    if (activeModule === MODULE_IDS.MAP && !isMin(PANEL_IDS.MAP)) {
-      ids.push(PANEL_IDS.MAP);
-    }
-
-    if (activeModule === MODULE_IDS.YEAR && !isMin(PANEL_IDS.YEAR)) {
-      ids.push(PANEL_IDS.YEAR);
-    }
-
-    if (activeModule === MODULE_IDS.SEASONALITY && !isMin(PANEL_IDS.SEASONALITY)) {
-      ids.push(PANEL_IDS.SEASONALITY);
-    }
-
-    if (
-      (activeModule === MODULE_IDS.POLYGON ||
-        (activeModule === MODULE_IDS.FEATURE && polygonDockedWithFeature)) &&
-      !isMin(PANEL_IDS.POLYGON)
-    ) {
-      ids.push(PANEL_IDS.POLYGON);
-    }
-
-    if (
-      (activeModule === MODULE_IDS.BUFFER ||
-        (activeModule === MODULE_IDS.FEATURE && bufferDockedWithFeature)) &&
-      !isMin(PANEL_IDS.BUFFER)
-    ) {
-      ids.push(PANEL_IDS.BUFFER);
-    }
-
-    if (activeModule === MODULE_IDS.AREA && !isMin(PANEL_IDS.AREA)) {
-      ids.push(PANEL_IDS.AREA);
-    }
-
-    if (activeModule === MODULE_IDS.SEARCH && !isMin(PANEL_IDS.SEARCH)) {
-      ids.push(PANEL_IDS.SEARCH);
-    }
-
-    if (activeModule === MODULE_IDS.OOPT && !isMin(PANEL_IDS.OOPT)) {
-      ids.push(PANEL_IDS.OOPT);
-    }
-
-    if (activeModule === MODULE_IDS.REGIONS && !isMin(PANEL_IDS.REGIONS)) {
-      ids.push(PANEL_IDS.REGIONS);
-    }
-
-    if (activeModule === MODULE_IDS.SUBMIT && !isMin(PANEL_IDS.SUBMIT)) {
-      ids.push(PANEL_IDS.SUBMIT);
-    }
-
-    if (activeModule === MODULE_IDS.DATA_WORK && !isMin(PANEL_IDS.DATA_WORK)) {
-      ids.push(PANEL_IDS.DATA_WORK);
-    }
-
-    if (activeModule === MODULE_IDS.REDBOOK && !isMin(PANEL_IDS.REDBOOK)) {
-      ids.push(PANEL_IDS.REDBOOK);
-    }
-
-    if (
-      selectedBoundsFeature &&
-      (activeModule === MODULE_IDS.OOPT || ooptPointsFilterActive) &&
-      !isMin(PANEL_IDS.OOPT_FEATURE)
-    ) {
-      ids.push(PANEL_IDS.OOPT_FEATURE);
-    }
-
-    if (
-      boundsSpeciesListOpen &&
-      selectedBoundsFeature &&
-      (activeModule === MODULE_IDS.OOPT || ooptPointsFilterActive) &&
-      !isMin(TASKBAR_PANEL_IDS.OOPT_SPECIES)
-    ) {
-      ids.push(TASKBAR_PANEL_IDS.OOPT_SPECIES);
-    }
-
-    if (regionSpeciesPanelOpen && !isMin(PANEL_IDS.REGION_SPECIES)) {
-      ids.push(PANEL_IDS.REGION_SPECIES);
-    }
-
-    if (dataSourcesPanelOpen) {
-      ids.push(PANEL_IDS.DATA_SOURCES);
-    }
-
-    if (tempArchivePanelOpen && !isMin(PANEL_IDS.TEMP_ARCHIVE)) {
-      ids.push(PANEL_IDS.TEMP_ARCHIVE);
-    }
-
-    if (comparePanelOpen && !isMin(PANEL_IDS.COMPARE)) {
-      ids.push(PANEL_IDS.COMPARE);
-    }
-
-    if (reportPanelOpen && !isMin(PANEL_IDS.REPORT)) {
-      ids.push(PANEL_IDS.REPORT);
-    }
-
-    if (analysisPanelOpen && !isMin(PANEL_IDS.ANALYSIS)) {
-      ids.push(PANEL_IDS.ANALYSIS);
-    }
-
-    if (compareDiversityOpen && !isMin(PANEL_IDS.COMPARE_DIVERSITY)) {
-      ids.push(PANEL_IDS.COMPARE_DIVERSITY);
-    }
-
-    if (compareSimilarityOpen && !isMin(PANEL_IDS.COMPARE_SIMILARITY)) {
-      ids.push(PANEL_IDS.COMPARE_SIMILARITY);
-    }
-
-    if (compareDistributionOpen && !isMin(PANEL_IDS.COMPARE_DISTRIBUTION)) {
-      ids.push(PANEL_IDS.COMPARE_DISTRIBUTION);
-    }
-
-    if (compareStatsKind && !isMin(PANEL_IDS.COMPARE_STATS)) {
-      ids.push(PANEL_IDS.COMPARE_STATS);
-    }
-
-    if (
-      dataSourceMode === DATA_SOURCE_MODES.EXTERNAL &&
-      externalProcessingActive &&
-      !isMin(PANEL_IDS.EXTERNAL_PROCESSING)
-    ) {
-      ids.push(PANEL_IDS.EXTERNAL_PROCESSING);
-    }
-
-    return ids;
-  }, [
+  const {
+    activeTaskbarPanelIds,
+    expandedTaskbarPanelIds,
+    handleTaskbarPanelClick
+  } = useTaskbarDomain({
     activeModule,
+    analysisPanelOpen,
     arealDockedWithFeature,
     boundsSpeciesListOpen,
     bufferDockedWithFeature,
-    polygonDockedWithFeature,
+    compareDistributionOpen,
+    compareDiversityOpen,
+    comparePanelOpen,
+    compareSimilarityOpen,
+    compareStatsKind,
     dataSourceMode,
     dataSourcesPanelOpen,
-    tempArchivePanelOpen,
-    comparePanelOpen,
-    reportPanelOpen,
-    analysisPanelOpen,
-    compareDiversityOpen,
-    compareSimilarityOpen,
-    compareDistributionOpen,
-    compareStatsKind,
     densePileSpeciesListOpen,
     denseProcessingActive,
     externalProcessingActive,
-    ooptPointsFilterActive,
-    panelMinimized,
-    regionSpeciesPanelOpen,
-    selectedBoundsFeature
-  ]);
-
-  /** Уводим все видимые панели в taskbar, кроме exceptPanelId. */
-  const stashVisiblePanelsToTaskbar = useCallback(
-    (exceptPanelId = null) => {
-      const visibleIds = collectVisiblePanelIds().filter(
-        (panelId) => panelId !== exceptPanelId
-      );
-
-      if (visibleIds.length === 0) {
-        return;
-      }
-
-      setPanelMinimized((prev) => {
-        const next = { ...prev };
-        let changed = false;
-
-        visibleIds.forEach((panelId) => {
-          if (!next[panelId]) {
-            next[panelId] = true;
-            changed = true;
-          }
-        });
-
-        return changed ? next : prev;
-      });
-      pinPanelsToTaskbar(visibleIds);
-    },
-    [collectVisiblePanelIds, pinPanelsToTaskbar]
-  );
-
-  stashVisiblePanelsToTaskbarRef.current = stashVisiblePanelsToTaskbar;
-
-  const activeTaskbarPanelIds = useMemo(() => {
-    const visibleIds = new Set(collectVisiblePanelIds());
-    return panelTaskbarOrder.filter((panelId) => visibleIds.has(panelId));
-  }, [collectVisiblePanelIds, panelTaskbarOrder]);
-
-  const handleTaskbarPanelClick = useCallback(
-    (panelId) => {
-      if (collectVisiblePanelIds().includes(panelId)) {
-        minimizePanel(panelId);
-        return;
-      }
-
-      restorePanel(panelId);
-    },
-    [collectVisiblePanelIds, minimizePanel, restorePanel]
-  );
-
-  const [externalSourcesLoadActive, setExternalSourcesLoadActive] = useState(
-    () => isExternalSourcesLoadActive()
-  );
-
-  useEffect(() => {
-    return subscribeExternalSourcesLoad((snap) => {
-      setExternalSourcesLoadActive(Boolean(snap.gbif.loading || snap.inat.loading));
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!externalSourcesLoadActive) {
-      return;
-    }
-    pinPanelsToTaskbar([PANEL_IDS.DATA_SOURCES]);
-  }, [externalSourcesLoadActive, pinPanelsToTaskbar]);
-
-  const handleOpenExternalLoadPanel = useCallback(() => {
-    if (
-      dataSourceMode !== DATA_SOURCE_MODES.EXTERNAL &&
-      dataSourceMode !== DATA_SOURCE_MODES.TEMP
-    ) {
-      handleDataSourceModeChange(DATA_SOURCE_MODES.EXTERNAL);
-    }
-    restorePanel(PANEL_IDS.DATA_SOURCES);
-  }, [dataSourceMode, handleDataSourceModeChange, restorePanel]);
-
-  const handleRegionOpenDataLoad = useCallback(
-    (kind, includeBuffer = false) => {
-      const overlayActive = overlayRegionEdit.active;
-      const entries = overlayActive
-        ? overlayRegionEdit.isos.map((iso) => {
-            const catalogEntry = regionCatalog.find((item) => item.iso === iso);
-            const overlayFeature =
-              overlayRegionEdit.features.find((feature) => feature.properties?.iso === iso) ||
-              catalogEntry?.feature;
-            return (
-              catalogEntry || {
-                iso,
-                name: overlayFeature?.properties?.name || iso,
-                nameEn: overlayFeature?.properties?.name_en || "",
-                feature: overlayFeature
-              }
-            );
-          })
-        : selectedRegionIsos
-            .map((iso) => regionCatalog.find((item) => item.iso === iso))
-            .filter(Boolean);
-
-      const { matched, unmatched } = matchMapRegionsToExternal(entries);
-      const activeBufferKm = overlayActive ? overlayRegionBufferKm : regionBufferKm;
-      const spatialByRegionId = {};
-      if (includeBuffer && activeBufferKm > 0) {
-        matched.forEach(({ region, feature }) => {
-          const buffered = applyBufferToExternalRegion(region, feature, activeBufferKm);
-          if (buffered) {
-            spatialByRegionId[region.id] = buffered;
-          }
-        });
-      }
-
-      setDataSourcesFocusRequest({
-        kind,
-        // Пустой список совпадений означает "не удалось сопоставить регион",
-        // а не "нужно показать пустую таблицу" — в этом случае показываем
-        // полный список регионов, как без выделения.
-        regions: matched.length > 0 ? matched.map((item) => item.region) : null,
-        spatialByRegionId:
-          Object.keys(spatialByRegionId).length > 0 ? spatialByRegionId : null,
-        unmatchedLabels: unmatched
-      });
-      handleOpenExternalLoadPanel();
-    },
-    [
-      handleOpenExternalLoadPanel,
-      overlayRegionBufferKm,
-      overlayRegionEdit,
-      regionBufferKm,
-      regionCatalog,
-      selectedRegionIsos
-    ]
-  );
-
-  const handleDataSourcesPanelToggle = useCallback(() => {
-    if (dataSourcesPanelOpen) {
-      if (isExternalSourcesLoadActive()) {
-        minimizePanel(PANEL_IDS.DATA_SOURCES);
-        return;
-      }
-      setDataSourcesPanelOpen(false);
-      setDataSourcesFocusRequest(null);
-      setExternalProcessingActive(false);
-      setPanelMinimized((prev) => ({
-        ...prev,
-        [PANEL_IDS.DATA_SOURCES]: true,
-        [PANEL_IDS.EXTERNAL_PROCESSING]: true
-      }));
-      unpinPanelsFromTaskbar([
-        PANEL_IDS.DATA_SOURCES,
-        PANEL_IDS.EXTERNAL_PROCESSING
-      ]);
-      return;
-    }
-
-    handleOpenExternalLoadPanel();
-  }, [
-    dataSourcesPanelOpen,
-    handleOpenExternalLoadPanel,
+    expandPanel,
+    isPanelOpen,
     minimizePanel,
-    unpinPanelsFromTaskbar
-  ]);
+    ooptPointsFilterActive,
+    panelCollapsed,
+    panelMinimized,
+    panelTaskbarOrder,
+    pinPanelsToTaskbar,
+    polygonDockedWithFeature,
+    regionSpeciesPanelOpen,
+    reportPanelOpen,
+    restorePanel,
+    settingsPanelOpen,
+    selectedBoundsFeature,
+    tempArchivePanelOpen,
+  });
+
+  const {
+    externalSourcesLoadActive,
+    handleDataSourcesPanelToggle,
+    handleOpenExternalLoadPanel,
+    handleRegionOpenDataLoad
+  } = useExternalSourcesDomain({
+    dataSourceMode,
+    dataSourcesPanelOpen,
+    handleDataSourceModeChange,
+    isPanelMinimized,
+    minimizePanel,
+    overlayRegionBufferKm,
+    overlayRegionEdit,
+    pinPanelsToTaskbar,
+    regionBufferKm,
+    regionCatalog,
+    restorePanel,
+    selectedRegionIsos,
+    setDataSourcesFocusRequest,
+    setDataSourcesPanelOpen,
+    setExternalProcessingActive,
+    setPanelMinimized,
+    unpinPanelsFromTaskbar,
+  });
 
   const effectiveWithinFeature = useMemo(() => {
     if (ooptPointsFilterActive && ooptWithinFeature) {
@@ -3741,252 +3143,45 @@ export default function MapView() {
     };
   }, [builtSpeciesPolygons, intersectionSpeciesA, intersectionSpeciesB]);
 
-  useEffect(() => {
-    if (!isPolygonToolActive(activeModule, polygonDockedWithFeature)) {
-      setPolygonAddMode(false);
-      clearIntersectionState();
-    }
-  }, [activeModule, clearIntersectionState, polygonDockedWithFeature]);
-
-  useEffect(() => {
-    if (activeModule !== MODULE_IDS.TIMELINE) {
-      setArealDynamicsEnabled(false);
-      setArealDynamicsFeature(null);
-      setArealDynamicsSlices([]);
-      setArealDynamicsComputing(false);
-      setArealDynamicsHideOthers(false);
-      setArealDynamicsBuildMode(POLYGON_BUILD_MODES.CONVEX);
-    }
-  }, [activeModule]);
-
-  useEffect(() => {
-    if (activeModule !== MODULE_IDS.TIMELINE || !arealDynamicsEnabled || !popupData) {
-      return;
-    }
-
-    setArealDynamicsFeature(popupData);
-  }, [activeModule, arealDynamicsEnabled, popupData]);
-
-  useEffect(() => {
-    if (!arealDynamicsEnabled || !arealDynamicsFeature) {
-      setArealDynamicsSlices([]);
-      setArealDynamicsComputing(false);
-      return undefined;
-    }
-
-    setArealDynamicsComputing(true);
-    const timer = window.setTimeout(() => {
-      setArealDynamicsSlices(
-        buildArealDynamicsSlices(arealDynamicsFeature, arealDynamicsBuildMode)
-      );
-      setArealDynamicsComputing(false);
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, [arealDynamicsEnabled, arealDynamicsFeature, arealDynamicsBuildMode]);
-
-  useEffect(() => {
-    if (!map.current || !mapReady) {
-      return;
-    }
-
-    let polygonsToSync = speciesPolygons;
-
-    if (
-      activeModule === MODULE_IDS.TIMELINE &&
-      arealDynamicsEnabled &&
-      arealDynamicsFeature?.properties?.name_latin
-    ) {
-      const activeLatin = arealDynamicsFeature.properties.name_latin;
-      polygonsToSync = speciesPolygons.map((entry) =>
-        entry.nameLatin === activeLatin ? { ...entry, hidden: true } : entry
-      );
-    } else if (
-      intersectionOnlyMode &&
-      intersectionResult?.hasIntersection &&
-      intersectionResult.speciesA &&
-      intersectionResult.speciesB
-    ) {
-      const hiddenLatins = new Set([
-        intersectionResult.speciesA.nameLatin,
-        intersectionResult.speciesB.nameLatin
-      ]);
-
-      polygonsToSync = speciesPolygons.map((entry) =>
-        hiddenLatins.has(entry.nameLatin) ? { ...entry, hidden: true } : entry
-      );
-    }
-
-    syncSpeciesPolygonLayer(map.current, polygonsToSync);
-  }, [
-    speciesPolygons,
-    mapReady,
+  useGeometryToolsDomain({
     activeModule,
+    areaDrawTool,
+    areaDrawingActive,
+    areaGeometry,
+    areaOperationMode,
+    arealDynamicsBuildMode,
     arealDynamicsEnabled,
     arealDynamicsFeature,
-    intersectionOnlyMode,
-    intersectionResult
-  ]);
-
-  useEffect(() => {
-    if (!map.current || !mapReady) {
-      return;
-    }
-
-    if (
-      activeModule === MODULE_IDS.TIMELINE &&
-      arealDynamicsEnabled &&
-      arealDynamicsSlices.length > 0
-    ) {
-      syncArealDynamicsLayer(
-        map.current,
-        filterSlicesUpToYear(arealDynamicsSlices, timelineYear)
-      );
-      return;
-    }
-
-    clearArealDynamicsLayer(map.current);
-  }, [
-    activeModule,
-    arealDynamicsEnabled,
     arealDynamicsSlices,
+    builtSpeciesPolygons,
+    clearIntersectionState,
+    computeIntersectionFromSelection,
+    intersectionLockedPair,
+    intersectionOnlyMode,
+    intersectionPinned,
+    intersectionResult,
+    map,
+    mapReady,
+    polygonDockedWithFeature,
+    popupData,
+    setAreaDrawingActive,
+    setAreaGeometry,
+    setAreaOperationMode,
+    setArealDynamicsBuildMode,
+    setArealDynamicsComputing,
+    setArealDynamicsEnabled,
+    setArealDynamicsFeature,
+    setArealDynamicsHideOthers,
+    setArealDynamicsSlices,
+    setIntersectionLockedPair,
+    setIntersectionOnlyMode,
+    setIntersectionResult,
+    setIntersectionSpeciesA,
+    setIntersectionSpeciesB,
+    setPolygonAddMode,
+    speciesPolygons,
     timelineYear,
-    mapReady
-  ]);
-
-  useEffect(() => {
-    if (!intersectionLockedPair) {
-      return;
-    }
-
-    const hasA = builtSpeciesPolygons.some(
-      (entry) => entry.nameLatin === intersectionLockedPair.latinA
-    );
-    const hasB = builtSpeciesPolygons.some(
-      (entry) => entry.nameLatin === intersectionLockedPair.latinB
-    );
-
-    if (!hasA || !hasB) {
-      setIntersectionLockedPair(null);
-    }
-  }, [intersectionLockedPair, builtSpeciesPolygons]);
-
-  useEffect(() => {
-    if (intersectionResult) {
-      setPolygonAddMode(false);
-    }
-  }, [intersectionResult]);
-
-  useEffect(() => {
-    if (!intersectionResult?.hasIntersection) {
-      setIntersectionOnlyMode(false);
-    }
-  }, [intersectionResult]);
-
-  useEffect(() => {
-    if (!map.current || !mapReady) {
-      return;
-    }
-
-    if (intersectionResult?.hasIntersection && intersectionResult.feature) {
-      updateSpeciesPolygonIntersectionLayer(map.current, intersectionResult.feature);
-      return;
-    }
-
-    clearSpeciesPolygonIntersectionLayer(map.current);
-  }, [intersectionResult, mapReady]);
-
-  useEffect(() => {
-    if (builtSpeciesPolygons.length < 2) {
-      setIntersectionSpeciesA(null);
-      setIntersectionSpeciesB(null);
-      clearIntersectionState();
-      return;
-    }
-
-    setIntersectionSpeciesA((current) => {
-      if (current && builtSpeciesPolygons.some((entry) => entry.nameLatin === current)) {
-        return current;
-      }
-
-      return builtSpeciesPolygons[0]?.nameLatin ?? null;
-    });
-
-    setIntersectionSpeciesB((current) => {
-      if (current && builtSpeciesPolygons.some((entry) => entry.nameLatin === current)) {
-        return current;
-      }
-
-      return builtSpeciesPolygons[1]?.nameLatin ?? null;
-    });
-  }, [builtSpeciesPolygons, clearIntersectionState]);
-
-  useEffect(() => {
-    if (!intersectionPinned) {
-      return;
-    }
-
-    const nextResult = computeIntersectionFromSelection();
-
-    if (!nextResult) {
-      clearIntersectionState();
-      return;
-    }
-
-    setIntersectionResult(nextResult);
-  }, [speciesPolygons, intersectionPinned, computeIntersectionFromSelection, clearIntersectionState]);
-
-  useEffect(() => {
-    if (activeModule !== MODULE_IDS.AREA) {
-      setAreaDrawingActive(false);
-    }
-  }, [activeModule]);
-
-  useEffect(() => {
-    if (!map.current || !mapReady) {
-      return;
-    }
-
-    if (areaGeometry) {
-      updateAreaSelectionLayer(map.current, areaGeometry);
-    } else {
-      clearAreaSelectionLayer(map.current);
-    }
-  }, [areaGeometry, mapReady]);
-
-  useEffect(() => {
-    const mapInstance = map.current;
-    if (!mapInstance || !mapReady || activeModule !== MODULE_IDS.AREA || !areaDrawingActive) {
-      stopActiveAreaDrawing();
-      return;
-    }
-
-    startAreaDrawing(mapInstance, areaDrawTool, {
-      onPreview: (coordinates) => {
-        updateAreaSelectionPreview(mapInstance, coordinates);
-      },
-      onComplete: (ringCoordinates) => {
-        setAreaGeometry((current) =>
-          applyAreaGeometryOperation(current, ringCoordinates, areaOperationMode)
-        );
-        setAreaDrawingActive(false);
-      },
-      onCancel: () => {
-        setAreaDrawingActive(false);
-        updateAreaSelectionPreview(mapInstance, []);
-      }
-    });
-
-    return () => {
-      stopActiveAreaDrawing();
-    };
-  }, [areaDrawingActive, areaDrawTool, areaOperationMode, activeModule, mapReady]);
-
-  useEffect(() => {
-    if (!areaGeometry && areaOperationMode === AREA_OPERATION_MODES.SUBTRACT) {
-      setAreaOperationMode(AREA_OPERATION_MODES.ADD);
-    }
-  }, [areaGeometry, areaOperationMode]);
+  });
 
   const handleAreaDrawToolChange = useCallback((nextTool) => {
     if (areaDrawTool === nextTool && areaDrawingActive) {
@@ -4329,360 +3524,64 @@ export default function MapView() {
     bumpPointsDataRevision();
   }, [locationFilters, bumpPointsDataRevision]);
 
-  useEffect(() => {
-    setHiddenPointKeysForFilter(effectiveHiddenPointKeys);
-  }, [effectiveHiddenPointKeys]);
-
-  useEffect(() => {
-    if (!mapReady || !map.current) {
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    (async () => {
-      try {
-        await loadPointAttributionsFromFirestore();
-        if (cancelled || !map.current) {
-          return;
-        }
-
-        applyLocationsFilter(map.current, locationFilters);
-        applyGbifLocationsFilter(map.current, locationFilters);
-        applyInatLocationsFilter(map.current, locationFilters);
-        bumpPointsDataRevision();
-      } catch (error) {
-        console.warn("Failed to load point attributions:", error);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // Только при готовности карты: locationFilters подхватит оверлей через apply* ниже.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, bumpPointsDataRevision]);
-
-  useEffect(() => {
-    if (!mapReady || !map.current) {
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const result = await loadMergedPointsFromFirestore();
-        if (cancelled || !map.current) {
-          return;
-        }
-
-        setMergedData(map.current, result.collection);
-
-        if (result.hiddenKeys.length > 0) {
-          setMergeHiddenKeys((current) => {
-            const nextSet = new Set(current);
-            result.hiddenKeys.forEach((key) => {
-              if (key) {
-                nextSet.add(String(key));
-              }
-            });
-            return [...nextSet];
-          });
-          bumpPointsDataRevision();
-        }
-      } catch (error) {
-        console.warn("Failed to load merged points:", error);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mapReady, bumpPointsDataRevision]);
-
-  useEffect(() => {
-    setHoverTooltipsEnabled(!hoverTooltipsDisabled);
-  }, [hoverTooltipsDisabled]);
-
-  useEffect(() => {
-    if (!mapReady) {
-      return undefined;
-    }
-    let cancelled = false;
-    void hydrateRegionOverlaysFromPersistence().then(() => {
-      if (cancelled) {
-        return;
-      }
-      setRegionBoundsDisplaySourceState(getRegionBoundsDisplaySource());
-      setTempLayersRevision((value) => value + 1);
-      setRegionOverlaysHydrated(true);
-      if (map.current) {
-        setTempLayerOverlaysData(map.current);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [mapReady]);
-
-  useEffect(() => {
-    if (!map.current || !mapReady) {
-      return;
-    }
-    const loadedIsos =
-      overlayRegionEdit.active || dataSourceMode === DATA_SOURCE_MODES.NONE
-        ? []
-        : listLoadedRegionCatalogIsos(regionCatalog).filter((iso) => !hiddenRegionIsoSet.has(iso));
-    const useOsmContours =
-      regionBoundsDisplaySource === REGION_BOUNDS_DISPLAY_SOURCES.OSM;
-    setRegionBoundsDisplaySource(regionBoundsDisplaySource);
-    setRegionBoundsContoursEnabled(regionBoundsEnabled);
-    const showRegionBounds =
-      !useOsmContours && (regionBoundsEnabled || loadedIsos.length > 0);
-    setRegionBoundsEnabled(map.current, showRegionBounds);
-    if (!overlayRegionEdit.active) {
-      applyRegionBoundsPaintSettings(map.current, regionBoundsSettings, regionFeatureColors);
-    } else {
-      const overlayEdit = getVisibleRegionOverlayEditState();
-      applyTempRegionOverlayPaint(map.current, {
-        settings: overlayEdit.style || regionBoundsSettings,
-        featureColors: overlayEdit.featureColors
-      });
-    }
-
-    const allVisible = hiddenRegionIsos.length === 0;
-    const catalogVisibleIsos = allVisible
-      ? null
-      : regionCatalog
-          .map((entry) => entry.iso)
-          .filter((iso) => !hiddenRegionIsoSet.has(iso));
-    const visibleIsos =
-      !regionBoundsEnabled && loadedIsos.length > 0 ? loadedIsos : catalogVisibleIsos;
-    applyRegionBoundsIsoFilter(map.current, visibleIsos);
-    setRegionBoundsSelectedIsos(map.current, selectedRegionIsos);
-    setRegionBoundsLoadedIsos(map.current, loadedIsos);
-    setTempLayerOverlaysData(map.current, { hiddenIsos: hiddenRegionIsos });
-    setTempOverlaySelectedIsos(map.current, selectedRegionIsos);
-  }, [
-    mapReady,
-    regionBoundsEnabled,
-    regionBoundsDisplaySource,
-    regionBoundsSettings,
-    regionFeatureColors,
-    hiddenRegionIsos,
+  const {
+    handleArealReset,
+    handleBufferReset,
+    handleSpeciesPolygonResetAll
+  } = useLayerSyncDomain({
+    basemapMode,
+    bumpPointsDataRevision,
+    dataSourceMode,
+    effectiveHiddenPointKeys,
     hiddenRegionIsoSet,
-    regionCatalog,
-    selectedRegionIsos,
-    overlayRegionEdit,
-    pointsDataRevision,
-    tempLayersRevision,
-    dataSourceMode
-  ]);
-
-  useEffect(() => {
-    if (overlayRegionEdit.active && !overlayRegionModeRef.current) {
-      setOverlayRegionBufferKm(overlayRegionEdit.bufferKm);
-      if (overlayRegionEdit.style) {
-        setRegionBoundsSettings(overlayRegionEdit.style);
-      }
-    } else if (!overlayRegionEdit.active && overlayRegionModeRef.current) {
-      setRegionBoundsSettings(loadRegionBoundsSettingsFromStorage());
-    }
-    overlayRegionModeRef.current = overlayRegionEdit.active;
-  }, [overlayRegionEdit.active, overlayRegionEdit.bufferKm, overlayRegionEdit.style]);
-
-  useEffect(() => {
-    if (!map.current || !mapReady) {
-      return;
-    }
-
-    if (overlayRegionEdit.active) {
-      updateRegionSelectionBuffer(
-        map.current,
-        overlayRegionEdit.features,
-        overlayRegionBufferKm
-      );
-      return;
-    }
-
-    const features = regionBoundsEnabled
-      ? selectedRegionIsos
-          .map((iso) => regionCatalog.find((entry) => entry.iso === iso)?.feature)
-          .filter(Boolean)
-      : [];
-    updateRegionSelectionBuffer(map.current, features, regionBufferKm);
-  }, [
+    hiddenRegionIsos,
+    hiddenRegionIsosRef,
+    hoverTooltipsDisabled: effectiveHoverTooltipsDisabled,
+    locationFilters,
+    map,
     mapReady,
-    overlayRegionEdit,
     overlayRegionBufferKm,
+    overlayRegionEdit,
+    overlayRegionModeRef,
+    pointsDataRevision,
+    regionAddModeRef,
+    regionBoundsDisplaySource,
     regionBoundsEnabled,
+    regionBoundsSettings,
+    regionBufferKm,
     regionCatalog,
+    regionCatalogRef,
+    regionFeatureColors,
     selectedRegionIsos,
-    regionBufferKm
-  ]);
-
-  useEffect(() => {
-    if (!mapReady) {
-      return undefined;
-    }
-
-    let cancelled = false;
-    loadRegionBoundsGeoJSON()
-      .then((data) => {
-        if (!cancelled) {
-          setRegionCatalog(buildRegionCatalog(data));
-        }
-      })
-      .catch((error) => {
-        console.error("Не удалось загрузить каталог регионов", error);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mapReady]);
-
-  useEffect(() => {
-    if (!regionCatalog.length) {
-      return;
-    }
-    setRegionFeatureColors((current) => {
-      if (current && Object.keys(current).length > 0) {
-        return current;
-      }
-      return createSubtleRegionColorMap(
-        regionCatalog.map((entry) => entry.iso),
-        regionBoundsSettings.fillColor
-      );
-    });
-  }, [regionCatalog, regionBoundsSettings.fillColor]);
-
-  useEffect(() => {
-    setRegionBoundsSelectHandler((entry, lngLat) => {
-      if (!entry?.iso || !map.current) {
-        return;
-      }
-
-      setActiveModule(MODULE_IDS.REGIONS);
-      setRegionBoundsVisible(true);
-
-      const alreadySelected = selectedRegionIsosRef.current.includes(entry.iso);
-      const nextSelection = alreadySelected
-        ? selectedRegionIsosRef.current
-        : regionAddModeRef.current
-          ? [...selectedRegionIsosRef.current, entry.iso]
-          : [entry.iso];
-
-      selectedRegionIsosRef.current = nextSelection;
-      setSelectedRegionIsos(nextSelection);
-
-      showRegionActionPopup(map.current, {
-        title: entry.name,
-        lngLat,
-        selected: alreadySelected,
-        onAdd: () => {
-          regionAddModeRef.current = true;
-          setRegionAddMode(true);
-          if (hiddenRegionIsosRef.current.length > 0) {
-            hiddenRegionIsosRef.current = [];
-            setHiddenRegionIsos([]);
-          }
-          hideRegionActionPopup();
-        },
-        onRemove: () => {
-          const next = selectedRegionIsosRef.current.filter((iso) => iso !== entry.iso);
-          selectedRegionIsosRef.current = next;
-          setSelectedRegionIsos(next);
-          if (next.length === 0) {
-            regionAddModeRef.current = false;
-            setRegionAddMode(false);
-          }
-          hideRegionActionPopup();
-        },
-        onIsolate: () => {
-          const keep = new Set(selectedRegionIsosRef.current);
-          const hidden = [
-            ...regionCatalogRef.current.map((item) => item.iso).filter((iso) => !keep.has(iso)),
-            ...listOsmOverlaySelectableIsos().filter((iso) => !keep.has(iso))
-          ];
-          hiddenRegionIsosRef.current = hidden;
-          setHiddenRegionIsos(hidden);
-          regionAddModeRef.current = false;
-          setRegionAddMode(false);
-          hideRegionActionPopup();
-        },
-        getTempLayerChoices: () =>
-          listTempLayerPlaques().map((plaque) => ({
-            key: plaque.key,
-            label: plaque.label || plaque.taxonName || "Слой"
-          })),
-        onAddToLayer: (plaqueKey) => {
-          const catalogFeature = getRegionEntryByIso(entry.iso)?.feature;
-          const feature = catalogFeature || entry.feature;
-          const result = appendRegionPolygonToTempPlaque(plaqueKey, {
-            iso: entry.iso,
-            feature,
-            name: entry.name
-          });
-          if (result?.ok) {
-            persistTempLayers().catch(() => {});
-          }
-          hideRegionActionPopup();
-        }
-      });
-    });
-    return () => setRegionBoundsSelectHandler(null);
-  }, []);
-
-  useEffect(() => {
-    if (!map.current || !mapReady) {
-      return;
-    }
-
-    if (basemapMode === BASEMAP_MODES.YANDEX) {
-      setOsmBasemapEnabled(map.current, false);
-      setYandexBasemapEnabled(map.current, true);
-      return;
-    }
-
-    setYandexBasemapEnabled(map.current, false);
-
-    if (basemapMode === BASEMAP_MODES.OSM) {
-      setOsmBasemapEnabled(map.current, true);
-      return;
-    }
-
-    setOsmBasemapEnabled(map.current, false);
-  }, [basemapMode, mapReady]);
-
-  const handleSpeciesPolygonResetAll = useCallback(() => {
-    setSpeciesPolygons([]);
-    setActivePolygonId(null);
-    setPolygonAddMode(false);
-    setIntersectionSpeciesA(null);
-    setIntersectionSpeciesB(null);
-    setIntersectionResult(null);
-    setIntersectionOnlyMode(false);
-    setIntersectionLockedPair(null);
-
-    if (map.current) {
-      clearSpeciesPolygonLayer(map.current);
-    }
-  }, []);
-
-  const handleArealReset = useCallback(() => {
-    setArealEnabled(false);
-    setArealAllMarkers(false);
-    setArealRadius(DEFAULT_AREAL_RADIUS_KM);
-  }, []);
-
-  const handleBufferReset = useCallback(() => {
-    setBufferEnabled(false);
-    setBufferRadii(DEFAULT_BUFFER_RADII_KM);
-    setBufferSelectedPoints([]);
-    setBufferSelectionMode(false);
-  }, []);
+    selectedRegionIsosRef,
+    setActivePolygonId,
+    setArealAllMarkers,
+    setArealEnabled,
+    setArealRadius,
+    setBufferEnabled,
+    setBufferRadii,
+    setBufferSelectedPoints,
+    setBufferSelectionMode,
+    setHiddenRegionIsos,
+    setIntersectionLockedPair,
+    setIntersectionOnlyMode,
+    setIntersectionResult,
+    setIntersectionSpeciesA,
+    setIntersectionSpeciesB,
+    setMergeHiddenKeys,
+    setOverlayRegionBufferKm,
+    setPolygonAddMode,
+    setRegionAddMode,
+    setRegionBoundsDisplaySourceState,
+    setRegionBoundsSettings,
+    setRegionCatalog,
+    setRegionFeatureColors,
+    setRegionOverlaysHydrated,
+    setSelectedRegionIsos,
+    setSpeciesPolygons,
+    setTempLayersRevision,
+    tempLayersRevision,
+  });
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -4925,6 +3824,7 @@ export default function MapView() {
     applyTempLayersGroupingMode(map.current, {
       clusterByTempLayers,
       clusterByTempSublayers,
+      clusterByRegnum,
       clusterPieCharts: grouping.clusterPieCharts,
       clusteringEnabled: grouping.clusteringEnabled,
       denseClustersHighlight: grouping.denseClustersHighlight
@@ -5036,12 +3936,12 @@ export default function MapView() {
       if (!map.current) {
         return;
       }
-      refreshHeatmapSourceOptions(externalOnly);
-      // Общая тепловая карта: в режиме временных слоёв — только они;
-      // при авто-растровом режиме включаем её независимо от ручного тумблера пользователя.
-      setHeatmapEnabled(map.current, heatmapEnabled || autoRasterMode, locationFilters);
+      refreshHeatmapSourceOptions(tempOnly);
+      // Тепловая карта только по переключателям: общая — в «Группах точек»,
+      // отдельные — у временных слоёв. Порог числа точек её сам не включает.
+      setHeatmapEnabled(map.current, heatmapEnabled, locationFilters);
       syncTempLayerHeatmaps(map.current, {
-        active: externalOnly,
+        active: tempOnly,
         filters: locationFilters,
         layers: getTempLayers()
       });
@@ -5051,7 +3951,7 @@ export default function MapView() {
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [heatmapEnabled, autoRasterMode, locationFilters, externalOnly, tempLayersRevision, heatmapSettings]);
+  }, [heatmapEnabled, locationFilters, tempOnly, tempLayersRevision, heatmapSettings]);
 
   useEffect(() => {
     if (!analysisPanelOpen) {
@@ -5691,7 +4591,6 @@ export default function MapView() {
   }, [denseGroupsHidden]);
 
   const handleDenseProcessingOpen = useCallback(() => {
-    stashVisiblePanelsToTaskbarRef.current(PANEL_IDS.DENSE);
     setMarkersVisibleState(true);
     setDenseClustersHighlightState(true);
     setDenseGroupsHidden(false);
@@ -6635,6 +5534,16 @@ export default function MapView() {
 
   const closePanel = useCallback(
     (panelId) => {
+      // Панель закрывается окончательно: уходит и с экрана, и из дока.
+      closePanelById(panelId);
+
+      // Снимаем подсветку модуля, иначе повторный клик по нему только свернёт меню
+      // и не откроет панель заново.
+      const moduleIdForPanel = PANEL_MODULE_IDS[panelId];
+      if (moduleIdForPanel) {
+        setActiveModule((current) => (current === moduleIdForPanel ? null : current));
+      }
+
       switch (panelId) {
         case PANEL_IDS.FEATURE: {
           clearPointSelection();
@@ -6726,6 +5635,11 @@ export default function MapView() {
           unpinPanelsFromTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
           break;
         }
+        case PANEL_IDS.SETTINGS: {
+          setSettingsPanelOpen(false);
+          unpinPanelsFromTaskbar([PANEL_IDS.SETTINGS]);
+          break;
+        }
         case PANEL_IDS.COMPARE: {
           setComparePanelOpen(false);
           setCompareDiversityOpen(false);
@@ -6811,6 +5725,7 @@ export default function MapView() {
       bufferDockedWithFeature,
       polygonDockedWithFeature,
       clearPointSelection,
+      closePanelById,
       handleBoundsSpeciesListClose,
       handleCloseNearSpeciesMatches,
       handleCloseUnattributedPoints,
@@ -6819,6 +5734,18 @@ export default function MapView() {
       handleDenseProcessingClose,
       handleCloseRegionSpeciesPanel,
       minimizePanel,
+      setAnalysisPanelOpen,
+      setCompareDistributionOpen,
+      setCompareDiversityOpen,
+      setComparePanelOpen,
+      setCompareSimilarityOpen,
+      setCompareStatsKind,
+      setDataSourcesFocusRequest,
+      setDataSourcesPanelOpen,
+      setPanelMinimized,
+      setReportPanelOpen,
+      setSettingsPanelOpen,
+      setTempArchivePanelOpen,
       unpinPanelsFromTaskbar
     ]
   );
@@ -7492,6 +6419,49 @@ export default function MapView() {
 
   const arealDisplayedContainedPoints = arealContainedPoints ?? activeToolFilterPointsSummary;
 
+  const mapDisplaySettingsProps = {
+    markersVisible,
+    onMarkersVisibleChange: setMarkersVisibleState,
+    lowPerformanceMode,
+    onPerformanceModeChange: handlePerformanceModeChange,
+    heatmapEnabled,
+    onHeatmapEnabledChange: setHeatmapEnabledState,
+    heatmapTempLayersOnly: tempOnly,
+    onHeatmapSettingsOpen: () => setHeatmapSettingsOpen(true),
+    clusteringEnabled,
+    onClusteringEnabledChange: handleClusteringEnabledChange,
+    clusterByRegnum,
+    onClusterByRegnumChange: handleClusterByRegnumChange,
+    clusterByTempLayers,
+    onClusterByTempLayersChange: handleClusterByTempLayersChange,
+    clusterByTempSublayers,
+    onClusterByTempSublayersChange: handleClusterByTempSublayersChange,
+    hasTempLayers: getTempLayers().length > 0,
+    clusterPieCharts,
+    onClusterPieChartsChange: handleClusterPieChartsChange,
+    denseClustersHighlight,
+    onDenseClustersHighlightChange: handleDenseClustersHighlightChange,
+    compactPointDisplay,
+    compactGridForced: displayedLayerPointCount > compactGridSettings.pointLimit,
+    displayedLayerPointCount,
+    compactGridPointLimit: compactGridSettings.pointLimit,
+    onCompactPointDisplayChange: handleCompactPointDisplayChange,
+    onCompactGridSettingsOpen: () => setCompactGridSettingsOpen(true),
+    onDenseProcessingOpen: handleDenseProcessingOpen,
+    mergedPointsVisible,
+    onMergedPointsVisibleChange: (visible) => {
+      if (visible) {
+        handleDataSourceModeChange(DATA_SOURCE_MODES.MERGED);
+        return;
+      }
+      if (dataSourceMode === DATA_SOURCE_MODES.MERGED) {
+        handleDataSourceModeChange(DATA_SOURCE_MODES.NONE);
+        return;
+      }
+      setMergedPointsVisible(false);
+    }
+  };
+
   const showOoptFeaturePanel =
     Boolean(selectedBoundsFeature) &&
     (activeModule === MODULE_IDS.OOPT || ooptPointsFilterActive);
@@ -7545,12 +6515,14 @@ export default function MapView() {
 
   const showModulePanelStack =
     (activeModule !== null && activeModule !== MODULE_IDS.TIMELINE) ||
+    openPanelIds.length > 0 ||
     (showOoptFeaturePanel && activeModule !== MODULE_IDS.TIMELINE) ||
     dataSourcesPanelOpen ||
     tempArchivePanelOpen ||
     comparePanelOpen ||
     reportPanelOpen ||
     analysisPanelOpen ||
+    settingsPanelOpen ||
     dataSourceMode === DATA_SOURCE_MODES.EXTERNAL ||
     denseProcessingActive;
 
@@ -7576,6 +6548,8 @@ export default function MapView() {
         onReportPanelToggle={handleReportPanelToggle}
         analysisPanelOpen={analysisPanelOpen}
         onAnalysisPanelToggle={handleAnalysisPanelToggle}
+        settingsPanelOpen={settingsPanelOpen}
+        onSettingsPanelToggle={handleSettingsPanelToggle}
         onSaveUserSettings={handleSaveMapConfig}
         onLoadUserSettings={handleLoadMapConfig}
       />
@@ -7633,7 +6607,9 @@ export default function MapView() {
               onCompareSetChange={handleCompareSetChange}
             />
           )}
-          {reportPanelOpen && !isPanelMinimized(PANEL_IDS.REPORT) && (
+          {reportPanelOpen &&
+            !FEATURE_FLAGS.reportModuleDisabled &&
+            !isPanelMinimized(PANEL_IDS.REPORT) && (
             <ReportExportPanel
               reportContext={reportContext}
               collapsed={isPanelCollapsed(PANEL_IDS.REPORT)}
@@ -7652,9 +6628,20 @@ export default function MapView() {
               onKdeOverlayChange={handleKdeOverlayChange}
             />
           )}
+          {settingsPanelOpen && !isPanelMinimized(PANEL_IDS.SETTINGS) && (
+            <SettingsPanel
+              mapDisplayProps={mapDisplaySettingsProps}
+              hoverTooltipsDisabled={hoverTooltipsDisabled}
+              onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
+              collapsed={isPanelCollapsed(PANEL_IDS.SETTINGS)}
+              onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.SETTINGS)}
+              onMinimize={handleMinimizePanel(PANEL_IDS.SETTINGS)}
+              onClose={handleClosePanel(PANEL_IDS.SETTINGS)}
+            />
+          )}
           {denseProcessingExclusive ? (
             <>
-              {activeModule === MODULE_IDS.FEATURE &&
+              {(activeModule === MODULE_IDS.FEATURE || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.FEATURE])) &&
                 !isPanelMinimized(PANEL_IDS.FEATURE) && (
                 <FeaturePopup
                   feature={popupData}
@@ -7710,7 +6697,7 @@ export default function MapView() {
             </>
           ) : (
             <>
-          {activeModule === MODULE_IDS.FEATURE &&
+          {(activeModule === MODULE_IDS.FEATURE || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.FEATURE])) &&
             !isPanelMinimized(PANEL_IDS.FEATURE) && (
             <FeaturePopup
               feature={popupData}
@@ -7738,8 +6725,8 @@ export default function MapView() {
               onClearRussianName={handleClearRussianName}
             />
           )}
-          {(activeModule === MODULE_IDS.AREAL ||
-            (activeModule === MODULE_IDS.FEATURE && arealDockedWithFeature)) &&
+          {((activeModule === MODULE_IDS.AREAL || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.AREAL])) ||
+            ((activeModule === MODULE_IDS.FEATURE || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.FEATURE])) && arealDockedWithFeature)) &&
             !isPanelMinimized(PANEL_IDS.AREAL) && (
             <ArealPopup
               enabled={arealEnabled}
@@ -7763,7 +6750,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.AREAL)}
             />
           )}
-          {activeModule === MODULE_IDS.STATUS &&
+          {(activeModule === MODULE_IDS.STATUS || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.STATUS])) &&
             !isPanelMinimized(PANEL_IDS.STATUS) && (
             <StatusFilterPanel
               activeStatusFilters={statusFilters}
@@ -7774,55 +6761,16 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.STATUS)}
             />
           )}
-          {activeModule === MODULE_IDS.MAP && !isPanelMinimized(PANEL_IDS.MAP) && (
+          {(activeModule === MODULE_IDS.MAP || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.MAP])) && !isPanelMinimized(PANEL_IDS.MAP) && (
             <MapDisplayPanel
-              markersVisible={markersVisible}
-              onMarkersVisibleChange={setMarkersVisibleState}
-              heatmapEnabled={heatmapEnabled}
-              onHeatmapEnabledChange={setHeatmapEnabledState}
-              heatmapTempLayersOnly={externalOnly}
-              onHeatmapSettingsOpen={() => setHeatmapSettingsOpen(true)}
-              clusteringEnabled={clusteringEnabled}
-              onClusteringEnabledChange={handleClusteringEnabledChange}
-              clusterByRegnum={clusterByRegnum}
-              onClusterByRegnumChange={handleClusterByRegnumChange}
-              clusterByTempLayers={clusterByTempLayers}
-              onClusterByTempLayersChange={handleClusterByTempLayersChange}
-              clusterByTempSublayers={clusterByTempSublayers}
-              onClusterByTempSublayersChange={handleClusterByTempSublayersChange}
-              hasTempLayers={getTempLayers().length > 0}
-              clusterPieCharts={clusterPieCharts}
-              onClusterPieChartsChange={handleClusterPieChartsChange}
-              denseClustersHighlight={denseClustersHighlight}
-              onDenseClustersHighlightChange={handleDenseClustersHighlightChange}
-              compactPointDisplay={compactPointDisplay}
-              compactGridForced={
-                displayedLayerPointCount > compactGridSettings.pointLimit
-              }
-              displayedLayerPointCount={displayedLayerPointCount}
-              compactGridPointLimit={compactGridSettings.pointLimit}
-              onCompactPointDisplayChange={handleCompactPointDisplayChange}
-              onCompactGridSettingsOpen={() => setCompactGridSettingsOpen(true)}
-              onDenseProcessingOpen={handleDenseProcessingOpen}
-              mergedPointsVisible={mergedPointsVisible}
-              onMergedPointsVisibleChange={(visible) => {
-                if (visible) {
-                  handleDataSourceModeChange(DATA_SOURCE_MODES.MERGED);
-                  return;
-                }
-                if (dataSourceMode === DATA_SOURCE_MODES.MERGED) {
-                  handleDataSourceModeChange(DATA_SOURCE_MODES.NONE);
-                  return;
-                }
-                setMergedPointsVisible(false);
-              }}
+              {...mapDisplaySettingsProps}
               collapsed={isPanelCollapsed(PANEL_IDS.MAP)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.MAP)}
               onMinimize={handleMinimizePanel(PANEL_IDS.MAP)}
               onClose={handleClosePanel(PANEL_IDS.MAP)}
             />
           )}
-          {activeModule === MODULE_IDS.YEAR &&
+          {(activeModule === MODULE_IDS.YEAR || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.YEAR])) &&
             !isPanelMinimized(PANEL_IDS.YEAR) && (
             <YearFilterPanel
               enabled={yearFilterEnabled}
@@ -7839,7 +6787,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.YEAR)}
             />
           )}
-          {activeModule === MODULE_IDS.SEASONALITY &&
+          {(activeModule === MODULE_IDS.SEASONALITY || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.SEASONALITY])) &&
             !isPanelMinimized(PANEL_IDS.SEASONALITY) && (
             <SeasonalityPanel
               nameLatin={seasonalityNameLatin}
@@ -7852,8 +6800,8 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.SEASONALITY)}
             />
           )}
-          {(activeModule === MODULE_IDS.POLYGON ||
-            (activeModule === MODULE_IDS.FEATURE && polygonDockedWithFeature)) &&
+          {((activeModule === MODULE_IDS.POLYGON || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.POLYGON])) ||
+            ((activeModule === MODULE_IDS.FEATURE || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.FEATURE])) && polygonDockedWithFeature)) &&
             !isPanelMinimized(PANEL_IDS.POLYGON) && (
             <SpeciesPolygonPopup
               feature={popupData}
@@ -7893,8 +6841,8 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.POLYGON)}
             />
           )}
-          {(activeModule === MODULE_IDS.BUFFER ||
-            (activeModule === MODULE_IDS.FEATURE && bufferDockedWithFeature)) &&
+          {((activeModule === MODULE_IDS.BUFFER || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.BUFFER])) ||
+            ((activeModule === MODULE_IDS.FEATURE || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.FEATURE])) && bufferDockedWithFeature)) &&
           !isPanelMinimized(PANEL_IDS.BUFFER) ? (
             <BufferPopup
               feature={popupData}
@@ -7920,7 +6868,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.BUFFER)}
             />
           ) : null}
-          {activeModule === MODULE_IDS.AREA &&
+          {(activeModule === MODULE_IDS.AREA || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.AREA])) &&
             !isPanelMinimized(PANEL_IDS.AREA) && (
             <AreaSelectionPopup
               drawTool={areaDrawTool}
@@ -7942,7 +6890,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.AREA)}
             />
           )}
-          {activeModule === MODULE_IDS.SEARCH &&
+          {(activeModule === MODULE_IDS.SEARCH || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.SEARCH])) &&
             !isPanelMinimized(PANEL_IDS.SEARCH) && (
             <SpeciesSearchPanel
               query={speciesSearchInput}
@@ -7957,7 +6905,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.SEARCH)}
             />
           )}
-          {activeModule === MODULE_IDS.DATA_WORK &&
+          {(activeModule === MODULE_IDS.DATA_WORK || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.DATA_WORK])) &&
             !isPanelMinimized(PANEL_IDS.DATA_WORK) && (
             <DataWorkPanel
               collapsed={isPanelCollapsed(PANEL_IDS.DATA_WORK)}
@@ -7976,7 +6924,7 @@ export default function MapView() {
               }
             />
           )}
-          {activeModule === MODULE_IDS.REDBOOK &&
+          {(activeModule === MODULE_IDS.REDBOOK || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.REDBOOK])) &&
             !isPanelMinimized(PANEL_IDS.REDBOOK) && (
             <RedBookSearchPanel
               collapsed={isPanelCollapsed(PANEL_IDS.REDBOOK)}
@@ -8004,7 +6952,7 @@ export default function MapView() {
               }}
             />
           )}
-          {activeModule === MODULE_IDS.OOPT &&
+          {(activeModule === MODULE_IDS.OOPT || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.OOPT])) &&
             !isPanelMinimized(PANEL_IDS.OOPT) && (
             <OoptPanel
               catalogByLayerId={boundsCatalogByLayerId}
@@ -8020,14 +6968,13 @@ export default function MapView() {
               errorsById={boundsLayerErrors}
               firebaseConfigured={isFirebaseConfigured()}
               markersVisible={markersVisible}
-              onMarkersVisibleChange={setMarkersVisibleState}
               collapsed={isPanelCollapsed(PANEL_IDS.OOPT)}
               onCollapsedChange={handlePanelCollapsedChange(PANEL_IDS.OOPT)}
               onMinimize={handleMinimizePanel(PANEL_IDS.OOPT)}
               onClose={handleClosePanel(PANEL_IDS.OOPT)}
             />
           )}
-          {activeModule === MODULE_IDS.REGIONS &&
+          {(activeModule === MODULE_IDS.REGIONS || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.REGIONS])) &&
             !isPanelMinimized(PANEL_IDS.REGIONS) && (
             <RegionPanel
               layerEnabled={regionBoundsEnabled}
@@ -8083,7 +7030,7 @@ export default function MapView() {
               onClose={handleClosePanel(PANEL_IDS.OOPT_FEATURE)}
             />
           ) : null}
-          {activeModule === MODULE_IDS.SUBMIT &&
+          {(activeModule === MODULE_IDS.SUBMIT || isPanelOpen(MODULE_PANEL_IDS[MODULE_IDS.SUBMIT])) &&
             !isPanelMinimized(PANEL_IDS.SUBMIT) && (
             <Suspense fallback={null}>
               <UserSubmissionPanel
@@ -8101,7 +7048,7 @@ export default function MapView() {
               />
             </Suspense>
           )}
-          {dataSourcesPanelOpen && (
+          {dataSourcesPanelOpen && !isPanelMinimized(PANEL_IDS.DATA_SOURCES) && (
               <DataSourcesPanel
                 map={map.current}
                 collapsed={isPanelCollapsed(PANEL_IDS.DATA_SOURCES)}
@@ -8335,8 +7282,8 @@ export default function MapView() {
         onSpeciesSelect={handleDensePileSpeciesSelect}
       />
       <PanelTaskbar
-        items={panelTaskbarOrder}
-        activeIds={activeTaskbarPanelIds}
+        items={activeTaskbarPanelIds}
+        activeIds={expandedTaskbarPanelIds}
         loadingIds={
           externalSourcesLoadActive ? [PANEL_IDS.DATA_SOURCES] : []
         }

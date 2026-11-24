@@ -59,6 +59,8 @@ function getCollapsedSummary(
 export default function MapDisplayPanel({
   markersVisible = true,
   onMarkersVisibleChange,
+  lowPerformanceMode = false,
+  onPerformanceModeChange,
   heatmapEnabled = false,
   onHeatmapEnabledChange,
   heatmapTempLayersOnly = false,
@@ -88,7 +90,8 @@ export default function MapDisplayPanel({
   collapsed: collapsedProp,
   onCollapsedChange,
   onMinimize,
-  onClose
+  onClose,
+  embedded = false
 }) {
   const [collapsedInternal, setCollapsedInternal] = useState(true);
   const isControlled = collapsedProp !== undefined;
@@ -101,35 +104,47 @@ export default function MapDisplayPanel({
     !markersVisible || denseClustersHighlight || compactPointDisplay;
   const clusterPieChartsDisabled = clusteringDisabled || !clusteringEnabled;
   const clusterByRegnumDisabled =
-    clusteringDisabled || !clusteringEnabled || clusterPieCharts;
+    !markersVisible || denseClustersHighlight || clusterPieCharts;
   const clusterByTempLayersDisabled =
     clusteringDisabled || !clusteringEnabled || clusterPieCharts;
   const clusterByTempSublayersDisabled =
     clusterByTempLayersDisabled || !clusterByTempLayers;
   const denseClustersHighlightDisabled = !markersVisible || compactPointDisplay;
 
-  return (
-    <aside className={`map-display-panel ${collapsed ? "map-display-panel--collapsed" : ""}`}>
-      <div className="map-display-panel-header">
-        <h3 className="map-display-panel-title">Группы точек</h3>
-        <div className="popup-panel-header-actions">
-          <ModuleHelpButton mapToolAccent open={helpOpen} onClick={() => setHelpOpen((value) => !value)} />
-          {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
-          <button
-            type="button"
-            className="map-display-panel-toggle"
-            onClick={() => setCollapsed(!collapsed)}
-            aria-expanded={!collapsed}
-            aria-label={toggleLabel}
-            title={toggleLabel}
-          >
-            {collapsed ? "▾" : "▴"}
-          </button>
-          {onClose ? <PanelCloseButton onClick={onClose} /> : null}
-        </div>
-      </div>
+  const PanelContainer = embedded ? "div" : "aside";
 
-      {collapsed ? (
+  return (
+    <PanelContainer
+      className={`map-display-panel${collapsed ? " map-display-panel--collapsed" : ""}${
+        embedded ? " map-display-panel--embedded" : ""
+      }`}
+    >
+      {!embedded ? (
+        <div className="map-display-panel-header">
+          <h3 className="map-display-panel-title">Группы точек</h3>
+          <div className="popup-panel-header-actions">
+            <ModuleHelpButton
+              mapToolAccent
+              open={helpOpen}
+              onClick={() => setHelpOpen((value) => !value)}
+            />
+            {onMinimize ? <PanelMinimizeButton onClick={onMinimize} /> : null}
+            <button
+              type="button"
+              className="map-display-panel-toggle"
+              onClick={() => setCollapsed(!collapsed)}
+              aria-expanded={!collapsed}
+              aria-label={toggleLabel}
+              title={toggleLabel}
+            >
+              {collapsed ? "▾" : "▴"}
+            </button>
+            {onClose ? <PanelCloseButton onClick={onClose} /> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {collapsed && !embedded ? (
         <p className="map-display-panel-summary">
           {getCollapsedSummary(
             markersVisible,
@@ -217,11 +232,9 @@ export default function MapDisplayPanel({
                 ? "Доступно только при включённых маркерах"
                 : denseClustersHighlight
                   ? "Недоступно в режиме плотных групп"
-                  : !clusteringEnabled
-                    ? "Доступно только при включённой кластеризации"
-                    : clusterPieCharts
-                      ? "Недоступно при включённых диаграммах"
-                      : "Кластеризовать только точки с одинаковым царством"
+                  : clusterPieCharts
+                    ? "Недоступно при включённых диаграммах"
+                    : "Группировать точки с указанным царством отдельно"
             }
           >
             <input
@@ -393,10 +406,27 @@ export default function MapDisplayPanel({
               Настроить
             </button>
           </div>
+
+          <hr />
+
+          <label
+            className="map-display-switch"
+            title="Отключает размытие подложки, анимации, тени и подсказки при наведении — быстрее на слабой графике. Настройка запоминается"
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(lowPerformanceMode)}
+              onChange={(e) => onPerformanceModeChange?.(e.target.checked)}
+            />
+            <span className="map-display-switch-slider" />
+            <span className="map-display-switch-label">Режим слабых ПК</span>
+          </label>
         </div>
       )}
 
-      <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.MAP} open={helpOpen} />
-    </aside>
+      {!embedded ? (
+        <ModuleHelpPanel mapToolAccent sectionId={MODULE_IDS.MAP} open={helpOpen} />
+      ) : null}
+    </PanelContainer>
   );
 }

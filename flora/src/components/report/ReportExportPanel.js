@@ -106,9 +106,10 @@ export default function ReportExportPanel({
               className="popup-panel-toggle"
               onClick={() => onCollapsedChange(!collapsed)}
               aria-expanded={!collapsed}
+              aria-label={toggleLabel}
               title={toggleLabel}
             >
-              {toggleLabel}
+              {collapsed ? "▾" : "▴"}
             </button>
           )}
           {onClose ? <PanelCloseButton onClick={onClose} /> : null}

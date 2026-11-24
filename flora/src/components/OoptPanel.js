@@ -7,6 +7,7 @@ import { ModuleHelpButton, ModuleHelpPanel } from "./ModuleHelp";
 import { MODULE_IDS } from "./ModuleMenu";
 import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
+import { PanelSwitch } from "./panel/PanelPrimitives";
 import "../styles/OoptPanel.css";
 import { ListIcon } from "../images/buttons";
 
@@ -210,7 +211,6 @@ export default function OoptPanel({
   errorsById = {},
   firebaseConfigured = false,
   markersVisible = true,
-  onMarkersVisibleChange,
   collapsed: collapsedProp,
   onCollapsedChange,
   onMinimize,
@@ -269,35 +269,19 @@ export default function OoptPanel({
             </p>
           )}
 
-          <label className="oopt-panel-switch" title="Скрыть все маркеры точек на карте">
-            <input
-              type="checkbox"
-              checked={!markersVisible}
-              onChange={(event) => onMarkersVisibleChange?.(!event.target.checked)}
-            />
-            <span className="oopt-panel-switch-slider" aria-hidden="true" />
-            <span className="oopt-panel-switch-label">Скрыть точки</span>
-          </label>
-
-          <label
-            className={`oopt-panel-switch${!firebaseConfigured || !allCatalogEntries.length ? " oopt-panel-switch--disabled" : ""}`}
-            title="Показать или скрыть все полигоны ООПТ и заповедников на карте"
-          >
-            <input
-              type="checkbox"
-              checked={allPolygonsVisible}
-              disabled={!firebaseConfigured || !allCatalogEntries.length}
-              onChange={(event) =>
-                onGroupVisibilityChange?.(
-                  null,
-                  allCatalogEntries.map((entry) => entry.key),
-                  event.target.checked
-                )
-              }
-            />
-            <span className="oopt-panel-switch-slider" aria-hidden="true" />
-            <span className="oopt-panel-switch-label">Показать все ООПТ</span>
-          </label>
+          <PanelSwitch
+            label="Показать все ООПТ"
+            checked={allPolygonsVisible}
+            disabled={!firebaseConfigured || !allCatalogEntries.length}
+            hint="Показать или скрыть все полигоны ООПТ и заповедников на карте"
+            onChange={(checked) =>
+              onGroupVisibilityChange?.(
+                null,
+                allCatalogEntries.map((entry) => entry.key),
+                checked
+              )
+            }
+          />
 
           <label className="oopt-panel-search">
             <span className="oopt-panel-search-label">Поиск</span>

@@ -105,6 +105,8 @@ let lastInatInputCollection = EMPTY_FEATURE_COLLECTION;
 let inatMapUpdatesPaused = false;
 /** Ключи точек, скрытых под булавкой выделения / share. */
 let hiddenPointFeatureKeys = [];
+/** Применялись ли скрытые ключи к данным карты (первый вызов обязан пересобрать источник). */
+let hiddenPointFeatureKeysApplied = false;
 
 function getInatFeatureStableKey(feature) {
   if (feature?.id != null && feature.id !== "") {
@@ -308,10 +310,19 @@ function applyInatUnclusteredFilter(map) {
  * (выделение в «Сведения о точке» или share-ссылка).
  */
 export function setInatHiddenPointFeatureKeys(map, keys) {
-  hiddenPointFeatureKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
-  if (!map) {
+  const nextKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
+  // См. setGbifHiddenPointFeatureKeys: пересборка только при изменении набора.
+  const unchanged =
+    hiddenPointFeatureKeysApplied &&
+    nextKeys.length === hiddenPointFeatureKeys.length &&
+    nextKeys.every((key, index) => key === hiddenPointFeatureKeys[index]);
+  hiddenPointFeatureKeys = nextKeys;
+
+  if (!map || unchanged) {
     return;
   }
+
+  hiddenPointFeatureKeysApplied = true;
 
   // Надёжнее убрать точку из GeoJSON (фильтр слоя на clustered source иногда не срабатывает).
   if (lastInatInputCollection) {

@@ -1,5 +1,5 @@
-﻿import mapboxgl from "mapbox-gl";
-import { booleanPointInPolygon, point } from "@turf/turf";
+import mapboxgl from "mapbox-gl";
+import { bbox, booleanPointInPolygon, point } from "@turf/turf";
 import {
   formatPropertyValue,
   getPropertyLabel
@@ -69,11 +69,11 @@ import {
 } from "./mapPerformance";
 import {
   SPECIES_SEARCH_FILTER_KEY,
-  featureMatchesSpeciesSearch
+  createSpeciesSearchPredicate
 } from "../locations/speciesSearchFilter";
 import {
   REGION_SPECIES_ALLOWLIST_KEY,
-  featureMatchesRegionSpeciesAllowlist
+  createRegionSpeciesAllowlistPredicate
 } from "../locations/regionSpeciesAllowlist";
 import {
   applyRedBookLocationsFilter,
@@ -486,23 +486,42 @@ function donutSegment(start, end, radius, innerRadius, color) {
   } ${radius + innerRadius * y0}" fill="${color}" />`;
 }
 
+function getRegnumPieSegments(props) {
+  const segments = CLUSTER_REGNUM_KEYS.map((key) => ({
+    count: Number(props[key]) || 0,
+    color: REGNUM_COLORS[key]
+  }));
+  const known = segments.reduce((sum, segment) => sum + segment.count, 0);
+  if (known <= 0) {
+    return null;
+  }
+  const other = (Number(props.point_count) || known) - known;
+  if (other > 0) {
+    segments.push({ count: other, color: "#94a3b8" });
+  }
+  return segments;
+}
+
+function getClusterPieSegments(props) {
+  return getRegnumPieSegments(props) ?? getTempLayerPieSegments(props);
+}
+
 function getClusterPieChartSignature(props) {
-  const tempSegments = getTempLayerPieSegments(props);
-  if (tempSegments) {
-    return `temp:${tempSegments.map((segment) => segment.count).join(":")}`;
+  const segments = getClusterPieSegments(props);
+  if (segments) {
+    return segments.map((segment) => segment.count).join(":");
   }
   return CLUSTER_REGNUM_KEYS.map((key) => Number(props[key]) || 0).join(":");
 }
 
-/** SVG-пончик: доли по царству или по временным слоям и общее число точек в центре. */
+/** SVG-пончик: доли по царству, а если царства нет — по временным слоям. */
 function createClusterPieChartElement(props) {
-  const tempSegments = getTempLayerPieSegments(props);
-  const segments = tempSegments
-    ? tempSegments
-    : CLUSTER_REGNUM_KEYS.map((key) => ({
-        count: Number(props[key]) || 0,
-        color: REGNUM_COLORS[key]
-      }));
+  const segments =
+    getClusterPieSegments(props) ??
+    CLUSTER_REGNUM_KEYS.map((key) => ({
+      count: Number(props[key]) || 0,
+      color: REGNUM_COLORS[key]
+    }));
   const total =
     Number(props.point_count) ||
     segments.reduce((sum, segment) => sum + segment.count, 0);
@@ -2065,7 +2084,138 @@ function rebuildLocationsLayers(map, { reuseFiltered = false } = {}) {
 }
 
 /** Фильтрует GeoJSON-объекты по properties; массив значений — логика «любой из». */
+/**
+ * Сводит набор фильтров к массиву предикатов: всё, что считается «на фильтр»
+ * (нормализация строк, множества значений, bbox полигона), вычисляется один раз.
+ * @returns {((feature: object) => boolean)[]} пустой массив — фильтров нет
+ */
+function compilePropertyFilterTests(propertyFilters) {
+  const entries = Object.entries(propertyFilters ?? {});
+  const tests = [];
+
+  for (let e = 0; e < entries.length; e += 1) {
+    const key = entries[e][0];
+    const value = entries[e][1];
+
+    if (value && typeof value === "object" && !Array.isArray(value) && "min" in value && "max" in value) {
+      const { min, max } = value;
+
+      if (key === "found_year") {
+        tests.push((feature) => {
+          const year = parseFoundYear(feature.properties?.found_year);
+          if (year == null) {
+            return true;
+          }
+          return year >= min && year <= max;
+        });
+        continue;
+      }
+
+      tests.push((feature) => {
+        const prop = feature.properties?.[key];
+        if (prop == null || prop === "") {
+          return false;
+        }
+        const numeric = typeof prop === "number" ? prop : Number(prop);
+        if (!Number.isFinite(numeric)) {
+          return false;
+        }
+        return numeric >= min && numeric <= max;
+      });
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        continue;
+      }
+
+      if (key === "regnum") {
+        const allowed = new Set();
+        for (let i = 0; i < value.length; i += 1) {
+          const entry = value[i];
+          if (entry === "__none__") {
+            continue;
+          }
+          allowed.add(entry == null || entry === "" ? "" : String(entry).toLowerCase());
+        }
+        tests.push((feature) => {
+          const raw = feature.properties?.regnum;
+          const normalized =
+            raw == null || String(raw).trim() === "" ? "" : String(raw).toLowerCase();
+          return allowed.has(normalized);
+        });
+        continue;
+      }
+
+      const allowedValues = new Set(value);
+
+      if (key === "status") {
+        // У внешних источников нет статуса МСОП — фильтр статуса их не отсекает.
+        tests.push((feature) => {
+          const props = feature.properties;
+          if (props?.source === "gbif" || props?.source === "inaturalist" || props?.temp_layer_id) {
+            return true;
+          }
+          return allowedValues.has(props?.[key]);
+        });
+        continue;
+      }
+
+      tests.push((feature) => allowedValues.has(feature.properties?.[key]));
+      continue;
+    }
+
+    if (key === "regnum") {
+      const allowed = value == null || value === "" ? "" : String(value).toLowerCase();
+      tests.push((feature) => {
+        const raw = feature.properties?.regnum;
+        const normalized =
+          raw == null || String(raw).trim() === "" ? "" : String(raw).toLowerCase();
+        return allowed === normalized;
+      });
+      continue;
+    }
+
+    tests.push((feature) => feature.properties?.[key] === value);
+  }
+
+  return tests;
+}
+
+/** Предикат «точка внутри полигона» с bbox-пречеком: turf вызывается только для точек рядом. */
+function compileWithinFeatureTest(withinFeature) {
+  if (!withinFeature?.geometry) {
+    return null;
+  }
+
+  let box = null;
+  try {
+    box = withinFeature.bbox ?? bbox(withinFeature);
+  } catch {
+    box = null;
+  }
+
+  return (feature) => {
+    const coordinates = feature.geometry?.coordinates;
+    if (!coordinates) {
+      return false;
+    }
+
+    if (box) {
+      const x = coordinates[0];
+      const y = coordinates[1];
+      if (x < box[0] || x > box[2] || y < box[1] || y > box[3]) {
+        return false;
+      }
+    }
+
+    return booleanPointInPolygon(point(coordinates), withinFeature);
+  };
+}
+
 export function filterFeatures(features, filters = {}) {
+  const list = Array.isArray(features) ? features : [];
   const {
     [WITHIN_FEATURE_FILTER_KEY]: withinFeature,
     [HIDDEN_FEATURE_KEYS_FILTER_KEY]: _hiddenFeatureKeys,
@@ -2074,123 +2224,62 @@ export function filterFeatures(features, filters = {}) {
     [REQUIRE_FOUND_YEAR_FILTER_KEY]: requireFoundYear,
     ...propertyFilters
   } = filters;
-  const filterEntries = Object.entries(propertyFilters);
 
-  let result = features;
+  const hasHiddenKeys = hiddenPointKeysSet.size > 0;
+  const speciesSearchTest = createSpeciesSearchPredicate(speciesSearch);
+  const regionSpeciesTest = createRegionSpeciesAllowlistPredicate(regionSpeciesAllowlist);
+  const propertyTests = compilePropertyFilterTests(propertyFilters);
+  const withinFeatureTest = compileWithinFeatureTest(withinFeature);
 
-  if (hiddenPointKeysSet.size > 0) {
-    result = result.filter(
-      (feature) => !hiddenPointKeysSet.has(getStablePointKey(feature))
-    );
+  // Ни одного активного фильтра — возвращаем исходный массив (как и раньше).
+  if (
+    !hasHiddenKeys &&
+    !requireFoundYear &&
+    !speciesSearchTest &&
+    !regionSpeciesTest &&
+    propertyTests.length === 0 &&
+    !withinFeatureTest
+  ) {
+    return features;
   }
 
-  if (requireFoundYear) {
-    result = result.filter(
-      (feature) => parseFoundYear(feature.properties?.found_year) != null
-    );
-  }
+  const result = [];
 
-  if (speciesSearch) {
-    result = result.filter((feature) =>
-      featureMatchesSpeciesSearch(feature, speciesSearch)
-    );
-  }
+  for (let i = 0; i < list.length; i += 1) {
+    const feature = list[i];
 
-  if (regionSpeciesAllowlist) {
-    result = result.filter((feature) =>
-      featureMatchesRegionSpeciesAllowlist(feature, regionSpeciesAllowlist)
-    );
-  }
+    if (hasHiddenKeys && hiddenPointKeysSet.has(getStablePointKey(feature))) {
+      continue;
+    }
 
-  if (filterEntries.length > 0) {
-    result = result.filter((feature) =>
-      filterEntries.every(([key, value]) => {
-        if (value && typeof value === "object" && !Array.isArray(value) && "min" in value && "max" in value) {
-          const prop = feature.properties?.[key];
-          if (key === "found_year") {
-            const year = parseFoundYear(prop);
-            if (year == null) {
-              return true;
-            }
-            return year >= value.min && year <= value.max;
-          }
-          if (prop == null || prop === "") {
-            return false;
-          }
+    if (requireFoundYear && parseFoundYear(feature.properties?.found_year) == null) {
+      continue;
+    }
 
-          const numeric = typeof prop === "number" ? prop : Number(prop);
-          if (!Number.isFinite(numeric)) {
-            return false;
-          }
+    if (speciesSearchTest && !speciesSearchTest(feature)) {
+      continue;
+    }
 
-          return numeric >= value.min && numeric <= value.max;
-        }
+    if (regionSpeciesTest && !regionSpeciesTest(feature)) {
+      continue;
+    }
 
-        if (Array.isArray(value)) {
-          if (value.length === 0) {
-            return true;
-          }
-
-          // У внешних источников нет статуса МСОП — фильтр статуса их не отсекает.
-          if (
-            key === "status" &&
-            (feature.properties?.source === "gbif" ||
-              feature.properties?.source === "inaturalist" ||
-              feature.properties?.temp_layer_id)
-          ) {
-            return true;
-          }
-
-          if (key === "regnum") {
-            const raw = feature.properties?.regnum;
-            const normalized =
-              raw == null || String(raw).trim() === ""
-                ? ""
-                : String(raw).toLowerCase();
-
-            return value.some((entry) => {
-              if (entry === "__none__") {
-                return false;
-              }
-
-              const allowed =
-                entry == null || entry === ""
-                  ? ""
-                  : String(entry).toLowerCase();
-              return allowed === normalized;
-            });
-          }
-
-          return value.includes(feature.properties[key]);
-        }
-
-        if (key === "regnum") {
-          const raw = feature.properties?.regnum;
-          const normalized =
-            raw == null || String(raw).trim() === ""
-              ? ""
-              : String(raw).toLowerCase();
-          const allowed =
-            value == null || value === ""
-              ? ""
-              : String(value).toLowerCase();
-          return allowed === normalized;
-        }
-
-        return feature.properties[key] === value;
-      })
-    );
-  }
-
-  if (withinFeature?.geometry) {
-    result = result.filter((feature) => {
-      const coordinates = feature.geometry?.coordinates;
-      if (!coordinates) {
-        return false;
+    let matchesProperties = true;
+    for (let t = 0; t < propertyTests.length; t += 1) {
+      if (!propertyTests[t](feature)) {
+        matchesProperties = false;
+        break;
       }
+    }
+    if (!matchesProperties) {
+      continue;
+    }
 
-      return booleanPointInPolygon(point(coordinates), withinFeature);
-    });
+    if (withinFeatureTest && !withinFeatureTest(feature)) {
+      continue;
+    }
+
+    result.push(feature);
   }
 
   return result;

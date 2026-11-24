@@ -1,4 +1,9 @@
-import { DEFAULT_CLUSTER_COLOR, DEFAULT_POINT_COLOR, getPointColorExpression } from "./pointColors";
+import {
+  DEFAULT_CLUSTER_COLOR,
+  DEFAULT_POINT_COLOR,
+  getPointColorExpression
+} from "./pointColors";
+import { splitTempUnitsByRegnum } from "./tempRegnumUnits";
 import {
   addCompactGridLayers,
   buildCompactViewportFeatures,
@@ -12,7 +17,7 @@ import {
   isCompactPointDisplayEnabled,
   isRegionContourPickActive
 } from "../map/compactPointDisplay";
-import { shouldUseCompactDensityGrid } from "../map/compactGridSettings";
+import { shouldSuppressLoadedPointLayers } from "../map/regionLoadSummary";
 import {
   compactPropertiesMatchFilters,
   getCompactLocationFilters,
@@ -82,6 +87,7 @@ const TEMP_LAYER_CLUSTER_COLOR = [
 let layerVisible = false;
 let clusterByTempLayers = true;
 let clusterByTempSublayers = true;
+let clusterByRegnum = false;
 let clusterPieChartsEnabled = false;
 let clusteringEnabled = true;
 let denseClustersHighlightEnabled = false;
@@ -101,6 +107,8 @@ let pieLayerKeys = [];
  * }>} */
 let activeUnits = [];
 let hiddenPointFeatureKeys = [];
+/** Применялись ли скрытые ключи к данным карты (первый вызов обязан пересобрать источник). */
+let hiddenPointFeatureKeysApplied = false;
 let locationFeatureFilter = (features) => features;
 
 export function setTempLayersLocationFeatureFilter(filterFn) {
@@ -226,6 +234,10 @@ function isSplitBySublayer() {
   return isSplitByLayer() && clusterByTempSublayers;
 }
 
+function shouldSplitTempByRegnum() {
+  return clusterByRegnum && !clusterPieChartsEnabled && !denseClustersHighlightEnabled;
+}
+
 function buildUnits() {
   const units = !isSplitByLayer()
     ? [
@@ -246,7 +258,7 @@ function buildUnits() {
 }
 
 function unitLayerIds(unitId) {
-  if (!isSplitByLayer()) {
+  if (!unitId || unitId === "all") {
     return {
       sourceId: TEMP_LAYERS_SOURCE_ID,
       clusterLayerId: TEMP_LAYERS_CLUSTER_LAYER_ID,
@@ -277,6 +289,25 @@ function clusterColorForUnit(markerColor) {
   return TEMP_LAYER_CLUSTER_COLOR;
 }
 
+const TEMP_PIE_REGNUM_KEYS = ["plantae", "animalia", "fungi", "protozoa"];
+
+function buildRegnumClusterProperties() {
+  return Object.fromEntries(
+    TEMP_PIE_REGNUM_KEYS.map((regnum) => [
+      regnum,
+      [
+        "+",
+        [
+          "case",
+          ["==", ["downcase", ["coalesce", ["get", "regnum"], ""]], regnum],
+          1,
+          0
+        ]
+      ]
+    ])
+  );
+}
+
 function buildPieClusterProperties() {
   const groups = getTempLayerFeatureGroups();
   pieLayerKeys = groups.map((group, index) => ({
@@ -288,15 +319,18 @@ function buildPieClusterProperties() {
     layerId: group.id
   }));
 
-  return Object.fromEntries(
-    pieLayerKeys.map(({ prop, layerId }) => [
-      prop,
-      [
-        "+",
-        ["case", ["==", ["get", "temp_layer_id"], layerId], 1, 0]
-      ]
-    ])
-  );
+  return {
+    ...buildRegnumClusterProperties(),
+    ...Object.fromEntries(
+      pieLayerKeys.map(({ prop, layerId }) => [
+        prop,
+        [
+          "+",
+          ["case", ["==", ["get", "temp_layer_id"], layerId], 1, 0]
+        ]
+      ])
+    )
+  };
 }
 
 function getClusterPaint(markerColor) {
@@ -636,6 +670,12 @@ export function setTempLayersData(map) {
     return;
   }
 
+  if (shouldSuppressLoadedPointLayers()) {
+    removeTempLayersFromMap(map);
+    setTempLayerOverlaysData(map, { visible: layerVisible });
+    return;
+  }
+
   if (isCompactPointDisplayEnabled()) {
     ensureCompactViewportSync(map, "temp", () => setTempLayersData(map));
   }
@@ -645,7 +685,7 @@ export function setTempLayersData(map) {
   tempDensePileMembers = new Map();
   const denseClusterFeatures = [];
 
-  if (isCompactPointDisplayEnabled() && shouldUseCompactDensityGrid() && !isSplitByLayer()) {
+  if (isCompactPointDisplayEnabled() && !isSplitByLayer() && !shouldSplitTempByRegnum()) {
     const built = buildCompactViewportFeatures({
       map,
       source: "temp",
@@ -659,11 +699,11 @@ export function setTempLayersData(map) {
     });
     addUnitToMap(map, { id: "all", markerColor: null, features: built.features });
   } else {
-    buildUnits()
+    splitTempUnitsByRegnum(buildUnits(), shouldSplitTempByRegnum())
       .filter((unit) => unit.features.length > 0)
       .forEach((unit) => {
         if (isCompactPointDisplayEnabled()) {
-          const built = buildCompactViewportFromGeojson(map, unit.features, "temp");
+          const built = buildCompactViewportFromGeojson(map, unit.features, `temp-${unit.id}`);
           addUnitToMap(map, {
             ...unit,
             features: excludeHiddenPinFeatures(built.features)
@@ -693,6 +733,7 @@ export function applyTempLayersGroupingMode(
   {
     clusterByTempLayers: nextClusterByTempLayers,
     clusterByTempSublayers: nextClusterByTempSublayers,
+    clusterByRegnum: nextByRegnum,
     clusterPieCharts: nextPie,
     clusteringEnabled: nextClustering,
     denseClustersHighlight: nextDense
@@ -712,6 +753,9 @@ export function applyTempLayersGroupingMode(
   }
   if (nextClusterByTempSublayers !== undefined) {
     clusterByTempSublayers = Boolean(nextClusterByTempSublayers);
+  }
+  if (nextByRegnum !== undefined) {
+    clusterByRegnum = Boolean(nextByRegnum);
   }
   if (
     nextDense !== undefined &&
@@ -883,10 +927,20 @@ export function setTempDensePileExpandedHandler(handler) {
  * Скрывает обычные маркеры временных слоёв для точек, показанных булавкой.
  */
 export function setTempLayersHiddenPointFeatureKeys(map, keys) {
-  hiddenPointFeatureKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
-  if (!map) {
+  const nextKeys = [...new Set((keys ?? []).filter(Boolean).map(String))];
+  // setTempLayersData снимает и заново создаёт все слои и источники временных слоёв,
+  // поэтому вызываем его только когда набор скрытых ключей действительно изменился.
+  const unchanged =
+    hiddenPointFeatureKeysApplied &&
+    nextKeys.length === hiddenPointFeatureKeys.length &&
+    nextKeys.every((key, index) => key === hiddenPointFeatureKeys[index]);
+  hiddenPointFeatureKeys = nextKeys;
+
+  if (!map || unchanged) {
     return;
   }
+
+  hiddenPointFeatureKeysApplied = true;
   setTempLayersData(map);
 }
 

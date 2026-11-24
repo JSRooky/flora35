@@ -32,26 +32,45 @@ export function isSpeciesSearchFilterActive(spec) {
   return Boolean(createSpeciesSearchFilter(spec ?? {}));
 }
 
-/** Совпадает ли точка с фильтром поиска по виду. */
-export function featureMatchesSpeciesSearch(feature, spec) {
+/**
+ * Компилирует фильтр поиска в предикат: нормализация считается один раз на фильтр,
+ * а не на каждую точку выборки (на 100k+ точек это десятки миллионов лишних
+ * `trim`/`toLowerCase`).
+ * @param {object} spec — значение фильтра `__speciesSearch`
+ * @returns {((feature: object) => boolean) | null} `null`, если фильтр не активен
+ */
+export function createSpeciesSearchPredicate(spec) {
   const normalized = createSpeciesSearchFilter(spec ?? {});
   if (!normalized) {
-    return true;
+    return null;
   }
 
-  const latin = String(feature?.properties?.name_latin ?? "");
-  const nameRu = String(feature?.properties?.name_ru ?? "");
+  const nameLatin = normalized.nameLatin ? normalized.nameLatin.toLowerCase() : null;
+  const needle = nameLatin ? "" : normalizeSpeciesSearchText(normalized.query);
 
-  if (normalized.nameLatin) {
-    return latin.toLowerCase() === normalized.nameLatin.toLowerCase();
-  }
+  return (feature) => {
+    const latin = String(feature?.properties?.name_latin ?? "").toLowerCase();
 
-  const needle = normalizeSpeciesSearchText(normalized.query);
-  if (!needle) {
-    return true;
-  }
+    if (nameLatin) {
+      return latin === nameLatin;
+    }
 
-  return latin.toLowerCase().includes(needle) || nameRu.toLowerCase().includes(needle);
+    if (!needle) {
+      return true;
+    }
+
+    if (latin.includes(needle)) {
+      return true;
+    }
+
+    return String(feature?.properties?.name_ru ?? "").toLowerCase().includes(needle);
+  };
+}
+
+/** Совпадает ли точка с фильтром поиска по виду. */
+export function featureMatchesSpeciesSearch(feature, spec) {
+  const predicate = createSpeciesSearchPredicate(spec);
+  return predicate ? predicate(feature) : true;
 }
 
 function getSpeciesGroupKey(feature) {

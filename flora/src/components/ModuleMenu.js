@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ReactComponent as MainLogo } from "../images/main_logo.svg";
-import { DatabaseIcon, LayersArchiveIcon } from "../images/buttons";
+import { DatabaseIcon, LayersArchiveIcon, SettingsIcon } from "../images/buttons";
 import { DATA_SOURCE_OPTIONS, VISIBLE_DATA_SOURCE_OPTIONS } from "../locations/loadPoints";
+import { FEATURE_FLAGS, FEATURE_UNAVAILABLE_TITLE } from "../config/featureFlags";
 import UserAccountControl from "./UserAccountControl";
 import "../styles/ModuleMenu.css";
 
@@ -38,6 +39,7 @@ export const MODULE_IDS = {
   COMPARE: "compare",
   REPORT: "report",
   ANALYSIS: "analysis",
+  SETTINGS: "settings",
   EXTERNAL_PROCESSING: "external-processing",
   /** @deprecated Используйте EXTERNAL_PROCESSING */
   GBIF_PROCESSING: "external-processing",
@@ -324,21 +326,32 @@ export default function ModuleMenu({
   onReportPanelToggle,
   analysisPanelOpen = false,
   onAnalysisPanelToggle,
+  settingsPanelOpen = false,
+  onSettingsPanelToggle,
   accountUser = null,
   onSaveUserSettings,
   onLoadUserSettings
 }) {
-  const renderModuleItem = ({ id, label, timeAccent = false, mapToolAccent = false }) => {
+  const renderModuleItem = ({
+    id,
+    label,
+    timeAccent = false,
+    mapToolAccent = false,
+    forceDisabled = false,
+    disabledTitle: disabledTitleOverride
+  }) => {
     const pointRequired = isPointRequiredModule(id) && !pointSelected;
     // Радиус и Буфер — взаимоисключающие инструменты карты, активный блокирует другой.
     const blockedByOtherTool =
       (id === MODULE_IDS.AREAL && arealBlocked) || (id === MODULE_IDS.BUFFER && bufferBlocked);
-    const disabled = pointRequired || blockedByOtherTool;
-    const disabledTitle = pointRequired
-      ? DISABLED_POINT_REQUIRED_TITLE
-      : id === MODULE_IDS.AREAL
-        ? DISABLED_AREAL_BY_BUFFER_TITLE
-        : DISABLED_BUFFER_BY_AREAL_TITLE;
+    const disabled = forceDisabled || pointRequired || blockedByOtherTool;
+    const disabledTitle =
+      disabledTitleOverride ??
+      (pointRequired
+        ? DISABLED_POINT_REQUIRED_TITLE
+        : id === MODULE_IDS.AREAL
+          ? DISABLED_AREAL_BY_BUFFER_TITLE
+          : DISABLED_BUFFER_BY_AREAL_TITLE);
 
     return (
       <li key={id}>
@@ -389,6 +402,8 @@ export default function ModuleMenu({
               mapToolAccent
               activeModule={comparePanelOpen ? MODULE_IDS.COMPARE : activeModule}
               onModuleSelect={onComparePanelToggle}
+              disabled={FEATURE_FLAGS.compareModuleDisabled}
+              disabledTitle={FEATURE_UNAVAILABLE_TITLE}
             />
           </li>
           <li>
@@ -402,15 +417,34 @@ export default function ModuleMenu({
           </li>
           <li>
             <ModuleMenuButton
-              id={REPORT_MODULE_ITEM.id}
-              label={REPORT_MODULE_ITEM.label}
-              mapToolAccent
-              activeModule={reportPanelOpen ? MODULE_IDS.REPORT : activeModule}
-              onModuleSelect={onReportPanelToggle}
+              id={MODULE_IDS.SETTINGS}
+              label="Настройки"
+              icon={<SettingsIcon className="module-menu-btn-icon" aria-hidden="true" focusable="false" />}
+              activeModule={settingsPanelOpen ? MODULE_IDS.SETTINGS : activeModule}
+              onModuleSelect={onSettingsPanelToggle}
             />
           </li>
+          {FEATURE_FLAGS.reportModuleDisabled ? null : (
+            <li>
+              <ModuleMenuButton
+                id={REPORT_MODULE_ITEM.id}
+                label={REPORT_MODULE_ITEM.label}
+                mapToolAccent
+                activeModule={reportPanelOpen ? MODULE_IDS.REPORT : activeModule}
+                onModuleSelect={onReportPanelToggle}
+              />
+            </li>
+          )}
           <li className="module-menu-separator module-menu-separator--push-end" aria-hidden="true" />
-          {TEST_MODULE_ITEMS.map(renderModuleItem)}
+          {TEST_MODULE_ITEMS.map((item) =>
+            renderModuleItem({
+              ...item,
+              forceDisabled: FEATURE_FLAGS.submitModuleDisabled,
+              disabledTitle: FEATURE_FLAGS.submitModuleDisabled
+                ? FEATURE_UNAVAILABLE_TITLE
+                : undefined,
+            })
+          )}
           <li className="module-menu-separator" aria-hidden="true" />
           {renderModuleItem(REDBOOK_MODULE_ITEM)}
           <li className="module-menu-separator" aria-hidden="true" />
@@ -421,8 +455,11 @@ export default function ModuleMenu({
                 id="module-menu-data-source-select"
                 className="module-menu-data-source-select"
                 value={dataSourceMode}
+                disabled={FEATURE_FLAGS.dataSourceSelectDisabled}
                 title={
-                  DATA_SOURCE_OPTIONS.find(({ value }) => value === dataSourceMode)?.title
+                  FEATURE_FLAGS.dataSourceSelectDisabled
+                    ? FEATURE_UNAVAILABLE_TITLE
+                    : DATA_SOURCE_OPTIONS.find(({ value }) => value === dataSourceMode)?.title
                 }
                 onChange={(event) => onDataSourceModeChange?.(event.target.value)}
               >

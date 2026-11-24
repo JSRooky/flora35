@@ -176,9 +176,10 @@ export default function AnalysisPanel({
               className="popup-panel-toggle"
               onClick={() => onCollapsedChange(!collapsed)}
               aria-expanded={!collapsed}
+              aria-label={toggleLabel}
               title={toggleLabel}
             >
-              {toggleLabel}
+              {collapsed ? "▾" : "▴"}
             </button>
           ) : null}
           {onClose ? <PanelCloseButton onClick={onClose} /> : null}

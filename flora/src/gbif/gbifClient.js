@@ -5,7 +5,6 @@ import {
   notifyGbifRateLimit,
   parseGbifRetryAfterMs
 } from "./gbifRequestQueue";
-import { getCacheEntry, setCacheEntry } from "./gbifCache";
 
 const GBIF_OCCURRENCE_SEARCH_URL = "https://api.gbif.org/v1/occurrence/search";
 export const GBIF_PAGE_SIZE = 300;
@@ -153,13 +152,6 @@ export async function fetchOccurrencePage(
   { signal, onRateLimited, onOverloaded, maxRetries = null } = {}
 ) {
   const url = `${GBIF_OCCURRENCE_SEARCH_URL}?${params.toString()}`;
-
-  // Check cache first
-  const cacheEntry = await getCacheEntry(url);
-  if (cacheEntry) {
-    return cacheEntry.response;
-  }
-
   let lastError = null;
 
   for (let attempt = 0; attempt <= FETCH_RATE_LIMIT_RETRY_COUNT; attempt += 1) {
@@ -177,12 +169,7 @@ export async function fetchOccurrencePage(
         throw createHttpError(response.status, response.statusText, retryAfterMs);
       }
 
-      const json = await response.json();
-
-      // Cache successful response
-      setCacheEntry(url, json).catch(() => {});
-
-      return json;
+      return await response.json();
     } catch (error) {
       if (isGbifAbortError(error, signal)) {
         const abortError = new Error("Aborted");

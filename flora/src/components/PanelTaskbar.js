@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { getPanelTaskbarMeta } from "../panelTaskbarRegistry";
 import "../styles/PanelTaskbar.css";
-import { AreaIcon, BufferIcon, ClustersIcon, DatabaseIcon, DenseIcon, DownloadIcon, GlobeIcon, LayersArchiveIcon, LayersIcon, ListIcon, OoptIcon, PointIcon, PolygonHullIcon, PolygonIcon, RadiusIcon, StatusIcon, SubmitIcon, YearIcon } from "../images/buttons";
+import { AreaIcon, BufferIcon, ClustersIcon, DatabaseIcon, DenseIcon, DownloadIcon, GlobeIcon, LayersArchiveIcon, LayersIcon, ListIcon, OoptIcon, PointIcon, PolygonHullIcon, PolygonIcon, RadiusIcon, SettingsIcon, StatusIcon, SubmitIcon, YearIcon } from "../images/buttons";
 
 const TASKBAR_ICONS = {
   radius: RadiusIcon,
@@ -23,7 +23,8 @@ const TASKBAR_ICONS = {
   layersArchive: LayersArchiveIcon,
   layers: LayersIcon,
   download: DownloadIcon,
-  analysis: PolygonHullIcon
+  analysis: PolygonHullIcon,
+  settings: SettingsIcon
 };
 
 function TaskbarIcon({ name }) {
