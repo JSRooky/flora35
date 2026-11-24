@@ -5736,7 +5736,18 @@ export default function MapView() {
       handleDenseProcessingClose,
       handleCloseRegionSpeciesPanel,
       minimizePanel,
+      setAnalysisPanelOpen,
+      setCompareDistributionOpen,
+      setCompareDiversityOpen,
+      setComparePanelOpen,
+      setCompareSimilarityOpen,
+      setCompareStatsKind,
+      setDataSourcesFocusRequest,
+      setDataSourcesPanelOpen,
+      setPanelMinimized,
+      setReportPanelOpen,
       setSettingsPanelOpen,
+      setTempArchivePanelOpen,
       unpinPanelsFromTaskbar
     ]
   );

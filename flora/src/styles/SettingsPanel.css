@@ -64,7 +64,7 @@
   border-top: 1px solid #ddd;
 }
 
-.map-display-panel--embedded {
+.map-display-panel.map-display-panel--embedded {
   width: auto;
   max-width: none;
   overflow: visible;

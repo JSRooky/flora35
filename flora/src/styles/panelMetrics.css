@@ -19,7 +19,9 @@
 
 /* Все панели одной ширины; min-width: 0 нужен flex-детям, иначе длинные
    значения (названия видов, списки источников) распирают панель. */
-.module-panel-stack > * {
+/* Модальные оверлеи могут быть DOM-соседями панели (React Fragment).
+   Не применять к ним метрики панели: у overlay собственные inset и центрирование. */
+.module-panel-stack > :not([class*="-overlay"]) {
   width: var(--flora-panel-width);
   max-width: var(--flora-panel-max-width);
   min-width: 0;
@@ -43,7 +45,7 @@
     max-height: calc(100vh - 96px);
   }
 
-  .module-panel-stack > * {
+  .module-panel-stack > :not([class*="-overlay"]) {
     width: var(--flora-panel-width);
     max-width: 100%;
   }
@@ -80,7 +82,7 @@
 }
 
 /* Непрозрачная подложка панелей вместо размытой: текст остаётся читаемым. */
-:root[data-flora-perf="low"] .module-panel-stack > * {
+:root[data-flora-perf="low"] .module-panel-stack > :not([class*="-overlay"]) {
   background-color: var(--flora-panel-bg-solid, #ffffff);
 }
 

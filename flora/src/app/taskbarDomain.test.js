@@ -73,6 +73,19 @@ describe("useTaskbarDomain", () => {
     expect(result.current.activeTaskbarPanelIds).toContain(PANEL_IDS.SETTINGS);
   });
 
+  test("настройки остаются в доке при открытой обработке плотных групп", () => {
+    const { result } = renderHook(() =>
+      useTaskbarDomain(
+        makeDeps({
+          denseProcessingActive: true,
+          settingsPanelOpen: true
+        })
+      )
+    );
+
+    expect(result.current.activeTaskbarPanelIds).toContain(PANEL_IDS.SETTINGS);
+  });
+
   test("развёрнутая панель помечается активной, свёрнутая — нет", () => {
     const expanded = renderHook(() =>
       useTaskbarDomain(makeDeps({ comparePanelOpen: true }))

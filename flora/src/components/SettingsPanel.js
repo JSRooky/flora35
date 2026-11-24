@@ -43,7 +43,8 @@ export default function SettingsPanel({
         <p className="settings-panel-summary">Отображение карты и подсказки</p>
       ) : (
         <div className="settings-panel-content">
-          <MapDisplayPanel {...mapDisplayProps} embedded />
+          <h4 className="map-display-section-title">Отображение карты</h4>
+          <MapDisplayPanel {...mapDisplayProps} collapsed={false} embedded />
           <hr />
           <h4 className="map-display-section-title">Подсказки</h4>
           <label

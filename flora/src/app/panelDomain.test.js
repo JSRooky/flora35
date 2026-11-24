@@ -37,4 +37,14 @@ describe("usePanelDomain", () => {
     expect(result.current.isPanelMinimized(PANEL_IDS.DATA_SOURCES)).toBe(true);
     expect(result.current.panelTaskbarOrder).toContain(PANEL_IDS.DATA_SOURCES);
   });
+
+  test("restoring settings from the taskbar opens the panel", () => {
+    const { result } = renderHook(() => usePanelDomain(makeDeps()));
+
+    act(() => result.current.restorePanel(PANEL_IDS.SETTINGS));
+
+    expect(result.current.settingsPanelOpen).toBe(true);
+    expect(result.current.isPanelMinimized(PANEL_IDS.SETTINGS)).toBe(false);
+    expect(result.current.panelTaskbarOrder).toContain(PANEL_IDS.SETTINGS);
+  });
 });

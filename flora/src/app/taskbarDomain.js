@@ -48,6 +48,10 @@ export function useTaskbarDomain({
   const collectOpenPanelIds = useCallback(() => {
     const ids = [];
 
+    if (settingsPanelOpen) {
+      ids.push(PANEL_IDS.SETTINGS);
+    }
+
     if (denseProcessingActive) {
       ids.push(PANEL_IDS.DENSE);
 
@@ -156,10 +160,6 @@ export function useTaskbarDomain({
 
     if (tempArchivePanelOpen) {
       ids.push(PANEL_IDS.TEMP_ARCHIVE);
-    }
-
-    if (settingsPanelOpen) {
-      ids.push(PANEL_IDS.SETTINGS);
     }
 
     if (comparePanelOpen) {
