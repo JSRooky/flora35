@@ -419,7 +419,7 @@ export default function RegionsLoadTable({
         });
       }
     },
-    [destination, intoTempStaging, kingdomsByRegion, previews, source, spatialByRegionId, syncedAt]
+    [intoTempStaging, kingdomsByRegion, previews, source, spatialByRegionId, syncedAt]
   );
 
   const runRegionLoad = useCallback(

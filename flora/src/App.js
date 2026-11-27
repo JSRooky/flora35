@@ -15,6 +15,7 @@ import {
   applyLocationsFilter,
   applyLocationsGroupingMode,
   refreshClusterPieChartMarkers,
+  refreshLocationsClusterColors,
   clearSelectedPointHighlight,
   clearSharedPointPin,
   featureMatchesFilters,
@@ -236,7 +237,7 @@ import MapCornerControls from "./components/MapCornerControls";
 import MapZoomControl from "./components/MapZoomControl";
 import PanelTaskbar from "./components/PanelTaskbar";
 import { PANEL_TASKBAR_MODULE_ID, TASKBAR_PANEL_IDS } from "./panelTaskbarRegistry";
-import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler, setGbifMapUpdatesPaused, clearGbifLayer } from "./components/addGbifLayer";
+import { addGbifLayer, setGbifVisibility, applyGbifGroupingMode, refreshGbifClusterColors, refreshGbifDensePiles, expandGbifDensePileByKey, collapseGbifExpandedDensePiles, setGbifDensePileExpandedHandler, setGbifMapUpdatesPaused, clearGbifLayer } from "./components/addGbifLayer";
 import {
   clearRegionLoadSummary,
   setRegionLoadSummaryDisplayHandler,
@@ -261,7 +262,7 @@ import {
   TEMP_OVERLAY_KINDS,
   TEMP_OVERLAY_LABELS
 } from "./tempLayers/collectMapToolOverlays";
-import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatDensePiles, expandInatDensePileByKey, collapseInatExpandedDensePiles, setInatDensePileExpandedHandler, setInatMapUpdatesPaused, clearInatLayer } from "./components/addInatLayer";
+import { addInatLayer, setInatVisibility, applyInatGroupingMode, refreshInatClusterColors, refreshInatDensePiles, expandInatDensePileByKey, collapseInatExpandedDensePiles, setInatDensePileExpandedHandler, setInatMapUpdatesPaused, clearInatLayer } from "./components/addInatLayer";
 import {
   addMergedLayer,
   setMergedVisibility,
@@ -275,6 +276,13 @@ import {
   setRedBookVisibility,
   upsertRedBookFeatures
 } from "./components/addRedBookLayer";
+import {
+  applyClusterRegnumColors,
+  DEFAULT_CLUSTER_REGNUM_COLORS,
+  loadClusterRegnumColorsFromStorage,
+  normalizeClusterRegnumColors,
+  saveClusterRegnumColorsToStorage
+} from "./components/pointColors";
 import RedBookSearchPanel from "./components/RedBookSearchPanel";
 import { hydrateRedBookStoreFromPersistence } from "./redbook/redBookStore";
 import { submitMergedPoint } from "./firebase/submitMergedPoint";
@@ -419,6 +427,9 @@ export default function MapView() {
   const [displayedLayerPointCount, setDisplayedLayerPointCountState] = useState(0);
   const compactGridAutoRef = useRef(false);
   const [clusterPieCharts, setClusterPieChartsState] = useState(DEFAULT_CLUSTER_PIE_CHARTS);
+  const [clusterRegnumColors, setClusterRegnumColorsState] = useState(
+    loadClusterRegnumColorsFromStorage
+  );
   const [denseClustersHighlight, setDenseClustersHighlightState] = useState(
     DEFAULT_DENSE_CLUSTERS_HIGHLIGHT
   );
@@ -448,9 +459,27 @@ export default function MapView() {
   }, []);
   const [markersVisible, setMarkersVisibleState] = useState(DEFAULT_MARKERS_VISIBLE);
   const [mapReady, setMapReady] = useState(false);
+
+  useEffect(() => {
+    applyClusterRegnumColors(clusterRegnumColors);
+    saveClusterRegnumColorsToStorage(clusterRegnumColors);
+  }, [clusterRegnumColors]);
+
+  useEffect(() => {
+    if (!map.current || !mapReady) {
+      return;
+    }
+
+    refreshLocationsClusterColors(map.current);
+    refreshGbifClusterColors(map.current);
+    refreshInatClusterColors(map.current);
+    setTempLayersData(map.current);
+    refreshClusterPieChartMarkers(map.current);
+  }, [clusterRegnumColors, mapReady]);
+
   const [heatmapEnabled, setHeatmapEnabledState] = useState(false);
   // Авто-режим при огромном числе точек: маркеры/кластеры прячем, показываем только heatmap (как у iNat).
-  const [autoRasterMode, setAutoRasterMode] = useState(false);
+  const [, setAutoRasterMode] = useState(false);
   const autoRasterModeRef = useRef(false);
   const [heatmapSettingsOpen, setHeatmapSettingsOpen] = useState(false);
   const [compactGridSettingsOpen, setCompactGridSettingsOpen] = useState(false);
@@ -1027,7 +1056,7 @@ export default function MapView() {
       }));
       setBoundsSpeciesListOpen(true);
     },
-    [boundsSpeciesListOpen, handleBoundsFeatureSelect, selectedBoundsFeature]
+    [boundsSpeciesListOpen, handleBoundsFeatureSelect, selectedBoundsFeature, setPanelMinimized]
   );
 
   const handleModuleSelect = useCallback((moduleId) => {
@@ -1185,7 +1214,7 @@ export default function MapView() {
         }
       });
     },
-    [bumpPointsDataRevision]
+    [bumpPointsDataRevision, setDataSourcesPanelOpen, setPanelMinimized]
   );
 
   const handleTempLayerToggle = useCallback((layerId, visible) => {
@@ -1263,7 +1292,7 @@ export default function MapView() {
       setRegionSpeciesPanelOpen(true);
     });
     return () => setRegionLoadSummaryListHandler(null);
-  }, [pinPanelsToTaskbar]);
+  }, [pinPanelsToTaskbar, setPanelMinimized]);
 
   const regionSpeciesInventory = useMemo(() => {
     if (!regionSpeciesContext?.regionId) {
@@ -1377,7 +1406,7 @@ export default function MapView() {
     setTempArchivePanelOpen(true);
     expandPanel(PANEL_IDS.TEMP_ARCHIVE);
     pinPanelsToTaskbar([PANEL_IDS.TEMP_ARCHIVE]);
-  }, [expandPanel, pinPanelsToTaskbar]);
+  }, [expandPanel, pinPanelsToTaskbar, setTempArchivePanelOpen, setTempArchiveStatus]);
 
   const handleTempArchivePanelToggle = useCallback(() => {
     if (tempArchivePanelOpen && !isPanelMinimized(PANEL_IDS.TEMP_ARCHIVE)) {
@@ -1390,6 +1419,7 @@ export default function MapView() {
   }, [
     handleOpenTempArchive,
     isPanelMinimized,
+    setTempArchivePanelOpen,
     tempArchivePanelOpen,
     unpinPanelsFromTaskbar
   ]);
@@ -1398,7 +1428,7 @@ export default function MapView() {
     setComparePanelOpen(true);
     expandPanel(PANEL_IDS.COMPARE);
     pinPanelsToTaskbar([PANEL_IDS.COMPARE]);
-  }, [expandPanel, pinPanelsToTaskbar]);
+  }, [expandPanel, pinPanelsToTaskbar, setComparePanelOpen]);
 
   const handleComparePanelToggle = useCallback(() => {
     if (comparePanelOpen && !isPanelMinimized(PANEL_IDS.COMPARE)) {
@@ -1430,6 +1460,12 @@ export default function MapView() {
     comparePanelOpen,
     isPanelMinimized,
     openComparePanel,
+    setCompareDistributionOpen,
+    setCompareDiversityOpen,
+    setCompareSimilarityOpen,
+    setCompareStatsKind,
+    setExperimentalPrompt,
+    setComparePanelOpen,
     unpinPanelsFromTaskbar
   ]);
 
@@ -1447,13 +1483,13 @@ export default function MapView() {
     setReportPanelOpen(true);
     expandPanel(PANEL_IDS.REPORT);
     pinPanelsToTaskbar([PANEL_IDS.REPORT]);
-  }, [reportPanelOpen, isPanelMinimized, expandPanel, pinPanelsToTaskbar, unpinPanelsFromTaskbar]);
+  }, [reportPanelOpen, isPanelMinimized, expandPanel, pinPanelsToTaskbar, setReportPanelOpen, unpinPanelsFromTaskbar]);
 
   const openAnalysisPanel = useCallback(() => {
     setAnalysisPanelOpen(true);
     expandPanel(PANEL_IDS.ANALYSIS);
     pinPanelsToTaskbar([PANEL_IDS.ANALYSIS]);
-  }, [expandPanel, pinPanelsToTaskbar]);
+  }, [expandPanel, pinPanelsToTaskbar, setAnalysisPanelOpen]);
 
   const handleAnalysisPanelToggle = useCallback(() => {
     if (analysisPanelOpen && !isPanelMinimized(PANEL_IDS.ANALYSIS)) {
@@ -1475,6 +1511,8 @@ export default function MapView() {
     analysisPanelOpen,
     isPanelMinimized,
     openAnalysisPanel,
+    setAnalysisPanelOpen,
+    setExperimentalPrompt,
     unpinPanelsFromTaskbar
   ]);
 
@@ -1514,15 +1552,15 @@ export default function MapView() {
     if (featureId === EXPERIMENTAL_FEATURE_IDS.ANALYSIS) {
       openAnalysisPanel();
     }
-  }, [experimentalPrompt, openAnalysisPanel, openComparePanel]);
+  }, [experimentalPrompt, openAnalysisPanel, openComparePanel, setExperimentalPrompt]);
 
   const handleExperimentalCancel = useCallback(() => {
     setExperimentalPrompt(null);
-  }, []);
+  }, [setExperimentalPrompt]);
 
   const handleKdeOverlayChange = useCallback((collection) => {
     setKdeOverlay(collection);
-  }, []);
+  }, [setKdeOverlay]);
 
   const handleCompareSetChange = useCallback((plaques) => {
     const nextKeys = (plaques ?? []).map((plaque) => plaque.key);
@@ -1535,7 +1573,7 @@ export default function MapView() {
       }
       return nextKeys;
     });
-  }, []);
+  }, [setCompareDiversityKeys]);
 
   const handleOpenSimilarity = useCallback(
     (plaques) => {
@@ -1545,13 +1583,13 @@ export default function MapView() {
       setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE_SIMILARITY]: false }));
       pinPanelsToTaskbar([PANEL_IDS.COMPARE_SIMILARITY]);
     },
-    [pinPanelsToTaskbar]
+    [pinPanelsToTaskbar, setCompareDiversityKeys, setCompareSimilarityOpen, setPanelMinimized]
   );
 
   const handleCloseSimilarity = useCallback(() => {
     setCompareSimilarityOpen(false);
     unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_SIMILARITY]);
-  }, [unpinPanelsFromTaskbar]);
+  }, [setCompareSimilarityOpen, unpinPanelsFromTaskbar]);
 
   const handleOpenDistribution = useCallback(
     (plaques) => {
@@ -1561,13 +1599,13 @@ export default function MapView() {
       setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE_DISTRIBUTION]: false }));
       pinPanelsToTaskbar([PANEL_IDS.COMPARE_DISTRIBUTION]);
     },
-    [pinPanelsToTaskbar]
+    [pinPanelsToTaskbar, setCompareDistributionOpen, setCompareDiversityKeys, setPanelMinimized]
   );
 
   const handleCloseDistribution = useCallback(() => {
     setCompareDistributionOpen(false);
     unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_DISTRIBUTION]);
-  }, [unpinPanelsFromTaskbar]);
+  }, [setCompareDistributionOpen, unpinPanelsFromTaskbar]);
 
   const handleOpenStats = useCallback(
     (kind, plaques) => {
@@ -1577,13 +1615,13 @@ export default function MapView() {
       setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE_STATS]: false }));
       pinPanelsToTaskbar([PANEL_IDS.COMPARE_STATS]);
     },
-    [pinPanelsToTaskbar]
+    [pinPanelsToTaskbar, setCompareDiversityKeys, setCompareStatsKind, setPanelMinimized]
   );
 
   const handleCloseStats = useCallback(() => {
     setCompareStatsKind(null);
     unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_STATS]);
-  }, [unpinPanelsFromTaskbar]);
+  }, [setCompareStatsKind, unpinPanelsFromTaskbar]);
 
   const handleOpenDiversity = useCallback(
     (plaques) => {
@@ -1593,13 +1631,13 @@ export default function MapView() {
       setPanelMinimized((prev) => ({ ...prev, [PANEL_IDS.COMPARE_DIVERSITY]: false }));
       pinPanelsToTaskbar([PANEL_IDS.COMPARE_DIVERSITY]);
     },
-    [pinPanelsToTaskbar]
+    [pinPanelsToTaskbar, setCompareDiversityKeys, setCompareDiversityOpen, setPanelMinimized]
   );
 
   const handleCloseDiversity = useCallback(() => {
     setCompareDiversityOpen(false);
     unpinPanelsFromTaskbar([PANEL_IDS.COMPARE_DIVERSITY]);
-  }, [unpinPanelsFromTaskbar]);
+  }, [setCompareDiversityOpen, unpinPanelsFromTaskbar]);
 
   const handleTempLayerArchive = useCallback(
     async (layerId) => {
@@ -1619,7 +1657,7 @@ export default function MapView() {
       }
       handleOpenTempArchive();
     },
-    [handleOpenTempArchive, refreshTempLayersUi, handleDataSourceModeChange]
+    [handleOpenTempArchive, refreshTempLayersUi, handleDataSourceModeChange, setTempArchiveStatus]
   );
 
   const handleTempArchiveRestore = useCallback(
@@ -1642,7 +1680,7 @@ export default function MapView() {
       }
       setTempArchiveStatus("");
     },
-    [refreshTempLayersUi, handleDataSourceModeChange]
+    [refreshTempLayersUi, handleDataSourceModeChange, setTempArchiveStatus]
   );
 
   const handleTempArchiveExport = useCallback(async (archiveId, format) => {
@@ -1652,7 +1690,7 @@ export default function MapView() {
     if (!result?.ok) {
       setTempArchiveStatus("Не удалось экспортировать слой.");
     }
-  }, []);
+  }, [setTempArchiveStatus]);
 
   const handleTempArchiveDelete = useCallback(async (archiveId) => {
     await deleteArchivedPlaque(archiveId).catch(() => {});
@@ -1665,7 +1703,7 @@ export default function MapView() {
     if (!result?.ok) {
       setTempArchiveStatus("Не удалось переименовать слой.");
     }
-  }, []);
+  }, [setTempArchiveStatus]);
 
   const handleTempLayerRename = useCallback((layerId, title) => {
     const result = setTempLayerLabel(layerId, title);
@@ -1946,7 +1984,7 @@ export default function MapView() {
       setSubmissionCoordinates(null);
       setSubmissionLocationPicking(false);
     }
-  }, [activeModule]);
+  }, [activeModule, setSubmissionCoordinates, setSubmissionLocationPicking]);
 
   useEffect(() => {
     const mapInstance = map.current;
@@ -1983,7 +2021,11 @@ export default function MapView() {
       hadFoundYearPropertyFilterRef.current = false;
       setYearFilterEnabled(previousYearFilterEnabledRef.current);
     }
-  }, [hasFoundYearPropertyFilter]);
+  }, [
+    hasFoundYearPropertyFilter,
+    hadFoundYearPropertyFilterRef,
+    previousYearFilterEnabledRef
+  ]);
 
   // Снимок актуального состояния в ref: колбэки ниже создаются с пустыми
   // зависимостями (стабильная ссылка для подписок на карту), но должны читать
@@ -2836,7 +2878,7 @@ export default function MapView() {
 
       return !open;
     });
-  }, [handleDensePileSelect]);
+  }, [handleDensePileSelect, setPanelMinimized]);
 
   const handleDensePileSpeciesListClose = useCallback(() => {
     setDensePileSpeciesListOpen(false);
@@ -2860,7 +2902,7 @@ export default function MapView() {
     if (!selectedDensePileKey) {
       setDensePileSpeciesListOpen(false);
     }
-  }, [selectedDensePileKey]);
+  }, [selectedDensePileKey, setDensePileSpeciesListOpen]);
 
   useEffect(() => {
     // MAP — обычный режим обработки; FEATURE — просмотр точки из списка видов.
@@ -2890,7 +2932,13 @@ export default function MapView() {
       setDensePileSpeciesListOpen(false);
       densePileCameraBeforeRef.current = null;
     }
-  }, [activeModule, denseProcessingActive, densePileSpeciesListOpen, pinPanelsToTaskbar]);
+  }, [
+    activeModule,
+    denseProcessingActive,
+    densePileSpeciesListOpen,
+    pinPanelsToTaskbar,
+    setPanelMinimized
+  ]);
 
   const handleLookupRussianName = useCallback(async (feature, { force = false } = {}) => {
     const nameLatin = feature?.properties?.name_latin;
@@ -2994,7 +3042,7 @@ export default function MapView() {
   const handleSubmissionCoordinatesReset = useCallback(() => {
     setSubmissionCoordinates(null);
     setSubmissionLocationPicking(false);
-  }, []);
+  }, [setSubmissionCoordinates, setSubmissionLocationPicking]);
 
   const areaContainedPoints = useMemo(() => {
     if (!areaGeometry || !mapReady) {
@@ -3957,7 +4005,7 @@ export default function MapView() {
     if (!analysisPanelOpen) {
       setKdeOverlay(null);
     }
-  }, [analysisPanelOpen]);
+  }, [analysisPanelOpen, setKdeOverlay]);
 
   useEffect(() => {
     if (!map.current) {
@@ -4160,7 +4208,7 @@ export default function MapView() {
 
     prevSelectedBoundsFeatureKeyRef.current = featureKey;
     expandPanel(PANEL_IDS.OOPT_FEATURE);
-  }, [selectedBoundsFeature, expandPanel]);
+  }, [selectedBoundsFeature, expandPanel, prevSelectedBoundsFeatureKeyRef]);
 
   useEffect(() => {
     refreshAreal();
@@ -4407,6 +4455,7 @@ export default function MapView() {
           toolPointsFilter: toolPointsFilterEnabled
         },
         colors: {
+          clusterRegnumColors,
           heatmap: heatmapSettings,
           compactGrid: compactGridSettings,
           regionBounds: regionBoundsSettings,
@@ -4426,6 +4475,7 @@ export default function MapView() {
     clusteringEnabled,
     compactGridSettings,
     compactPointDisplay,
+    clusterRegnumColors,
     dataSourceMode,
     denseClustersHighlight,
     densePileMinSize,
@@ -4517,6 +4567,11 @@ export default function MapView() {
       if (parsed.colors.heatmap) {
         setHeatmapSettings(parsed.colors.heatmap);
         saveHeatmapSettingsToStorage(parsed.colors.heatmap);
+      }
+      if (parsed.colors.clusterRegnumColors) {
+        setClusterRegnumColorsState(
+          normalizeClusterRegnumColors(parsed.colors.clusterRegnumColors)
+        );
       }
       if (parsed.colors.compactGrid) {
         const saved = setCompactGridSettings(parsed.colors.compactGrid);
@@ -5436,7 +5491,7 @@ export default function MapView() {
 
       return !open;
     });
-  }, []);
+  }, [setPanelMinimized]);
 
   const handleBoundsSpeciesListClose = useCallback(() => {
     setBoundsSpeciesListOpen(false);
@@ -5530,7 +5585,7 @@ export default function MapView() {
     setArealDockedWithFeature(false);
     setBufferDockedWithFeature(false);
     setPolygonDockedWithFeature(false);
-  }, []);
+  }, [setPanelCollapsed]);
 
   const closePanel = useCallback(
     (panelId) => {
@@ -5840,7 +5895,7 @@ export default function MapView() {
         updateSelectedPointHighlight(map.current, sharedFeature);
       }
     });
-  }, [mapReady, dataSourceMode, handleDataSourceModeChange]);
+  }, [mapReady, dataSourceMode, handleDataSourceModeChange, pendingSharePointRef]);
 
   // Инициализация карты Mapbox и всех слоёв/обработчиков — выполняется один раз при монтировании.
   useEffect(() => {
@@ -6462,6 +6517,16 @@ export default function MapView() {
     }
   };
 
+  const handleClusterRegnumColorChange = (regnum, color) => {
+    setClusterRegnumColorsState((current) =>
+      normalizeClusterRegnumColors({ ...current, [regnum]: color })
+    );
+  };
+
+  const handleResetClusterRegnumColors = () => {
+    setClusterRegnumColorsState({ ...DEFAULT_CLUSTER_REGNUM_COLORS });
+  };
+
   const showOoptFeaturePanel =
     Boolean(selectedBoundsFeature) &&
     (activeModule === MODULE_IDS.OOPT || ooptPointsFilterActive);
@@ -6631,6 +6696,9 @@ export default function MapView() {
           {settingsPanelOpen && !isPanelMinimized(PANEL_IDS.SETTINGS) && (
             <SettingsPanel
               mapDisplayProps={mapDisplaySettingsProps}
+              clusterRegnumColors={clusterRegnumColors}
+              onClusterRegnumColorChange={handleClusterRegnumColorChange}
+              onResetClusterRegnumColors={handleResetClusterRegnumColors}
               hoverTooltipsDisabled={hoverTooltipsDisabled}
               onHoverTooltipsDisabledChange={setHoverTooltipsDisabled}
               collapsed={isPanelCollapsed(PANEL_IDS.SETTINGS)}

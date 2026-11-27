@@ -1570,12 +1570,12 @@ function collectOverlayIdsToRemove(overlays, overlayId) {
   let grew = true;
   while (grew) {
     grew = false;
-    overlays.forEach((item) => {
+    for (const item of overlays) {
       if (item?.id && item.parentId && ids.has(item.parentId) && !ids.has(item.id)) {
         ids.add(item.id);
         grew = true;
       }
-    });
+    }
   }
   return ids;
 }

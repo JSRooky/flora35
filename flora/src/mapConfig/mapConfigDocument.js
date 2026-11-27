@@ -5,6 +5,7 @@ import { normalizeRegionBoundsSettings } from "../components/regionBoundsSetting
 import { DATA_SOURCE_MODES } from "../locations/loadPoints";
 import { createDefaultExternalProcessingFilters } from "../externalSources/externalProcessingFilters";
 import { createDefaultToolPointsFilterState } from "../toolPointsFilterStorage";
+import { normalizeClusterRegnumColors } from "../components/pointColors";
 
 export const MAP_CONFIG_KIND = "flora35-map-config";
 export const MAP_CONFIG_VERSION = 2;
@@ -189,6 +190,9 @@ export function parseMapConfigDocument(data) {
       }
     },
     colors: {
+      clusterRegnumColors: colors.clusterRegnumColors
+        ? normalizeClusterRegnumColors(colors.clusterRegnumColors)
+        : null,
       heatmap,
       compactGrid,
       regionBounds,

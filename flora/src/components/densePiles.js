@@ -1,5 +1,5 @@
 import { getFeatureCoordinates } from "./spreadCoincidentPoints";
-import { DEFAULT_POINT_COLOR, getPointColorForRegnum } from "./pointColors";
+import { DEFAULT_POINT_COLOR, getClusterRegnumColor } from "./pointColors";
 
 /** Минимум точек с полностью одинаковыми координатами для сверхплотного кластера (по умолчанию). */
 export const MIN_DENSE_PILE_SIZE = 10;
@@ -181,7 +181,7 @@ function densePileItemColor(properties) {
   if (typeof markerColor === "string" && markerColor) {
     return markerColor;
   }
-  return getPointColorForRegnum(properties?.regnum);
+  return getClusterRegnumColor(properties?.regnum);
 }
 
 function densePileFeatureStableKey(feature, fallback) {

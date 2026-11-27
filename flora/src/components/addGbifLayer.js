@@ -17,8 +17,8 @@ import {
 } from "../map/compactPointDisplay";
 import { findInatFeatureById } from "../inaturalist/inatStore";
 import {
+  CLUSTER_REGNUM_COLORS,
   DEFAULT_CLUSTER_COLOR,
-  REGNUM_COLORS,
   getPointColorExpression,
   getPointColorForRegnum
 } from "./pointColors";
@@ -734,7 +734,7 @@ function prepareMapGbifFeatures(features) {
 
 function getGbifClusterPaint(regnum = null) {
   const clusterColor = regnum
-    ? REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR
+    ? CLUSTER_REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR
     : DEFAULT_CLUSTER_COLOR;
   const usePieCharts = gbifClusterPieChartsEnabled && !regnum;
 
@@ -1070,6 +1070,10 @@ export function applyGbifGroupingMode(
   if (changed && map) {
     rebuildGbifLayers(map);
   }
+}
+
+export function refreshGbifClusterColors(map) {
+  rebuildGbifLayers(map);
 }
 
 /** Включает/выключает кластеризацию слоя GBIF. */

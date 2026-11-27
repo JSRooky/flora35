@@ -1,6 +1,6 @@
 import mapboxgl from "mapbox-gl";
 import { getRegnumLabel, REGNUM_ORDER } from "./featurePropertyLabels";
-import { getPointColorForRegnum } from "./pointColors";
+import { getClusterRegnumColor } from "./pointColors";
 
 const POINT_TOOLTIP_FADE_MS = 120;
 /** Максимум точек кластера, вытаскиваемых для подсказки при наведении (не весь кластер). */
@@ -218,7 +218,7 @@ export function buildClusterRegnumTooltipHtml(
         return "";
       }
       const label = escapeHtml(getRegnumLabel(key || null));
-      const color = getPointColorForRegnum(key || null);
+      const color = getClusterRegnumColor(key || null);
       return `<li class="cluster-tooltip-item"><span class="cluster-tooltip-species" style="color: ${color}">${label}</span> <span class="cluster-tooltip-count">— ${count}</span></li>`;
     })
     .filter(Boolean)

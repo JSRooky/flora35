@@ -83,9 +83,11 @@ import {
 } from "./addRedBookLayer";
 import { enrichFeaturesWithAttribution } from "../dataWork/pointAttributionOverlay";
 import {
+  CLUSTER_REGNUM_COLORS,
   DEFAULT_CLUSTER_COLOR,
   DEFAULT_POINT_COLOR,
   REGNUM_COLORS,
+  getClusterRegnumColor,
   getPointColorExpression,
   getPointColorForRegnum
 } from "./pointColors";
@@ -489,7 +491,7 @@ function donutSegment(start, end, radius, innerRadius, color) {
 function getRegnumPieSegments(props) {
   const segments = CLUSTER_REGNUM_KEYS.map((key) => ({
     count: Number(props[key]) || 0,
-    color: REGNUM_COLORS[key]
+    color: getClusterRegnumColor(key)
   }));
   const known = segments.reduce((sum, segment) => sum + segment.count, 0);
   if (known <= 0) {
@@ -520,7 +522,7 @@ function createClusterPieChartElement(props) {
     getClusterPieSegments(props) ??
     CLUSTER_REGNUM_KEYS.map((key) => ({
       count: Number(props[key]) || 0,
-      color: REGNUM_COLORS[key]
+      color: getClusterRegnumColor(key)
     }));
   const total =
     Number(props.point_count) ||
@@ -733,6 +735,12 @@ function attachClusterPieChartMarkers(map) {
 /** Переподключает SVG-диаграммы кластеров после смены режима группировки. */
 export function refreshClusterPieChartMarkers(map) {
   attachClusterPieChartMarkers(map);
+}
+
+export function refreshLocationsClusterColors(map) {
+  if (locationsData) {
+    rebuildLocationsLayers(map, { reuseFiltered: true });
+  }
 }
 
 /** Добавляет каждой точке URL иконки по полю regnum (растение / животное). */
@@ -1803,7 +1811,7 @@ function prepareMapFeatures(features) {
 
 function getLocationsClusterPaint(regnum = null) {
   const clusterColor = regnum
-    ? REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR
+    ? CLUSTER_REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR
     : DEFAULT_CLUSTER_COLOR;
   const usePieCharts = clusterPieChartsEnabled && !regnum;
 

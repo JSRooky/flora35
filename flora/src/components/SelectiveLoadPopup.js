@@ -485,7 +485,7 @@ export default function SelectiveLoadPopup({
         });
       }
     },
-    [destination, gbifCounts, inatCounts, intoTempStaging, resolvedTaxa, resolvedTaxon, spatialByRegionId]
+    [gbifCounts, inatCounts, intoTempStaging, resolvedTaxa, resolvedTaxon, spatialByRegionId]
   );
 
   const commitLoadedPoints = useCallback(async () => {
@@ -594,9 +594,7 @@ export default function SelectiveLoadPopup({
     busyRegionId,
     commitLoadedPoints,
     countFetchIncoming,
-    gbifCounts,
     gbifRegions,
-    inatCounts,
     inatRegions,
     intoTempStaging,
     isAll,

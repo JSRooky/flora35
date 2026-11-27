@@ -241,7 +241,19 @@ export function usePanelDomain({
         break;
       }
     }
-  }, [pinPanelsToTaskbar, setSettingsPanelOpen]);
+  }, [
+    pinPanelsToTaskbar,
+    setSettingsPanelOpen,
+    dataSourceModeRef,
+    map,
+    setActiveModule,
+    setBoundsSpeciesListOpen,
+    setDataSourceModeState,
+    setDensePileSpeciesListOpen,
+    setDenseProcessingActive,
+    setExternalProcessingActive,
+    setRegionSpeciesPanelOpen
+  ]);
 
   const handleMinimizePanel = useCallback(
     (panelId) => () => minimizePanel(panelId),
@@ -339,7 +351,7 @@ export function usePanelDomain({
       ...prev,
       [PANEL_IDS.GBIF_PROCESSING]: false
     }));
-  }, []);
+  }, [setExternalProcessingActive]);
 
   const handleGbifPanelCollapsedChange = useCallback(
     (collapsed) => {

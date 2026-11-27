@@ -85,6 +85,7 @@ export default function MapDisplayPanel({
   onCompactPointDisplayChange,
   onCompactGridSettingsOpen,
   onDenseProcessingOpen,
+  showClusteringOptions = true,
   mergedPointsVisible = true,
   onMergedPointsVisibleChange,
   collapsed: collapsedProp,
@@ -199,161 +200,165 @@ export default function MapDisplayPanel({
             .
           </p>
 
-          <h4 className="map-display-section-title">Кластеризация</h4>
+          {showClusteringOptions ? (
+            <div className="map-display-clustering-settings">
+              <h4 className="map-display-section-title">Кластеризация</h4>
 
-          <label
-            className={`map-display-switch${clusteringDisabled ? " map-display-switch--disabled" : ""}`}
-            title={
-              !markersVisible
-                ? "Доступно только при включённых маркерах"
-                : compactPointDisplay
-                  ? "Недоступно при компактной отрисовке"
-                  : denseClustersHighlight
-                    ? "Недоступно в режиме плотных групп"
-                    : "Кластеризовать близкие точки"
-            }
-          >
-            <input
-              type="checkbox"
-              checked={clusteringEnabled && !denseClustersHighlight && !compactPointDisplay}
-              disabled={clusteringDisabled}
-              onChange={(e) => onClusteringEnabledChange?.(e.target.checked)}
-            />
-            <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">Кластеризовать</span>
-          </label>
+              <label
+                className={`map-display-switch${clusteringDisabled ? " map-display-switch--disabled" : ""}`}
+                title={
+                  !markersVisible
+                    ? "Доступно только при включённых маркерах"
+                    : compactPointDisplay
+                      ? "Недоступно при компактной отрисовке"
+                      : denseClustersHighlight
+                        ? "Недоступно в режиме плотных групп"
+                        : "Кластеризовать близкие точки"
+                }
+              >
+                <input
+                  type="checkbox"
+                  checked={clusteringEnabled && !denseClustersHighlight && !compactPointDisplay}
+                  disabled={clusteringDisabled}
+                  onChange={(e) => onClusteringEnabledChange?.(e.target.checked)}
+                />
+                <span className="map-display-switch-slider" />
+                <span className="map-display-switch-label">Кластеризовать</span>
+              </label>
 
-          <label
-            className={`map-display-switch${
-              clusterByRegnumDisabled ? " map-display-switch--disabled" : ""
-            }`}
-            title={
-              !markersVisible
-                ? "Доступно только при включённых маркерах"
-                : denseClustersHighlight
-                  ? "Недоступно в режиме плотных групп"
-                  : clusterPieCharts
-                    ? "Недоступно при включённых диаграммах"
-                    : "Группировать точки с указанным царством отдельно"
-            }
-          >
-            <input
-              type="checkbox"
-              checked={clusterByRegnum}
-              disabled={clusterByRegnumDisabled}
-              onChange={(e) => onClusterByRegnumChange?.(e.target.checked)}
-            />
-            <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">По царству</span>
-          </label>
-
-          {hasTempLayers ? (
-            <div className="map-display-dense-row">
-            <label
-              className={`map-display-switch${
-                clusterByTempLayersDisabled ? " map-display-switch--disabled" : ""
-              }`}
-              title={
-                !markersVisible
-                  ? "Доступно только при включённых маркерах"
-                  : denseClustersHighlight
-                    ? "Недоступно в режиме плотных групп"
-                    : !clusteringEnabled
-                      ? "Доступно только при включённой кластеризации"
+              <label
+                className={`map-display-switch${
+                  clusterByRegnumDisabled ? " map-display-switch--disabled" : ""
+                }`}
+                title={
+                  !markersVisible
+                    ? "Доступно только при включённых маркерах"
+                    : denseClustersHighlight
+                      ? "Недоступно в режиме плотных групп"
                       : clusterPieCharts
                         ? "Недоступно при включённых диаграммах"
-                        : "Кластеризовать каждый временный слой отдельно"
-              }
-            >
-              <input
-                type="checkbox"
-                checked={clusterByTempLayers}
-                disabled={clusterByTempLayersDisabled}
-                onChange={(e) => onClusterByTempLayersChange?.(e.target.checked)}
-              />
-              <span className="map-display-switch-slider" />
-              <span className="map-display-switch-label">По слоям</span>
-            </label>
-            <label
-              className={`map-display-switch map-display-switch--nested${
-                clusterByTempSublayersDisabled ? " map-display-switch--disabled" : ""
-              }`}
-              title={
-                clusterByTempSublayersDisabled
-                  ? "Доступно при включённой кластеризации по слоям"
-                  : "Кластеризовать GBIF и iNat внутри слоя отдельно"
-              }
-            >
-              <input
-                type="checkbox"
-                checked={clusterByTempLayers && clusterByTempSublayers}
-                disabled={clusterByTempSublayersDisabled}
-                onChange={(e) => onClusterByTempSublayersChange?.(e.target.checked)}
-              />
-              <span className="map-display-switch-slider" />
-              <span className="map-display-switch-label">Внутри слоя</span>
-            </label>
+                        : "Группировать точки с указанным царством отдельно"
+                }
+              >
+                <input
+                  type="checkbox"
+                  checked={clusterByRegnum}
+                  disabled={clusterByRegnumDisabled}
+                  onChange={(e) => onClusterByRegnumChange?.(e.target.checked)}
+                />
+                <span className="map-display-switch-slider" />
+                <span className="map-display-switch-label">По царству</span>
+              </label>
+
+              {hasTempLayers ? (
+                <div className="map-display-dense-row">
+                  <label
+                    className={`map-display-switch${
+                      clusterByTempLayersDisabled ? " map-display-switch--disabled" : ""
+                    }`}
+                    title={
+                      !markersVisible
+                        ? "Доступно только при включённых маркерах"
+                        : denseClustersHighlight
+                          ? "Недоступно в режиме плотных групп"
+                          : !clusteringEnabled
+                            ? "Доступно только при включённой кластеризации"
+                            : clusterPieCharts
+                              ? "Недоступно при включённых диаграммах"
+                              : "Кластеризовать каждый временный слой отдельно"
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      checked={clusterByTempLayers}
+                      disabled={clusterByTempLayersDisabled}
+                      onChange={(e) => onClusterByTempLayersChange?.(e.target.checked)}
+                    />
+                    <span className="map-display-switch-slider" />
+                    <span className="map-display-switch-label">По слоям</span>
+                  </label>
+                  <label
+                    className={`map-display-switch map-display-switch--nested${
+                      clusterByTempSublayersDisabled ? " map-display-switch--disabled" : ""
+                    }`}
+                    title={
+                      clusterByTempSublayersDisabled
+                        ? "Доступно при включённой кластеризации по слоям"
+                        : "Кластеризовать GBIF и iNat внутри слоя отдельно"
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      checked={clusterByTempLayers && clusterByTempSublayers}
+                      disabled={clusterByTempSublayersDisabled}
+                      onChange={(e) => onClusterByTempSublayersChange?.(e.target.checked)}
+                    />
+                    <span className="map-display-switch-slider" />
+                    <span className="map-display-switch-label">Внутри слоя</span>
+                  </label>
+                  </div>
+              ) : null}
+
+              <label
+                className={`map-display-switch${
+                  clusterPieChartsDisabled ? " map-display-switch--disabled" : ""
+                }`}
+                title={
+                  !markersVisible
+                    ? "Доступно только при включённых маркерах"
+                    : denseClustersHighlight
+                      ? "Недоступно в режиме плотных групп"
+                      : !clusteringEnabled
+                        ? "Доступно только при включённой кластеризации"
+                        : "Показывать состав кластера секторной диаграммой; отключает группировку по царству и по слоям"
+                }
+              >
+                <input
+                  type="checkbox"
+                  checked={clusterPieCharts}
+                  disabled={clusterPieChartsDisabled}
+                  onChange={(e) => onClusterPieChartsChange?.(e.target.checked)}
+                />
+                <span className="map-display-switch-slider" />
+                <span className="map-display-switch-label">Диаграммы</span>
+              </label>
+
+              <div
+                className={`map-display-dense-row${
+                  denseClustersHighlightDisabled ? " map-display-dense-row--disabled" : ""
+                }`}
+              >
+                <label
+                  className={`map-display-switch${
+                    denseClustersHighlightDisabled ? " map-display-switch--disabled" : ""
+                  }`}
+                  title={
+                    denseClustersHighlightDisabled
+                      ? "Доступно только при включённых маркерах"
+                      : "Отключить обычную кластеризацию и показать только группы ≥10 точек с полностью одинаковыми координатами; остальные точки скрыть"
+                  }
+                >
+                  <input
+                    type="checkbox"
+                    checked={denseClustersHighlight}
+                    disabled={denseClustersHighlightDisabled}
+                    onChange={(e) => onDenseClustersHighlightChange?.(e.target.checked)}
+                  />
+                  <span className="map-display-switch-slider" />
+                  <span className="map-display-switch-label">Плотные группы</span>
+                </label>
+                <button
+                  type="button"
+                  className="map-display-dense-process-btn"
+                  disabled={denseClustersHighlightDisabled}
+                  onClick={() => onDenseProcessingOpen?.()}
+                  title="Открыть панель обработки плотных групп"
+                >
+                  Обработка
+                </button>
+              </div>
             </div>
           ) : null}
-
-          <label
-            className={`map-display-switch${
-              clusterPieChartsDisabled ? " map-display-switch--disabled" : ""
-            }`}
-            title={
-              !markersVisible
-                ? "Доступно только при включённых маркерах"
-                : denseClustersHighlight
-                  ? "Недоступно в режиме плотных групп"
-                  : !clusteringEnabled
-                    ? "Доступно только при включённой кластеризации"
-                    : "Показывать состав кластера секторной диаграммой; отключает группировку по царству и по слоям"
-            }
-          >
-            <input
-              type="checkbox"
-              checked={clusterPieCharts}
-              disabled={clusterPieChartsDisabled}
-              onChange={(e) => onClusterPieChartsChange?.(e.target.checked)}
-            />
-            <span className="map-display-switch-slider" />
-            <span className="map-display-switch-label">Диаграммы</span>
-          </label>
-
-          <div
-            className={`map-display-dense-row${
-              denseClustersHighlightDisabled ? " map-display-dense-row--disabled" : ""
-            }`}
-          >
-            <label
-              className={`map-display-switch${
-                denseClustersHighlightDisabled ? " map-display-switch--disabled" : ""
-              }`}
-              title={
-                denseClustersHighlightDisabled
-                  ? "Доступно только при включённых маркерах"
-                  : "Отключить обычную кластеризацию и показать только группы ≥10 точек с полностью одинаковыми координатами; остальные точки скрыть"
-              }
-            >
-              <input
-                type="checkbox"
-                checked={denseClustersHighlight}
-                disabled={denseClustersHighlightDisabled}
-                onChange={(e) => onDenseClustersHighlightChange?.(e.target.checked)}
-              />
-              <span className="map-display-switch-slider" />
-              <span className="map-display-switch-label">Плотные группы</span>
-            </label>
-            <button
-              type="button"
-              className="map-display-dense-process-btn"
-              disabled={denseClustersHighlightDisabled}
-              onClick={() => onDenseProcessingOpen?.()}
-              title="Открыть панель обработки плотных групп"
-            >
-              Обработка
-            </button>
-          </div>
 
           <hr />
 

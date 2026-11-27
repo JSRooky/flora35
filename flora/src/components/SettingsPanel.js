@@ -2,10 +2,15 @@ import React, { useState } from "react";
 import MapDisplayPanel from "./MapDisplayPanel";
 import PanelCloseButton from "./PanelCloseButton";
 import PanelMinimizeButton from "./PanelMinimizeButton";
+import { REGNUM_ORDER, getRegnumLabel } from "./featurePropertyLabels";
+import { DEFAULT_CLUSTER_REGNUM_COLORS } from "./pointColors";
 import "../styles/SettingsPanel.css";
 
 export default function SettingsPanel({
   mapDisplayProps,
+  clusterRegnumColors = DEFAULT_CLUSTER_REGNUM_COLORS,
+  onClusterRegnumColorChange,
+  onResetClusterRegnumColors,
   hoverTooltipsDisabled = false,
   onHoverTooltipsDisabledChange,
   collapsed: collapsedProp,
@@ -40,11 +45,43 @@ export default function SettingsPanel({
       </div>
 
       {collapsed ? (
-        <p className="settings-panel-summary">Отображение карты и подсказки</p>
+        <p className="settings-panel-summary">Отображение карты, цвета и подсказки</p>
       ) : (
         <div className="settings-panel-content">
           <h4 className="map-display-section-title">Отображение карты</h4>
-          <MapDisplayPanel {...mapDisplayProps} collapsed={false} embedded />
+          <MapDisplayPanel
+            {...mapDisplayProps}
+            collapsed={false}
+            embedded
+            showClusteringOptions={false}
+          />
+          <hr />
+          <h4 className="map-display-section-title">Цвета царств в кластерах</h4>
+          <div className="settings-panel-regnum-colors">
+            {REGNUM_ORDER.map((regnum) => {
+              const label = getRegnumLabel(regnum);
+              return (
+                <label key={regnum} className="settings-panel-regnum-color">
+                  <span>{label}</span>
+                  <input
+                    type="color"
+                    value={clusterRegnumColors[regnum] ?? DEFAULT_CLUSTER_REGNUM_COLORS[regnum]}
+                    onChange={(event) =>
+                      onClusterRegnumColorChange?.(regnum, event.target.value)
+                    }
+                    aria-label={`Цвет царства: ${label}`}
+                  />
+                </label>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className="settings-panel-reset-colors"
+            onClick={() => onResetClusterRegnumColors?.()}
+          >
+            Сбросить цвета
+          </button>
           <hr />
           <h4 className="map-display-section-title">Подсказки</h4>
           <label

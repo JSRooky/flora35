@@ -41,6 +41,9 @@
   position: fixed;
   top: 68px;
   left: 20px;
+  /* Keep the scrollport clear of panel edges without changing their position. */
+  margin: -12px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;

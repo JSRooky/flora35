@@ -145,7 +145,7 @@ export function useLayerSyncDomain({
     return () => {
       cancelled = true;
     };
-  }, [mapReady, bumpPointsDataRevision]);
+  }, [mapReady, bumpPointsDataRevision, map, setMergeHiddenKeys]);
 
   useEffect(() => {
     setHoverTooltipsEnabled(!hoverTooltipsDisabled);
@@ -170,7 +170,7 @@ export function useLayerSyncDomain({
     return () => {
       cancelled = true;
     };
-  }, [mapReady]);
+  }, [mapReady, setRegionBoundsDisplaySourceState, setTempLayersRevision, setRegionOverlaysHydrated, map]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -223,7 +223,8 @@ export function useLayerSyncDomain({
     overlayRegionEdit,
     pointsDataRevision,
     tempLayersRevision,
-    dataSourceMode
+    dataSourceMode,
+    map
   ]);
 
   useEffect(() => {
@@ -236,7 +237,14 @@ export function useLayerSyncDomain({
       setRegionBoundsSettings(loadRegionBoundsSettingsFromStorage());
     }
     overlayRegionModeRef.current = overlayRegionEdit.active;
-  }, [overlayRegionEdit.active, overlayRegionEdit.bufferKm, overlayRegionEdit.style]);
+  }, [
+    overlayRegionEdit.active,
+    overlayRegionEdit.bufferKm,
+    overlayRegionEdit.style,
+    overlayRegionModeRef,
+    setOverlayRegionBufferKm,
+    setRegionBoundsSettings
+  ]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -265,7 +273,8 @@ export function useLayerSyncDomain({
     regionBoundsEnabled,
     regionCatalog,
     selectedRegionIsos,
-    regionBufferKm
+    regionBufferKm,
+    map
   ]);
 
   useEffect(() => {
@@ -287,7 +296,7 @@ export function useLayerSyncDomain({
     return () => {
       cancelled = true;
     };
-  }, [mapReady]);
+  }, [mapReady, setRegionCatalog]);
 
   useEffect(() => {
     if (!regionCatalog.length) {
@@ -302,7 +311,7 @@ export function useLayerSyncDomain({
         regionBoundsSettings.fillColor
       );
     });
-  }, [regionCatalog, regionBoundsSettings.fillColor]);
+  }, [regionCatalog, regionBoundsSettings.fillColor, setRegionFeatureColors]);
 
   useEffect(() => {
     setRegionBoundsSelectHandler((entry, lngLat) => {
@@ -376,7 +385,16 @@ export function useLayerSyncDomain({
       });
     });
     return () => setRegionBoundsSelectHandler(null);
-  }, []);
+  }, [
+    hiddenRegionIsosRef,
+    map,
+    regionAddModeRef,
+    regionCatalogRef,
+    selectedRegionIsosRef,
+    setHiddenRegionIsos,
+    setRegionAddMode,
+    setSelectedRegionIsos
+  ]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -397,7 +415,7 @@ export function useLayerSyncDomain({
     }
 
     setOsmBasemapEnabled(map.current, false);
-  }, [basemapMode, mapReady]);
+  }, [basemapMode, mapReady, map]);
 
   const handleSpeciesPolygonResetAll = useCallback(() => {
     setSpeciesPolygons([]);
@@ -412,20 +430,35 @@ export function useLayerSyncDomain({
     if (map.current) {
       clearSpeciesPolygonLayer(map.current);
     }
-  }, []);
+  }, [
+    map,
+    setActivePolygonId,
+    setIntersectionLockedPair,
+    setIntersectionOnlyMode,
+    setIntersectionResult,
+    setIntersectionSpeciesA,
+    setIntersectionSpeciesB,
+    setPolygonAddMode,
+    setSpeciesPolygons
+  ]);
 
   const handleArealReset = useCallback(() => {
     setArealEnabled(false);
     setArealAllMarkers(false);
     setArealRadius(DEFAULT_AREAL_RADIUS_KM);
-  }, []);
+  }, [setArealAllMarkers, setArealEnabled, setArealRadius]);
 
   const handleBufferReset = useCallback(() => {
     setBufferEnabled(false);
     setBufferRadii(DEFAULT_BUFFER_RADII_KM);
     setBufferSelectedPoints([]);
     setBufferSelectionMode(false);
-  }, []);
+  }, [
+    setBufferEnabled,
+    setBufferRadii,
+    setBufferSelectedPoints,
+    setBufferSelectionMode
+  ]);
 
   return { handleArealReset, handleBufferReset, handleSpeciesPolygonResetAll };
 }

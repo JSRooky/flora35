@@ -13,8 +13,8 @@ import {
   isRegionContourPickActive
 } from "../map/compactPointDisplay";
 import {
+  CLUSTER_REGNUM_COLORS,
   DEFAULT_CLUSTER_COLOR,
-  REGNUM_COLORS,
   getPointColorExpression,
   getPointColorForRegnum
 } from "./pointColors";
@@ -687,7 +687,7 @@ function prepareMapInatFeatures(features) {
 
 function getInatClusterPaint(regnum = null) {
   const clusterColor = regnum
-    ? REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR
+    ? CLUSTER_REGNUM_COLORS[regnum] ?? DEFAULT_CLUSTER_COLOR
     : DEFAULT_CLUSTER_COLOR;
   const usePieCharts = inatClusterPieChartsEnabled && !regnum;
 
@@ -1023,6 +1023,10 @@ export function applyInatGroupingMode(
   if (changed && map) {
     rebuildInatLayers(map);
   }
+}
+
+export function refreshInatClusterColors(map) {
+  rebuildInatLayers(map);
 }
 
 /** Включает/выключает кластеризацию слоя iNat. */

@@ -107,7 +107,8 @@ export function useExternalSourcesDomain({
       overlayRegionEdit,
       regionBufferKm,
       regionCatalog,
-      selectedRegionIsos
+      selectedRegionIsos,
+      setDataSourcesFocusRequest
     ]
   );
 
@@ -143,6 +144,10 @@ export function useExternalSourcesDomain({
     isPanelMinimized,
     minimizePanel,
     restorePanel,
+    setDataSourcesFocusRequest,
+    setDataSourcesPanelOpen,
+    setExternalProcessingActive,
+    setPanelMinimized,
     unpinPanelsFromTaskbar
   ]);
 

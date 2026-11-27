@@ -22,6 +22,20 @@ describe("mapConfigDocument", () => {
     expect(parsed.colors.compactGrid.color).toBe("#112233");
   });
 
+  test("normalizes kingdom cluster colors from map config", () => {
+    const parsed = parseMapConfigDocument({
+      kind: MAP_CONFIG_KIND,
+      colors: { clusterRegnumColors: { plantae: "#112233" } }
+    });
+
+    expect(parsed.colors.clusterRegnumColors).toEqual({
+      plantae: "#112233",
+      animalia: "#c98263",
+      fungi: "#7a5d8f",
+      protozoa: "#2a8f9e"
+    });
+  });
+
   test("rejects a different kind", () => {
     expect(() =>
       parseMapConfigDocument({ kind: "flora35-heatmap-settings", layers: {} })

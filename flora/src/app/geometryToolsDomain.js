@@ -54,7 +54,7 @@ export function useGeometryToolsDomain({
       setPolygonAddMode(false);
       clearIntersectionState();
     }
-  }, [activeModule, clearIntersectionState, polygonDockedWithFeature]);
+  }, [activeModule, clearIntersectionState, polygonDockedWithFeature, setPolygonAddMode]);
 
   useEffect(() => {
     if (activeModule !== MODULE_IDS.TIMELINE) {
@@ -65,7 +65,15 @@ export function useGeometryToolsDomain({
       setArealDynamicsHideOthers(false);
       setArealDynamicsBuildMode(POLYGON_BUILD_MODES.CONVEX);
     }
-  }, [activeModule]);
+  }, [
+    activeModule,
+    setArealDynamicsEnabled,
+    setArealDynamicsFeature,
+    setArealDynamicsSlices,
+    setArealDynamicsComputing,
+    setArealDynamicsHideOthers,
+    setArealDynamicsBuildMode
+  ]);
 
   useEffect(() => {
     if (activeModule !== MODULE_IDS.TIMELINE || !arealDynamicsEnabled || !popupData) {
@@ -73,7 +81,7 @@ export function useGeometryToolsDomain({
     }
 
     setArealDynamicsFeature(popupData);
-  }, [activeModule, arealDynamicsEnabled, popupData]);
+  }, [activeModule, arealDynamicsEnabled, popupData, setArealDynamicsFeature]);
 
   useEffect(() => {
     if (!arealDynamicsEnabled || !arealDynamicsFeature) {
@@ -91,7 +99,13 @@ export function useGeometryToolsDomain({
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [arealDynamicsEnabled, arealDynamicsFeature, arealDynamicsBuildMode]);
+  }, [
+    arealDynamicsEnabled,
+    arealDynamicsFeature,
+    arealDynamicsBuildMode,
+    setArealDynamicsSlices,
+    setArealDynamicsComputing
+  ]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -133,7 +147,8 @@ export function useGeometryToolsDomain({
     arealDynamicsEnabled,
     arealDynamicsFeature,
     intersectionOnlyMode,
-    intersectionResult
+    intersectionResult,
+    map
   ]);
 
   useEffect(() => {
@@ -159,7 +174,8 @@ export function useGeometryToolsDomain({
     arealDynamicsEnabled,
     arealDynamicsSlices,
     timelineYear,
-    mapReady
+    mapReady,
+    map
   ]);
 
   useEffect(() => {
@@ -177,19 +193,19 @@ export function useGeometryToolsDomain({
     if (!hasA || !hasB) {
       setIntersectionLockedPair(null);
     }
-  }, [intersectionLockedPair, builtSpeciesPolygons]);
+  }, [intersectionLockedPair, builtSpeciesPolygons, setIntersectionLockedPair]);
 
   useEffect(() => {
     if (intersectionResult) {
       setPolygonAddMode(false);
     }
-  }, [intersectionResult]);
+  }, [intersectionResult, setPolygonAddMode]);
 
   useEffect(() => {
     if (!intersectionResult?.hasIntersection) {
       setIntersectionOnlyMode(false);
     }
-  }, [intersectionResult]);
+  }, [intersectionResult, setIntersectionOnlyMode]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -202,7 +218,7 @@ export function useGeometryToolsDomain({
     }
 
     clearSpeciesPolygonIntersectionLayer(map.current);
-  }, [intersectionResult, mapReady]);
+  }, [intersectionResult, mapReady, map]);
 
   useEffect(() => {
     if (builtSpeciesPolygons.length < 2) {
@@ -227,7 +243,12 @@ export function useGeometryToolsDomain({
 
       return builtSpeciesPolygons[1]?.nameLatin ?? null;
     });
-  }, [builtSpeciesPolygons, clearIntersectionState]);
+  }, [
+    builtSpeciesPolygons,
+    clearIntersectionState,
+    setIntersectionSpeciesA,
+    setIntersectionSpeciesB
+  ]);
 
   useEffect(() => {
     if (!intersectionPinned) {
@@ -242,13 +263,19 @@ export function useGeometryToolsDomain({
     }
 
     setIntersectionResult(nextResult);
-  }, [speciesPolygons, intersectionPinned, computeIntersectionFromSelection, clearIntersectionState]);
+  }, [
+    speciesPolygons,
+    intersectionPinned,
+    computeIntersectionFromSelection,
+    clearIntersectionState,
+    setIntersectionResult
+  ]);
 
   useEffect(() => {
     if (activeModule !== MODULE_IDS.AREA) {
       setAreaDrawingActive(false);
     }
-  }, [activeModule]);
+  }, [activeModule, setAreaDrawingActive]);
 
   useEffect(() => {
     if (!map.current || !mapReady) {
@@ -260,7 +287,7 @@ export function useGeometryToolsDomain({
     } else {
       clearAreaSelectionLayer(map.current);
     }
-  }, [areaGeometry, mapReady]);
+  }, [areaGeometry, mapReady, map]);
 
   useEffect(() => {
     const mapInstance = map.current;
@@ -288,13 +315,22 @@ export function useGeometryToolsDomain({
     return () => {
       stopActiveAreaDrawing();
     };
-  }, [areaDrawingActive, areaDrawTool, areaOperationMode, activeModule, mapReady]);
+  }, [
+    areaDrawingActive,
+    areaDrawTool,
+    areaOperationMode,
+    activeModule,
+    mapReady,
+    map,
+    setAreaGeometry,
+    setAreaDrawingActive
+  ]);
 
   useEffect(() => {
     if (!areaGeometry && areaOperationMode === AREA_OPERATION_MODES.SUBTRACT) {
       setAreaOperationMode(AREA_OPERATION_MODES.ADD);
     }
-  }, [areaGeometry, areaOperationMode]);
+  }, [areaGeometry, areaOperationMode, setAreaOperationMode]);
 
   return {};
 }

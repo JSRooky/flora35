@@ -1,4 +1,4 @@
-import { getPointColorForRegnum } from "./pointColors";
+import { getClusterRegnumColor } from "./pointColors";
 import { partitionMapFeaturesByRegnum } from "./mapPerformance";
 
 const TEMP_REGNUM_KEYS = ["plantae", "animalia", "fungi", "protozoa"];
@@ -24,7 +24,7 @@ export function splitTempUnitsByRegnum(units, enabled) {
       out.push({
         ...unit,
         id: `${unit.id}--${regnum}`,
-        markerColor: getPointColorForRegnum(regnum),
+        markerColor: getClusterRegnumColor(regnum),
         features: bucket
       });
     }
